@@ -173,8 +173,7 @@ export type Server = {
   stop(): Promise<void>
 }
 
-export async function startServer(root: string, cwd: string, extraEnv: Env = {}): Promise<Server> {
-  const password = crypto.randomUUID()
+export function isolatedEnv(root: string, cwd: string, extraEnv: Env = {}): Env {
   // A kill switch such as OMCA_DISABLED_HOOKS in the developer's environment would turn off the
   // features under test, so only extraEnv sets OMCA variables.
   const inherited = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("OMCA_")))
@@ -182,13 +181,29 @@ export async function startServer(root: string, cwd: string, extraEnv: Env = {})
     ...inherited,
     ...extraEnv,
     PWD: cwd,
-    OPENCODE_PASSWORD: password,
     OPENCODE_DB: ":memory:",
     XDG_CONFIG_HOME: join(root, "config"),
     XDG_DATA_HOME: join(root, "data"),
     XDG_CACHE_HOME: join(root, "cache"),
   }
   for (const key of ["XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"]) mkdirSync(env[key] as string, { recursive: true })
+  return env
+}
+
+export async function installPackage(spec: string, env: Env, cwd: string): Promise<void> {
+  const child = Bun.spawn([opencodeBin ?? "opencode", "plugin", "add", spec], { cwd, env, stdout: "pipe", stderr: "pipe" })
+  const timer = setTimeout(() => endTree(child), 150_000)
+  try {
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+    if (code !== 0) throw new Error(`Package installation exited ${code}:\n${stdout}\n${stderr}`)
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+export async function startServer(root: string, cwd: string, extraEnv: Env = {}): Promise<Server> {
+  const password = crypto.randomUUID()
+  const env = isolatedEnv(root, cwd, { ...extraEnv, OPENCODE_PASSWORD: password })
   const port = freePort()
   const base = `http://127.0.0.1:${port}`
   const logPath = join(root, "server.log")

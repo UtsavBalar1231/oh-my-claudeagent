@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
-import { type Agent, commit, countLines, git, type Listing, opencodeBin, packageFixture, removeDir, scratchDir, type Server, startServer, until, writeConfig } from "./harness.ts"
+import { type Agent, commit, countLines, git, installPackage, isolatedEnv, type Listing, opencodeBin, packageFixture, removeDir, scratchDir, type Server, startServer, until, writeConfig } from "./harness.ts"
 
-type Fixture = { root: string; server: Server; a: string; b: string; c: string; stopPackage(): Promise<void> }
+type Fixture = { root: string; server: Server; packageServer: Server; a: string; b: string; c: string; stopPackage(): Promise<void> }
 type Session = { data?: { id?: string; location?: { directory?: string } } }
 type Named = { id?: string; name?: string; autoinvoke?: boolean; status?: { status?: string } }
 
-const SLOW = 120_000
+const SLOW = 180_000
 let fixture: Fixture | undefined
 
 function need(): Fixture {
@@ -27,8 +27,8 @@ function localPlugin(pluginRoot: string, sonnet: string) {
   return { plugins: [{ package: join(pluginRoot, "opencode"), options: { models: { sonnet } } }] }
 }
 
-async function omcaAgents(dir: string): Promise<Agent[] | undefined> {
-  const { body } = await need().server.api<Listing<Agent>>("GET", "/api/agent", dir)
+async function omcaAgents(dir: string, server = need().server): Promise<Agent[] | undefined> {
+  const { body } = await server.api<Listing<Agent>>("GET", "/api/agent", dir)
   const omca = (body?.data ?? []).filter((agent) => agent.id.startsWith("omca-"))
   return omca.length === 8 ? body?.data : undefined
 }
@@ -44,13 +44,16 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
     const [a, b, c] = ["a", "b", "c"].map((name) => join(root, name)) as [string, string, string]
     workspace(a, localPlugin(plugin.directory, "anthropic/claude-sonnet-5-5"))
     workspace(b, { plugins: [join(plugin.directory, "opencode")] })
-    workspace(c, { plugins: [plugin.spec] })
-    fixture = { root, server: await startServer(root, root), a, b, c, stopPackage: plugin.stop }
+    workspace(c, {})
+    const packageRoot = join(root, "package-runtime")
+    await installPackage(plugin.spec, isolatedEnv(packageRoot, c), c)
+    fixture = { root, server: await startServer(root, root), packageServer: await startServer(packageRoot, c), a, b, c, stopPackage: plugin.stop }
   }, SLOW)
 
   afterAll(async () => {
     if (!fixture) return
     await fixture.server.stop()
+    await fixture.packageServer.stop()
     await fixture.stopPackage()
     await removeDir(fixture.root)
   }, SLOW)
@@ -157,13 +160,13 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
   })
 
   test("Git package spec loads 8 agents with a non-empty omca-explorer system prompt", async () => {
-    const { server, c } = need()
+    const { packageServer: server, c } = need()
     let packageState = ""
     await until(
       "git spec load",
       60_000,
       async () => {
-        const agents = await omcaAgents(c)
+        const agents = await omcaAgents(c, server)
         if ((explore(agents)?.system?.length ?? 0) === 0) {
           const plugins = await server.api("GET", "/api/plugin", c)
           packageState = plugins.text
