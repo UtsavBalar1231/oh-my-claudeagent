@@ -30,13 +30,22 @@ const evidence = (hash: string, overrides: Record<string, unknown> = {}): Record
 
 beforeEach(() => {
   const preferred = join(homedir(), ".cache", "tmp", "opencode");
-  directory = mkdtempSync(join(existsSync(preferred) ? preferred : tmpdir(), "omca-state-"));
+  directory = fs.realpathSync.native(mkdtempSync(join(existsSync(preferred) ? preferred : tmpdir(), "omca-state-")));
   checkout = join(directory, "checkout");
   mkdirSync(checkout);
 });
 afterEach(() => { rmSync(directory, { recursive: true, force: true }); });
 
 describe("native session snapshots", () => {
+  test.skipIf(process.platform === "win32")("admits a plan through the session checkout's aliased ancestor", async () => {
+    const path = plan();
+    const alias = join(directory, "alias");
+    symlinkSync(checkout, alias);
+    await bindPlan(alias, "ses_one", join(alias, "work.md"));
+    expect(boundPlan(alias, "ses_one")?.path).toBe(path);
+    expect(readSnapshot(alias, "ses_one").plan?.name).toBe("work");
+  });
+
   test("missing state is observable and snapshots never create .omca", async () => {
     const snapshot = readSnapshot(checkout, "ses_one");
     expect(snapshot.plan).toBeNull();

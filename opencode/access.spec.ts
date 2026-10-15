@@ -1,6 +1,6 @@
 import type { Plugin } from "@opencode/plugin"
 import { afterEach, beforeEach, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { join } from "node:path"
 import { authorizePath, canonicalPath, resolvePath } from "./access.ts"
@@ -10,7 +10,7 @@ let root: string
 let calls: Array<{ action: string; resources: string[] }>
 
 beforeEach(() => {
-  directory = mkdtempSync(join(tmpdir(), "omca-access-"))
+  directory = realpathSync.native(mkdtempSync(join(tmpdir(), "omca-access-")))
   root = join(directory, "workspace")
   mkdirSync(root)
   calls = []
@@ -41,7 +41,7 @@ test("external reads assert the directory boundary before the canonical file", a
   writeFileSync(path, "reference")
   await authorizePath(context(), "ses_one", "plan", root, path, "read")
   expect(calls.map((call) => call.action)).toEqual(["external_directory", "read"])
-  expect(calls[1]?.resources).toEqual([canonicalPath(path)])
+  expect(calls[1]?.resources).toEqual([canonicalPath(path).replaceAll("\\", "/")])
 })
 
 test("native denials propagate without an alternate filesystem read", async () => {

@@ -1,7 +1,7 @@
 import type { Plugin } from "@opencode/plugin";
 import type { Info, ToolContext, ToolEditor } from "@opencode/plugin/promise/tool";
 import { afterEach, expect, spyOn, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { tools as astTools } from "../servers/tools/ast.ts";
@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 function directory() {
-  const dir = mkdtempSync(join(tmpdir(), "omca-native-tools-"));
+  const dir = realpathSync.native(mkdtempSync(join(tmpdir(), "omca-native-tools-")));
   dirs.push(dir);
   return dir;
 }

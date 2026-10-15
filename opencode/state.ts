@@ -81,10 +81,12 @@ function checkLock(root: string, path: string): void {
   }
 }
 
-function planPath(root: string, path: string): string {
+function planPath(root: string, path: string, spelledRoot = root): string {
   const home = realpathSync.native(homedir());
   const expanded = path.startsWith("~/") ? join(home, path.slice(2)) : path;
-  const actual = contained(resolve(root, expanded), [root, join(home, ".opencode", "plan")]);
+  const requested = resolve(spelledRoot, expanded);
+  const normalized = inside(spelledRoot, requested) ? resolve(root, relative(spelledRoot, requested)) : requested;
+  const actual = contained(normalized, [root, join(home, ".opencode", "plan")]);
   if (!actual.endsWith(".md")) throw new Error("A plan must be a local Markdown file");
   return actual;
 }
@@ -291,7 +293,7 @@ export function readSnapshot(directory: string, sessionID: string, expectedPlan?
 export async function bindPlan(directory: string, sessionID: string, path: string, beforeWrite?: () => Promise<void>): Promise<void> {
   const key = sessionKey(sessionID);
   const root = rootOf(directory);
-  const actual = planPath(root, path);
+  const actual = planPath(root, path, projectRoot(resolve(directory)));
   const name = toPlanName(basename(actual, ".md"));
   readPlan(actual, name);
   const registry = registryPath(root);

@@ -164,7 +164,11 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
         const agents = await omcaAgents(c)
         return (explore(agents)?.system?.length ?? 0) > 0
       },
-      server.last,
+      () => {
+        const failures = server.log().split("\n").filter((line) => /WARN|ERROR|failed/i.test(line)).join("\n")
+        console.error(failures)
+        return `${failures}\n${server.last()}`
+      },
     )
   }, SLOW)
 })
