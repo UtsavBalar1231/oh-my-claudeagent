@@ -26,8 +26,9 @@ from the band and agents atoms. A Spinner whose `requestId` is a tracked agent i
 Spinner, pass through unchanged.
 
 `agents-tracker` also owns the agent page that `tabs/agent-page.ts` draws on the Agents tab: a
-Button keyed `open-<agent id>` on each lane opens it, and `b`, `c` and `r` go back, copy the brief
-and reload. Its one `tool.call` registration matches `{ agentId: /./ }`, so only a subagent's
+Button keyed `open-<agent id>` on each lane opens it, and `b`, `c`, `r` and `v` go back, copy the
+brief, reload and put the agent's transcript in the main view (`v` reads "Back to main" while that
+agent is in view). Its one `tool.call` registration matches `{ agentId: /./ }`, so only a subagent's
 call reaches the mod and a main-loop call never does. It appends the call and its outcome to a
 module-level map, with no state write. The `pages` atom is written only when a page is opened, on
 `r` and at the agent's `turn.complete`, from `$.session.messages({ agentId })` and that map; a
@@ -55,15 +56,11 @@ never starts it. No timer runs on a remote surface: Desktop draws a still Svg, s
 every site on each state write and would restart an animation, and the other remote surfaces
 animate the Svg by themselves.
 
-The UI kit (`ui.ts`) reads the engine version once, in `resolveSession` (`host.ts`), and sets
-`isTypeset` on the session when `$.session.version()` answers 2.1.299 or later, judged on `base`
-when it is present. A refused call, or a version that does not parse, leaves it false. When it is
-true the kit's `Text` sends `weight: "semibold"` in place of `bold: true`, and on a remote surface
-`Run` sets `mono` on its container and every span, a `Text` outside `Run` that holds a digit sets
-`tabular`, and the row gaps of the pane and its tabs and the band's button gap are the named steps
-`"md"` and `"lg"` in place of cells. The terminal keeps its cell gaps. When it is false every tree
-is drawn as it was before the gate. Drawing code reads the flag from `resolvedSession()` and
-never awaits the engine.
+The UI kit (`ui.ts`) always sends the typeset props. Its `Text` sends `weight: "semibold"` in
+place of `bold: true`, and on a remote surface `Run` sets `mono` on its container and every span,
+a `Text` outside `Run` that holds a digit sets `tabular`, and the row gaps of the pane and its
+tabs and the band's button gap are the named steps `"md"` and `"lg"` in place of cells. The
+terminal keeps its cell gaps. `resolveSession` (`host.ts`) does not read the engine version.
 
 The pane's `ui.scroll` hook reads one committed layout (`regions.ts`). Each terminal drawing
 collects its own on `view.layout`: every scroll region and every list that draws its own window,

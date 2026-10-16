@@ -10,13 +10,14 @@ import { sha256Hex } from "../src/core/sha256.ts";
 import { fitEnd, type GlyphTier, glyphs, oneLine } from "../src/core/ui-kit.ts";
 import { TONE_KEYS } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
-import { boundPlanOf, bytesOf, fillPrompt, type Host, ledgerWrittenAt, proofFacts, reason, resolvedSession, sessionOf, stampOf, verdictFor } from "./host.ts";
+import { boundPlanOf, bytesOf, fillPrompt, type Host, ledgerWrittenAt, proofFacts, reason, sessionOf, stampOf, verdictFor } from "./host.ts";
 import { isRemote, type Kit, kitOf, Run, type TextStyle } from "./ui.ts";
 
 type Snapshot = { band: Band; hasFinalVerification: boolean; exitCode: number | null; planPath: string | undefined };
 
 let glyphTier: GlyphTier = "nerd";
 let shownActions = 0;
+let isAgentInView = false;
 let toastedVerificationAt = 0;
 let toastedPlan: { path: string; isDone: boolean } | undefined;
 let isBaselined = false;
@@ -154,6 +155,12 @@ async function actionsFor(host: Host, { band, hasFinalVerification }: Snapshot):
   });
 }
 
+async function clearActionsFor(host: Host, text: string): Promise<void> {
+  if (isAgentInView || shownActions === 0 || text === "" || isShownHotkey(text)) return;
+  shownActions = 0;
+  await host.state.nextActions.set([]);
+}
+
 const withoutReadAt = (band: Band | undefined): string => JSON.stringify({ ...band, readAt: 0 });
 
 async function writeBand(host: Host, band: Band): Promise<void> {
@@ -206,14 +213,20 @@ export const band: Features = {
   },
   "prompt.edit": {
     post: async (host, _e, result) => {
-      if (shownActions === 0 || result.text === "" || isShownHotkey(result.text)) return undefined;
-      shownActions = 0;
-      await host.state.nextActions.set([]);
+      await clearActionsFor(host, result.text);
+      return undefined;
+    },
+  },
+  "prompt.change": {
+    post: async (host, e, result) => {
+      const isOwnFill = e.origin.kind === "plugin" && e.origin.name === host.plugin.name;
+      if (!isOwnFill) await clearActionsFor(host, result.text);
       return undefined;
     },
   },
   "ui.render AbovePrompt": {
     pre: async (host, e) => {
+      isAgentInView = e.props.view.agentId !== undefined;
       if (!host.options.showBand || e.props.hasSurvey) return undefined;
       const [{ value: snapshot }, { value: actions = [] }, { value: agents = {} }] = await Promise.all([
         host.state.band.get(),
@@ -221,16 +234,16 @@ export const band: Features = {
         host.state.agents.get(),
       ]);
       const running = Object.values(agents).filter((agent) => agent.status === "running").length;
-      const view = bandView(snapshot, actions, e.props.bodyColumns, glyphTier, running);
+      const view = bandView(snapshot, isAgentInView ? [] : actions, e.props.bodyColumns, glyphTier, running);
       if (view === undefined) return undefined;
-      const kit = kitOf(host.ui.resolve(e), e.surface, { isTypeset: resolvedSession().isTypeset });
+      const kit = kitOf(host.ui.resolve(e), e.surface);
       const { Box, Button } = kit;
       const rows = [Box({ key: "status", children: [row(kit, view.status)] })];
       if (view.buttons.length > 0) {
         rows.push(
           Box({
             key: "actions",
-            gap: kit.isTypeset && isRemote(kit) ? "lg" : BUTTON_GAP,
+            gap: isRemote(kit) ? "lg" : BUTTON_GAP,
             children: view.buttons.map((button) =>
               Button({
                 key: button.key,

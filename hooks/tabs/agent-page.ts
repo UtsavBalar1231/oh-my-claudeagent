@@ -2,7 +2,7 @@ import type { RenderElement } from "claude-code";
 import { lookOf } from "../../src/core/agent-type.ts";
 import { costText, type Lane, shellLanguage, STATUS_WORDS, statusMark, toolLabel } from "../../src/core/mission.ts";
 import { GRID, type MascotSize } from "../../src/core/mascots.ts";
-import { agentGlyph, clockOf, COLUMN_GAP, fitEnd, formatDuration, formatTokens, KEYS, oneLine, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
+import { agentGlyph, clockOf, COLUMN_GAP, displayWidth, fitEnd, formatDuration, formatTokens, KEYS, oneLine, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
 import { agentKey, fitPieces, levelMark, ON_SURFACE, type Piece, piecesWidth, TONE_KEYS } from "../../src/core/visual.ts";
 import { loadPage } from "../agents-tracker.ts";
 import { type Host, type State, update } from "../host.ts";
@@ -16,6 +16,7 @@ type Call = Page["calls"][number];
 
 const BACK = "b";
 const COPY = "c";
+const VIEW = "v";
 const DURATION_CELLS = 6;
 const BODY_KEY = "page-body";
 // Narrower than the mascot and this much text, the header keeps to its two lines.
@@ -41,6 +42,11 @@ export async function open(host: Host, view: View, id: string): Promise<void> {
 async function close(host: Host, id: string): Promise<void> {
   await showPage(host, null);
   refocus(host, openKey(id), "agents");
+}
+
+async function switchView(host: Host, id: string, isViewing: boolean): Promise<void> {
+  const { deny } = await host.ui.view(isViewing ? {} : { agentId: id });
+  if (deny !== undefined) host.ui.toast(`Could not switch the view: ${deny}`);
 }
 
 async function copyBrief(host: Host, brief: string): Promise<void> {
@@ -109,16 +115,21 @@ function header(view: View, lane: Lane): { children: RenderElement[]; rows: numb
 export async function view(host: Host, view: View, lane: Lane): Promise<readonly RenderElement[]> {
   const { g, kit } = view;
   const page = (await host.state.pages.get()).value?.[lane.id];
+  const isViewing = view.viewing === lane.id;
+  const buttons = [
+    [BACK, "Back", () => close(host, lane.id)],
+    ...(page === undefined ? [] : [[COPY, "Copy brief", () => copyBrief(host, page.brief)] as const]),
+    [KEYS.reload, "Reload", () => loadPage(host, lane.id)],
+    [VIEW, isViewing ? "Back to main" : "Show transcript", () => switchView(host, lane.id, isViewing)],
+  ] as const;
+  const cells = buttons.reduce((sum, [hotkey, label]) => sum + displayWidth(`${hotkey}: ${label}`), 0);
+  const keyGap = cells + COLUMN_GAP * (buttons.length - 1) <= view.width ? COLUMN_GAP : 1;
   const keys = kit.Box({
     key: "page-keys",
     flexDirection: "row",
-    columnGap: COLUMN_GAP,
+    columnGap: keyGap,
     ...buttonRow(view),
-    children: [
-      keyButton(view, BACK, "Back", () => close(host, lane.id)),
-      ...(page === undefined ? [] : [keyButton(view, COPY, "Copy brief", () => copyBrief(host, page.brief))]),
-      keyButton(view, KEYS.reload, "Reload", () => loadPage(host, lane.id)),
-    ],
+    children: buttons.map(([hotkey, label, work]) => keyButton(view, hotkey, label, work)),
   });
   const head = header(view, lane);
   if (page === undefined) {

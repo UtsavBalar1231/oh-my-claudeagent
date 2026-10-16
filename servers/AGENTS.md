@@ -38,7 +38,7 @@ catalogs) and answers the `omca_hook` calls the settings hooks make. It speaks M
   ran a code-mode `search` for an `omca` namespace before the call in about half of the runs.
 - Run the specs with `bun test servers`, and the handshake check with `just validate --check mcp`; `just typecheck` covers this
   directory through `tsconfig.runtime.json`.
-- Keep a tool description under 2,048 characters, the cap every client from the 2.1.295 floor applies; Claude Code truncates past it.
+- Keep a tool description under 2,048 characters, a margin OMCA keeps under Claude Code's cap; a longer one is truncated.
 
 The state files these tools read and write are `boulder.json` (a session-bound plan
 registry keyed `plans[plan_name]` and `bindings[session_id]`),
@@ -48,8 +48,9 @@ the notepad tree under `.omca/notepads/`. Read `resolveBoundPlan` in
 `src/core/boulder.ts` for the resolution ladder rather than hand-parsing `boulder.json`
 anywhere else.
 
-Each durable file has one reader: `parseRegistry` in `src/core/boulder.ts` and `readLedger` in
-`src/core/evidence.ts`. Both refuse text that is not JSON, not an object, or whose `version` key
+Each durable file has one canonical reader: `readRegistryDocument` in `src/core/boulder.ts`
+and `readLedger` in `src/core/evidence.ts`. `parseRegistry` provides a registry-only view of
+the same reader. Both refuse text that is not JSON, not an object, or whose `version` key
 is present and not `1`; a file without `version` reads as version 1. Writers (`boulder_write`,
 `evidence_log`, ledger rotation and its archives) stamp `"version": 1` as the first key and
 throw an error naming the file when the reader refuses it, so a corrupt registry or ledger is

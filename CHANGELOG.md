@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-10-17
+
+### Added
+
+- **Native OpenCode integration:** selectable OMCA coordinator, planning/start/pause
+  commands, session-aware tools, Code Mode discovery, and a themed terminal dashboard.
+- **Packaged terminal UI:** compiled Solid artifact with source-freshness checks and
+  installed-package testing.
+- **Agent transcript from the pane:** `v` on an agent's page puts its transcript in the main
+  view, and reads Back to main while that agent is in view.
+
+### Changed
+
+- **Notepad sections open as pages:** the Notepad tab lists its four sections as rows with
+  their counts and newest dates, and Enter or a click opens a section on a page of its own
+  that scrolls in every row the pane has under its header. `b` goes back, and `f` and `w` find
+  and clear on both. The stacked scrolling cards are gone.
+- **Band actions clear on a recalled prompt:** the next-step buttons also clear when the prompt
+  is filled from history, an undo or another plugin, not only when you type. They are held
+  while an agent's transcript is in the main view.
+- **Needs Claude Code 2.1.300 or later:** an older client, including a Desktop Code tab
+  whose bundled Claude Code is older, does not load the mod (guard, band, pane, toasts).
+  `/omca doctor`, `omca-setup` and the mod-missing message name the floor.
+- **Shared implementation:** both hosts reuse prompt sources, registry operations,
+  evidence and notepad services. Selected shared prompt bodies are about 75% smaller.
+- **OpenCode tools:** native tools replace the adapter's MCP process. Session context
+  is automatic; AST operations require explicit files and preview before apply.
+- **Support boundary:** OpenCode requires 2.0.29 in the 2.0 release line. Its evidence
+  remains historical; no Stop veto or native verification receipts are claimed.
+
+### Fixed
+
+- **Execution safety:** Plan delegation bypasses, approval/path races, and AST
+  mutation-time checks.
+- **State integrity:** metadata preservation, receipt identity, interleaved evidence,
+  timestamp compatibility, and first-write ignore rules.
+- **Agent reports:** valid concise answers no longer trigger header or length-based
+  retry loops.
+- **Terminal behavior:** stale snapshots, cancellation, footer updates, installed-package
+  rendering, and Escape-to-close.
+- **File reading:** cancellation stops streaming instead of finishing the scan.
+
 ## [3.1.0] - 2026-10-14
 
 ### Changed
@@ -3036,6 +3078,7 @@ for multi-agent orchestration.
 - Shellcheck fixes applied across all hook scripts
 - Ruff fixes applied to Python MCP servers
 
+[3.2.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.0.1...v3.1.0
 [3.0.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.0.0...v3.0.1
 [3.0.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v2.21.0...v3.0.0

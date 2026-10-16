@@ -12,9 +12,6 @@ disallowed-tools: [Agent]
 
 Fix the following build issue: $ARGUMENTS
 
-When no issue is specified, run the build command to discover failures, then diagnose and fix.
-
-Build-fixer workflow: reproduce, diagnose root cause, minimal fix, verify build passes. Repeat until exit 0.
-
-After build passes, record evidence:
-`evidence_log(evidence_type="build", command="<build command>", exit_code=0, output_snippet="<relevant output>")`
+If the input is empty, find the documented build command and reproduce its
+failure. Apply the build-fixer's instructions and return its evidence and any
+unresolved blockers.

@@ -1,6 +1,6 @@
 type ProgressUpdate = { message: string; progress?: number; total?: number };
 export type Progress = (update: ProgressUpdate) => void;
-export type ToolContext = { signal: AbortSignal; progress: Progress };
+export type ToolContext = { signal: AbortSignal; progress: Progress; workspaceRoot?: string; audit?: boolean; beforeApply?: () => Promise<void> };
 
 export const IDLE_CONTEXT: ToolContext = { signal: new AbortController().signal, progress: () => {} };
 

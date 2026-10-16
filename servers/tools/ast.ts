@@ -200,14 +200,18 @@ function findBinary(): string {
 
 export async function run(
   argv: string[],
-  options: { input?: string; allowExit1?: boolean; timeoutMs?: number; signal?: AbortSignal; progress?: Progress } = {},
+  options: { input?: string; allowExit1?: boolean; timeoutMs?: number; signal?: AbortSignal; progress?: Progress; workspaceRoot?: string } = {},
 ) {
   const timeoutMs = options.timeoutMs ?? TIMEOUT_MS;
   const { signal, progress } = options;
   signal?.throwIfAborted();
   const started = performance.now();
-  const proc = Bun.spawn([discoverBinary(), ...argv], {
-    cwd: workspace(),
+  const scoped = options.workspaceRoot === undefined ? [] : [
+    `--config=${process.platform === "win32" ? "NUL" : "/dev/null"}`,
+    ...["hidden", "dot", "exclude", "global", "parent", "vcs"].map((kind) => `--no-ignore=${kind}`),
+  ];
+  const proc = Bun.spawn([discoverBinary(), ...argv.slice(0, 1), ...scoped, ...argv.slice(1)], {
+    cwd: workspace(options.workspaceRoot),
     stdin: options.input === undefined ? "ignore" : Buffer.from(options.input),
     stdout: "pipe",
     stderr: "pipe",
@@ -245,7 +249,8 @@ export async function run(
   return { stdout, stderr };
 }
 
-function workspace(): string {
+function workspace(explicit?: string): string {
+  if (explicit !== undefined) return realpathSync.native(explicit);
   const configured = process.env.CLAUDE_PROJECT_DIR || process.env.CLAUDE_PROJECT_ROOT;
   return realpathSync.native(projectRoot(configured || process.cwd()));
 }
@@ -261,8 +266,8 @@ function within(root: string, candidate: string): boolean {
 // once a path has failed the workspace check. An existing path is judged by its canonical
 // spelling, which folds case and short names where the filesystem does; one that does not exist
 // yet can only be judged as written.
-function normalizePaths(paths: string[] | undefined): string[] {
-  const root = workspace();
+function normalizePaths(paths: string[] | undefined, workspaceRoot?: string): string[] {
+  const root = workspace(workspaceRoot);
   let worktrees: string[] | undefined;
   const owner = (candidate: string): string | undefined => {
     if (within(root, candidate)) return root;
@@ -380,12 +385,12 @@ export function patternWarning(stderr: string): string | undefined {
 // ast-grep filters files by the language's extension set even with an explicit `--lang`, so
 // `cpp` against a `.c` file scans nothing and returns a silent zero. A directory leaves the
 // contents unknown, so it never warns.
-export function extensionMismatch(paths: string[], lang: string): string | undefined {
+export function extensionMismatch(paths: string[], lang: string, workspaceRoot?: string): string | undefined {
   const extensions = Object.entries(LANG_EXTENSIONS)
     .filter(([, mapped]) => mapped === lang)
     .map(([extension]) => extension);
   if (extensions.length === 0) return undefined;
-  const root = workspace();
+  const root = workspace(workspaceRoot);
   const files: string[] = [];
   for (const path of paths) {
     const stat = statSync(resolve(root, path), { throwIfNoEntry: false });
@@ -400,7 +405,7 @@ export function extensionMismatch(paths: string[], lang: string): string | undef
   );
 }
 
-function zeroMatchMessage(pattern: string, lang: string, stderr: string, paths: string[], isReplace = false): string {
+function zeroMatchMessage(pattern: string, lang: string, stderr: string, paths: string[], isReplace = false, workspaceRoot?: string): string {
   const extras: string[] = [];
   const warning = patternWarning(stderr);
   if (warning !== undefined) {
@@ -408,7 +413,7 @@ function zeroMatchMessage(pattern: string, lang: string, stderr: string, paths: 
       `${warning} Replace literal sub-parts with metavariables ($VAR / $$$), or use ast_find_rule with an explicit \`kind:\`.`,
     );
   }
-  const mismatch = extensionMismatch(paths, lang);
+  const mismatch = extensionMismatch(paths, lang, workspaceRoot);
   if (mismatch !== undefined) extras.push(mismatch);
   const message = noMatchMessage(pattern, lang, isReplace);
   return extras.length === 0 ? message : `${message}\n\n${extras.join("\n")}`;
@@ -508,7 +513,7 @@ export const tools: Tool[] = [
       const a = argReader(args, "ast_search");
       const pattern = a.string("pattern");
       const lang = a.choice("lang", LANGUAGES);
-      const paths = normalizePaths(a.strings("paths"));
+      const paths = normalizePaths(a.strings("paths"), ctx.workspaceRoot);
       const globs = a.strings("globs") ?? [];
       const context = a.integer("context", 0);
       const maxResults = clampResults(a.integer("max_results", MAX_RESULTS_DEFAULT));
@@ -528,7 +533,7 @@ export const tools: Tool[] = [
         { allowExit1: true, ...ctx },
       );
       const { matches, truncated } = parseMatches(result.stdout);
-      if (matches.length === 0) return zeroMatchMessage(pattern, lang, result.stderr, paths);
+      if (matches.length === 0) return zeroMatchMessage(pattern, lang, result.stderr, paths, false, ctx.workspaceRoot);
       if (format === "json") return jsonMatches(matches, maxResults, truncated);
       return withCapNotice(formatRun(matches, maxResults), truncated);
     },
@@ -569,14 +574,14 @@ export const tools: Tool[] = [
       const pattern = a.string("pattern");
       const rewrite = a.string("rewrite");
       const lang = a.choice("lang", LANGUAGES);
-      const paths = normalizePaths(a.strings("paths"));
+      const paths = normalizePaths(a.strings("paths"), ctx.workspaceRoot);
       const globs = a.strings("globs") ?? [];
       const dryRun = a.boolean("dry_run", true);
       const rule = [`--pattern=${pattern}`, `--rewrite=${rewrite}`, "--lang", lang];
       const scope = [...globArgs(globs), "--", ...paths];
       const preview = await run(["run", ...rule, "--json=compact", ...scope], { allowExit1: true, ...ctx });
       const { matches, truncated } = parseMatches(preview.stdout);
-      if (matches.length === 0) return zeroMatchMessage(pattern, lang, preview.stderr, paths, true);
+      if (matches.length === 0) return zeroMatchMessage(pattern, lang, preview.stderr, paths, true, ctx.workspaceRoot);
       if (!dryRun) {
         // --update-all rewrites every match on disk while the preview stops at the cap, so a
         // capped preview must never be applied.
@@ -585,6 +590,7 @@ export const tools: Tool[] = [
             `Refusing to apply: matches exceed the ${MAX_RESULT_CAP}-result preview cap, so --update-all would rewrite files the dry run did not show. Narrow the scope with paths/globs or a more specific pattern until the full change set previews, then re-run with dry_run=false.`,
           );
         }
+        await ctx.beforeApply?.();
         try {
           await run(["run", ...rule, "--update-all", ...scope], ctx);
         } catch (error) {
@@ -626,7 +632,7 @@ export const tools: Tool[] = [
     call: async (args, ctx = IDLE_CONTEXT) => {
       const a = argReader(args, "ast_find_rule");
       const ruleYaml = a.string("rule_yaml");
-      const paths = normalizePaths(a.strings("paths"));
+      const paths = normalizePaths(a.strings("paths"), ctx.workspaceRoot);
       const maxResults = clampResults(a.integer("max_results", MAX_RESULTS_DEFAULT));
       const format = a.choice("output_format", ["text", "json"], "text");
       const result = await run(["scan", `--inline-rules=${ruleYaml}`, "--json=compact", "--", ...paths], {

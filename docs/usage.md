@@ -8,7 +8,7 @@ file is listed in the [reference](references.md).
 ### Install
 
 Install the plugin with the command in the [README](../README.md#install). OMCA needs Claude
-Code 2.1.295 or later and bun 1.4.2 or later. `ast-grep` (or `sg`) is optional: without it the
+Code 2.1.300 or later and bun 1.4.2 or later. `ast-grep` (or `sg`) is optional: without it the
 `ast_*` tools return an error and everything else works.
 
 ### Run setup
@@ -59,47 +59,77 @@ keeps its `.omca/` directory until you delete it.
 
 ### Use it from OpenCode
 
-The `opencode/` directory loads OMCA's specialists, skills, MCP server and guards into OpenCode
-2.0.18. Add it to your OpenCode config from git:
+The adapter supports OpenCode 2.0.29 in the 2.0 release line. Add the package to
+`plugins` in `~/.config/opencode/opencode.json(c)`:
 
 ```jsonc
 {
   "plugins": [
     {
       "package": "oh-my-claudeagent@git+https://github.com/UtsavBalar1231/oh-my-claudeagent.git",
-      "options": { "models": { "opus": "anthropic/claude-opus-5-5", "fable": "anthropic/claude-fable-5-1" } }
+      "options": {
+        "models": {
+          "opus": "openai/gpt-6.1-sol#high",
+          "sonnet": "openai/gpt-6.1-sol#high",
+          "fable": "openai/gpt-6.1-sol#xhigh"
+        }
+      }
     }
   ]
 }
 ```
 
-To load a local checkout instead, list the path of its `opencode/` directory under `plugins`.
+For a local checkout, use its `opencode/` directory as the plugin path. Published
+packages load their server and `./tui` exports together; do not add a second copy
+to `cli.json`.
 
 `options.models` maps OMCA's `opus`, `sonnet` and `fable` tiers to OpenCode model ids, in
 `provider/model` form with an optional `#variant`. Without it, every `omca-*` subagent runs on
 the parent session's model. To override one agent, set `agents.omca-<name>.model` in your own
 config. The `ast_*` tools need ast-grep on `PATH`.
 
-What OpenCode gets:
+Choose `omca` from the primary-agent selector for coordination. Build and Plan
+remain available. Specialists run as child sessions: `omca-explorer`,
+`omca-architect`, `omca-researcher`, `omca-viewer`, `omca-analyzer`, `omca-reviewer`,
+`omca-build-fixer` and `omca-executor`.
+Read-only specialists use native read/search tools without shell or file edits.
+With OMCA enabled, native Plan delegates only to Explore or OMCA's read-only
+specialists. Execution-capable children, including General, require Build or OMCA.
 
-- Subagents `omca-explorer`, `omca-architect`, `omca-researcher`, `omca-viewer`,
-  `omca-analyzer`, `omca-reviewer`, `omca-build-fixer` and `omca-executor`.
-- Skills `omca-debugging`, `omca-remove-ai-slops`, `omca-refactor`, `omca-git-master` and
-  `omca-handoff`, each slash-invocable. `/omca-handoff` is not offered to the model.
-- Commands `/omca-analyzer`, `/omca-reviewer` and `/omca-build-fixer`, each asking the primary agent to
-  launch that subagent.
-- The `omca` server's evidence, notepad, AST, `boulder_progress` and `file_read` tools, named
-  `omca_<tool>`. The adapter hides `boulder_write`, `session_search`, `agents_list`,
-  `categories_list`, `health_check` and `omca_hook`, and the server's instructions name only the
-  tools it shows.
-- The destructive-command guard and the comment gate on model and user shell commands and on
-  file edits. The comment gate blocks only with `OMCA_COMMENT_GATE=deny`. A blocked `!` command
-  shows as a failed command; the reason goes to the OpenCode server log.
-- OMCA's working discipline, injected into primary agents such as `build` and `plan`.
+Commands:
 
-Every id carries the `omca-` prefix, so OpenCode's own `build`, `plan`, `general` and `explore`
-are untouched. The adapter leaves out the orchestrator, the planner, `plan`
-and `start-work` with plan tracking, the stop gates and the status line.
+| Command | Behavior |
+| --- | --- |
+| `/omca` | Open the terminal panel without starting work |
+| `/omca-plan <request>` | Discuss a plan in native Plan mode; save a file only when asked |
+| `/omca-start-work <path>` | Ask approval, validate and bind a FINAL plan, then coordinate execution |
+| `/omca-pause` | Interrupt the coordinator and remove its binding without deleting its files |
+| `/omca-analyzer`, `/omca-reviewer`, `/omca-build-fixer` | Ask the primary agent to launch the specialist |
+
+Use Build or OMCA before starting work. A saved plan needs `Status: FINAL`,
+numbered task checkboxes and valid dependencies. Plans may live in the checkout
+or `~/.opencode/plan`. A fork or a session moved to another checkout does not
+inherit an execution binding. Run start-work explicitly at the destination.
+Independent background sessions retain OpenCode's own interruption controls.
+Plan reads refuse files over 1 MiB or plans over 1,000 numbered tasks. Dashboard
+snapshots refuse state files over 4 MiB rather than allocating unbounded inputs.
+
+The panel shows the bound plan, native child sessions, evidence, notepads and
+adapter health. Selecting a child opens its native session. The interface uses
+the current theme and leaves native tabs, the composer and permission prompts
+in place. Headless clients use the same tools without the panel.
+
+The adapter registers native `omca_*` evidence, notepad, AST, progress and file
+tools. It does not start a duplicate OMCA MCP process. Custom filesystem tools
+still check native read/edit permissions; they do not bypass an external-directory
+deny. The shell guard uses the actual command directory. The comment gate blocks
+only with `OMCA_COMMENT_GATE=deny`.
+
+**Limits:** OpenCode has no OMCA Stop veto. Completed checkboxes and historical
+passing evidence do not prove the current checkout is verified. The panel labels
+ledger successes as historical until native execution provenance is supported.
+The TUI is a terminal extension, not a Desktop or Web UI extension. OMCA does not
+replace provider authentication, compaction, scheduling, memory, or native undo.
 
 ## Plan and run work
 
@@ -179,7 +209,9 @@ task and the running count; the bar stays. The prompt's border names the plan.
 Below it, numbered buttons offer the next step: log the evidence, start work, run the final
 verification, or review the changes with architect. Press a button's digit in an empty prompt, or
 click it, to fill the prompt with that step; nothing runs until you send it. Typing anything else
-clears the buttons.
+clears the buttons, and so does filling the prompt from history, an undo or another plugin. The
+buttons are held while an agent's transcript is in the main view and return with the main
+conversation.
 
 Set the `showBand` option to `false` to hide it.
 
@@ -206,11 +238,12 @@ takes the cost's place.
    finished agents and the tokens they spent. Point at a lane, or press `d`, to see its prompt,
    last output, tool calls and tokens. Press Enter on a lane, or click its name, to open the
    agent's page: its full brief, each tool call with its outcome and duration, its latest reply and its
-   cost, shown as `~$` because it is estimated. On the page `b` goes back, `c` copies the brief
-   and `r` reads the page again. A teammate in a team has a lane too; it waits between messages
-   instead of finishing. When the lanes run past the pane, a cue above and below counts the lanes
-   out of view, the mouse wheel scrolls them, and Up and Down step the focus a lane at a time with
-   the lanes following.
+   cost, shown as `~$` because it is estimated. On the page `b` goes back, `c` copies the brief,
+   `r` reads the page again and `v` shows the agent's transcript in the main view; while that
+   transcript is in view the same key reads Back to main. A teammate in a team has a lane too; it
+   waits between messages instead of finishing. When the lanes run past the pane, a cue above and
+   below counts the lanes out of view, the mouse wheel scrolls them, and Up and Down step the
+   focus a lane at a time with the lanes following.
 
    The brief and the reply on the agent page are drawn as markdown and scroll a row at a time,
    and a shell command, on the page and in a lane's tool row, is highlighted as code.
@@ -219,10 +252,11 @@ takes the cost's place.
    code in the code color, bold, italics and links, with the markers dropped.
 2. **Plan**: the plan board, below.
 3. **Evidence**: the proof ledger, below.
-4. **Notepad**: one card per section of the bound plan's notepad, each entry under its date. `f`
-   finds text in the entries, `w` clears the search, and `l` picks another plan's notepad. A wide
-   pane sets the cards in two columns, and the mouse wheel over a card scrolls that card alone, a
-   row at a time.
+4. **Notepad**: one row per section of the bound plan's notepad (learnings, issues, decisions and
+   problems), each with its entry count and the date of its newest entry. Enter or a click on a
+   row opens that section's page, every entry under its date, which the mouse wheel scrolls a
+   row at a time; `b` goes back to the rows. `f` finds text in the entries on either view, `w`
+   clears the search, and `l` picks another plan's notepad from the rows.
 5. **Stats**: runs per agent type, the evidence rate of executor and build-fixer, the agents that
    run checks, tokens per finished delegation, and the estimated cost by agent, across the
    project's recorded sessions. Runs on a model without a
@@ -405,7 +439,7 @@ server's whole normalized name followed by `__*`. A shorter prefix such as
 
 `/omca doctor` opens the Doctor tab and runs its checks:
 
-- the OMCA version that is loaded, and whether Claude Code meets the 2.1.295 floor;
+- the OMCA version that is loaded, and whether Claude Code meets the 2.1.300 floor;
 - whether bun 1.4.2 or later is on the session's `PATH`;
 - when a hook last reached the `omca` server;
 - whether `ast-grep` or `sg` is on `PATH`;
@@ -473,8 +507,8 @@ gates are off. At session start OMCA writes a line in the transcript that bun is
 and the Doctor tab reports bun as missing. Make bun reachable from the app's `PATH`, for example
 by linking it into a directory the app searches, and restart the app.
 
-The Code tab in Desktop runs its own bundled copy of Claude Code, which trails the CLI. OMCA's mod
-(the guard, band, pane, toasts and guard dialog) runs there only when that copy is 2.1.295 or
+The Code tab in Desktop runs its own bundled copy of Claude Code. OMCA's mod
+(the guard, band, pane, toasts and guard dialog) runs there only when that copy is 2.1.300 or
 later; `/status` in a Code-tab session shows its version. On an older copy the agents, skills,
 MCP tools and stop gates still work and the mod does not load. Desktop for Linux is a beta for
 Debian and Ubuntu that updates through the package manager, so a newer bundled copy arrives with
@@ -520,11 +554,11 @@ the tool again; do not skip the evidence.
 
 **The band, the pane and the guard are gone.** The mod is not running. On the first prompt of a
 session the `omca` server shows a message once when that happens, saying the Bash guard, band and
-pane are off. Run `/plugin` and check that OMCA is listed under mods active. Mods are off when
-your organization sets `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks`, when
-Anthropic turns them off remotely, or after the mod worker crashes three times. Using Desktop can
-save that remote switch as off in `~/.claude.json`, which then turns mods off in the terminal too;
-removing `cachedGrowthBookFeatures.tengu_plugin_hooks_modules` from that file and restarting
+pane are off. Run `/plugin` and check that OMCA is listed under mods active. The mod does not
+load on a Claude Code older than 2.1.300. Mods are off when your organization sets
+`allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks`, when Anthropic turns them
+off remotely, or after the mod worker crashes three times. Using Desktop can save that remote
+switch as off in `~/.claude.json`, which then turns mods off in the terminal too; removing `cachedGrowthBookFeatures.tengu_plugin_hooks_modules` from that file and restarting
 clears it ([#99130](https://github.com/anthropics/claude-code/issues/99130)). With two copies of
 OMCA enabled from different marketplaces, only one copy's hooks and mod load, and `/plugin` notes
 the other under Errors; disable one copy and run `/reload-plugins`. A session where nothing draws,

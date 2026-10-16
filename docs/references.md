@@ -3,6 +3,11 @@
 This page lists what OMCA ships and how to configure it. For step-by-step use, see the
 [usage guide](usage.md).
 
+Claude Code host behavior is described below. The
+[OpenCode V2 guide](usage.md#use-it-from-opencode) covers its native tools, terminal
+panel, permissions and completion limits. Both adapters use the same core state
+readers, durable evidence/notepad operations and safety classifiers.
+
 ## What OMCA owns
 
 Claude Code owns plan mode, memory, the plugin format, permissions, sandboxing, subagents,
@@ -147,7 +152,7 @@ server's `omca_hook` tool, which dispatches through `servers/hooks/registry.ts`.
 | `agent.spawn`, `turn.step` | The Agents tab and delegation records |
 | `tool.call` | A subagent's tool calls, kept for its page on the Agents tab; only a subagent's call reaches the mod, and a main-loop call skips it |
 | `session.compact` | Asks the summarizer to keep the bound plan and its next ten open tasks. It does not run for a user-installed plugin where an organization manages Claude Code; the server's `SessionStart` `compact` handler re-injects the plan context there |
-| `ui.render`, `ui.focus`, `ui.scroll`, `ui.close`, `prompt.edit`, `command.run` | The band, the pane and the commands |
+| `ui.render`, `ui.focus`, `ui.scroll`, `ui.close`, `prompt.edit`, `prompt.change`, `command.run` | The band, the pane and the commands |
 
 `tool.check` runs before every Bash and PowerShell call in every permission mode and never
 returns an allow, which would skip the auto-mode classifier.
@@ -198,7 +203,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | `context-injector` | `AGENTS.md`, `README.md` and rule injection when a file is read or edited |
 | `comment-gate` | The comment check on writes |
 | `plan-write-guard`, `plan-format-warn` | The plan checkbox refusal and warning |
-| `empty-task-response` | The note on an empty or malformed agent report |
+| `empty-task-response` | The note on an empty or transitional agent report; concise findings need no fixed headers |
 | `failure-recovery` | Advice after a failed tool call |
 | `subagent-context` | The context each subagent gets at start |
 | `permission-coach` | The retry after an auto-mode denial |
@@ -261,7 +266,7 @@ The plugin applies none of these.
 | `permissions.deny` with `Agent(model:fable)` | Gates per-call escalations to the `fable` tier. It cannot cap an agent's declared tier, because those calls carry no `model` |
 | `subagentPromptCacheTtl` | `"1h"` keeps a long parallel run's cache warm, at a higher write price |
 | `idleCompaction` | On by default in a terminal session. About 54 minutes after the last request, a conversation over the threshold compacts before its one-hour cache expires. `false` turns it off, as does `DISABLE_AUTO_COMPACT` |
-| `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS` | Context size at which idle compaction applies. Default 200000, lowest 100000. Both idle compaction settings need Claude Code 2.1.290 or later |
+| `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS` | Context size at which idle compaction applies. Default 200000, lowest 100000 |
 | `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` | Default 10. A wider parallel group runs in series |
 
 Do not add `Write(<path>)`, `NotebookEdit(<path>)` or `Glob(<path>)` rules: they never match.
@@ -306,7 +311,7 @@ ledger, notepads and the registry, and links the JSON Schemas for the ledger and
 | `plan` and `start-work`, which stop unless `health_check` reports the runtime `ok` | Yes | When bun is on the app's `PATH` | Yes | When bun is on the app's `PATH` | Unless `allowManagedMcpServersOnly`, `allowManagedHooksOnly`, `disableAllHooks` or `allowManagedModsOnly` |
 | `omca` MCP tools | Yes | When bun is on the app's `PATH` | Yes | When bun is on the app's `PATH` | Unless `allowManagedMcpServersOnly` |
 | Stop checks, guidance, context injection | Yes | When bun is on the app's `PATH` | Yes | When bun is on the app's `PATH` | Unless `allowManagedHooksOnly` or `disableAllHooks` |
-| Guard decisions | Yes | When the app's Claude Code is 2.1.295 or later | Yes | Yes | Unless `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks` |
+| Guard decisions | Yes | When the app's Claude Code is 2.1.300 or later | Yes | Yes | Unless `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks` |
 | Guard review dialog | Yes | As guard decisions | No: held commands are decided without you | No: decided as in `-p` | As the guard |
 | Band, pane, plan reader, doctor | Yes | As guard decisions, with [Desktop's differences](usage.md#desktop-and-vs-code) | No | No ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)) | As the guard |
 | Status line | Yes | Not documented | No | Not documented | Unless `allowManagedHooksOnly` or `disableAllHooks` |
@@ -318,7 +323,7 @@ the guard leaves its decisions in place. A Desktop session in WSL loads no plugi
 ## Platform support
 
 CI runs the validator, the lint, the type checks, the bun specs, the mod tests, a smoke session
-and the OpenCode adapter specs on Linux, macOS and Windows against Claude Code 2.1.299. The
+and the OpenCode adapter specs on Linux, macOS and Windows against Claude Code 2.1.301. The
 guard reads Bash and PowerShell commands, including `cmd /c` and `Invoke-Expression`, and
 resolves home and project paths per platform. The README screenshots are captured with tmux,
 kitty and Xvfb, so capturing them needs Linux or WSL.

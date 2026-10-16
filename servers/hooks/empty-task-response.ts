@@ -1,25 +1,13 @@
-import { omcaAgentName } from "../../src/core/agent-type.ts";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
 import { field, text } from "../../src/core/tool-input.ts";
 import type { Handler, Payload } from "./registry.ts";
 
 export const POOR_OUTPUT =
-  "[POOR AGENT OUTPUT] The agent returned empty or trivially short text with no synthesis. A rate limit, server error, or kill would have arrived as a delegation error carrying the agent's partial work, so an empty result here means the agent ended its own turn without a deliverable, typically after spending its turns on tool calls. A finished agent keeps its history, so resume it once with SendMessage and ask only for its findings in the required output format; that reuses the work it already did, where a fresh agent would repeat it. Built-in Explore and Plan agents cannot be resumed, so relaunch those. If the resumed reply is also empty, proceed with what you have rather than messaging it again.";
+  "[POOR AGENT OUTPUT] The agent returned no substantive report. A rate limit, server error, or kill arrives as a delegation error carrying the agent's partial work. Resume a resumable agent once with SendMessage and ask for its findings, evidence and limits, without repeating the investigation. Built-in Explore and Plan agents cannot be resumed; relaunch those. If the next reply is also empty, report the gap and use the available evidence instead of looping.";
 
 // SubagentHandback fires on the subagent's own call, so its advice goes to the subagent itself.
-export const POOR_HANDBACK = "Your hand-back is empty or misses required sections; hand back a complete report.";
+export const POOR_HANDBACK = "Your hand-back is empty or stopped before delivering findings. Return the findings, evidence and remaining limits.";
 
-const SECTIONS: Readonly<Record<string, readonly string[]>> = {
-  executor: ["STATUS:", "CHANGES:", "EVIDENCE:"],
-  explorer: ["FILES:", "ANSWER:", "NEXT STEPS:"],
-  architect: ["RECOMMENDATION:", "ALTERNATIVES:", "RISKS:"],
-  researcher: ["SOURCES:", "FINDINGS:", "APPLICABILITY:"],
-};
-
-// Under 50 characters a report carries no synthesis, unless it reads as a deliberate completion:
-// re-querying a terse "Done." is what loops a finished agent.
-const MIN_REPORT = 50;
-const COMPLETION = /done|ending|complete|finished|no further|nothing (further|left|to do)|acknowledged|deliverable/;
 // A report under 200 characters that opens with a transitional phrase stopped mid-work. Only the
 // opening counts: a short report's `NEXT STEPS:` line is a section, not a stall.
 const MAX_TRANSITIONAL = 200;
@@ -28,24 +16,23 @@ const TRANSITIONAL =
 
 // The report travels in the SubagentHandback payload under auto mode; otherwise a completed Agent
 // result carries it, while a launch acknowledgement or a pointer at a hand-back carries none.
-function delivered(payload: Payload): { report: string; agentType: string } | undefined {
+function delivered(payload: Payload): string | undefined {
   if (payload.tool_name === "SubagentHandback") {
-    return { report: text(field(payload.tool_input, "message")), agentType: text(payload.agent_type) };
+    return text(field(payload.tool_input, "message"));
   }
   const response = payload.tool_response;
   if (payload.tool_name !== "Agent" || field(response, "status") !== "completed" || field(response, "handback") === "send") return;
   const content = field(response, "content");
   const texts = Array.isArray(content) ? content.map((part) => field(part, "text")).filter((part) => typeof part === "string") : [];
-  return { report: texts.join("\n"), agentType: text(field(payload.tool_input, "subagent_type")) };
+  return texts.join("\n");
 }
 
-// A harness note can be prepended as one bracketed line; the report is what follows it.
-const withoutHarnessNote = (report: string): string => report.replace(/^\[[^\n]*\](?:\n|$)/, "");
+// Only the explicit harness prefix is metadata; reports may contain bracketed findings.
+const withoutHarnessNote = (report: string): string => report.replace(/^\[harness:[^\n]*\](?:\n|$)/i, "");
 
 function isPoor(report: string): boolean {
   if (report.trim() === "") return true;
   const lower = report.toLowerCase();
-  if (report.length < MIN_REPORT && !COMPLETION.test(lower)) return true;
   return report.length < MAX_TRANSITIONAL && TRANSITIONAL.test(lower);
 }
 
@@ -56,14 +43,7 @@ export const handle: Handler = (payload) => {
   const found = delivered(payload);
   if (found === undefined) return;
   const isOwnHandback = payload.tool_name === "SubagentHandback" && Boolean(payload.agent_id);
-  const report = withoutHarnessNote(found.report.replace(/\n+$/, ""));
+  const report = withoutHarnessNote(found.replace(/\n+$/, ""));
   if (isPoor(report)) return advise(isOwnHandback ? POOR_HANDBACK : POOR_OUTPUT);
-  const agentType = omcaAgentName(found.agentType) ?? "";
-  const lower = report.toLowerCase();
-  const missing = (SECTIONS[agentType] ?? []).filter((section) => !lower.includes(section.toLowerCase()));
-  if (missing.length === 0) return;
-  if (isOwnHandback) return advise(POOR_HANDBACK);
-  return advise(
-    `[ADVISORY] Agent '${agentType}' output is missing expected section headers: ${missing.join(" ")}. The required output format specifies these sections. Output may be incomplete or hard to parse downstream.`,
-  );
+  return;
 };

@@ -5,25 +5,12 @@ description: "Use to strip AI slop from changed files (double guards, dead fallb
 
 # Remove AI slop
 
-Code-level cleanup for changes an LLM wrote (yours or someone else's), scoped to a bounded set of files. This skill is judgment work: it decides what to cut and, just as often, what to leave. A mechanical comment checker already flags some obvious slop on write; this skill covers the categories that need reading the code to call correctly.
+Clean only the requested files or reviewed diff. Read each candidate before cutting redundant guards, dead fallbacks, narrating comments, or unused abstractions. Do not introduce replacement abstractions, change public signatures or algorithms, or weaken test assertions. Use `references/categories.md` for examples and borderline cases.
 
-The categories live in `references/categories.md`: what each looks like, the KEEP rule that names what must survive, and, for anything touching a trust boundary, the proof a deletion needs before it happens.
+Preserve load-bearing validation, error/data-loss handling, security controls, and comments that explain contracts or non-obvious constraints. Keep license/SPDX and file/module headers, API docs, `// SAFETY:` rationale, locking/concurrency and `Context:` contracts, invariants and constant derivations, error/panic semantics, units and boundary conditions, deprecation notices, bug-linked workarounds, and project-mandated comments.
 
-## Workflow
+Before deleting a trust-boundary guard or catch, test an adversarial input and prove the remaining path handles the same failure. Trace callers and mutation paths before declaring a check redundant. No proof means no deletion. Do not turn an environment assumption into a guarantee about external input.
 
-1. **Scope.** Default to the diff of the change under review, or an explicit file list if the caller hands you one. Do not wander into files outside that scope, even when you spot slop in passing. Note it and move on.
-2. **Categorize.** Read every file in scope against the categories in `references/categories.md`. Build a per-file list of candidate cuts, each tagged with its category and a one-line reason.
-3. **Batch and apply.**
-   - Edit the files directly, one category at a time, safest first: comments, then dead code, then defensive clutter, then everything else.
-   - Split the list across executors only when it is large enough that independent batches finish sooner than one pass, and attach the category list and KEEP rules to each batch.
-   - For any cut inside `references/categories.md`'s trust-boundary set, apply the proof requirement before removing anything. No adversarial case, no deletion.
-4. **Verify.** Run the project's own build, lint, and test commands on the touched files. A cleanup that breaks the build is not a cleanup. If the project's build and test commands are unclear, end your report with a `## BLOCKING QUESTIONS` block that asks for them rather than guessing.
-5. **Record.** Log each verification with `evidence_log`. If you're mid-plan and find a category boundary you had to call by judgment (kept something that looked like slop, or cut something that looked defensible), write it to the plan's notepad so the decision survives past this turn.
+Apply small cuts, safest first. Delegate independent batches only if the current role permits it; give each worker its exact files and the protection rules. Leaf workers make their own cuts.
 
-## Reporting
-
-State, per file: what got cut (category, one line why), what got kept and why the KEEP rule applied, and what you weren't sure about. "Removed some dead code" is not a report. Silence on a skipped file is not a report either: say what you didn't touch and why.
-
-## Boundaries
-
-This skill does not touch test files' assertions, does not change public function signatures, does not introduce new abstractions to replace old ones, and does not rewrite algorithms under the banner of cleanup. An equivalence claim that needs a proof is a refactor, not slop removal, and belongs in its own change.
+Run the relevant project build, lint, and tests after cuts. If the commands are unknown, ask rather than guess. Log real exits with `evidence_log`. Report per file the cuts, what stays and why, and any uncertainty. For a bound plan, record consequential judgment calls with `notepad_write`.

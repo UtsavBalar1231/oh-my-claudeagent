@@ -58,6 +58,7 @@ function bindHost($: EngineInterface, options: Options): Host {
       toast: (text, toastOptions) => $.ui.toast(text, toastOptions),
       notify: (text, notifyOptions) => $.ui.notify(text, notifyOptions),
       blit: (args) => $.ui.blit(args),
+      view: (args) => $.ui.view(args),
     },
     session: {
       id: () => $.session.id(),
@@ -155,6 +156,7 @@ export const register: Register = (on, pluginOptions) => {
   const turnComplete = featuresFor("turn.complete", { band, agentsTracker, metrics, pane, footer });
   const agentSpawn = featuresFor("agent.spawn", { agentsTracker, pane, metrics });
   const promptEdit = featuresFor("prompt.edit", { band });
+  const promptChange = featuresFor("prompt.change", { band });
   const promptAutocomplete = featuresFor("prompt.autocomplete", { completion });
   const paneClose = featuresFor("ui.close", { pane });
   const paneFocus = featuresFor("ui.focus", { pane });
@@ -177,6 +179,7 @@ export const register: Register = (on, pluginOptions) => {
   on("turn.complete", ($, e, next) => dispatch(bindHost($, options), "turn.complete", turnComplete, e, next));
   on("agent.spawn", ($, e, next) => dispatch(bindHost($, options), "agent.spawn", agentSpawn, e, next)).catch((_$, e, next) => next(e));
   on("prompt.edit", ($, e, next) => dispatch(bindHost($, options), "prompt.edit", promptEdit, e, next));
+  on("prompt.change", ($, e, next) => dispatch(bindHost($, options), "prompt.change", promptChange, e, next));
   on("prompt.autocomplete", ($, e, next) => dispatch(bindHost($, options), "prompt.autocomplete", promptAutocomplete, e, next));
   on("ui.close", ($, e, next) => dispatch(bindHost($, options), "ui.close", paneClose, e, next)).catch((_$, e, next) => next(e));
   on("ui.focus", ($, e, next) => dispatch(bindHost($, options), "ui.focus", paneFocus, e, next)).catch((_$, e, next) => next(e));

@@ -44,7 +44,7 @@ export type Inputs = {
   hasOldMemory: boolean;
 };
 
-const ENGINE_FLOOR = "2.1.295";
+const ENGINE_FLOOR = "2.1.300";
 export const BUN_FLOOR = "1.4.2";
 const FRESH_MS = 10 * 60_000;
 
@@ -58,14 +58,6 @@ function parseVersion(text: string): Version | undefined {
 function isOlder(version: Version, floor: string): boolean {
   const [a, b, c] = parseVersion(floor) ?? [0, 0, 0];
   return version[0] !== a ? version[0] < a : version[1] !== b ? version[1] < b : version[2] < c;
-}
-
-const TYPESET_FLOOR = "2.1.299";
-
-/** Whether the engine draws a Text's `weight`, `mono` and `tabular`, and the named Space steps, as a release from 2.1.299 on. */
-export function isTypesetVersion(text: string): boolean {
-  const version = parseVersion(text);
-  return version !== undefined && !isOlder(version, TYPESET_FLOOR);
 }
 
 function pluginOptions(settings: Inputs["settings"], plugin: string): Readonly<Record<string, unknown>> | undefined {

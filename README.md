@@ -6,14 +6,16 @@
 
 <img src=".github/assets/hero.png" width="1000" alt="A Claude Code session on the left hands task 7 of the checkout plan to the executor, while the OMCA pane on the right shows the plan board at 6 of 14 tasks, with proof on the done tasks, the executor on task 7 and task 7's detail beside the list.">
 
-oh-my-claudeagent (OMCA) is a Claude Code plugin that plans work with you, hands each task to a
-specialist agent, and keeps a session from calling work done before a verification has been
-logged. The blog post [Claude Code, with receipts](https://utsavbalar.in/blog/oh-my-claudeagent)
-tells why it exists and how it works inside.
+oh-my-claudeagent (OMCA) coordinates specialist agents, plans and verification evidence in
+Claude Code and OpenCode V2. Both adapters share state formats, safety checks and durable
+operations. Claude Code also gates completion on logged verification; OpenCode labels the
+evidence without a Stop veto. The blog post
+[Claude Code, with receipts](https://utsavbalar.in/blog/oh-my-claudeagent) describes the original
+workflow.
 
 ## Requirements
 
-- Claude Code 2.1.295 or later. Tested with 2.1.299.
+- Claude Code 2.1.300 or later. Tested with 2.1.301.
 - bun 1.4.2 or later, on the `PATH` Claude Code starts with. The `omca` server, its hooks and
   the status line run on bun.
 - `ast-grep` (or `sg`), optional. Only the structural code search tools need it.
@@ -33,6 +35,13 @@ lockfile, so installing fetches no npm dependencies.
 Inside a session, the same steps are `/plugin marketplace add UtsavBalar1231/oh-my-claudeagent`
 and `/plugin install oh-my-claudeagent@omca`. Then run `/oh-my-claudeagent:omca-setup`, which
 checks the requirements above and offers to point your status line at OMCA's renderer.
+
+### OpenCode V2
+
+The OpenCode adapter requires OpenCode 2.0.29 or later in the 2.0 release line.
+It adds a selectable `omca` coordinator, native specialist tools, and a terminal
+panel opened with `/omca`. Build and Plan remain available. See
+[OpenCode setup](docs/usage.md#use-it-from-opencode) for installation and limits.
 
 ## Your first plan
 
@@ -108,10 +117,14 @@ The guard dialog arrives the moment the model asks for a destructive command.
 
 ## What OMCA runs, reads and writes
 
-OMCA runs locally: the `omca` MCP server on bun, a mod inside Claude Code, and, once you set it
+In Claude Code, OMCA runs locally: the `omca` MCP server on bun, a mod inside Claude Code, and, once you set it
 up, a status line renderer on bun. None of them makes a network call. Claude Code sends the conversation to Anthropic as it does
 without the plugin, and any MCP server you add follows its own policy. [PRIVACY.md](PRIVACY.md)
 is the privacy policy.
+
+In OpenCode, the native adapter runs in the connected server. Its terminal panel
+uses OpenCode's authenticated client for scoped snapshots; a remote server's
+project files stay on that server. OMCA adds no telemetry or external service.
 
 **Settings hooks.** `hooks/hooks.json` registers `SessionStart` (only after `/clear` and
 compaction), `UserPromptSubmit`, `UserPromptExpansion`, `SubagentStart`, `PreToolUse` (only
@@ -128,8 +141,8 @@ and PowerShell calls, and the tail of the transcript at Stop. The drift guard ru
 
 **The mod.** `hooks/register.ts` handles `tool.check` for Bash and PowerShell (the
 destructive-command guard), `tool.call`, `session.start`, `turn.start`, `turn.step`,
-`turn.complete`, `agent.spawn`, `prompt.edit`, `prompt.autocomplete`, `ui.close`, `ui.focus`,
-`ui.scroll`, `command.run` for `/omca`, `ui.render` and `session.compact`. `claude plugin
+`turn.complete`, `agent.spawn`, `prompt.edit`, `prompt.change`, `prompt.autocomplete`, `ui.close`,
+`ui.focus`, `ui.scroll`, `command.run` for `/omca`, `ui.render` and `session.compact`. `claude plugin
 validate .` lists them with the host calls the mod makes: the file system, the clock, local
 processes such as `git`, the settings file (read only), session information, the prompt box and
 the UI. It reads these environment variables: `CLAUDE_AFK_TIMEOUT_MS`,
