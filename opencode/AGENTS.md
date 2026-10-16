@@ -1,6 +1,7 @@
 # OpenCode V2 adapter
 
-`index.ts` is the server plugin. `tui.tsx` is the optional terminal companion and
+`index.ts` is the server plugin. `tui.tsx` is the optional terminal companion;
+`tui-panel.tsx` renders its session panel with native theme and interaction APIs.
 `rpc.ts` is its import-safe contract. `state.ts` reads checkout-local OMCA state.
 `tools.ts` registers native, session-aware tools. `lib.ts` projects shared
 Markdown bodies and metadata into native definitions; it owns no second prompt

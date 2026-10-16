@@ -80,11 +80,14 @@ describe.skipIf(!opencodeBin || !tmux || process.platform === "win32")("native O
     terminal("send-keys", "-t", "omca", "Enter")
     await until("slash completion selected", 5_000, async () => capture().includes("/omca"), capture)
     terminal("send-keys", "-t", "omca", "Enter")
-    await until("OMCA panel displayed", 20_000, async () => capture().includes("OMCA Overview"), capture)
-    expect(capture()).toContain("Plan: work")
+    await until("OMCA panel displayed", 20_000, async () => capture().includes("OMCA / Overview"), capture)
+    expect(capture()).toContain("Current plan")
+    expect(capture()).toContain("First task")
+    expect(capture()).not.toContain("SHA256")
+    expect(capture()).not.toContain("Native server-authored verification")
     for (const width of [120, 200, 80]) {
       terminal("resize-window", "-t", "omca", "-x", String(width), "-y", "32")
-      await until(`OMCA panel at ${width} columns`, 5_000, async () => capture().includes("OMCA Overview"), capture)
+      await until(`OMCA panel at ${width} columns`, 5_000, async () => capture().includes("OMCA / Overview"), capture)
     }
     terminal("send-keys", "-t", "omca", "6")
     await until("Doctor tab", 5_000, async () => capture().includes("Read-only server health"), capture)
