@@ -41,8 +41,6 @@ type ButtonStyle = Omit<ButtonProps, "hover"> & { hover?: Keyed<TextHoverProps, 
 // default silently and an invalid color string refuses the whole tree, so a raw string must not compile.
 export type Kit = {
   surface: RenderSurface;
-  /** Whether the engine draws a Text's `weight`, `mono` and `tabular` and the named Space steps. */
-  isTypeset: boolean;
   Box: ElementConstructor<BoxStyle>;
   Text: ElementConstructor<TextStyle>;
   Button: ElementConstructor<ButtonStyle>;
@@ -94,15 +92,14 @@ function typesetText(table: ElementTable, surface: RenderSurface): Kit["Text"] {
   };
 }
 
-type KitOptions = { tier?: GlyphTier; isStill?: boolean; isTypeset?: boolean };
+type KitOptions = { tier?: GlyphTier; isStill?: boolean };
 
 // The engine completes every table, so a surface without an Input still hands out one that
 // draws an empty fragment; the surface, not the table, says whether a field can be drawn.
-export const kitOf = (table: ElementTable, surface: RenderSurface, { tier = "nerd", isStill = false, isTypeset = false }: KitOptions = {}): Kit => ({
+export const kitOf = (table: ElementTable, surface: RenderSurface, { tier = "nerd", isStill = false }: KitOptions = {}): Kit => ({
   surface,
-  isTypeset,
   Box: table.Box,
-  Text: isTypeset ? typesetText(table, surface) : table.Text,
+  Text: typesetText(table, surface),
   Button: table.Button,
   Markdown: table.Markdown,
   Code: table.Code,
@@ -116,8 +113,8 @@ const styleOf = ({ text: _text, ...style }: Piece): TextStyle => style;
 /** Whether the surface lays the tree out in pixels and scrolls the pane itself, as every one but the terminal does. */
 export const isRemote = (kit: Kit): boolean => kit.surface !== "terminal";
 
-/** The gap between the rows of a remote surface: one cell row, or the step a cell-drawn surface draws as one row down. */
-export const rowGapOf = (kit: Kit): Space => (kit.isTypeset ? "md" : 1);
+/** The gap between the rows of a remote surface. */
+export const ROW_GAP: Space = "md";
 
 /**
  * One row of styled spans cut at its end. Ink applies the outer Text's mode to every span inside it.
@@ -126,7 +123,7 @@ export const rowGapOf = (kit: Kit): Space => (kit.isTypeset ? "md" : 1);
  * that does not shrink, and the row clips whatever runs past the pane.
  */
 export function Run(kit: Kit, spans: readonly { style: TextStyle; text: string }[]): RenderElement {
-  const face = kit.isTypeset && isRemote(kit) ? ({ mono: true } as const) : {};
+  const face = isRemote(kit) ? ({ mono: true } as const) : {};
   const texts = spans.map(({ style, text }) => kit.Text({ ...style, ...face, children: [text] }));
   if (!isRemote(kit)) return kit.Text({ wrap: "truncate-end", children: texts });
   return kit.Box({ flexDirection: "row", overflow: "hidden", children: [kit.Box({ flexShrink: 0, children: [kit.Text({ ...face, children: texts })] })] });

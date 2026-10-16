@@ -8,7 +8,7 @@ file is listed in the [reference](references.md).
 ### Install
 
 Install the plugin with the command in the [README](../README.md#install). OMCA needs Claude
-Code 2.1.295 or later and bun 1.4.2 or later. `ast-grep` (or `sg`) is optional: without it the
+Code 2.1.300 or later and bun 1.4.2 or later. `ast-grep` (or `sg`) is optional: without it the
 `ast_*` tools return an error and everything else works.
 
 ### Run setup
@@ -435,7 +435,7 @@ server's whole normalized name followed by `__*`. A shorter prefix such as
 
 `/omca doctor` opens the Doctor tab and runs its checks:
 
-- the OMCA version that is loaded, and whether Claude Code meets the 2.1.295 floor;
+- the OMCA version that is loaded, and whether Claude Code meets the 2.1.300 floor;
 - whether bun 1.4.2 or later is on the session's `PATH`;
 - when a hook last reached the `omca` server;
 - whether `ast-grep` or `sg` is on `PATH`;
@@ -503,8 +503,8 @@ gates are off. At session start OMCA writes a line in the transcript that bun is
 and the Doctor tab reports bun as missing. Make bun reachable from the app's `PATH`, for example
 by linking it into a directory the app searches, and restart the app.
 
-The Code tab in Desktop runs its own bundled copy of Claude Code, which trails the CLI. OMCA's mod
-(the guard, band, pane, toasts and guard dialog) runs there only when that copy is 2.1.295 or
+The Code tab in Desktop runs its own bundled copy of Claude Code. OMCA's mod
+(the guard, band, pane, toasts and guard dialog) runs there only when that copy is 2.1.300 or
 later; `/status` in a Code-tab session shows its version. On an older copy the agents, skills,
 MCP tools and stop gates still work and the mod does not load. Desktop for Linux is a beta for
 Debian and Ubuntu that updates through the package manager, so a newer bundled copy arrives with
@@ -550,11 +550,11 @@ the tool again; do not skip the evidence.
 
 **The band, the pane and the guard are gone.** The mod is not running. On the first prompt of a
 session the `omca` server shows a message once when that happens, saying the Bash guard, band and
-pane are off. Run `/plugin` and check that OMCA is listed under mods active. Mods are off when
-your organization sets `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks`, when
-Anthropic turns them off remotely, or after the mod worker crashes three times. Using Desktop can
-save that remote switch as off in `~/.claude.json`, which then turns mods off in the terminal too;
-removing `cachedGrowthBookFeatures.tengu_plugin_hooks_modules` from that file and restarting
+pane are off. Run `/plugin` and check that OMCA is listed under mods active. The mod does not
+load on a Claude Code older than 2.1.300. Mods are off when your organization sets
+`allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks`, when Anthropic turns them
+off remotely, or after the mod worker crashes three times. Using Desktop can save that remote
+switch as off in `~/.claude.json`, which then turns mods off in the terminal too; removing `cachedGrowthBookFeatures.tengu_plugin_hooks_modules` from that file and restarting
 clears it ([#99130](https://github.com/anthropics/claude-code/issues/99130)). With two copies of
 OMCA enabled from different marketplaces, only one copy's hooks and mod load, and `/plugin` notes
 the other under Errors; disable one copy and run `/reload-plugins`. A session where nothing draws,

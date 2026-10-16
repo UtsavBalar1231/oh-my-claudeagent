@@ -112,7 +112,8 @@ type Run = { text: string; color?: unknown; backgroundColor?: unknown; bold?: un
 function runsOf(row: Node | undefined): Run[] {
   return (row === undefined ? [] : childrenOf(row)).flatMap((piece) => {
     if (!isNode(piece)) return [];
-    const { color, backgroundColor, bold, dimColor } = piece.props ?? {};
+    const { color, backgroundColor, weight, dimColor } = piece.props ?? {};
+    const bold = weight === "semibold" ? true : undefined;
     return [
       {
         text: childrenOf(piece).join(""),

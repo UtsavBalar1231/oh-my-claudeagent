@@ -89,7 +89,7 @@ const row = (key: string, ...pieces: unknown[]) => ({
 const card = (key: string, border: string, width: number, title: string, ...children: unknown[]) => ({
   type: "Box",
   props: { key, flexDirection: "column", borderStyle: "round", borderColor: border, paddingX: 1, width },
-  children: [text({ bold: true, color: "text", wrap: "truncate-end" }, title), ...children],
+  children: [text({ weight: "semibold", color: "text", wrap: "truncate-end" }, title), ...children],
 });
 
 async function statsTab($: Engine, size: Size = DOCK_200): Promise<RenderElement> {
@@ -106,7 +106,7 @@ test("the agents card draws each agent's glyph in its roster color with the name
   const gap = lit({}, "  ");
 
   expect(childrenOf(agents ?? { type: "" })).toEqual([
-    text({ bold: true, color: "text", wrap: "truncate-end" }, "Agents · 3 types"),
+    text({ weight: "semibold", color: "text", wrap: "truncate-end" }, "Agents · 3 types"),
     text({ dimColor: true }, "  agent                  runs  median  tokens  est. cost  evidence  outcomes    "),
     row(
       "stats-oh-my-claudeagent:executor",
@@ -217,7 +217,7 @@ test("the cost card totals the priced runs, splits its meter by agent with the c
       "success",
       STACKED_WIDTH,
       "Estimated cost",
-      line(text({ bold: true }, "$1.35+"), text({}, " "), text({ color: GREEN }, "█".repeat(55)), text({ color: BLUE }, "█")),
+      line(text({ weight: "semibold" }, "$1.35+"), text({}, " "), text({ color: GREEN }, "█".repeat(55)), text({ color: BLUE }, "█")),
       text({ dimColor: true, wrap: "wrap" }, "n/a: no listed price · 2026-10-11 list prices"),
     ),
   );
@@ -448,7 +448,7 @@ test("on a remote surface the stacked cards sit in a column with a row between t
     const tree = await ui.drawn();
     const cards = nodeByKey(tree, "stats-cards");
     if (surface === "desktop") {
-      expect(cards?.props).toEqual({ key: "stats-cards", flexDirection: "column", rowGap: 1 });
+      expect(cards?.props).toEqual({ key: "stats-cards", flexDirection: "column", rowGap: "md" });
       expect(keysOf(cards)).toEqual(["stats-agents", "stats-tokens", "stats-cost"]);
     } else {
       expect(cards).toBeUndefined();
@@ -464,7 +464,7 @@ test("on a remote surface at the split tier the agents card and the pair of card
   const ui = await $.ui.mount(pane("desktop", { columns: 200, rows: 50, placement: "inline" }));
   const cards = nodeByKey(await ui.drawn(), "stats-cards");
 
-  expect(cards?.props).toEqual({ key: "stats-cards", flexDirection: "column", rowGap: 1 });
+  expect(cards?.props).toEqual({ key: "stats-cards", flexDirection: "column", rowGap: "md" });
   expect(keysOf(cards)).toEqual(["stats-agents", "stats-lower"]);
   await ui.unmount();
 });

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { RENAMES } from "./agent-names.ts";
-import { addRefreshInterval, type Check, doctorChecks, type Inputs, isTypesetVersion, MIGRATE_COMMAND, SETUP_COMMAND, unifiedDiff } from "./doctor-checks.ts";
+import { addRefreshInterval, type Check, doctorChecks, type Inputs, MIGRATE_COMMAND, SETUP_COMMAND, unifiedDiff } from "./doctor-checks.ts";
 
 const NOW = Date.UTC(2026, 9, 2, 12, 0, 0);
 const STATUS_LINE = { type: "command", command: "omca-statusline" };
@@ -8,7 +8,7 @@ const USER_SETTINGS = `{\n  "statusLine": {\n    "type": "command",\n    "comman
 
 const BASE: Inputs = {
   modVersion: "3.0.0",
-  engineVersion: "2.1.295",
+  engineVersion: "2.1.300",
   bunVersion: "1.4.2",
   astGrep: { name: "ast-grep", version: "0.39.0" },
   hook: { kind: "seen", lastHookAt: NOW / 1000 - 30 },
@@ -111,27 +111,17 @@ describe("output style", () => {
   });
 });
 
-test.each<[string, boolean]>([
-  ["2.1.296", false],
-  ["2.1.299", true],
-  ["v2.1.300", true],
-  ["2.1.299-dev", true],
-  ["garbage", false],
-])("isTypesetVersion(%s) is %p", (version, expected) => {
-  expect(isTypesetVersion(version)).toBe(expected);
-});
-
 test("mod version", () => {
   expect(run({}, "mod")).toEqual({ level: "ok", detail: "oh-my-claudeagent 3.0.0 is loaded" });
   expect(run({ modVersion: null }, "mod")).toEqual({ level: "warn", detail: "Could not read this mod's version from its manifest" });
 });
 
 test.each<[string, Omit<Check, "id" | "label">]>([
-  ["2.1.295", { level: "ok", detail: "2.1.295 meets the 2.1.295 floor" }],
-  ["2.2.0", { level: "ok", detail: "2.2.0 meets the 2.1.295 floor" }],
-  ["2.1.296-dev", { level: "ok", detail: "2.1.296-dev meets the 2.1.295 floor" }],
-  ["2.1.294", { level: "fail", detail: "2.1.294 is older than 2.1.295, which the OMCA mod needs" }],
-  ["1.9.999", { level: "fail", detail: "1.9.999 is older than 2.1.295, which the OMCA mod needs" }],
+  ["2.1.300", { level: "ok", detail: "2.1.300 meets the 2.1.300 floor" }],
+  ["2.2.0", { level: "ok", detail: "2.2.0 meets the 2.1.300 floor" }],
+  ["2.1.301-dev", { level: "ok", detail: "2.1.301-dev meets the 2.1.300 floor" }],
+  ["2.1.299", { level: "fail", detail: "2.1.299 is older than 2.1.300, which the OMCA mod needs" }],
+  ["1.9.999", { level: "fail", detail: "1.9.999 is older than 2.1.300, which the OMCA mod needs" }],
   ["nightly", { level: "warn", detail: 'Could not read a version from "nightly"' }],
 ])("Claude Code %s", (engineVersion, expected) => {
   expect(run({ engineVersion }, "engine")).toEqual(expected);

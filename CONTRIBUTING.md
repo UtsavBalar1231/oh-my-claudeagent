@@ -6,7 +6,7 @@
 - `bun` 1.4.2 or later, runtime for the MCP server, the hooks module, the status line and the scripts
 - `ast-grep` CLI (`ast-grep` or `sg`), structural code-search tools
 - `just`, task runner for dev commands. Its recipes run in bash, so on Windows run them from Git Bash
-- `claude`, Claude Code 2.1.295 or later, which loads the mod: `just test-mod`, the validator's engine group and `just qa` need it
+- `claude`, Claude Code 2.1.300 or later, which loads the mod: `just test-mod`, the validator's engine group and `just qa` need it
 - `pre-commit`, which runs the git hooks that `just setup` installs
 - `uv`, which `just bench` uses to install a baseline whose status line is the Python renderer
 

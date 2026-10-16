@@ -42,7 +42,8 @@ const element = (type: string) => (props: Record<string, unknown>, ...children: 
 };
 const text = element("Text");
 const box = element("Box");
-const line = (pieces: readonly Piece[]) => text({ wrap: "truncate-end" }, ...pieces.map(({ text: run, ...style }) => text(style, run)));
+const line = (pieces: readonly Piece[]) =>
+  text({ wrap: "truncate-end" }, ...pieces.map(({ text: run, bold, ...style }) => text({ ...style, ...(bold === true ? { weight: "semibold" } : {}) }, run)));
 const button = (key: string, label: string) => ({ type: "Button", props: { key, label, hotkey: key, plain: true }, press: expect.anything() });
 const title = (name: string, label: string, isDim = false) => ({
   type: "Button",

@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Needs Claude Code 2.1.300 or later:** an older client, including a Desktop Code tab
+  whose bundled Claude Code is older, does not load the mod (guard, band, pane, toasts).
+  `/omca doctor`, `omca-setup` and the mod-missing message name the floor.
 - **Shared implementation:** both hosts reuse prompt sources, registry operations,
   evidence and notepad services. Selected shared prompt bodies are about 75% smaller.
 - **OpenCode tools:** native tools replace the adapter's MCP process. Session context

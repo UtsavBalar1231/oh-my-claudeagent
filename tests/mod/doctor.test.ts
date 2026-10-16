@@ -39,7 +39,7 @@ type Engine = World & { writes: string[]; release: () => void; started: Promise<
 // The calls world.ts leaves out: a held `bun --version`, ast-grep found only as sg, the engine
 // version, and writes recorded in order, refused for any path in `refuse`.
 function engine(on: On, w: World, options: { hold?: boolean; refuse?: readonly string[] } = {}): Engine {
-  w.version = "2.1.295";
+  w.version = "2.1.300";
   let release = () => {};
   let started = () => {};
   const held = new Promise<void>((resolve) => (release = resolve));
@@ -82,7 +82,7 @@ function body(tree: RenderElement): string[] {
 }
 
 const CHECKS = [
-  " ✓ OK    Claude Code   2.1.295 meets the 2.1.295 floor",
+  " ✓ OK    Claude Code   2.1.300 meets the 2.1.300 floor",
   " ✓ OK    bun           bun 1.4.2 is on PATH",
   " ✓ OK    omca server   Last hook call 2 min ago",
   " ✓ OK    ast-grep      sg 0.39.0 is on PATH",
@@ -281,7 +281,7 @@ for (const layout of LAYOUTS) {
     w.version = undefined;
     await ui.press({ key: "r" });
     expect(rows(await ui.drawn()).slice(-2)).toEqual(["✗ The checks failed: version unavailable", "r: Run again"]);
-    w.version = "2.1.295";
+    w.version = "2.1.300";
     await ui.press({ key: "r" });
     expect(rows(await ui.drawn()).find((row) => row.startsWith(" ! WARN  Status line"))).toBe(
       " ! WARN  Status line  No refreshInterval, so it redraws on events only  and goes stale while agents run  i: Add refreshInterval 5",
@@ -377,7 +377,7 @@ for (const layout of LAYOUTS) {
     expect(drawn[3]).toBe("o: Show passing   + 11 ok - Claude Code, bun, omca server, ast-grep, O...");
     await ui.press({ key: "o" });
     const opened = body(await ui.drawn());
-    expect(opened).toContain("[+ OK]   Claude Code   2.1.295 meets the 2.1.295 floor");
+    expect(opened).toContain("[+ OK]   Claude Code   2.1.300 meets the 2.1.300 floor");
     expect(opened.at(-2)).toBe("  v 9 more - ^v scroll");
       expect(rows(await ui.drawn()).filter((row) => !isAscii(row))).toEqual([]);
     await ui.unmount();
@@ -624,21 +624,30 @@ test("a row is a chip with the level's glyph and word on its tone, the label bol
     hover: { backgroundColor: "selectionBg" },
     children: [
       line(
-        piece({ color: "inverseText", backgroundColor: "success", bold: true }, " ✓ OK "),
+        piece({ color: "inverseText", backgroundColor: "success", weight: "semibold" }, " ✓ OK "),
         piece({}, "   "),
-        piece({ bold: true }, "Claude Code   "),
-        piece({}, "2.1.295 meets the 2.1.295 floor"),
+        piece({ weight: "semibold" }, "Claude Code   "),
+        piece({}, "2.1.300 meets the 2.1.300 floor"),
       ),
     ],
   });
   expect(childrenOf(nodeByKey(drawn, "check-mod") ?? { type: "" })[0]).toEqual(
     line(
-      piece({ color: "inverseText", backgroundColor: "warning", bold: true }, " ! WARN "),
+      piece({ color: "inverseText", backgroundColor: "warning", weight: "semibold" }, " ! WARN "),
       piece({}, " "),
-      piece({ bold: true }, "OMCA          "),
+      piece({ weight: "semibold" }, "OMCA          "),
       piece({}, "Could not read this mod's version from its manifest"),
     ),
   );
+  await ui.unmount();
+});
+
+test("an engine older than 2.1.300 fails the Claude Code check", async ($, on) => {
+  const w = engine(on, world(on, {}, {}));
+  w.version = "2.1.299";
+  await $.command.run(run("doctor", 120));
+  const ui = await $.ui.mount(pane("terminal", WIDE));
+  expect(rows(await ui.drawn())).toContainEqual(expect.stringContaining("Claude Code   2.1.299 is older than 2.1.300, which the OMCA mod needs"));
   await ui.unmount();
 });
 

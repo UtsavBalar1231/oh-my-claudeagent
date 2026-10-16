@@ -14,7 +14,7 @@ import * as evidence from "./tabs/evidence.ts";
 import * as notepad from "./tabs/notepad.ts";
 import * as plan from "./tabs/plan.ts";
 import * as stats from "./tabs/stats.ts";
-import { isDrawable, isRemote, type Kit, kitOf, rowGapOf, Rule, rowsAtLeast, sizeOf } from "./ui.ts";
+import { isDrawable, isRemote, type Kit, kitOf, ROW_GAP, Rule, rowsAtLeast, sizeOf } from "./ui.ts";
 
 export const PANE = "omca";
 // The Agents tab's elapsed clocks tick each second, only while a terminal draws them: on Desktop every
@@ -217,7 +217,7 @@ export function keyButton(view: View, hotkey: string, label: string, work: () =>
 export const rule = (view: View): RenderElement => Rule(view.kit, view.width, view.g, view.isAscii);
 
 /** A row of Buttons wraps on a remote surface, whose native buttons are wider than the cells counted for them. */
-export const buttonRow = (view: View): { flexWrap?: "wrap"; rowGap?: Space } => (isRemote(view.kit) ? { flexWrap: "wrap", rowGap: rowGapOf(view.kit) } : {});
+export const buttonRow = (view: View): { flexWrap?: "wrap"; rowGap?: Space } => (isRemote(view.kit) ? { flexWrap: "wrap", rowGap: ROW_GAP } : {});
 
 /** A dim line of `width` cells, a blank row when the text is empty. */
 export const edge = (view: View, text: string, width = view.width): RenderElement =>
@@ -299,8 +299,8 @@ function bodyRows(host: Host, e: Input<"ui.render Pane">, isInline: boolean): nu
 }
 
 async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderElement> {
-  const { home, platform, glyphTier, isTypeset } = resolvedSession();
-  const kit = kitOf(host.ui.resolve(e), e.surface, { tier: glyphTier, isStill: mascots.still(), isTypeset });
+  const { home, platform, glyphTier } = resolvedSession();
+  const kit = kitOf(host.ui.resolve(e), e.surface, { tier: glyphTier, isStill: mascots.still() });
   const { Box, Text, Button } = kit;
   const width = usableColumns(e.props.bodyColumns);
   const isInline = e.props.placement !== "dock";

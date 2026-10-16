@@ -400,7 +400,9 @@ function spans(node: unknown): Span[] {
   if (node.type === "Button") return [{ text: String(props["label"]), ...(props["dimColor"] === true ? { dimColor: true } : {}) }];
   return children.flatMap((child) => {
     if (typeof child !== "string") return spans(child);
-    const style = Object.fromEntries(["color", "backgroundColor", "bold", "dimColor"].flatMap((name) => (props[name] === undefined ? [] : [[name, props[name]]])));
+    const style = Object.fromEntries(
+      [...["color", "backgroundColor", "dimColor"].flatMap((name) => (props[name] === undefined ? [] : [[name, props[name]]])), ...(props["weight"] === "semibold" ? [["bold", true]] : [])],
+    );
     return node.type === "Text" ? [{ text: child, ...style }] : [];
   });
 }
@@ -693,8 +695,8 @@ test("the split tier draws the focused task's detail beside the list", async ($,
   const detail = await ui.find({ key: "board-detail" });
   expect(detail?.props["overflow"]).toBe("hidden");
   expect(await ui.find({ type: "Text", text: "3. Draw the board" })).toBeDefined();
-  expect(await ui.find({ type: "Text", text: "Draw rows and chips." })).toMatchObject({ children: [{ children: ["Draw "] }, { props: { bold: true }, children: ["rows"] }, { children: [" and chips."] }] });
-  expect(await ui.find({ type: "Text", text: "Must NOT: add an option." })).toMatchObject({ children: [{ props: { bold: true }, children: ["Must"] }, { children: [" "] }, { props: { bold: true }, children: ["NOT:"] }, { children: [" add an option."] }] });
+  expect(await ui.find({ type: "Text", text: "Draw rows and chips." })).toMatchObject({ children: [{ children: ["Draw "] }, { props: { weight: "semibold" }, children: ["rows"] }, { children: [" and chips."] }] });
+  expect(await ui.find({ type: "Text", text: "Must NOT: add an option." })).toMatchObject({ children: [{ props: { weight: "semibold" }, children: ["Must"] }, { children: [" "] }, { props: { weight: "semibold" }, children: ["NOT:"] }, { children: [" add an option."] }] });
   expect((await ui.find({ type: "Code" }))?.props).toMatchObject({ source: "$ just test-mod", language: "bash" });
   expect(spans(detail).filter((span) => span.backgroundColor !== undefined)).toEqual([
     { text: " OPEN ", color: "inverseText", backgroundColor: "inactive", bold: true },

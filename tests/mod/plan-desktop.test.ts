@@ -217,9 +217,8 @@ test("in the terminal opening a task's page leaves the ring where the engine hol
 const nodesOf = (node: unknown): Record<string, unknown>[] =>
   isNode(node) ? [{ type: node.type, ...node.props }, ...childrenOf(node).flatMap(nodesOf)] : [];
 
-test("on an engine that draws typeset text a desktop board sends semibold, mono spans, tabular digits and named row gaps", async ($, on) => {
-  const w = planWorld(on);
-  w.version = "2.1.299";
+test("a desktop board sends semibold, mono spans, tabular digits and named row gaps", async ($, on) => {
+  planWorld(on);
   on("session.start", (_$, e) => ({ cwd: e.cwd }));
   on("command.register", (_$, e) => ({ value: { command: e.name } }));
   await $.session.start({ cwd: ROOT, surface: "desktop", isInteractive: true });

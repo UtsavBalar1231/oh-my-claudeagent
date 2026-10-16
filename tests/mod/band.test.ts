@@ -385,7 +385,7 @@ test("the bar, the glyphs and the running count draw in their theme keys, the wo
   const band = await mount($, "terminal");
   const styled = (await band.findAll({ type: "Text" }))
     .slice(1)
-    .map(({ text, props }) => [text, props["color"] ?? (props["bold"] === true ? "bold" : props["dimColor"] === true ? "dim" : "plain")]);
+    .map(({ text, props }) => [text, props["color"] ?? (props["weight"] === "semibold" ? "bold" : props["dimColor"] === true ? "dim" : "plain")]);
   expect(styled).toEqual([
     ["█", "success"],
     ["▎", "success"],

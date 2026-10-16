@@ -3,7 +3,7 @@ import { type Engine, expect, test } from "claude-code/testing";
 import { framesOf, rasterCells, svgOf } from "../../src/core/mascots.ts";
 import { type GlyphTier, glyphs } from "../../src/core/ui-kit.ts";
 import { chip, type Paint } from "../../src/core/visual.ts";
-import { Card, CodeBlock, Field, type Kit, kitOf, Row, rowGapOf, Rule, rowsAtLeast, Run, ScopedCard } from "../../hooks/ui.ts";
+import { Card, CodeBlock, Field, type Kit, kitOf, Row, ROW_GAP, Rule, rowsAtLeast, Run, ScopedCard } from "../../hooks/ui.ts";
 import { codeUnits, commitLayout, committedLayout, newLayout, scrollAt, ScrollRegion, scrollKeyed, type Unit } from "../../hooks/regions.ts";
 import { childrenOf, isNode, PLUGIN } from "./world.ts";
 
@@ -65,7 +65,7 @@ test("a rule draws its pieces as runs of one line", async ($, on) => {
       { wrap: "truncate-end" },
       text({ color: "subtle" }, "--"),
       text({}, " "),
-      text({ color: "text", bold: true }, "Tasks"),
+      text({ color: "text", weight: "semibold" }, "Tasks"),
       text({}, " "),
       text({ color: "subtle" }, "--"),
       text({}, " 1/2 "),
@@ -81,13 +81,13 @@ test("on a remote surface a line is a clipped row around one box that does not s
       box(
         { flexShrink: 0 },
         text(
-          {},
-          text({ color: "subtle" }, "--"),
-          text({}, " "),
-          text({ color: "text", bold: true, weight: "semibold" }, "Tasks"),
-          text({}, " "),
-          text({ color: "subtle" }, "--"),
-          text({}, " 1/2 "),
+          { mono: true },
+          text({ color: "subtle", mono: true }, "--"),
+          text({ mono: true }, " "),
+          text({ color: "text", weight: "semibold", bold: true, mono: true }, "Tasks"),
+          text({ mono: true }, " "),
+          text({ color: "subtle", mono: true }, "--"),
+          text({ mono: true }, " 1/2 "),
         ),
       ),
     )),
@@ -103,7 +103,7 @@ test("on a remote surface a region draws every unit in one column, with no cue, 
     commitLayout(layout);
     return region;
   }, "desktop");
-  expect(tree).toEqual(stamp(box({ key: "r", width: 30, flexDirection: "column" }, ...Array.from({ length: 10 }, (_, n) => text({}, `line ${n + 1}`)))));
+  expect(tree).toEqual(stamp(box({ key: "r", width: 30, flexDirection: "column" }, ...Array.from({ length: 10 }, (_, n) => text({ tabular: true }, `line ${n + 1}`)))));
   expect(scrollKeyed(1, "row")).toBe(false);
 });
 
@@ -124,13 +124,13 @@ test("a card is a round border in its tone with a bold title, filled when raised
   expect(await drawn((kit) => Card(kit, { key: "c", title: "Task 43", tone: "active", isAscii: false, isRaised: true, width: 40, children: body(kit) }))).toEqual({
     type: "Box",
     props: { key: "c", flexDirection: "column", borderStyle: "round", borderColor: "claude", paddingX: 1, width: 40, backgroundColor: "userMessageBackground" },
-    children: [text({ bold: true, color: "text", wrap: "truncate-end" }, "Task 43"), text({}, "Done when: just ci exits 0")],
+    children: [text({ weight: "semibold", color: "text", wrap: "truncate-end" }, "Task 43"), text({}, "Done when: just ci exits 0")],
     part: { plugin: "test" },
   });
   expect(await drawn((kit) => Card(kit, { key: "c", title: "Plan", tone: "planMode", isAscii: false, children: [] }))).toEqual({
     type: "Box",
     props: { key: "c", flexDirection: "column", borderStyle: "round", borderColor: "planMode", paddingX: 1 },
-    children: [text({ bold: true, color: "text", wrap: "truncate-end" }, "Plan")],
+    children: [text({ weight: "semibold", color: "text", wrap: "truncate-end" }, "Plan")],
     part: { plugin: "test" },
   });
 });
@@ -165,7 +165,7 @@ test("a tree's fewest rows: one per text or markdown, code by line, a border two
 test("a row lights selectionBg on hover, holds it bold when focused, and dims when done; a chip and a state mark keep their colors", async ($, on) => {
   const drawn = gallery($, on);
   const pieces = [{ text: "✓ ", color: "success" as const }, { text: "42 Port tabs " }, chip("PROVEN", "ok", false)];
-  const proven = text({ color: "inverseText", backgroundColor: "success", bold: true }, " PROVEN ");
+  const proven = text({ color: "inverseText", backgroundColor: "success", weight: "semibold" }, " PROVEN ");
   const row = (...children: unknown[]) =>
     stamp(box({ key: "r", flexDirection: "row", hover: { backgroundColor: "selectionBg" } }, text({ wrap: "truncate-end" }, ...children)));
 
@@ -175,7 +175,7 @@ test("a row lights selectionBg on hover, holds it bold when focused, and dims wh
   expect(await drawn((kit) => Row(kit, { key: "r", pieces, isFocused: true }))).toEqual(
     stamp(box(
       { key: "r", flexDirection: "row", hover: { backgroundColor: "selectionBg" }, backgroundColor: "selectionBg" },
-      text({ wrap: "truncate-end" }, text({ color: "success", bold: true }, "✓ "), text({ color: "text", bold: true }, "42 Port tabs "), proven),
+      text({ wrap: "truncate-end" }, text({ color: "success", weight: "semibold" }, "✓ "), text({ color: "text", weight: "semibold" }, "42 Port tabs "), proven),
     )),
   );
   expect(await drawn((kit) => Row(kit, { key: "r", pieces, isDone: true }))).toEqual(
@@ -185,7 +185,7 @@ test("a row lights selectionBg on hover, holds it bold when focused, and dims wh
   expect(focused).toEqual(
     stamp(box(
       { key: "r", flexDirection: "row", hover: { backgroundColor: "selectionBg" }, backgroundColor: "selectionBg" },
-      text({ wrap: "truncate-end" }, text({ color: "text", bold: true }, "✓ "), text({ color: "text", bold: true }, "42 Port tabs "), proven),
+      text({ wrap: "truncate-end" }, text({ color: "text", weight: "semibold" }, "✓ "), text({ color: "text", weight: "semibold" }, "42 Port tabs "), proven),
     )),
   );
 });
@@ -219,7 +219,7 @@ test("a field is an Input where the surface has one and its value as text on mob
   expect(await drawn((kit) => Field(kit, spec), "mobile")).toEqual(
     stamp(text({ wrap: "truncate-end" }, "/ ", text({ dimColor: true }, "filter tasks"))),
   );
-  expect(await drawn((kit) => Field(kit, { ...spec, value: "43" }), "mobile")).toEqual(stamp(text({ wrap: "truncate-end" }, "/ ", "43")));
+  expect(await drawn((kit) => Field(kit, { ...spec, value: "43" }), "mobile")).toEqual(stamp(text({ wrap: "truncate-end", tabular: true }, "/ ", "43")));
 });
 
 const MASCOT_STATES = ["working", "done", "failed", "idle"] as const;
@@ -345,26 +345,9 @@ function recording() {
 
 const BOLD_TITLE = { bold: true, color: "text", hover: { bold: true }, children: ["Tasks"] } as const;
 
-test("without the typeset engine a kit hands the table's Text its props as given, whatever the surface", () => {
-  for (const surface of ["terminal", "desktop"] as const) {
-    const { calls, table } = recording();
-    const kit = kitOf(table, surface);
-    kit.Text(BOLD_TITLE);
-    kit.Text({ children: ["3 tasks"] });
-    Run(kit, [{ style: { bold: true }, text: "1/2" }]);
-    expect(kit.isTypeset).toBe(false);
-    expect(rowGapOf(kit)).toBe(1);
-    expect(calls.filter(({ type }) => type === "Text").map(({ props }) => props).slice(0, 3)).toEqual([
-      BOLD_TITLE,
-      { children: ["3 tasks"] },
-      { bold: true, children: ["1/2"] },
-    ]);
-  }
-});
-
-test("on a remote typeset surface Text sends semibold for bold, Run sets mono on its container and every span, and other digits are tabular", () => {
+test("on a remote surface Text sends semibold for bold, Run sets mono on its container and every span, and other digits are tabular", () => {
   const { calls, table } = recording();
-  const kit = kitOf(table, "desktop", { isTypeset: true });
+  const kit = kitOf(table, "desktop");
   kit.Text(BOLD_TITLE);
   kit.Text({ children: ["3 tasks"] });
   kit.Text({ children: ["no digits"] });
@@ -373,7 +356,7 @@ test("on a remote typeset surface Text sends semibold for bold, Run sets mono on
     { style: { bold: true }, text: "Tasks" },
     { style: {}, text: "1/2" },
   ]);
-  expect(rowGapOf(kit)).toBe("md");
+  expect(ROW_GAP).toBe("md");
   expect(calls.map(({ type, props }) => ({ type, ...props }))).toEqual([
     { type: "Text", color: "text", weight: "semibold", hover: { bold: true }, children: ["Tasks"] },
     { type: "Text", tabular: true, children: ["3 tasks"] },
@@ -387,9 +370,9 @@ test("on a remote typeset surface Text sends semibold for bold, Run sets mono on
   ]);
 });
 
-test("on the terminal a typeset kit sends semibold for bold and nothing else: no mono and no tabular", () => {
+test("on the terminal the kit sends semibold for bold and nothing else: no mono and no tabular", () => {
   const { calls, table } = recording();
-  const kit = kitOf(table, "terminal", { isTypeset: true });
+  const kit = kitOf(table, "terminal");
   kit.Text({ bold: true, children: ["3 tasks"] });
   Run(kit, [{ style: { bold: true }, text: "1/2" }]);
   expect(calls.map(({ type, props }) => ({ type, ...props }))).toEqual([
