@@ -13,9 +13,9 @@ const SH_FAMILY = ["sh", "bash", "zsh"]
 export const shellKind = (shell: string): Context["shell"] =>
   SH_FAMILY.includes(shell.replace(/^.*[\\/]/, "").toLowerCase().replace(/\.exe$/, "")) ? "bash" : "powershell"
 
-function shellContext(projectRoot: string, shell: string): Context {
+function shellContext(projectRoot: string, shell: string, cwd: string): Context {
   const home = homeDir(process.env)
-  return { shell: shellKind(shell), cwd: projectRoot, root: projectRoot, platform: toPlatform(process.platform), ...(home !== undefined && { home }) }
+  return { shell: shellKind(shell), cwd, root: projectRoot, platform: toPlatform(process.platform), ...(home !== undefined && { home }) }
 }
 
 function symbolicRef(projectRoot: string, name: string): string | undefined {
@@ -37,14 +37,11 @@ function branches(projectRoot: string): Pick<Context, "branch" | "defaultBranch"
 const isPush = (finding: Finding | undefined): boolean =>
   finding !== undefined && finding.kind !== "catastrophic" && finding.git.some((git) => git.operation === "push --force")
 
-// OpenCode has no dialog to hold a command in, so it decides as `guardMode: deny` does: a
-// catastrophic or blocking match is denied, and an advisory one runs. A guard that fails refuses
-// the command, as the mod's guard does.
-export function checkShell(command: string, projectRoot: string, shell: string): GuardResult {
+export function checkShell(command: string, projectRoot: string, shell: string, cwd = projectRoot): GuardResult {
   try {
-    const ctx = shellContext(projectRoot, shell)
+    const ctx = shellContext(projectRoot, shell, cwd)
     const first = classify(command, ctx)
-    const finding = isPush(first) ? classify(command, { ...ctx, ...branches(projectRoot) }) : first
+    const finding = isPush(first) ? classify(command, { ...ctx, ...branches(cwd) }) : first
     if (finding === undefined || finding.kind === "advisory") return ALLOW
     if (finding.kind === "blocking" && isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "bash-guard")) return ALLOW
     return { deny: true, reason: reasonFor(finding) }

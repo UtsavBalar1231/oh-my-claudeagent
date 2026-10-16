@@ -1,6 +1,7 @@
 import { dirname, join } from "node:path";
 import { entriesOf, EVIDENCE_TYPES, type EvidenceType, readLedger } from "../../src/core/evidence.ts";
 import { STATE_VERSION } from "../../src/core/state-version.ts";
+import { isRecord } from "../../src/core/tool-input.ts";
 import { latestSessionId, touchSession } from "../hooks/session-state.ts";
 import { ledgerPath, writeStatus } from "../hooks/status-file.ts";
 import { ensureStateDir, readOrNull, withLock, writeFileAtomic } from "../io.ts";
@@ -21,6 +22,18 @@ export const KEEP_ENTRIES = 500;
 
 type Ledger = { document: Record<string, unknown>; entries: unknown[] };
 
+export type EvidenceEntry = {
+  type: EvidenceType;
+  command: string;
+  exit_code: number;
+  output_snippet: string;
+  timestamp: string;
+  verified_by?: string;
+  plan_sha256?: string;
+  record_id?: string;
+  [key: string]: unknown;
+};
+
 // The ledger is an append-only audit trail, so a file that does not parse is refused rather than replaced.
 function parseLedger(path: string, text: string): Ledger {
   const read = readLedger(text);
@@ -40,6 +53,18 @@ const capped = (value: string, max: number): string => (value.length > max ? Arr
 
 const writeLedger = (path: string, { document, entries }: Ledger): void =>
   writeFileAtomic(path, `${JSON.stringify({ version: STATE_VERSION, ...document, entries }, null, 2)}\n`);
+
+export async function appendEvidence(root: string, entry: EvidenceEntry, beforeWrite?: () => Promise<void>): Promise<number> {
+  const path = ledgerPath(root);
+  return withLock(`${path}.lock`, async () => {
+    if (beforeWrite !== undefined) await beforeWrite();
+    const ledger = readLedgerFile(path);
+    if (entry.record_id !== undefined && ledger.entries.some((existing) => isRecord(existing) && existing.record_id === entry.record_id)) return ledger.entries.length;
+    ledger.entries.push(entry);
+    writeLedger(path, ledger);
+    return ledger.entries.length;
+  });
+}
 
 function updateStatus(root: string): void {
   const sessionId = latestSessionId();
@@ -76,13 +101,7 @@ async function evidenceLog(args: Record<string, unknown>): Promise<string> {
     ...(planSha256 && { plan_sha256: planSha256 }),
   };
   ensureStateDir(root);
-  const path = ledgerPath(root);
-  const total = await withLock(`${path}.lock`, () => {
-    const ledger = readLedgerFile(path);
-    ledger.entries.push(entry);
-    writeLedger(path, ledger);
-    return ledger.entries.length;
-  });
+  const total = await appendEvidence(root, entry);
   updateStatus(root);
   return `Evidence recorded: ${type} (exit ${exitCode}), ${total} total entries`;
 }

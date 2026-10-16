@@ -75,6 +75,7 @@ just validate --check claims     # one validator group; the others are hooks, mo
 just test                        # every bun spec outside opencode/, including the validator specs
 just test-mod                    # the mod tests, through claude plugin test .
 just test-opencode               # every opencode/ spec; the ones that load OpenCode skip without opencode on PATH
+just build-opencode              # compile the TUI artifact used by Git/package installs
 just smoke                       # one claude -p session with the packaged plugin against the mock model
 just qa                          # manual QA against the mock model: session smoke, install verify, live hook probe, statusline probe, live MCP probe, worktree and agent-effort checks
 just bench                       # the working tree against a baseline ref, through the mock model
@@ -86,6 +87,13 @@ Use `just ci` before claiming a change is verified; `just test` runs the bun spe
 CI runs each recipe's commands directly, `bun scripts/validate.ts` for `just validate` for
 example, not through `just`. `scripts/validate/workflow.spec.ts` checks that CI runs every
 command of the `just ci` recipes and nothing else without a stated reason.
+
+After changing the OpenCode UI or its RPC contract, run `just build-opencode`.
+The package exports the compiled TUI because installed JSX is not transformed by
+the host. The artifact is generated from the shared TypeScript sources with host
+dependencies external; `just test-opencode` checks that it is current.
+Commit the generated artifact with its source changes. Source lint excludes the
+artifact; the compiler freshness check and installed-package tests cover it.
 
 The server specs under `servers/` need the ast-grep CLI. `just test` runs them with the other specs.
 
@@ -144,9 +152,10 @@ contains `origin/plugin`, a `## [<version>]` heading in `CHANGELOG.md` and no ex
 It then packages that tag's tracked files as a commit on the orphan `plugin` branch tagged
 `plugin-v<version>`. `EXCLUDES` in `scripts/package.ts` leaves out the repository tooling: the
 specs, `tests/`, `scripts/` except `scripts/setup-statusline.ts`, `package.json`, `bun.lock`,
-the typecheck and lint configs, `CONTRIBUTING.md`, the OpenCode adapter and `video/`. Without
-`package.json` and a lockfile, an install fetches no npm packages. A second commit on `main`
-records the packaged commit's SHA in `marketplace.json`, as a `url` source with `ref: plugin`.
+the typecheck and lint configs, `CONTRIBUTING.md`, the OpenCode adapter, `video/` and
+`design-lab/`. Without `package.json` and a lockfile, an install fetches no npm packages.
+A second commit on `main` records the packaged commit's SHA in `marketplace.json`, as a
+`url` source with `ref: plugin`.
 
 The script never pushes. It prints one atomic push of both branches and both tags,
 `git push --atomic origin main plugin v<version> plugin-v<version>`, so the stamped SHA never

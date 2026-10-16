@@ -1,7 +1,7 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, spyOn, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { asRegistry, parseRegistry, resolveBoundPlan } from "./boulder.ts";
+import { asRegistry, parseRegistry, readRegistryDocument, resolveBoundPlan, unbindSessions, upsertPlanSession } from "./boulder.ts";
 
 const FIXTURES = join(import.meta.dir, "../../tests/fixtures/boulder-schemas");
 
@@ -195,6 +195,9 @@ describe("asRegistry", () => {
 });
 
 describe("parseRegistry", () => {
+  test("retains its existing return shape", () => {
+    expect(parseRegistry('{"custom":true}')).toEqual({ kind: "ok", registry: { plans: {}, bindings: {} } });
+  });
   test("a registry fixture parses to its plans and bindings", () => {
     const registry = fixture("two-plan");
     expect(parseRegistry(rawFixture("two-plan"))).toMatchObject({ kind: "ok", registry: { plans: registry["plans"], bindings: registry["bindings"] } });
@@ -219,5 +222,62 @@ describe("parseRegistry", () => {
     ["a string version", '{"version":"1"}', "version"],
   ])("refuses %s", (_label, text, code) => {
     expect(parseRegistry(text)).toMatchObject({ kind: "refused", code });
+  });
+});
+
+describe("registry document updates", () => {
+  test("parses once while retaining unknown root, plan, and binding fields", () => {
+    const data = { version: 1, custom: { keep: true }, plans: { work: { active_plan: "/p.md", extension: 1 } }, bindings: { s: { plan_name: "work", extra: "keep" } } };
+    const text = JSON.stringify(data);
+    const parse = spyOn(JSON, "parse");
+    try {
+      const read = readRegistryDocument(text);
+      expect(parse).toHaveBeenCalledTimes(1);
+      expect(read).toEqual({ kind: "ok", document: data, registry: { plans: data.plans, bindings: data.bindings } });
+      if (read.kind !== "ok") throw new Error("Expected a readable registry");
+      expect<unknown>(read.registry.plans).toBe(read.document.plans);
+      expect<unknown>(read.registry.bindings).toBe(read.document.bindings);
+    } finally {
+      parse.mockRestore();
+    }
+  });
+
+  test.each(["{", "null", "[]", '{"version":2}', '{"plans":[]}', '{"bindings":[]}'])("shares parseRegistry's refusal for %s", (text) => {
+    expect<unknown>(readRegistryDocument(text)).toEqual(parseRegistry(text));
+  });
+
+  test("upserts plan fields and sessions without mutating or dropping metadata", () => {
+    const registry = {
+      plans: { work: { active_plan: "/old.md", started_at: "old", session_ids: ["first"], custom: { keep: true } }, other: { active_plan: "/other.md" } },
+      bindings: { first: { plan_name: "work", bound_at: 1, extra: "keep" }, other: { plan_name: "other", extension: true } },
+    };
+    const before = structuredClone(registry);
+    const updated = upsertPlanSession(registry, "work", { active_plan: "/new.md", worktree_path: "/tree" }, "first", 2);
+    expect(registry).toEqual(before);
+    expect(updated.plans.work).toEqual({ ...registry.plans.work, active_plan: "/new.md", worktree_path: "/tree" });
+    expect<unknown>(updated.bindings.first).toEqual({ plan_name: "work", bound_at: 2, extra: "keep" });
+    expect(updated.plans.other).toEqual(registry.plans.other);
+    expect(updated.bindings.other).toEqual(registry.bindings.other);
+    expect(upsertPlanSession(updated, "work", {}, "second", 3).plans.work?.session_ids).toEqual(["first", "second"]);
+  });
+
+  test("registers without a session and handles prototype-shaped keys as own data", () => {
+    const registry = { plans: {}, bindings: {} };
+    const unbound = upsertPlanSession(registry, "work", { active_plan: "/p.md" }, "", 1);
+    expect(unbound.bindings).toEqual({});
+    expect(unbound.plans.work?.session_ids).toEqual([]);
+    const bound = upsertPlanSession(unbound, "constructor", { active_plan: "/c.md" }, "__proto__", 2);
+    expect(Object.hasOwn(bound.plans, "constructor")).toBe(true);
+    expect(Object.hasOwn(bound.bindings, "__proto__")).toBe(true);
+    expect(bound.bindings.__proto__).toEqual({ plan_name: "constructor", bound_at: 2 });
+    expect(Object.getPrototypeOf(bound.bindings)).toBe(Object.prototype);
+  });
+
+  test("unbinds only requested sessions without mutating attribution history or metadata", () => {
+    const registry = { plans: { work: { session_ids: ["first", "second"], custom: true } }, bindings: { first: { plan_name: "work" }, second: { plan_name: "work", extra: "keep" } } };
+    const before = structuredClone(registry);
+    const updated = unbindSessions(registry, ["first", "missing"]);
+    expect(registry).toEqual(before);
+    expect(updated).toEqual({ plans: registry.plans, bindings: { second: registry.bindings.second } });
   });
 });

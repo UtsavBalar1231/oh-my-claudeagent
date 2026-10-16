@@ -48,8 +48,9 @@ the notepad tree under `.omca/notepads/`. Read `resolveBoundPlan` in
 `src/core/boulder.ts` for the resolution ladder rather than hand-parsing `boulder.json`
 anywhere else.
 
-Each durable file has one reader: `parseRegistry` in `src/core/boulder.ts` and `readLedger` in
-`src/core/evidence.ts`. Both refuse text that is not JSON, not an object, or whose `version` key
+Each durable file has one canonical reader: `readRegistryDocument` in `src/core/boulder.ts`
+and `readLedger` in `src/core/evidence.ts`. `parseRegistry` provides a registry-only view of
+the same reader. Both refuse text that is not JSON, not an object, or whose `version` key
 is present and not `1`; a file without `version` reads as version 1. Writers (`boulder_write`,
 `evidence_log`, ledger rotation and its archives) stamp `"version": 1` as the first key and
 throw an error naming the file when the reader refuses it, so a corrupt registry or ledger is

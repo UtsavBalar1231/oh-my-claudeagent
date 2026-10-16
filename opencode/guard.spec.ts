@@ -92,6 +92,13 @@ describe("decisions", () => {
     expect(checkShell(`rm -rf ${project}/build`, project, BASH)).toEqual({ deny: false })
   })
 
+  test("relative removals use the command cwd rather than the plugin directory", () => {
+    const project = join(tmp, "project")
+    const cwd = join(project, "nested")
+    expect(checkShell("rm -rf ../nested", project, BASH, cwd)).toEqual({ deny: true, reason: RM_CATASTROPHIC })
+    expect(checkShell("rm -rf build/out", project, BASH, cwd)).toEqual({ deny: false })
+  })
+
   test("home is read from the environment, in any spelling", () => {
     process.env.HOME = "/home/bob"
     process.env.USERPROFILE = "/home/bob"

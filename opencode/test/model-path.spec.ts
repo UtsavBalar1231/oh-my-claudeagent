@@ -1,16 +1,18 @@
 import { afterAll, beforeAll, describe, test } from "bun:test"
-import { closeSync, existsSync, openSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { commit, countLines, git, type Listing, opencodeBin, removeDir, repo, scratchDir, type Server, snapshot, startServer, until, writeConfig } from "./harness.ts"
+import { commit, countLines, git, type Listing, opencodeBin, removeDir, scratchDir, type Server, snapshot, startServer, startStubProvider, until, writeConfig } from "./harness.ts"
 
 type Message = { role?: string; content?: unknown }
 type Request = { model?: string; messages?: Message[]; tools?: { function: { name: string } }[] }
 type Named = { name?: string; parentID?: string | null; status?: { status?: string } }
-type Fixture = { root: string; ws: string; server: Server; stub: Bun.Subprocess; stubFd: number; stubLog: string; baseline: number }
+type Fixture = { root: string; ws: string; server: Server; stopProvider: () => Promise<void>; stubLog: string; baseline: number }
 
 const SLOW = 240_000
-const EXPLORER = "# Explorer: Codebase Search Specialist"
-const EVIDENCE = "Evidence before claims"
+let EXPLORER: string
+let EXECUTOR: string
+let EVIDENCE: string
+let HANDOFF: string
 const VISIBLE_OMCA_TOOLS = [
   "omca_ast_dump_tree", "omca_ast_find_rule", "omca_ast_replace", "omca_ast_search", "omca_ast_test_rule",
   "omca_boulder_progress", "omca_evidence_log", "omca_evidence_read", "omca_file_read",
@@ -44,6 +46,7 @@ const system = (request: Request) =>
     .filter((message) => message.role === "system")
     .map((message) => text(message.content))
     .join("\n")
+const worker = (request: Request) => system(request).includes(EXPLORER) || system(request).includes(EXECUTOR)
 
 const lastIsTool = (request: Request) => request.messages?.at(-1)?.role === "tool"
 const lastText = (request: Request) => text(request.messages?.at(-1)?.content)
@@ -82,7 +85,7 @@ async function opencode(args: string[], timeoutMs: number): Promise<string> {
   }
 }
 
-const run = (scenario: string) => opencode(["run", "--server", need().server.base, "--model", "stub/scripted", "--auto", "--format", "json", `OMCA-SCENARIO:${scenario}`], 180_000)
+const run = (scenario: string, agent = "build") => opencode(["run", "--server", need().server.base, "--model", "stub/scripted", "--agent", agent, "--auto", "--format", "json", `OMCA-SCENARIO:${scenario}`], 180_000)
 
 // Runs a scenario the first time any test asks for it, so a test that reads the requests a scenario produced does not depend on the test that usually runs it coming first.
 function ran(name: string): Promise<Scenario> {
@@ -97,38 +100,39 @@ function ran(name: string): Promise<Scenario> {
 }
 
 async function ranAll(): Promise<void> {
-  for (const name of ["shell-reset", "subagent", "skill-load"]) await ran(name)
+  for (const name of ["shell-reset", "subagent", "skill-load", "explore-write"]) await ran(name)
 }
 
 describe.skipIf(!opencodeBin)("opencode model path", () => {
   beforeAll(async () => {
     const root = scratchDir("model-path")
-    const stubLog = join(root, "requests.jsonl")
-    const stubOut = join(root, "stub.out")
-    writeFileSync(stubLog, "")
-    const stubFd = openSync(stubOut, "a")
-    const stub = Bun.spawn([process.execPath, join(repo, "opencode", "test", "stub-provider.ts")], {
-      env: { ...process.env, STUB_LOG: stubLog },
-      stdin: "ignore",
-      stdout: stubFd,
-      stderr: stubFd,
-    })
-    const stubPort = await until("stub started", 5000, async () => readFileSync(stubOut, "utf8").match(/^listening (\d+)/m)?.[1], () => readFileSync(stubOut, "utf8"))
+    const provider = await startStubProvider(root)
 
     const ws = join(root, "ws")
+    const plugin = snapshot(join(root, "plugin"))
+    const source = await import(join(plugin, "opencode", "lib.ts")) as typeof import("../lib.ts")
+    const expected = source.generate(plugin)
+    const explorer = expected.agents.find((agent) => agent.id === "omca-explorer")
+    const executor = expected.agents.find((agent) => agent.id === "omca-executor")
+    const handoff = expected.skills.find((skill) => skill.id === "omca-handoff")
+    if (!explorer || !executor || !handoff) throw new Error("Fixture prompt definitions are incomplete")
+    EXPLORER = explorer.system.trim()
+    EXECUTOR = executor.system.trim()
+    EVIDENCE = expected.outputStyle.trim()
+    HANDOFF = handoff.content.trim()
     writeConfig(ws, {
       model: "stub/scripted",
       providers: {
         stub: {
           package: "@opencode/ai/providers/openai-compatible",
-          settings: { baseURL: `http://127.0.0.1:${stubPort}/v1`, apiKey: "stub" },
+          settings: { baseURL: `http://127.0.0.1:${provider.port}/v1`, apiKey: "stub" },
           models: {
             scripted: { capabilities: { tools: true, input: ["text"], output: ["text"] }, limit: { context: 200000, output: 32000 } },
             "scripted-sonnet": { capabilities: { tools: true, input: ["text"], output: ["text"] }, limit: { context: 200000, output: 32000 } },
           },
         },
       },
-      plugins: [{ package: join(snapshot(join(root, "plugin")), "opencode"), options: { models: { sonnet: "stub/scripted-sonnet" } } }],
+      plugins: [{ package: join(plugin, "opencode"), options: { models: { sonnet: "stub/scripted-sonnet" } } }],
     })
     git(ws, "init", "-q")
     writeFileSync(join(ws, "file.txt"), "one\n")
@@ -138,18 +142,9 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
     commit(ws, "two", "-a")
 
     const server = await startServer(root, ws, { OMCA_COMMENT_GATE: "deny" })
-    fixture = { root, ws, server, stub, stubFd, stubLog, baseline: 0 }
+    fixture = { root, ws, server, stopProvider: provider.stop, stubLog: provider.requests, baseline: 0 }
 
     await until("opencode models lists stub/scripted", 30_000, async () => (await opencode(["models", "--server", server.base], 20_000)).includes("stub/scripted"), server.last)
-    await until(
-      "omca MCP server connected",
-      90_000,
-      async () => {
-        const { body } = await server.api<Listing<Named>>("GET", "/api/mcp", ws)
-        return (body?.data ?? []).some((mcp) => mcp.name === "omca" && mcp.status?.status === "connected")
-      },
-      server.last,
-    )
     await until(
       "omca tools reach the model",
       60_000,
@@ -166,9 +161,7 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
   afterAll(async () => {
     if (!fixture) return
     await fixture.server.stop()
-    fixture.stub.kill()
-    await fixture.stub.exited
-    closeSync(fixture.stubFd)
+    await fixture.stopProvider()
     await removeDir(fixture.root)
   }, SLOW)
 
@@ -180,18 +173,18 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
     verify(toolResults(scenario).includes("omca guard:"), "shell-reset: no omca guard denial reached the model")
   }, SLOW)
 
-  test("subagent: the omca-explorer child session sees the guard denial", async () => {
+  test("subagent: the omca-executor child session sees the guard denial", async () => {
     const { server, ws } = need()
     const scenario = await ran("subagent")
     const sessions = await server.api<Listing<Named>>("GET", "/api/session", ws)
     verify((sessions.body?.data ?? []).some((session) => session.parentID != null), `subagent: no child session: ${sessions.text}`)
-    verify(during(scenario).some((request) => system(request).includes(EXPLORER)), "subagent: no request carried the omca-explorer system")
+    verify(during(scenario).some((request) => system(request).includes(EXECUTOR)), "subagent: no request carried the omca-executor system")
     verify(head() === scenario.headBefore, "subagent: HEAD moved")
     const childResult = during(scenario)
-      .filter((request) => lastIsTool(request) && system(request).includes(EXPLORER))
+      .filter((request) => lastIsTool(request) && system(request).includes(EXECUTOR))
       .map(lastText)
       .join("\n")
-    verify(childResult.includes("omca guard:"), "subagent: no omca guard denial reached the omca-explorer child")
+    verify(childResult.includes("omca guard:"), "subagent: no omca guard denial reached the omca-executor child")
   }, SLOW)
 
   test("context: build requests carry the evidence rule and omca-explorer requests do not", async () => {
@@ -203,20 +196,23 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
     verify(!requests().some((request) => system(request).includes(EXPLORER) && system(request).includes(EVIDENCE)), `context: the omca-explorer request contains '${EVIDENCE}'`)
   }, SLOW)
 
-  test("tools: every build request exposes exactly the visible omca tools", async () => {
+  test("tools: build requests expose essential native tools without legacy transport tools", async () => {
     await ranAll()
     const buildTools = requests()
-      .filter((request) => (request.tools?.length ?? 0) > 0 && !system(request).includes(EXPLORER))
+      .filter((request) => (request.tools?.length ?? 0) > 0 && !worker(request))
       .map((request) => toolNames(request).filter((name) => name.startsWith("omca_")).sort())
     verify(buildTools.length > 0, "tools: no build request carried tools")
-    const wrong = buildTools.filter((names) => names.join(",") !== VISIBLE_OMCA_TOOLS.join(","))
-    verify(wrong.length === 0, `tools: a build request exposes ${wrong[0]?.join(",")} instead of ${VISIBLE_OMCA_TOOLS.join(",")}`)
+    for (const names of buildTools) {
+      verify(names.includes("omca_evidence_log"), "tools: native evidence tool missing")
+      verify(names.includes("omca_boulder_progress"), "tools: native progress tool missing")
+      verify(!names.some((name) => ["omca_omca_hook", "omca_agents_migrate", "omca_boulder_write"].includes(name)), "tools: a legacy transport tool is exposed")
+    }
   }, SLOW)
 
-  test("instructions: build requests carry the omca server's OpenCode wording and name only visible tools", async () => {
+  test("instructions: native guidance names registered tools without Claude transport ids", async () => {
     await ranAll()
-    const build = requests().filter((request) => (request.tools?.length ?? 0) > 0 && !system(request).includes(EXPLORER)).map(system)
-    verify(build.some((text) => text.includes("`omca_evidence_log`, real exit code included")), "instructions: no build request carried the omca server instructions")
+    const build = requests().filter((request) => (request.tools?.length ?? 0) > 0 && !worker(request)).map(system)
+    verify(build.some((text) => text.includes("omca_evidence_log")), "instructions: no build request carried native evidence guidance")
     const named = [...new Set(build.flatMap((text) => [...text.matchAll(/\bomca_[a-z_]+/g)].map((match) => match[0])))]
     const hidden = named.filter((name) => !VISIBLE_OMCA_TOOLS.includes(name))
     verify(hidden.length === 0, `instructions: a build request names ${hidden.join(",")}, which the adapter hides`)
@@ -229,7 +225,7 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
     const explorer = requests().filter((request) => system(request).includes(EXPLORER))
     verify(explorer.length > 0, "models: no omca-explorer request")
     verify(explorer.every((request) => request.model === "scripted-sonnet"), `models: omca-explorer went to ${explorer.map((request) => request.model).join(",")}`)
-    verify(requests().filter((request) => !system(request).includes(EXPLORER)).every((request) => request.model === "scripted"), "models: a build request left the default model")
+    verify(requests().filter((request) => !worker(request)).every((request) => request.model === "scripted"), "models: a build request left the default model")
   }, SLOW)
 
   test("slop-write: the comment gate denial reaches the model and the file is not written", async () => {
@@ -238,18 +234,33 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
     verify(!existsSync(join(need().ws, "slop.sh")), "slop-write: slop.sh was written")
   }, SLOW)
 
-  test("explore-write: omca-explorer cannot write a file", async () => {
+  test("explore-write: omca-explorer has neither file mutators nor an unrestricted shell", async () => {
     const scenario = await ran("explore-write")
     const explorer = during(scenario).filter((request) => system(request).includes(EXPLORER))
     verify(explorer.length > 0, "explore-write: no request carried the omca-explorer system")
-    verify(explorer.every((request) => !toolNames(request).some((name) => ["write", "edit", "patch"].includes(name))), "explore-write: omca-explorer was offered a write tool")
+    verify(explorer.every((request) => !toolNames(request).some((name) => ["write", "edit", "patch", "shell"].includes(name))), "explore-write: omca-explorer was offered a write tool or unrestricted shell")
     verify(!existsSync(join(need().ws, "explored.txt")), "explore-write: explored.txt was written")
   }, SLOW)
 
-  test("skill-load: the skill result names /omca-handoff without untranslated text", async () => {
+  test("skill-load: the skill returns its concise manual-only body without untranslated text", async () => {
     const result = toolResults(await ran("skill-load"))
     verify(result !== "", "skill-load: no follow-up request carried the skill result")
-    verify(result.includes("/omca-handoff"), "skill-load: skill result lacks /omca-handoff")
+    verify(result.includes(HANDOFF), "skill-load: native handoff instructions are missing")
     verify(!result.includes("oh-my-claudeagent:"), "skill-load: skill result contains untranslated oh-my-claudeagent: text")
+  }, SLOW)
+
+  test("Code Mode discovers deferred native OMCA tools", async () => {
+    const scenario = await ran("discover-tools")
+    verify(toolResults(scenario).includes("ast_search"), "discover-tools: native AST tool was not discoverable in Code Mode")
+  }, SLOW)
+
+  test.each(["plan-worker", "plan-general"])("native Plan refuses execution-capable delegation: %s", async (scenario) => {
+    const start = requests().length
+    await run(scenario, "plan")
+    const observed = requests().slice(start)
+    verify(observed.filter(lastIsTool).map(lastText).join("\n").includes("OMCA planning cannot launch execution-capable specialists"), "plan-worker: native permission denial did not reach the model")
+    verify(!observed.some((request) => system(request).includes(EXECUTOR)), "plan-worker: an executor request was started")
+    verify(!observed.some((request) => request.messages?.at(-1)?.role === "user" && lastText(request).includes("OMCA-SCENARIO:write-file")), "plan-worker: an implementation child received the forbidden task")
+    verify(!existsSync(join(need().ws, "explored.txt")), "plan-worker: implementation changed the workspace")
   }, SLOW)
 })

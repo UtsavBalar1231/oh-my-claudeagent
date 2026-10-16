@@ -25,9 +25,10 @@ under `servers/hooks/`. Every file is TypeScript on bun.
   `*.spec.ts`, `tests/`, `scripts/` except `scripts/setup-statusline.ts` (`KEEP`), the root
   `package.json`, `bun.lock`, `bunfig.toml`, the tsconfig files, `.oxlintrc.json`, `justfile`,
   `.pre-commit-config.yaml`, `.editorconfig`, `CONTRIBUTING.md`, `opencode/`, `.opencode/` and
-  `video/`. Claude Code installs npm packages whenever the plugin root holds `package.json` and a
-  lockfile. A leading `/` in `EXCLUDES` anchors a pattern at the root. Packaging deletes whatever
-  in `<dest>` is not on the shipped list, so it refuses a `<dest>` that is the repository or a
+  `video/` and `design-lab/`. Claude Code installs npm packages whenever the plugin root holds
+  `package.json` and a lockfile. A leading `/` in `EXCLUDES` anchors a pattern at the root.
+  Packaging deletes whatever in `<dest>` is not on the shipped list, so it refuses a `<dest>`
+  that is the repository or a
   directory holding it, and a non-empty `<dest>` that is not an earlier package (one whose
   `.claude-plugin/plugin.json` names `oh-my-claudeagent`). A spec checks that every relative
   import and every path a shipped file names resolves inside the shipped tree.
@@ -57,6 +58,10 @@ under `servers/hooks/`. Every file is TypeScript on bun.
 - `postedit-check.ts`: runs `just typecheck` after an edit to a `.ts` file and reports the
   first lines of a failure as hook context. A contributor wires it as a `PostToolUse` entry in
   their own `.claude/settings.json`; `CONTRIBUTING.md` has the entry.
+- `build-opencode.ts`: compiles the terminal companion with OpenTUI's Solid plugin,
+  leaving host packages external. `just build-opencode` writes `opencode/tui.generated.js`;
+  `--check` refuses an artifact that differs from its sources. Git/package installs
+  load this artifact because source transformation excludes `node_modules`.
 - `docs/`: the capture pipeline. `screenshots.ts` runs real Claude Code sessions in tmux against
   the mock model and attaches kitty to each one on a private Xvfb display. With no name it writes
   the README shots to `.github/assets/`: a PNG still per scene (ImageMagick `import`, optimized

@@ -52,6 +52,7 @@ export const EXCLUDES = [
   "/opencode/",
   "/.opencode/",
   "/video/",
+  "/design-lab/",
   "/.claude-plugin/types/",
 ] as const;
 

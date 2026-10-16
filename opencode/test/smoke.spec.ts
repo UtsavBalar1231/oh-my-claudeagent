@@ -1,12 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
+import { existsSync } from "node:fs"
 import { join } from "node:path"
-import { type Agent, commit, countLines, git, type Listing, opencodeBin, removeDir, scratchDir, type Server, snapshot, startServer, until, writeConfig } from "./harness.ts"
+import { type Agent, commit, countLines, git, installPackage, isolatedEnv, type Listing, opencodeBin, packageFixture, removeDir, scratchDir, type Server, startServer, until, writeConfig } from "./harness.ts"
 
-type Fixture = { root: string; server: Server; a: string; b: string; c: string }
+type Fixture = { root: string; server: Server; packageServer: Server; a: string; b: string; c: string; stopPackage(): Promise<void> }
 type Session = { data?: { id?: string; location?: { directory?: string } } }
 type Named = { id?: string; name?: string; autoinvoke?: boolean; status?: { status?: string } }
 
-const SLOW = 120_000
+const SLOW = 180_000
 let fixture: Fixture | undefined
 
 function need(): Fixture {
@@ -26,8 +27,8 @@ function localPlugin(pluginRoot: string, sonnet: string) {
   return { plugins: [{ package: join(pluginRoot, "opencode"), options: { models: { sonnet } } }] }
 }
 
-async function omcaAgents(dir: string): Promise<Agent[] | undefined> {
-  const { body } = await need().server.api<Listing<Agent>>("GET", "/api/agent", dir)
+async function omcaAgents(dir: string, server = need().server): Promise<Agent[] | undefined> {
+  const { body } = await server.api<Listing<Agent>>("GET", "/api/agent", dir)
   const omca = (body?.data ?? []).filter((agent) => agent.id.startsWith("omca-"))
   return omca.length === 8 ? body?.data : undefined
 }
@@ -39,20 +40,35 @@ const registeredIn = (dir: string) => until(`omca agents registered in ${dir}`, 
 describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
   beforeAll(async () => {
     const root = scratchDir("smoke")
-    const plugin = snapshot(join(root, "plugin"))
-    git(plugin, "init", "-q")
-    git(plugin, "add", "-A")
-    commit(plugin, "package")
+    const plugin = packageFixture(join(root, "plugin"))
     const [a, b, c] = ["a", "b", "c"].map((name) => join(root, name)) as [string, string, string]
-    workspace(a, localPlugin(plugin, "anthropic/claude-sonnet-5-5"))
-    workspace(b, localPlugin(plugin, "bad"))
-    workspace(c, { plugins: [`oh-my-claudeagent@git+file://${plugin}`] })
-    fixture = { root, server: await startServer(root, root), a, b, c }
+    workspace(a, localPlugin(plugin.directory, "anthropic/claude-sonnet-5-5"))
+    workspace(b, { plugins: [join(plugin.directory, "opencode")] })
+    workspace(c, {})
+    const packageRoot = join(root, "package-runtime")
+    const env = isolatedEnv(packageRoot, c)
+    try {
+      if (process.platform === "win32") {
+        const clone = Bun.spawn(["git", "clone", "--depth=1", plugin.spec.split("@git+")[1]!, join(root, "clone-probe")], { env, stdout: "pipe", stderr: "pipe", signal: AbortSignal.timeout(30_000) })
+        const [code, output] = await Promise.all([clone.exited, new Response(clone.stderr).text()])
+        console.log(`Windows shallow clone probe: exit ${code}\n${output}`)
+        expect(code).toBe(0)
+      }
+      await installPackage(plugin.spec, env, c)
+    } catch (error) {
+      console.error(plugin.diagnostics())
+      await plugin.stop()
+      await removeDir(root)
+      throw error
+    }
+    fixture = { root, server: await startServer(root, root), packageServer: await startServer(packageRoot, c), a, b, c, stopPackage: plugin.stop }
   }, SLOW)
 
   afterAll(async () => {
     if (!fixture) return
     await fixture.server.stop()
+    await fixture.packageServer.stop()
+    await fixture.stopPackage()
     await removeDir(fixture.root)
   }, SLOW)
 
@@ -73,6 +89,24 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
     expect(["edit", "subagent"].filter((action) => !denied.includes(action))).toEqual([])
   })
 
+  test("OMCA is selectable while native Build and Plan remain primary", async () => {
+    const agents = await registeredIn(need().a)
+    for (const id of ["omca", "build", "plan"]) expect(agents.find((agent) => agent.id === id)?.mode).toBe("primary")
+  })
+
+  test("read-only RPC works in the installed adapter without initializing state", async () => {
+    const { server, a } = need()
+    await registeredIn(a)
+    const created = await server.api<Session>("POST", "/api/session", a, { title: "OMCA inspection", location: { directory: a } })
+    const sessionID = created.body?.data?.id
+    expect(sessionID).toBeString()
+    const response = await server.api<{ output?: { sessionID?: string; plan?: unknown; health?: unknown[] } }>("POST", "/api/rpc/omca/snapshot", a, { input: { sessionID } })
+    expect(response.status, response.text).toBe(200)
+    expect(response.body?.output).toMatchObject({ sessionID, plan: null })
+    expect(response.body?.output?.health?.length).toBeGreaterThan(0)
+    expect(existsSync(join(a, ".omca"))).toBe(false)
+  }, SLOW)
+
   test("omca-explorer model is anthropic/claude-sonnet-5-5 in A and unset in B", async () => {
     const { a, b } = need()
     expect(explore(await registeredIn(a))?.model).toMatchObject({ providerID: "anthropic", id: "claude-sonnet-5-5" })
@@ -81,7 +115,7 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
     expect(explore(agentsInB)?.model ?? null).toBeNull()
   }, SLOW)
 
-  test("5 omca-* skills with omca-handoff autoinvoke false, and 3 omca-* commands", async () => {
+  test("skills preserve manual handoff and commands include native planning/execution", async () => {
     const { server, a } = need()
     const skills = await until(
       "omca skills",
@@ -100,23 +134,20 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
       async () => {
         const { body } = await server.api<Listing<Named>>("GET", "/api/command", a)
         const omca = (body?.data ?? []).filter((command) => command.name?.startsWith("omca-"))
-        return omca.length === 3 ? omca : undefined
+        const expected = ["omca-analyzer", "omca-reviewer", "omca-build-fixer", "omca-plan", "omca-start-work", "omca-pause"]
+        return expected.every((name) => omca.some((command) => command.name === name)) ? omca : undefined
       },
       server.last,
     )
   }, SLOW)
 
-  test("omca MCP server connected", async () => {
+  test("native integration does not start a duplicate omca MCP server", async () => {
     const { server, a } = need()
-    await until(
-      "omca MCP connected",
-      90_000,
-      async () => {
-        const { body } = await server.api<Listing<Named>>("GET", "/api/mcp", a)
-        return (body?.data ?? []).some((mcp) => mcp.name === "omca" && mcp.status?.status === "connected")
-      },
-      server.last,
-    )
+    await registeredIn(a)
+    const response = await server.api<Listing<Named>>("GET", "/api/mcp", a)
+    expect(response.status, response.text).toBe(200)
+    expect(Array.isArray(response.body?.data)).toBe(true)
+    expect(response.body!.data!.some((mcp) => mcp.name === "omca")).toBe(false)
   }, SLOW)
 
   test("shell guard blocked the reset, kept HEAD, and allowed git status", async () => {
@@ -135,23 +166,32 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
     expect(status.status).toBeLessThan(300)
   }, SLOW)
 
-  test("log has no disabled plugin line and one ignoring models line", async () => {
+  test("log has no disabled plugin or silently ignored model configuration", async () => {
     await registeredIn(need().b)
     const log = need().server.log()
     expect(countLines(log, "disabled plugin after transform failure")).toBe(0)
-    expect(countLines(log, "omca: ignoring models.")).toBe(1)
+    expect(countLines(log, "omca: ignoring models.")).toBe(0)
   })
 
-  test("git+file plugin spec loads 8 agents with a non-empty omca-explorer system prompt", async () => {
-    const { server, c } = need()
+  test("Git package spec loads 8 agents with a non-empty omca-explorer system prompt", async () => {
+    const { packageServer: server, c } = need()
+    let packageState = ""
     await until(
       "git spec load",
       60_000,
       async () => {
-        const agents = await omcaAgents(c)
+        const agents = await omcaAgents(c, server)
+        if ((explore(agents)?.system?.length ?? 0) === 0) {
+          const plugins = await server.api("GET", "/api/plugin", c)
+          packageState = plugins.text
+        }
         return (explore(agents)?.system?.length ?? 0) > 0
       },
-      server.last,
+      () => {
+        const failures = server.log().split("\n").filter((line) => /plugin|install|WARN|ERROR/i.test(line)).join("\n")
+        console.error(packageState, failures)
+        return `${packageState}\n${failures}\n${server.last()}`
+      },
     )
   }, SLOW)
 })

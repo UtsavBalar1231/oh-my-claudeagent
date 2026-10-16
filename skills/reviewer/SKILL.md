@@ -11,8 +11,6 @@ effort: high
 
 Review the work plan at: $ARGUMENTS
 
-When no path is specified, ask the user for the plan file path. Accept a FILE PATH only, not an inline plan, todo list, or text summary.
-
-Follow reviewer workflow: read the plan, deep-verify every file reference, apply the five evaluation criteria, run falsification on the 2 most critical tasks, and return the Final Verdict (OKAY / REJECT with confidence, justification, and priority-tiered issues).
-
-Output: A single OKAY/REJECT verdict in the Final Verdict Format defined in `${CLAUDE_PLUGIN_ROOT}/agents/reviewer.md`. This feeds the planner review loop.
+Require one unambiguous plan file path, not an inline summary. Ask for it when
+missing. Apply the reviewer's instructions and return OKAY or REJECT with
+concrete blockers, source references and the smallest corrections.

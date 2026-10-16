@@ -1,8 +1,9 @@
 # Privacy policy
 
-Effective 2026-10-12.
+Effective 2026-10-15.
 
-oh-my-claudeagent (OMCA) is a Claude Code plugin that runs on your machine.
+oh-my-claudeagent (OMCA) runs inside Claude Code or an OpenCode V2 server. An
+OpenCode server may be local or remote, as configured by its user.
 
 ## What OMCA collects
 
@@ -10,7 +11,13 @@ Nothing. OMCA has no account, no telemetry and no analytics.
 
 ## What OMCA sends
 
-Nothing. OMCA's own code makes no network calls and ships no remote MCP server.
+OMCA ships no remote MCP server and adds no external data-collection service.
+Its OpenCode terminal panel requests session-scoped plan, evidence and notepad
+snapshots through the host's authenticated client. With a remote OpenCode server,
+these requests and their responses cross that server connection. The terminal
+does not read remote filesystem paths on the client machine.
+
+Claude Code's OMCA server, mod and status line make no network calls themselves.
 
 ## What OMCA reads and writes on your machine
 
@@ -28,8 +35,9 @@ OMCA keeps its state in the project's `.omca/` directory:
 - Temporary `*.tmp` files are deleted after a day.
 - The `file_read` tool's log of the files it read stays until you remove it.
 
-The cleanup runs when the `omca` server starts. Delete `.omca/` to remove everything OMCA stored
-for a project.
+The cleanup runs when the Claude Code `omca` MCP server starts. OpenCode's native
+adapter does not run that startup cleanup. Delete `.omca/` to remove OMCA's stored
+project state. On a remote OpenCode deployment, that directory is on the server.
 
 Outside the project, `omca-setup` edits `~/.claude/settings.json` only after you confirm its diff,
 keeps the previous file as `settings.json.omca-bak`, and copies a launcher to
@@ -37,12 +45,12 @@ keeps the previous file as `settings.json.omca-bak`, and copies a launcher to
 tab's `refreshInterval` fix edits the same file the same way, with a backup. The status line
 caches git state in a file in the system temp directory.
 
-## Claude Code and other MCP servers
+## Hosts, model providers and other MCP servers
 
-Claude Code sends your conversation to Anthropic as it does without OMCA, under Anthropic's
-terms and privacy policy. An MCP server you add yourself, such as the optional documentation and
-code search servers in the README, follows its own operator's policy. OMCA does not control
-either.
+OMCA workflows may launch specialist sessions through the host using your configured
+models. Conversations and tool results follow that host's and model provider's
+data policies. An MCP server you add yourself follows its operator's policy.
+OMCA does not control those services.
 
 ## Questions
 

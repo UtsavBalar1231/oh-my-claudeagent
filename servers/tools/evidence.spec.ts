@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { COMMAND_MAX_CHARS, KEEP_ENTRIES, rotateLedger, SNIPPET_MAX_CHARS, tools, VERIFIED_BY_MAX_CHARS } from "./evidence.ts";
+import { appendEvidence, COMMAND_MAX_CHARS, type EvidenceEntry, KEEP_ENTRIES, rotateLedger, SNIPPET_MAX_CHARS, tools, VERIFIED_BY_MAX_CHARS } from "./evidence.ts";
 
 const SERVER = join(import.meta.dir, "..", "omca.ts");
 // Eight processes append 160 entries one at a time under the ledger lock, about 30 ms an entry on a Windows
@@ -55,11 +55,53 @@ const log = (root: string, extra: Record<string, unknown> = {}) =>
   });
 
 const entry = (i: number) => ({
-  type: "test",
+  type: "test" as const,
   command: `cmd-${i}`,
   exit_code: 0,
   output_snippet: "ok",
   timestamp: "2026-10-02T00:00:00Z",
+});
+
+describe("appendEvidence", () => {
+  test("shared append is byte-equivalent to the legacy writer and preserves unknown ledger data", async () => {
+    const legacy = project();
+    const shared = project();
+    const document = { note: "keep", entries: [{ type: "test" }, { custom: [1, 2, 3] }] };
+    for (const root of [legacy, shared]) {
+      mkdirSync(join(root, ".omca", "evidence"), { recursive: true });
+      writeFileSync(ledgerFile(root), json(document));
+    }
+    await log(legacy, { command: "c".repeat(2500), output_snippet: "😀".repeat(2500), verified_by: "executor", plan_sha256: PLAN_SHA });
+    const trusted = entries(legacy).at(-1) as EvidenceEntry;
+    expect(await appendEvidence(shared, trusted)).toBe(3);
+    expect(read(ledgerFile(shared))).toBe(read(ledgerFile(legacy)));
+  });
+
+  test("native record IDs deduplicate under the same append lock without changing existing bytes", async () => {
+    const root = project();
+    const trusted = { ...entry(1), record_id: "native-retry", origin: "attested", provenance: { adapter: "opencode" } };
+    expect(await appendEvidence(root, trusted)).toBe(1);
+    const before = read(ledgerFile(root));
+    expect(await appendEvidence(root, { ...trusted, command: "retry must not replace the original" })).toBe(1);
+    expect(read(ledgerFile(root))).toBe(before);
+    await Promise.all(Array.from({ length: 10 }, () => appendEvidence(root, trusted)));
+    expect(entries(root)).toHaveLength(1);
+  });
+
+  test("beforeWrite runs under the lock before reading or replacing ledger bytes", async () => {
+    const root = project();
+    mkdirSync(join(root, ".omca", "evidence"), { recursive: true });
+    writeFileSync(ledgerFile(root), "corrupt but untouched");
+    let calls = 0;
+    await expect(appendEvidence(root, entry(1), async () => {
+      calls++;
+      expect(existsSync(`${ledgerFile(root)}.lock`)).toBe(true);
+      throw new Error("native scope changed");
+    })).rejects.toThrow("native scope changed");
+    expect(calls).toBe(1);
+    expect(read(ledgerFile(root))).toBe("corrupt but untouched");
+    expect(existsSync(`${ledgerFile(root)}.lock`)).toBe(false);
+  });
 });
 
 function seedLedger(root: string, count: number, make = entry): object[] {

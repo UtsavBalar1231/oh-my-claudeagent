@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, expect, test } from "bun:test";
+import { afterEach, beforeEach, expect, spyOn, test } from "bun:test";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { TextDecoder } from "node:util";
 import type { Platform } from "../../src/core/path.ts";
 import { isNetworkPath, isSensitivePath, readLines, tools } from "./filesystem.ts";
 
@@ -149,6 +150,26 @@ test("readLines cuts a line at the cap across chunks, counts what it drops, and 
     `${"b".repeat(2000)}... [line truncated, 1 more chars]`,
     "c".repeat(2000),
   ]);
+});
+
+test("cancelling a file read stops decoding instead of scanning the remaining file", async () => {
+  const path = write("cancelled.txt", "line\n".repeat(100_000));
+  const controller = new AbortController();
+  const original = TextDecoder.prototype.decode;
+  let chunks = 0;
+  const decoder = spyOn(TextDecoder.prototype, "decode").mockImplementation(function (this: TextDecoder, ...args: Parameters<TextDecoder["decode"]>) {
+    chunks++;
+    const text = original.apply(this, args);
+    if (chunks === 1) controller.abort(new Error("read cancelled"));
+    return text;
+  });
+  try {
+    await expect(fileRead.call({ path, limit: 1 }, { signal: controller.signal, progress: () => {}, audit: false })).rejects.toThrow("read cancelled");
+    expect(chunks).toBe(1);
+    expect(existsSync(join(dir, ".omca"))).toBe(false);
+  } finally {
+    decoder.mockRestore();
+  }
 });
 
 test("an offset past the end says so", async () => {

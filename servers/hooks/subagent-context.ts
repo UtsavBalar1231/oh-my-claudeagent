@@ -7,7 +7,7 @@ const HANDOFF = "emit a '## BLOCKING QUESTIONS' block at the end of your final r
 const AUTONOMOUS = `AskUserQuestion is not available here. Make autonomous decisions when possible; if you need user input, ${HANDOFF} The orchestrator will relay.`;
 const PLANNER = `AskUserQuestion is not available here. When you need user input, ${HANDOFF} The orchestrator will relay and resume you with the answers.`;
 const OUTPUT_MANDATE =
-  "[OUTPUT MANDATE] Your text response is the ONLY output the orchestrator receives. Tool call results and intermediate reasoning are NOT forwarded. Structure your response according to your agent's defined output format.";
+  "[OUTPUT MANDATE] Your final response is the deliverable; intermediate tool results are not forwarded. Return findings, evidence and remaining limits, keeping any markers your agent requires.";
 const FILE_TOOLS =
   "[FILE TOOLS] Read files with the Read tool, not cat, head, tail, or sed -n in Bash: Read numbers the lines and pages a large file with offset and limit.";
 export const OMCA_TOOLS =
@@ -19,7 +19,7 @@ const EDITING_GUIDANCE = [
   "[PLAN SHA] When logging a final_verification entry, take plan_sha256 from boulder_progress for the active plan and pass it as evidence_log(..., plan_sha256=<plan_sha256>) so the Stop gate scopes evidence to this plan run.",
 ];
 const ORCHESTRATING_GUIDANCE = [
-  "[ANTI-DUPLICATION] Once you delegate exploration to explorer/researcher agents, do not perform the same search yourself. Avoid after delegating: manually grep/searching for the same information; re-doing research agents are handling; 'just quickly checking' the same files. Continue only with non-overlapping work. A background agent, the default in interactive sessions, answers the Agent call with a launch acknowledgement only, and its report arrives later in a task notification. Do not poll its output file or post holding messages while it runs.",
+  "[ANTI-DUPLICATION] Do not duplicate an active delegate's search. Continue non-overlapping work, then independently check its delivered findings. A background launch acknowledgement is not a result; wait for the actual task notification. Do not poll the child's transcript or send holding messages.",
   "[TEAM CONTRACT] OMCA agents are thin wrappers over Claude-native subagents and agent teams. Use subagents when workers only need to report back. Use native agent teams when workers need the shared task list or direct teammate messaging.",
 ];
 const ORCHESTRATING = new Set(["orchestrator", "planner"]);
@@ -30,7 +30,7 @@ const LEAF_WORKER =
 const NEVER_STUB =
   "[NEVER STUB] Your final message is the whole deliverable: put your complete findings in it, never a bare status word or a note that you are waiting.";
 
-function planLines(root: string, sessionId: unknown): string[] {
+function planLines(root: string, sessionId: unknown, canCheckpoint: boolean): string[] {
   if (typeof sessionId !== "string") return [];
   const read = readBoundPlan(root, sessionId);
   if (read.kind === "corrupt") console.error(`omca: subagent-context: ${registryPath(root)} is not valid JSON, so no plan context is added`);
@@ -41,10 +41,12 @@ function planLines(root: string, sessionId: unknown): string[] {
     ...(read.file !== undefined
       ? [
           `[ACTIVE PLAN] Refer to: ${file}`,
-          `The plan file at ${file} is READ-ONLY for you: the orchestrator flips its checkboxes after reviewing your report, so an edit here would record progress nobody verified. Record issues or decisions with notepad_write instead.`,
+          `The plan file at ${file} is READ-ONLY for you: the orchestrator flips its checkboxes after reviewing your report, so an edit here would record progress nobody verified.`,
         ]
       : []),
-    `[NOTEPAD AVAILABLE] Plan: ${name}. Use notepad_write('${name}', section, content) to record discoveries. Sections: learnings, issues, decisions, problems. Each call appends, so earlier entries stay.`,
+    canCheckpoint
+      ? `[NOTEPAD AVAILABLE] Plan: ${name}. Use notepad_write('${name}', section, content) to record discoveries. Sections: learnings, issues, decisions, problems. Each call appends, so earlier entries stay.`
+      : `[NOTEPAD AVAILABLE] Plan: ${name}. Return discoveries, issues and decisions for the primary to checkpoint; do not call notepad_write from this read-only assignment. Sections: learnings, issues, decisions, problems.`,
   ];
 }
 
@@ -58,7 +60,7 @@ export const handle: Handler = (payload, { root }) => {
     OUTPUT_MANDATE,
     FILE_TOOLS,
     `[OMCA TOOLS] ${OMCA_TOOLS}`,
-    ...planLines(root, payload.session_id),
+    ...planLines(root, payload.session_id, EDITING.has(name) || isOrchestrator),
     ...(EDITING.has(name) ? EDITING_GUIDANCE : []),
     ...(isOrchestrator ? ORCHESTRATING_GUIDANCE : [LEAF_WORKER, NEVER_STUB]),
   ].join("\n");

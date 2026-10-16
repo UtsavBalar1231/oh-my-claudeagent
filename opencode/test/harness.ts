@@ -75,6 +75,68 @@ export function snapshot(dest: string): string {
   return dest
 }
 
+export function packageFixture(dest: string): { directory: string; spec: string; diagnostics(): string; stop(): Promise<void> } {
+  const directory = snapshot(dest)
+  git(directory, "init", "-q")
+  git(directory, "add", "-A")
+  commit(directory, "package")
+  const requests: string[] = []
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    async fetch(request) {
+      const url = new URL(request.url)
+      requests.push(`${request.method} ${url.pathname}${url.search}`)
+      if (!["/info/refs", "/git-upload-pack", "/HEAD"].includes(url.pathname)) return new Response(null, { status: 404 })
+      const body = new Uint8Array(await request.arrayBuffer())
+      const child = Bun.spawn(["git", "http-backend"], {
+        env: { ...process.env, GIT_PROJECT_ROOT: directory, GIT_HTTP_EXPORT_ALL: "1", PATH_INFO: `/.git${url.pathname}`, QUERY_STRING: url.search.slice(1), REQUEST_METHOD: request.method, CONTENT_TYPE: request.headers.get("content-type") ?? "", CONTENT_LENGTH: String(body.length) },
+        stdin: body, stdout: "pipe", stderr: "pipe",
+      })
+      const [code, output, error] = await Promise.all([child.exited, new Response(child.stdout).arrayBuffer(), new Response(child.stderr).text()])
+      requests.push(`Git backend exited ${code}; ${output.byteLength} bytes; ${error}`)
+      if (code !== 0) return new Response(error, { status: 500 })
+      const bytes = Buffer.from(output)
+      const end = bytes.indexOf("\r\n\r\n")
+      if (end < 0) return new Response("Missing Git CGI headers", { status: 500 })
+      const headers = new Headers()
+      let status = 200
+      for (const line of bytes.subarray(0, end).toString().split("\r\n")) {
+        const colon = line.indexOf(":")
+        const name = line.slice(0, colon)
+        const value = line.slice(colon + 1).trim()
+        if (name.toLowerCase() === "status") status = Number.parseInt(value, 10)
+        else headers.set(name, value)
+      }
+      return new Response(bytes.subarray(end + 4), { status, headers })
+    },
+  })
+  const { name } = JSON.parse(readFileSync(join(directory, "package.json"), "utf8")) as { name: string }
+  return { directory, spec: `${name}@git+http://127.0.0.1:${server.port}`, diagnostics: () => requests.join("\n"), stop: async () => { await server.stop(true) } }
+}
+
+export async function startStubProvider(root: string): Promise<{ port: string; requests: string; stop(): Promise<void> }> {
+  const requests = join(root, "requests.jsonl")
+  const output = join(root, "stub.out")
+  writeFileSync(requests, "")
+  const fd = openSync(output, "a")
+  const proc = Bun.spawn([process.execPath, join(repo, "opencode", "test", "stub-provider.ts")], {
+    env: { ...process.env, STUB_LOG: requests }, stdin: "ignore", stdout: fd, stderr: fd,
+  })
+  const stop = async () => {
+    proc.kill()
+    await proc.exited
+    closeSync(fd)
+  }
+  try {
+    const port = await until("stub started", 5_000, async () => readFileSync(output, "utf8").match(/^listening (\d+)/m)?.[1], () => readFileSync(output, "utf8"))
+    return { port, requests, stop }
+  } catch (error) {
+    await stop()
+    throw error
+  }
+}
+
 // A process holds its working directory open on Windows, and OpenCode starts the omca MCP server as a
 // child in the project directory. Killing the parent alone leaves that child running there, so the
 // scratch directory stays busy. `taskkill /T` ends the whole tree.
@@ -114,8 +176,7 @@ export type Server = {
   stop(): Promise<void>
 }
 
-export async function startServer(root: string, cwd: string, extraEnv: Env = {}): Promise<Server> {
-  const password = crypto.randomUUID()
+export function isolatedEnv(root: string, cwd: string, extraEnv: Env = {}): Env {
   // A kill switch such as OMCA_DISABLED_HOOKS in the developer's environment would turn off the
   // features under test, so only extraEnv sets OMCA variables.
   const inherited = Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("OMCA_")))
@@ -123,13 +184,30 @@ export async function startServer(root: string, cwd: string, extraEnv: Env = {})
     ...inherited,
     ...extraEnv,
     PWD: cwd,
-    OPENCODE_PASSWORD: password,
     OPENCODE_DB: ":memory:",
     XDG_CONFIG_HOME: join(root, "config"),
     XDG_DATA_HOME: join(root, "data"),
     XDG_CACHE_HOME: join(root, "cache"),
   }
   for (const key of ["XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"]) mkdirSync(env[key] as string, { recursive: true })
+  return env
+}
+
+export async function installPackage(spec: string, env: Env, cwd: string): Promise<void> {
+  const trace = join(env["XDG_CACHE_HOME"]!, "git-install.trace")
+  const child = Bun.spawn([opencodeBin ?? "opencode", "plugin", "add", spec], { cwd, env: { ...env, GIT_TRACE: trace }, stdout: "pipe", stderr: "pipe" })
+  const timer = setTimeout(() => endTree(child), 150_000)
+  try {
+    const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
+    if (code !== 0) throw new Error(`Package installation exited ${code}:\n${stdout}\n${stderr}\n${existsSync(trace) ? readFileSync(trace, "utf8") : "No Git process traced"}`)
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+export async function startServer(root: string, cwd: string, extraEnv: Env = {}): Promise<Server> {
+  const password = crypto.randomUUID()
+  const env = isolatedEnv(root, cwd, { ...extraEnv, OPENCODE_PASSWORD: password })
   const port = freePort()
   const base = `http://127.0.0.1:${port}`
   const logPath = join(root, "server.log")

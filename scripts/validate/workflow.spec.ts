@@ -62,6 +62,7 @@ const startsCommand = (command: string, recipe: string): boolean => command === 
 
 const CI_ONLY_REASONS: Readonly<Record<string, string>> = {
   [`bun scripts/qa/junit-complete.ts "$RUNNER_TEMP/bun-junit.xml" ${SPEC_ROOTS}`]: "bun on Windows can crash and exit 0, which only CI's JUnit report shows",
+  'bun scripts/qa/junit-complete.ts "$RUNNER_TEMP/opencode-junit.xml" opencode/': "the adapter suite needs the same exit-zero crash protection as the shared specs",
   [`bun test --parallel --timeout=30000 --randomize --seed=\${{ github.run_number }} ${SPEC_ROOTS}`]: "a fresh seed per run, which a local recipe has no source for",
   "claude plugin validate . --strict": "the latest published client rather than the pinned one",
   "claude plugin validate .claude-plugin/plugin.json --strict": "the latest published client rather than the pinned one",
@@ -130,6 +131,13 @@ describe("workflow contract", () => {
     expect(checkRun?.[1]).toBe(testRun?.[2]);
     expect(checkRun?.[2]).toBe(testRun?.[1]);
     expect(recipeBody("test")).toEqual([`bun test --parallel --timeout=30000 ${SPEC_ROOTS}`]);
+  });
+
+  test("the adapter suite checks its own JUnit report against every adapter spec", () => {
+    const runs = job("test-opencode").steps.map((step) => step.run ?? "");
+    const run = runs.find((line) => line.startsWith("bun test --timeout=30000 opencode/"));
+    expect(run).toContain('--reporter=junit --reporter-outfile="$RUNNER_TEMP/opencode-junit.xml"');
+    expect(runs).toContain('bun scripts/qa/junit-complete.ts "$RUNNER_TEMP/opencode-junit.xml" opencode/');
   });
 
   test("a seeded random-order run on the same roots replaces the file-order run on Linux and puts its seed in the step name", () => {

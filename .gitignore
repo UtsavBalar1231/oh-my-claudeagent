@@ -1,5 +1,6 @@
 # JavaScript
 node_modules/
+/design-lab/
 
 # Demo video: dependencies, renders, and footage the capture harness regenerates
 video/node_modules/

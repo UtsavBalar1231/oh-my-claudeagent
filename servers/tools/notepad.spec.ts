@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, setSystemTime, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { tools } from "./notepad.ts";
+import { dirname, join } from "node:path";
+import { appendNotepad, compactNotepad, tools } from "./notepad.ts";
 
 const NOTEPAD_MODULE = join(import.meta.dir, "notepad.ts");
 const SERVER = join(import.meta.dir, "..", "omca.ts");
@@ -32,6 +32,65 @@ const call = async (name: string, args: Record<string, unknown>) => tool(name).c
 const write = (plan_name: string, section: string, content: string) => call("notepad_write", { plan_name, section, content });
 const sectionPath = (plan: string, section: string) => join(project, ".omca", "notepads", plan, `${section}.md`);
 const readSection = (plan: string, section: string) => readFileSync(sectionPath(plan, section), "utf8");
+
+describe("shared durable operations", () => {
+  beforeEach(() => setSystemTime(new Date("2026-10-02T12:00:00.789Z")));
+
+  test("shared append preserves legacy bytes, timestamp format, warning and directory touches", async () => {
+    const shared = join(project, "shared");
+    mkdirSync(shared);
+    const content = "é".repeat(30_000);
+    const legacyResult = await write("p", "issues", content);
+    expect(await appendNotepad(shared, "p", "issues", content)).toBe(legacyResult);
+    const path = join(shared, ".omca", "notepads", "p", "issues.md");
+    expect(readFileSync(path, "utf8")).toBe(readSection("p", "issues"));
+    expect(readFileSync(join(shared, ".omca", ".gitignore"), "utf8")).toBe(readFileSync(join(project, ".omca", ".gitignore"), "utf8"));
+    const old = new Date("2020-01-01T00:00:00Z");
+    utimesSync(join(shared, ".omca", "notepads"), old, old);
+    await appendNotepad(shared, "p", "issues", "second");
+    await write("p", "issues", "second");
+    expect(readFileSync(path, "utf8")).toBe(readSection("p", "issues"));
+    expect(statSync(join(shared, ".omca", "notepads")).mtimeMs).toBeGreaterThan(old.getTime());
+  });
+
+  test("shared compaction produces the same message and bytes as the legacy descriptor", async () => {
+    const shared = join(project, "shared");
+    const source = Array.from({ length: 25 }, (_, i) => entry(`Entry ${i}`)).join("");
+    const nativePath = join(shared, ".omca", "notepads", "p", "learnings.md");
+    for (const path of [sectionPath("p", "learnings"), nativePath]) {
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, source);
+    }
+    expect(await compactNotepad(shared, "p", "learnings")).toBe(await call("notepad_compact", { plan_name: "p", section: "learnings" }));
+    expect(readFileSync(nativePath, "utf8")).toBe(readSection("p", "learnings"));
+    expect(await compactNotepad(shared, "p", "learnings")).toBe(await call("notepad_compact", { plan_name: "p", section: "learnings" }));
+  });
+
+  test("shared operations validate before writes and missing compaction creates no state", async () => {
+    await expect(appendNotepad(project, "../escape", "issues", "bad")).rejects.toThrow("plan_name must match");
+    await expect(appendNotepad(project, "p", "unknown", "bad")).rejects.toThrow("section must be one of");
+    await expect(appendNotepad(project, "p", "issues", undefined)).rejects.toThrow("content must be a string");
+    expect(await compactNotepad(project, "p", "issues")).toBe("Section 'issues' not found for plan 'p'");
+    expect(existsSync(join(project, ".omca"))).toBe(false);
+  });
+
+  test("native callbacks run under the shared lock and can refuse append or compaction", async () => {
+    const path = sectionPath("p", "issues");
+    await expect(appendNotepad(project, "p", "issues", "must not land", async () => {
+      expect(existsSync(`${path}.lock`)).toBe(true);
+      throw new Error("session moved");
+    })).rejects.toThrow("session moved");
+    expect(existsSync(path)).toBe(false);
+    expect(existsSync(join(project, ".omca", ".gitignore"))).toBe(false);
+    await write("p", "issues", "keep original");
+    const before = readSection("p", "issues");
+    await expect(compactNotepad(project, "p", "issues", async () => {
+      expect(existsSync(`${path}.lock`)).toBe(true);
+      throw new Error("session switched to plan");
+    })).rejects.toThrow("session switched to plan");
+    expect(readSection("p", "issues")).toBe(before);
+  });
+});
 
 describe("declarations", () => {
   test("the four notepad tools are declared in order, the writers first and last", () => {

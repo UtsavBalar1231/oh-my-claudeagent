@@ -59,47 +59,77 @@ keeps its `.omca/` directory until you delete it.
 
 ### Use it from OpenCode
 
-The `opencode/` directory loads OMCA's specialists, skills, MCP server and guards into OpenCode
-2.0.18. Add it to your OpenCode config from git:
+The adapter supports OpenCode 2.0.29 in the 2.0 release line. Add the package to
+`plugins` in `~/.config/opencode/opencode.json(c)`:
 
 ```jsonc
 {
   "plugins": [
     {
       "package": "oh-my-claudeagent@git+https://github.com/UtsavBalar1231/oh-my-claudeagent.git",
-      "options": { "models": { "opus": "anthropic/claude-opus-5-5", "fable": "anthropic/claude-fable-5-1" } }
+      "options": {
+        "models": {
+          "opus": "openai/gpt-6.1-sol#high",
+          "sonnet": "openai/gpt-6.1-sol#high",
+          "fable": "openai/gpt-6.1-sol#xhigh"
+        }
+      }
     }
   ]
 }
 ```
 
-To load a local checkout instead, list the path of its `opencode/` directory under `plugins`.
+For a local checkout, use its `opencode/` directory as the plugin path. Published
+packages load their server and `./tui` exports together; do not add a second copy
+to `cli.json`.
 
 `options.models` maps OMCA's `opus`, `sonnet` and `fable` tiers to OpenCode model ids, in
 `provider/model` form with an optional `#variant`. Without it, every `omca-*` subagent runs on
 the parent session's model. To override one agent, set `agents.omca-<name>.model` in your own
 config. The `ast_*` tools need ast-grep on `PATH`.
 
-What OpenCode gets:
+Choose `omca` from the primary-agent selector for coordination. Build and Plan
+remain available. Specialists run as child sessions: `omca-explorer`,
+`omca-architect`, `omca-researcher`, `omca-viewer`, `omca-analyzer`, `omca-reviewer`,
+`omca-build-fixer` and `omca-executor`.
+Read-only specialists use native read/search tools without shell or file edits.
+With OMCA enabled, native Plan delegates only to Explore or OMCA's read-only
+specialists. Execution-capable children, including General, require Build or OMCA.
 
-- Subagents `omca-explorer`, `omca-architect`, `omca-researcher`, `omca-viewer`,
-  `omca-analyzer`, `omca-reviewer`, `omca-build-fixer` and `omca-executor`.
-- Skills `omca-debugging`, `omca-remove-ai-slops`, `omca-refactor`, `omca-git-master` and
-  `omca-handoff`, each slash-invocable. `/omca-handoff` is not offered to the model.
-- Commands `/omca-analyzer`, `/omca-reviewer` and `/omca-build-fixer`, each asking the primary agent to
-  launch that subagent.
-- The `omca` server's evidence, notepad, AST, `boulder_progress` and `file_read` tools, named
-  `omca_<tool>`. The adapter hides `boulder_write`, `session_search`, `agents_list`,
-  `categories_list`, `health_check` and `omca_hook`, and the server's instructions name only the
-  tools it shows.
-- The destructive-command guard and the comment gate on model and user shell commands and on
-  file edits. The comment gate blocks only with `OMCA_COMMENT_GATE=deny`. A blocked `!` command
-  shows as a failed command; the reason goes to the OpenCode server log.
-- OMCA's working discipline, injected into primary agents such as `build` and `plan`.
+Commands:
 
-Every id carries the `omca-` prefix, so OpenCode's own `build`, `plan`, `general` and `explore`
-are untouched. The adapter leaves out the orchestrator, the planner, `plan`
-and `start-work` with plan tracking, the stop gates and the status line.
+| Command | Behavior |
+| --- | --- |
+| `/omca` | Open the terminal panel without starting work |
+| `/omca-plan <request>` | Discuss a plan in native Plan mode; save a file only when asked |
+| `/omca-start-work <path>` | Ask approval, validate and bind a FINAL plan, then coordinate execution |
+| `/omca-pause` | Interrupt the coordinator and remove its binding without deleting its files |
+| `/omca-analyzer`, `/omca-reviewer`, `/omca-build-fixer` | Ask the primary agent to launch the specialist |
+
+Use Build or OMCA before starting work. A saved plan needs `Status: FINAL`,
+numbered task checkboxes and valid dependencies. Plans may live in the checkout
+or `~/.opencode/plan`. A fork or a session moved to another checkout does not
+inherit an execution binding. Run start-work explicitly at the destination.
+Independent background sessions retain OpenCode's own interruption controls.
+Plan reads refuse files over 1 MiB or plans over 1,000 numbered tasks. Dashboard
+snapshots refuse state files over 4 MiB rather than allocating unbounded inputs.
+
+The panel shows the bound plan, native child sessions, evidence, notepads and
+adapter health. Selecting a child opens its native session. The interface uses
+the current theme and leaves native tabs, the composer and permission prompts
+in place. Headless clients use the same tools without the panel.
+
+The adapter registers native `omca_*` evidence, notepad, AST, progress and file
+tools. It does not start a duplicate OMCA MCP process. Custom filesystem tools
+still check native read/edit permissions; they do not bypass an external-directory
+deny. The shell guard uses the actual command directory. The comment gate blocks
+only with `OMCA_COMMENT_GATE=deny`.
+
+**Limits:** OpenCode has no OMCA Stop veto. Completed checkboxes and historical
+passing evidence do not prove the current checkout is verified. The panel labels
+ledger successes as historical until native execution provenance is supported.
+The TUI is a terminal extension, not a Desktop or Web UI extension. OMCA does not
+replace provider authentication, compaction, scheduling, memory, or native undo.
 
 ## Plan and run work
 

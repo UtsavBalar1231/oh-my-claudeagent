@@ -5,6 +5,7 @@ import { TextDecoder } from "node:util";
 import { expandTilde, normalizePath, type Platform, toPlatform } from "../../src/core/path.ts";
 import { isMissing, projectRoot } from "../io.ts";
 import type { Tool } from "../omca.ts";
+import { IDLE_CONTEXT, type ToolContext } from "../progress.ts";
 import { type Args, integerArg, isoTimestamp, stringArg } from "./args.ts";
 
 const DEFAULT_LIMIT = 1000;
@@ -29,7 +30,8 @@ const LATIN1: Decoder = { decode: (chunk) => chunk?.toString("latin1") ?? "" };
  * With `maxLineChars` a longer line is cut there while it streams, and carries a marker naming the
  * characters dropped.
  */
-export async function* readLines(path: string, decoder: Decoder, maxLineChars = Number.POSITIVE_INFINITY): AsyncGenerator<string> {
+export async function* readLines(path: string, decoder: Decoder, maxLineChars = Number.POSITIVE_INFINITY, signal?: AbortSignal): AsyncGenerator<string> {
+  signal?.throwIfAborted();
   let kept = "";
   let dropped = 0;
   let last = "";
@@ -52,12 +54,14 @@ export async function* readLines(path: string, decoder: Decoder, maxLineChars = 
     last = "";
     return more > 0 ? `${line}... [line truncated, ${more} more chars]` : line;
   };
-  for await (const chunk of createReadStream(path)) {
+  for await (const chunk of createReadStream(path, signal ? { signal } : undefined)) {
     for (const [index, part] of decoder.decode(chunk, { stream: true }).split("\n").entries()) {
+      signal?.throwIfAborted();
       if (index > 0) yield finish();
       add(part);
     }
   }
+  signal?.throwIfAborted();
   add(decoder.decode());
   if (last !== "") yield finish();
 }
@@ -74,9 +78,10 @@ function humanSize(bytes: number): string {
   return `${value.toFixed(1)} ${units[unit]}`;
 }
 
-function audit(path: string, allowed: boolean): void {
+function audit(path: string, allowed: boolean, ctx: ToolContext): void {
+  if (ctx.audit === false) return;
   try {
-    const log = join(projectRoot(process.cwd()), AUDIT_LOG);
+    const log = join(ctx.workspaceRoot ?? projectRoot(process.cwd()), AUDIT_LOG);
     mkdirSync(dirname(log), { recursive: true });
     appendFileSync(log, `${JSON.stringify({ path, allowed, timestamp: isoTimestamp() })}\n`);
   } catch (error) {
@@ -132,35 +137,38 @@ function inspect(path: string, unlimited: boolean): { file: string; size: number
   return { file, size: stat.size };
 }
 
-async function collectWindow(file: string, decoder: Decoder, offset: number, limit: number) {
+async function collectWindow(file: string, decoder: Decoder, offset: number, limit: number, signal?: AbortSignal) {
   const window: string[] = [];
   let total = 0;
-  for await (const line of readLines(file, decoder, MAX_LINE_CHARS)) {
+  for await (const line of readLines(file, decoder, MAX_LINE_CHARS, signal)) {
     if (total >= offset && (limit <= 0 || window.length < limit)) window.push(line);
     total++;
   }
   return { window, total };
 }
 
-async function readWindow(file: string, encoding: string, offset: number, limit: number) {
+async function readWindow(file: string, encoding: string, offset: number, limit: number, signal?: AbortSignal) {
+  signal?.throwIfAborted();
   try {
     const decoder = new TextDecoder(encoding, { fatal: true });
-    return { ...(await collectWindow(file, decoder, offset, limit)), usedEncoding: encoding };
+    return { ...(await collectWindow(file, decoder, offset, limit, signal)), usedEncoding: encoding };
   } catch (error) {
     // A TypeError is bytes invalid in the encoding and a RangeError is an unknown encoding name.
+    signal?.throwIfAborted();
     if (!(error instanceof TypeError || error instanceof RangeError)) throw error;
   }
-  return { ...(await collectWindow(file, LATIN1, offset, limit)), usedEncoding: "latin-1" };
+  return { ...(await collectWindow(file, LATIN1, offset, limit, signal)), usedEncoding: "latin-1" };
 }
 
-async function readChecked(path: string, encoding: string, offset: number, limit: number) {
+async function readChecked(path: string, encoding: string, offset: number, limit: number, signal?: AbortSignal) {
   const checked = inspect(path, limit <= 0);
   if (typeof checked === "string") return checked;
-  return { size: checked.size, ...(await readWindow(checked.file, encoding, offset, limit)) };
+  return { size: checked.size, ...(await readWindow(checked.file, encoding, offset, limit, signal)) };
 }
 
-async function fileRead(args: Args): Promise<string> {
-  const path = stringArg(args, "path");
+async function fileRead(args: Args, ctx = IDLE_CONTEXT): Promise<string> {
+  ctx.signal.throwIfAborted();
+  const path = ctx.workspaceRoot === undefined ? stringArg(args, "path") : resolve(ctx.workspaceRoot, stringArg(args, "path"));
   const offset = Math.max(0, integerArg(args, "offset", 0));
   const budgeted = args.limit === undefined || args.limit === null;
   const requested = integerArg(args, "limit", DEFAULT_LIMIT);
@@ -168,12 +176,13 @@ async function fileRead(args: Args): Promise<string> {
 
   let read: Awaited<ReturnType<typeof readChecked>>;
   try {
-    read = await readChecked(path, encoding, offset, requested);
+    read = await readChecked(path, encoding, offset, requested, ctx.signal);
   } catch (error) {
-    audit(path, false);
+    audit(path, false, ctx);
     throw error;
   }
-  audit(path, typeof read !== "string");
+  ctx.signal.throwIfAborted();
+  audit(path, typeof read !== "string", ctx);
   if (typeof read === "string") return read;
   const { size, total, usedEncoding } = read;
   let { window } = read;

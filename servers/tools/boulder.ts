@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { asRegistry, type PlanEntry, parseRegistry, type Registry, resolveBoundPlan } from "../../src/core/boulder.ts";
+import { asRegistry, type PlanEntry, readRegistryDocument, type Registry, type RegistryDocument, resolveBoundPlan, unbindSessions, upsertPlanSession } from "../../src/core/boulder.ts";
 import { allTasksDone, planIsComplete, planTasks } from "../../src/core/checkboxes.ts";
 import { toPlanName } from "../../src/core/notepad.ts";
 import { STATE_VERSION } from "../../src/core/state-version.ts";
@@ -12,7 +12,7 @@ import type { Tool } from "../omca.ts";
 import { argReader, isoTimestamp, rootOf, WORKING_DIRECTORY } from "./args.ts";
 
 export const GC_MAX_AGE_SECONDS = 7 * 24 * 3600;
-const ISO_SECONDS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
+const ISO_UTC_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 
 type PruneSummary = { pruned_plans: string[]; pruned_bindings: string[] };
 
@@ -23,22 +23,22 @@ const sessionIdOr = (sessionId: string): string =>
   sessionId || (latestSessionId() ?? process.env.CLAUDE_CODE_SESSION_ID ?? "");
 
 /** The registry on disk. A file that does not parse as one reads as empty here, so only `boulder_write` has to refuse it. */
-function readRegistryFile(path: string): Registry {
+function readRegistryFile(path: string): RegistryDocument {
   const text = readOrNull(path);
-  const parsed = text === null ? undefined : parseRegistry(text);
-  return parsed?.kind === "ok" ? parsed.registry : asRegistry({});
+  const parsed = text === null ? undefined : readRegistryDocument(text);
+  return parsed?.kind === "ok" ? parsed : { document: {}, registry: asRegistry({}) };
 }
 
-function readWritableRegistry(path: string): Registry {
+function readWritableRegistry(path: string): RegistryDocument {
   const text = readOrNull(path);
-  if (text === null) return asRegistry({});
-  const parsed = parseRegistry(text);
+  if (text === null) return { document: {}, registry: asRegistry({}) };
+  const parsed = readRegistryDocument(text);
   if (parsed.kind === "refused") throw new Error(`${path} cannot be updated: ${parsed.reason}. Repair or delete the file, then register the plan again.`);
-  return parsed.registry;
+  return parsed;
 }
 
-const writeRegistry = (path: string, registry: Registry): void =>
-  writeFileAtomic(path, `${JSON.stringify({ version: STATE_VERSION, plans: registry.plans, bindings: registry.bindings }, null, 2)}\n`);
+const writeRegistry = (path: string, file: RegistryDocument): void =>
+  writeFileAtomic(path, `${JSON.stringify({ version: STATE_VERSION, ...file.document, plans: file.registry.plans, bindings: file.registry.bindings }, null, 2)}\n`);
 
 function planFileIsComplete(path: string | undefined): boolean {
   if (!path) return false;
@@ -50,7 +50,7 @@ function planFileIsComplete(path: string | undefined): boolean {
 }
 
 const isoSeconds = (iso: unknown): number => {
-  const ms = typeof iso === "string" && ISO_SECONDS.test(iso) ? Date.parse(iso) : Number.NaN;
+  const ms = typeof iso === "string" && ISO_UTC_TIMESTAMP.test(iso) ? Date.parse(iso) : Number.NaN;
   return Number.isNaN(ms) ? 0 : ms / 1000;
 };
 
@@ -95,9 +95,9 @@ export async function gcRegistry(root: string): Promise<PruneSummary> {
   const path = registryPath(root);
   if (!existsSync(path)) return { pruned_plans: [], pruned_bindings: [] };
   return withLock(`${path}.lock`, () => {
-    const registry = readRegistryFile(path);
-    const summary = pruneUnbound(registry);
-    if (summary.pruned_plans.length > 0 || summary.pruned_bindings.length > 0) writeRegistry(path, registry);
+    const file = readRegistryFile(path);
+    const summary = pruneUnbound(file.registry);
+    if (summary.pruned_plans.length > 0 || summary.pruned_bindings.length > 0) writeRegistry(path, file);
     return summary;
   });
 }
@@ -114,21 +114,16 @@ export function unbindBoundSessions(deadline: number): void {
     const isDone = tryWithLockSync(
       `${path}.lock`,
       () => {
-        const registry = readRegistryFile(path);
-        const before = Object.keys(registry.bindings).length;
-        for (const sessionId of sessionIds) delete registry.bindings[sessionId];
-        if (Object.keys(registry.bindings).length !== before) writeRegistry(path, registry);
+        const file = readRegistryFile(path);
+        const before = Object.keys(file.registry.bindings).length;
+        file.registry = unbindSessions(file.registry, sessionIds);
+        if (Object.keys(file.registry.bindings).length !== before) writeRegistry(path, file);
       },
       Math.max(0, deadline - Date.now()),
     );
     if (!isDone) console.error(`omca: ${path}.lock stayed busy, so session ids ${[...sessionIds].join(", ")} stay bound`);
   }
 }
-
-// Object.fromEntries defines keys as own data properties, so a name like `__proto__` is stored
-// rather than swallowed by the prototype setter, and an existing key keeps its position.
-const withKey = <T>(record: Record<string, T>, key: string, value: T): Record<string, T> =>
-  Object.fromEntries([...Object.entries(record), [key, value]]);
 
 async function boulderWrite(args: Record<string, unknown>): Promise<string> {
   const arg = argReader(args, "boulder_write").string;
@@ -140,24 +135,18 @@ async function boulderWrite(args: Record<string, unknown>): Promise<string> {
   const path = join(ensureStateDir(root), "boulder.json");
 
   const sessions = await withLock(`${path}.lock`, () => {
-    const registry = readWritableRegistry(path);
-    const existing: PlanEntry = Object.hasOwn(registry.plans, planName) ? (registry.plans[planName] as PlanEntry) : {};
-    const sessionIds = Array.isArray(existing.session_ids) ? [...existing.session_ids] : [];
-    if (sessionId && !sessionIds.includes(sessionId)) sessionIds.push(sessionId);
+    const file = readWritableRegistry(path);
+    const existing: PlanEntry = Object.hasOwn(file.registry.plans, planName) ? (file.registry.plans[planName] as PlanEntry) : {};
     const worktree = worktreePath || existing.worktree_path || "";
-    const entry: PlanEntry = {
+    file.registry = upsertPlanSession(file.registry, planName, {
       active_plan: activePlan,
       started_at: existing.started_at || isoTimestamp(),
-      session_ids: sessionIds,
       ...(worktree && { worktree_path: worktree }),
-    };
-    registry.plans = withKey(registry.plans, planName, entry);
-    if (sessionId) {
-      registry.bindings = withKey(registry.bindings, sessionId, { plan_name: planName, bound_at: Math.floor(Date.now() / 1000) });
-    }
-    pruneStale(registry, Date.now() / 1000);
-    writeRegistry(path, registry);
-    return sessionIds.length;
+    }, sessionId, Math.floor(Date.now() / 1000));
+    const sessionCount = file.registry.plans[planName]?.session_ids?.length ?? 0;
+    pruneStale(file.registry, Date.now() / 1000);
+    writeRegistry(path, file);
+    return sessionCount;
   });
   if (sessionId) bound.set(root, (bound.get(root) ?? new Set()).add(sessionId));
   return `Boulder state written: plan=${planName}, sessions=${sessions}`;
@@ -170,7 +159,7 @@ function boulderProgress(args: Record<string, unknown>): string {
   const sessionId = arg("session_id", "");
   const workingDirectory = arg("working_directory", "");
   if (!planPath) {
-    const registry = readRegistryFile(registryPath(rootOf(workingDirectory)));
+    const { registry } = readRegistryFile(registryPath(rootOf(workingDirectory)));
     if (planName) {
       const { plans } = registry;
       planPath = (Object.hasOwn(plans, planName) && plans[planName]?.active_plan) || "";

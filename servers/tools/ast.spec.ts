@@ -664,6 +664,25 @@ describe("ast_replace", () => {
     expect(fake.argv(2)).toEqual(["run", ...target, "--update-all", "--", "."]);
   });
 
+  test("ast_replace checks beforeApply after the async preview and before any update", async () => {
+    project();
+    const fake = fakeBinary([{ stdout: JSON.stringify([match("app.py", 0, "old_func(x)")]) }]);
+    const tool = tools.find((candidate) => candidate.name === "ast_replace")!;
+    let checked = false;
+    await expect(tool.call({ pattern: "old_func($X)", rewrite: "new_func($X)", lang: "python", dry_run: false }, {
+      signal: new AbortController().signal,
+      progress: () => {},
+      beforeApply: async () => {
+        expect(fake.calls()).toBe(1);
+        expect(fake.argv(1)).toContain("--json=compact");
+        checked = true;
+        throw new Error("apply authority expired");
+      },
+    })).rejects.toThrow("apply authority expired");
+    expect(checked).toBe(true);
+    expect(fake.calls()).toBe(1);
+  });
+
   test("ast_replace apply refused when truncated", async () => {
     project();
     const fake = fakeBinary([{ stdout: matchesJson(501) }]);
