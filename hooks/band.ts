@@ -17,6 +17,7 @@ type Snapshot = { band: Band; hasFinalVerification: boolean; exitCode: number | 
 
 let glyphTier: GlyphTier = "nerd";
 let shownActions = 0;
+let isAgentInView = false;
 let toastedVerificationAt = 0;
 let toastedPlan: { path: string; isDone: boolean } | undefined;
 let isBaselined = false;
@@ -155,7 +156,7 @@ async function actionsFor(host: Host, { band, hasFinalVerification }: Snapshot):
 }
 
 async function clearActionsFor(host: Host, text: string): Promise<void> {
-  if (shownActions === 0 || text === "" || isShownHotkey(text)) return;
+  if (isAgentInView || shownActions === 0 || text === "" || isShownHotkey(text)) return;
   shownActions = 0;
   await host.state.nextActions.set([]);
 }
@@ -225,6 +226,7 @@ export const band: Features = {
   },
   "ui.render AbovePrompt": {
     pre: async (host, e) => {
+      isAgentInView = e.props.view.agentId !== undefined;
       if (!host.options.showBand || e.props.hasSurvey) return undefined;
       const [{ value: snapshot }, { value: actions = [] }, { value: agents = {} }] = await Promise.all([
         host.state.band.get(),
@@ -232,7 +234,7 @@ export const band: Features = {
         host.state.agents.get(),
       ]);
       const running = Object.values(agents).filter((agent) => agent.status === "running").length;
-      const view = bandView(snapshot, actions, e.props.bodyColumns, glyphTier, running);
+      const view = bandView(snapshot, isAgentInView ? [] : actions, e.props.bodyColumns, glyphTier, running);
       if (view === undefined) return undefined;
       const kit = kitOf(host.ui.resolve(e), e.surface);
       const { Box, Button } = kit;

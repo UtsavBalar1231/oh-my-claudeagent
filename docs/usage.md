@@ -209,7 +209,9 @@ task and the running count; the bar stays. The prompt's border names the plan.
 Below it, numbered buttons offer the next step: log the evidence, start work, run the final
 verification, or review the changes with architect. Press a button's digit in an empty prompt, or
 click it, to fill the prompt with that step; nothing runs until you send it. Typing anything else
-clears the buttons, and so does filling the prompt from history, an undo or another plugin.
+clears the buttons, and so does filling the prompt from history, an undo or another plugin. The
+buttons are held while an agent's transcript is in the main view and return with the main
+conversation.
 
 Set the `showBand` option to `false` to hide it.
 

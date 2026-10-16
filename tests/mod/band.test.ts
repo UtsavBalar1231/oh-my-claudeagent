@@ -127,13 +127,13 @@ const change = ($: Engine, text: string, origin: Args<"prompt.change">["origin"]
   return prompt.change({ text, cursor: text.length, origin });
 };
 
-const mount = ($: Engine, surface: (typeof SURFACES)[number], bodyColumns = 120) =>
+const mount = ($: Engine, surface: (typeof SURFACES)[number], bodyColumns = 120, view: { agentId?: string } = {}) =>
   $.ui.mount({
     plugin: PLUGIN,
     surface,
     component: "AbovePrompt",
     requestId: "band",
-    props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns, scroll: { offset: 0, bodyRows: 9 }, view: {} },
+    props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns, scroll: { offset: 0, bodyRows: 9 }, view },
   });
 
 async function texts(band: Band): Promise<string[]> {
@@ -591,6 +591,24 @@ test("a prompt filled from history, an undo, the engine or another plugin clears
     await band.redraw();
     expect(await buttons(band), origin.kind).toEqual([]);
   }
+});
+
+test("while an agent's transcript is in view the band holds its actions, and typing there keeps them for the main view", async ($, on) => {
+  world(on, bound(12, 46, { [STATUS]: statusFile("just test") }));
+  await start($);
+  await turn($);
+  const main = await mount($, "terminal");
+  expect((await buttons(main)).length).toBe(2);
+  await main.unmount();
+  const agent = await mount($, "terminal", 120, { agentId: "a1" });
+  expect(await buttons(agent)).toEqual([]);
+  expect(await statusRow(agent)).toBeDefined();
+
+  await edit($, "x", "x");
+  await change($, "earlier draft", { kind: "history" });
+  await agent.unmount();
+  const back = await mount($, "terminal");
+  expect((await buttons(back)).length).toBe(2);
 });
 
 test("the band's own fill, an emptied prompt and a lone shown hotkey keep the actions", async ($, on) => {
