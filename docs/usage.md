@@ -252,10 +252,11 @@ takes the cost's place.
    code in the code color, bold, italics and links, with the markers dropped.
 2. **Plan**: the plan board, below.
 3. **Evidence**: the proof ledger, below.
-4. **Notepad**: one card per section of the bound plan's notepad, each entry under its date. `f`
-   finds text in the entries, `w` clears the search, and `l` picks another plan's notepad. A wide
-   pane sets the cards in two columns, and the mouse wheel over a card scrolls that card alone, a
-   row at a time.
+4. **Notepad**: one row per section of the bound plan's notepad (learnings, issues, decisions and
+   problems), each with its entry count and the date of its newest entry. Enter or a click on a
+   row opens that section's page, every entry under its date, which the mouse wheel scrolls a
+   row at a time; `b` goes back to the rows. `f` finds text in the entries on either view, `w`
+   clears the search, and `l` picks another plan's notepad from the rows.
 5. **Stats**: runs per agent type, the evidence rate of executor and build-fixer, the agents that
    run checks, tokens per finished delegation, and the estimated cost by agent, across the
    project's recorded sessions. Runs on a model without a

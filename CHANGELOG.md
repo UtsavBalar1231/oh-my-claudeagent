@@ -18,6 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Notepad sections open as pages:** the Notepad tab lists its four sections as rows with
+  their counts and newest dates, and Enter or a click opens a section on a page of its own
+  that scrolls in every row the pane has under its header. `b` goes back, and `f` and `w` find
+  and clear on both. The stacked scrolling cards are gone.
 - **Band actions clear on a recalled prompt:** the next-step buttons also clear when the prompt
   is filled from history, an undo or another plugin, not only when you type. They are held
   while an agent's transcript is in the main view.

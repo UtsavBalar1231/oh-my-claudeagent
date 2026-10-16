@@ -222,16 +222,14 @@ for (const columns of [56, 90, 120, 38 + GUTTER_CELLS, 39 + GUTTER_CELLS]) {
 }
 
 test("a cued tab scrolled past its top draws an up cue over the window's first row, and none at the top", async ($, on) => {
-  // Four sections of notes, each card held to its least rows, stack past a short pane.
-  const long = Array.from({ length: 60 }, (_, i) => `- Note ${i + 1} of the long notepad.`).join("\n");
-  const sections = Object.fromEntries(["learnings", "issues", "decisions", "problems"].map((name) => [NOTES.replace("learnings", name), long]));
-  world(on, { ...FILES, ...sections });
+  // The notepad's index, the tab bar and six rows, runs past a four-row body.
+  world(on, FILES);
   on("ui.scroll", () => ({}));
   await $.command.run(run("", 120));
   const SHORT: Size = { columns: 120, rows: 20, placement: "dock" };
   const mount = pane("terminal", SHORT);
   const cues = async (offset: number) => {
-    const ui = await $.ui.mount({ ...mount, props: { ...mount.props, scroll: { offset, bodyRows: 16 } } });
+    const ui = await $.ui.mount({ ...mount, props: { ...mount.props, scroll: { offset, bodyRows: 4 } } });
     await ui.press({ key: "4" });
     const drawn = await ui.drawn();
     await ui.unmount();
@@ -241,10 +239,10 @@ test("a cued tab scrolled past its top draws an up cue over the window's first r
 
   const [none, below] = await cues(0);
   expect(none).toBeUndefined();
-  expect(below?.props).toEqual({ key: "more-cue", position: "absolute", top: 15, left: 0, width });
+  expect(below?.props).toEqual({ key: "more-cue", position: "absolute", top: 3, left: 0, width });
 
-  const [above] = await cues(4);
-  expect(above?.props).toEqual({ key: "less-cue", position: "absolute", top: 4, left: 0, width });
+  const [above] = await cues(2);
+  expect(above?.props).toEqual({ key: "less-cue", position: "absolute", top: 2, left: 0, width });
   expect(childrenOf(above ?? { type: "" })).toEqual([{ type: "Text", props: { dimColor: true }, children: ["  ↑ more".padEnd(width)] }]);
 });
 
@@ -291,10 +289,12 @@ test("each tab key shows its tab, on the terminal and the desktop", async ($, on
 
     await ui.press({ key: "4" });
     expect((await body())[0]).toBe("sample  BOUND  · 1 entry");
+    expect((await body()).some((row) => row.includes("Learnings · 1 entry"))).toBe(true);
+    await ui.press({ key: "notepad-section-learnings" });
     const prose = surface === "terminal" ? "Text" : "Markdown";
     expect(await ui.find({ type: prose, text: "The ledger rotates at 1,000 entries." })).toBeDefined();
     expect(await ui.find({ type: prose, text: "Session ids come from the payload." })).toBeDefined();
-    expect((await body()).some((row) => row.includes("Learnings · 1 entry"))).toBe(true);
+    await ui.press({ key: "b" });
 
     await ui.press({ key: "5" });
     expect(await body()).toEqual(["No delegation statistics have been collected yet.", "r: Reload"]);
