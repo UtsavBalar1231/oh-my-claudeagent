@@ -238,11 +238,12 @@ takes the cost's place.
    finished agents and the tokens they spent. Point at a lane, or press `d`, to see its prompt,
    last output, tool calls and tokens. Press Enter on a lane, or click its name, to open the
    agent's page: its full brief, each tool call with its outcome and duration, its latest reply and its
-   cost, shown as `~$` because it is estimated. On the page `b` goes back, `c` copies the brief
-   and `r` reads the page again. A teammate in a team has a lane too; it waits between messages
-   instead of finishing. When the lanes run past the pane, a cue above and below counts the lanes
-   out of view, the mouse wheel scrolls them, and Up and Down step the focus a lane at a time with
-   the lanes following.
+   cost, shown as `~$` because it is estimated. On the page `b` goes back, `c` copies the brief,
+   `r` reads the page again and `v` shows the agent's transcript in the main view; while that
+   transcript is in view the same key reads Back to main. A teammate in a team has a lane too; it
+   waits between messages instead of finishing. When the lanes run past the pane, a cue above and
+   below counts the lanes out of view, the mouse wheel scrolls them, and Up and Down step the
+   focus a lane at a time with the lanes following.
 
    The brief and the reply on the agent page are drawn as markdown and scroll a row at a time,
    and a shell command, on the page and in a lane's tool row, is highlighted as code.

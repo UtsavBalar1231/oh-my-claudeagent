@@ -64,6 +64,7 @@ export type Host = {
     toast: Engine["ui"]["toast"];
     notify: Engine["ui"]["notify"];
     blit: Engine["ui"]["blit"];
+    view: Engine["ui"]["view"];
   };
   session: {
     id: Engine["session"]["id"];

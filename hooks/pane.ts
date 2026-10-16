@@ -52,6 +52,7 @@ export type View = {
   now: number;
   press: Press;
   layout: Layout;
+  viewing: string | undefined;
 };
 export type TabView = (host: Host, view: View) => Promise<readonly RenderElement[]>;
 
@@ -341,7 +342,7 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
   const chrome = tabs.length + (hasRule ? 1 : 0);
   const tier = widthTier(e.props.bodyColumns);
   const layout = newLayout(chrome, e.props.scroll.offset);
-  const view: View = { kit, g, isAscii, width, tier, rows: Math.max(0, rows - chrome), isInline, home, platform, now, press, layout };
+  const view: View = { kit, g, isAscii, width, tier, rows: Math.max(0, rows - chrome), isInline, home, platform, now, press, layout, viewing: e.props.view.agentId };
   // A remote surface scrolls the whole tree itself, so its drawings leave the terminal's windows as they are.
   const isTerminal = !isRemote(kit);
   let body: readonly RenderElement[];

@@ -161,6 +161,30 @@ test("maskLive fixes the live session's times, engine cost, running seconds and 
   ]);
 });
 
+test("maskLive fixes an agent page's running seconds, a tool line's timers and the spinner's verb, keeping each line's width", () => {
+  const screen = [
+    "│      ▄▄▄▄         running · 35s · 60.1k tokens │",
+    "  Searching for 2 patterns, running 1 shell command · 35s…",
+    "  ⎿  $ sleep 90 (34s)",
+    "● Shimmying… (35s · ↓ 15.3k tokens)  │ pane",
+    "  Smooshing… (5s · ↓ 1.2k tokens)",
+    "│      ▀        ▄  started 02:16",
+    "│ Bash ls plans                                 101ms",
+    "│ Read src/a.ts                                  66ms",
+  ].join("\n");
+
+  expect(maskLive(screen).split("\n")).toEqual([
+    "│      ▄▄▄▄         running · NNs · NN.Nk tokens │",
+    "  Searching for 2 patterns, running 1 shell command · NNs…",
+    "  ⎿  $ sleep 90 (NNs)",
+    "● Working… (NNs · ↓ NN.Nk tokens)    │ pane",
+    "  Working… (Ns · ↓ N.Nk tokens)",
+    "│      ▀        ▄  started HH:MM",
+    "│ Bash ls plans                                   Nms",
+    "│ Read src/a.ts                                   Nms",
+  ]);
+});
+
 const SIZES = [
   [80, 40],
   [120, 40],

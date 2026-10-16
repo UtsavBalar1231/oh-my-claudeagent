@@ -58,6 +58,7 @@ function bindHost($: EngineInterface, options: Options): Host {
       toast: (text, toastOptions) => $.ui.toast(text, toastOptions),
       notify: (text, notifyOptions) => $.ui.notify(text, notifyOptions),
       blit: (args) => $.ui.blit(args),
+      view: (args) => $.ui.view(args),
     },
     session: {
       id: () => $.session.id(),

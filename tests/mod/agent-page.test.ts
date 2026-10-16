@@ -121,7 +121,7 @@ test("a lane head's button opens the page of a running agent: header, full brief
     " ",
     "Reply",
     "Reading the parser.",
-    "b: Back  c: Copy brief  r: Reload",
+    "b: Back c: Copy brief r: Reload v: Show transcript",
   ]);
   expect((await ui.find({ type: "Code" }))?.props).toEqual({ source: "bun test src/parser.spec.ts", language: "bash", wrap: "truncate-end" });
   expect(pagesOf()[id]?.calls).toEqual([
@@ -268,6 +268,57 @@ test("c copies the brief and says so in a toast, and says when the copy failed",
   await ui.unmount();
 });
 
+function viewing(agentId: string) {
+  const base = pane("terminal", DOCK_120);
+  return { ...base, props: { ...base.props, view: { agentId } } } as never;
+}
+
+// A hook that answers ui.view as the engine would, and records what each press asked for.
+function viewer(on: On, answer: { deny?: string } = {}): { asked: unknown[] } {
+  const asked: unknown[] = [];
+  on("ui.view", (_$, e) => (asked.push(e), { value: answer }));
+  return { asked };
+}
+
+test("v puts the agent's transcript in the main view, and reads Back to main while that agent is in view", async ($, on) => {
+  const { asked } = viewer(on);
+  const { id } = await runningAgent($, on, "view");
+  const ui = await $.ui.mount(pane("terminal", DOCK_120));
+  await ui.press({ key: `open-${id}` });
+  expect(pageRows(await ui.drawn())).toContain("b: Back c: Copy brief r: Reload v: Show transcript");
+
+  await ui.press({ key: "v" });
+  expect(asked).toEqual([{ agentId: id }]);
+  await ui.unmount();
+
+  const inView = await $.ui.mount(viewing(id));
+  expect(pageRows(await inView.drawn())).toContain("b: Back  c: Copy brief  r: Reload  v: Back to main");
+  await inView.press({ key: "v" });
+  expect(asked).toEqual([{ agentId: id }, {}]);
+  await inView.unmount();
+});
+
+test("a transcript in view that is another agent's leaves the key reading Show transcript", async ($, on) => {
+  const { id } = await runningAgent($, on, "other");
+  const ui = await $.ui.mount(viewing("someone-else"));
+  await ui.press({ key: `open-${id}` });
+  expect(pageRows(await ui.drawn()).at(-1)).toBe("b: Back c: Copy brief r: Reload v: Show transcript");
+  await ui.unmount();
+});
+
+test("a denied switch says why in a toast", async ($, on) => {
+  const { asked } = viewer(on, { deny: "no agent holds that id" });
+  const { w, id } = await runningAgent($, on, "denied");
+  const ui = await $.ui.mount(pane("terminal", DOCK_120));
+  await ui.press({ key: `open-${id}` });
+
+  await ui.press({ key: "v" });
+
+  expect(asked).toEqual([{ agentId: id }]);
+  expect(w.toasts).toEqual(["Could not switch the view: no agent holds that id"]);
+  await ui.unmount();
+});
+
 test("r reads the transcript and the recorded calls again", async ($, on) => {
   const { w, id, pagesOf } = await runningAgent($, on, "reload");
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
@@ -365,7 +416,7 @@ test("the agent's turn.complete drops the starts of calls still in flight", asyn
   expect(pagesOf()[id]?.calls).toEqual([{ tool: "Read", summary: "a.ts", ok: true, durationMs: null }]);
 });
 
-const KEYS_ROW = "b: Back  c: Copy brief  r: Reload";
+const KEYS_ROW = "b: Back  c: Copy brief  r: Reload  v: Show transcript";
 const CUE = "↓ more · wheel to scroll";
 
 test("on a short pane the page opens on the agent's identity with its keys last and a cue for what is below, and the ring is not put on Back", async ($, on) => {

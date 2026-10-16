@@ -1,0 +1,6 @@
+{
+  "command": "Fix the parser with the executor",
+  "keys": ["/omca", "Enter", "Enter", "v"],
+  "mockScript": "pane",
+  "fixture": "pane"
+}

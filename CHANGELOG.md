@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   commands, session-aware tools, Code Mode discovery, and a themed terminal dashboard.
 - **Packaged terminal UI:** compiled Solid artifact with source-freshness checks and
   installed-package testing.
+- **Agent transcript from the pane:** `v` on an agent's page puts its transcript in the main
+  view, and reads Back to main while that agent is in view.
 
 ### Changed
 

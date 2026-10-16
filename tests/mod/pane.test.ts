@@ -689,6 +689,11 @@ test("every row stays inside the body less the close-mark gutter at 80, 120 and 
         }
         await fits(`tab ${key}`);
       }
+      await ui.press({ key: "1" });
+      await ui.press({ key: "open-a-1" });
+      expect(rows(await ui.drawn()).some((row) => row.includes("v: Show transcript")), `${size.columns} ${size.placement} ${surface} v key`).toBe(true);
+      await fits("agent page");
+      await ui.press({ key: "b" });
       expect(views).toHaveLength(6);
       await ui.unmount();
     }

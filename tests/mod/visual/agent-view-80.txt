@@ -1,0 +1,40 @@
+
+ ▐▛███▛█   Claude Code v2.1.301
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
+
+
+❯ Find every caller of the shared router and say which ones bypass the harness.
+
+● Searching for 2 patterns, listing 1 directory, running 1 shell command · Ns…
+  ⎿  $ sleep 90 (Ns)
+
+
+
+
+
+
+
+● Working… (Ns · ↓ NN.Nk tokens)
+  ⎿  Tip: Start with small features or bug fixes, tell Claude to propose a plan,
+     and verify its suggested edits
+╭────────────────────────────────────────────────────────────────────────────✕─╮
+│ 1: Agents  2: Plan  3: Evidence  4: Notepad  5: Stats  6: Doctor             │
+│   ▄▄▀▀▀▀▀▀▄▄      explorer · Map the router callers                         │
+│     ▀▀  ▀▀ ▀▄▄▀   running · Ns · NN.Nk tokens                               │
+│    ▀▀▀▀▀▀▀▀   ▀  sonnet-5-5 · high                                           │
+│    ▀▀▀▀▀▀▀▀      4 tool calls                                                │
+│ Brief                                                                        │
+│ Find every caller of the shared router and say which ones bypass the         │
+│ harness.                                                                     │
+│ Tool calls · 1                                                               │
+│ ↓ more · wheel to scroll                                                     │
+│ b: Back  c: Copy brief  r: Reload  v: Back to main                           │
+╰──────────────────────────────────────────────────────────────────────────────╯
+                                                            ◐ medium · /effort
+─────────────────────────────────────────────────────── Map the router callers ─
+❯ Message @oh-my-claudeagent:e……
+────────────────────────────────────────────────────────────────────────────────
+  ⏸ manual mode on · /tasks to see subagents · ← for agents · ↓ to manage
+
+  ◯ main

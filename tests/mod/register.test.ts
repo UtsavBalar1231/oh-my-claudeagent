@@ -84,6 +84,7 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
         "ui.panes",
         "ui.resolve",
         "ui.toast",
+        "ui.view",
       ],
       env: {
         reads: [

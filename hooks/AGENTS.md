@@ -26,8 +26,9 @@ from the band and agents atoms. A Spinner whose `requestId` is a tracked agent i
 Spinner, pass through unchanged.
 
 `agents-tracker` also owns the agent page that `tabs/agent-page.ts` draws on the Agents tab: a
-Button keyed `open-<agent id>` on each lane opens it, and `b`, `c` and `r` go back, copy the brief
-and reload. Its one `tool.call` registration matches `{ agentId: /./ }`, so only a subagent's
+Button keyed `open-<agent id>` on each lane opens it, and `b`, `c`, `r` and `v` go back, copy the
+brief, reload and put the agent's transcript in the main view (`v` reads "Back to main" while that
+agent is in view). Its one `tool.call` registration matches `{ agentId: /./ }`, so only a subagent's
 call reaches the mod and a main-loop call never does. It appends the call and its outcome to a
 module-level map, with no state write. The `pages` atom is written only when a page is opened, on
 `r` and at the agent's `turn.complete`, from `$.session.messages({ agentId })` and that map; a

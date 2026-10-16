@@ -140,14 +140,22 @@ const digitsOut = (text: string): string => text.replace(/\d/g, "N");
  * The screen with the live session's own values fixed: the turn timer's line, whose verb Claude Code
  * picks at random, the Doctor's check time, a turn footer's engine cost, which
  * counts whatever background agents spent before the turn ended, the seconds a running agent has
- * run, in an OMCA lane and in Claude Code's task list, a subagent's token count, whose requests
+ * run, in an OMCA lane, in an agent page's header and in Claude Code's task list, spinner and tool
+ * lines, the spinner's verb, which Claude Code picks at random, an agent page's start time and its
+ * tool calls' durations, a subagent's token count, whose requests
  * vary by a few hundred tokens from run to run, and a turn footer's tokens, which the mock sizes
  * from the request and so move with every change to a prompt the plugin sends.
  */
 export const maskLive = (screen: string): string =>
   screen
+    .replace(/([A-Z][a-z]+… \()(\d+s · ↓ [\d.]+[kM]? tokens\))( *)/g, (_match: string, verb: string, counts: string, spaces: string) =>
+      `Working… (${counts}${spaces === "" ? "" : " ".repeat(Math.max(1, spaces.length + verb.length - "Working… (".length))}`,
+    )
     .replace(/\b((?:running|low|medium|high|xhigh|max) +)(\d+s)\b/g, (_match: string, lead: string, took: string) => `${lead}${digitsOut(took)}`)
     .replace(/\b\d+s · ↓/g, digitsOut)
+    .replace(/\brunning · \d+s\b/g, digitsOut)
+    .replace(/· \d+s…/g, digitsOut)
+    .replace(/\(\d+s\)/g, digitsOut)
     .replace(/\b\d+(?:\.\d+)?[kM]? tokens\b/g, digitsOut)
     .replace(/\b\d+(?:\.\d+)?[kM]?[  ]in[  ]\d+(?:\.\d+)?[kM]?[  ]out\b/g, digitsOut)
     .replace(/✻ \S+ for (\d+s) · done \d{1,2}:\d{2} [AP]M */g, (line: string, took: string, at: number, whole: string) =>
@@ -156,7 +164,13 @@ export const maskLive = (screen: string): string =>
     .replace(/\$\d+\.\d+([\u00a0 ])engine([\u00a0 ])cost */g, (match: string, a: string, b: string, at: number, whole: string) =>
       keepWidth(`$X.XX${a}engine${b}cost`, match, at, whole),
     )
-    .replace(/checked \d\d:\d\d/g, "checked HH:MM");
+    .replace(/checked \d\d:\d\d/g, "checked HH:MM")
+    .replace(/started \d\d:\d\d/g, "started HH:MM")
+    .replace(/ +\d+ms\b/g, (match: string) => `${" ".repeat(match.length - 3)}Nms`);
+
+// The settle check compares screens with the blink and the live values masked: a running agent's
+// elapsed seconds tick on several lines out of phase, and no pause between them is long enough to read as still.
+const steady = (screen: string): string => withoutBlink(maskLive(screen));
 
 export const mockEnv = (port: number | undefined): Record<string, string> => ({
   DISABLE_AUTOUPDATER: "1",
@@ -219,13 +233,13 @@ export class Tmux {
   }
 
   async settle(before: string): Promise<string> {
-    const settled = withoutBlink(before);
-    await this.waitFor((screen) => withoutBlink(screen) !== settled, CHANGE_TIMEOUT_MS, "a change").catch(() => before);
-    let last = withoutBlink(this.screen());
+    const settled = steady(before);
+    await this.waitFor((screen) => steady(screen) !== settled, CHANGE_TIMEOUT_MS, "a change").catch(() => before);
+    let last = steady(this.screen());
     let stable = 0;
     return this.waitFor(
       (screen) => {
-        const masked = withoutBlink(screen);
+        const masked = steady(screen);
         stable = masked === last ? stable + 1 : 0;
         last = masked;
         return stable >= STABLE_POLLS;
