@@ -154,6 +154,12 @@ async function actionsFor(host: Host, { band, hasFinalVerification }: Snapshot):
   });
 }
 
+async function clearActionsFor(host: Host, text: string): Promise<void> {
+  if (shownActions === 0 || text === "" || isShownHotkey(text)) return;
+  shownActions = 0;
+  await host.state.nextActions.set([]);
+}
+
 const withoutReadAt = (band: Band | undefined): string => JSON.stringify({ ...band, readAt: 0 });
 
 async function writeBand(host: Host, band: Band): Promise<void> {
@@ -206,9 +212,14 @@ export const band: Features = {
   },
   "prompt.edit": {
     post: async (host, _e, result) => {
-      if (shownActions === 0 || result.text === "" || isShownHotkey(result.text)) return undefined;
-      shownActions = 0;
-      await host.state.nextActions.set([]);
+      await clearActionsFor(host, result.text);
+      return undefined;
+    },
+  },
+  "prompt.change": {
+    post: async (host, e, result) => {
+      const isOwnFill = e.origin.kind === "plugin" && e.origin.name === host.plugin.name;
+      if (!isOwnFill) await clearActionsFor(host, result.text);
       return undefined;
     },
   },

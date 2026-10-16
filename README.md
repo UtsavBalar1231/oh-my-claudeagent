@@ -141,8 +141,8 @@ and PowerShell calls, and the tail of the transcript at Stop. The drift guard ru
 
 **The mod.** `hooks/register.ts` handles `tool.check` for Bash and PowerShell (the
 destructive-command guard), `tool.call`, `session.start`, `turn.start`, `turn.step`,
-`turn.complete`, `agent.spawn`, `prompt.edit`, `prompt.autocomplete`, `ui.close`, `ui.focus`,
-`ui.scroll`, `command.run` for `/omca`, `ui.render` and `session.compact`. `claude plugin
+`turn.complete`, `agent.spawn`, `prompt.edit`, `prompt.change`, `prompt.autocomplete`, `ui.close`,
+`ui.focus`, `ui.scroll`, `command.run` for `/omca`, `ui.render` and `session.compact`. `claude plugin
 validate .` lists them with the host calls the mod makes: the file system, the clock, local
 processes such as `git`, the settings file (read only), session information, the prompt box and
 the UI. It reads these environment variables: `CLAUDE_AFK_TIMEOUT_MS`,

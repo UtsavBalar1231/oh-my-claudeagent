@@ -152,7 +152,7 @@ server's `omca_hook` tool, which dispatches through `servers/hooks/registry.ts`.
 | `agent.spawn`, `turn.step` | The Agents tab and delegation records |
 | `tool.call` | A subagent's tool calls, kept for its page on the Agents tab; only a subagent's call reaches the mod, and a main-loop call skips it |
 | `session.compact` | Asks the summarizer to keep the bound plan and its next ten open tasks. It does not run for a user-installed plugin where an organization manages Claude Code; the server's `SessionStart` `compact` handler re-injects the plan context there |
-| `ui.render`, `ui.focus`, `ui.scroll`, `ui.close`, `prompt.edit`, `command.run` | The band, the pane and the commands |
+| `ui.render`, `ui.focus`, `ui.scroll`, `ui.close`, `prompt.edit`, `prompt.change`, `command.run` | The band, the pane and the commands |
 
 `tool.check` runs before every Bash and PowerShell call in every permission mode and never
 returns an allow, which would skip the auto-mode classifier.

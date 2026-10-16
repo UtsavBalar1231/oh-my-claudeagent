@@ -83,6 +83,7 @@ function world(on: On, disk: Files): World {
     if (file === undefined) throw new Error(`ENOENT: no such file or directory, stat '${spelled(e.path)}'`);
     return { value: { kind: "file", size: file.text.length, mtimeMs: file.mtimeMs, isLink: false } };
   });
+  on("prompt.change", (_$, e) => ({ text: e.text }));
   on("prompt.fill", (_$, e) => (fills.push(e.text), { isFilled: true }));
   on("prompt.submit", (_$, e) => (submits.push(e.text), { text: e.text }));
   on("ui.log", (_$, e) => (logs.push(e.text), { value: undefined }));
@@ -118,6 +119,12 @@ const edit = ($: Engine, text: string, inputText: string): Promise<unknown> => {
   const prompt: { fill: unknown; edit?: EngineCall<"prompt.edit"> } = $.prompt;
   if (prompt.edit === undefined) throw new Error("this engine offers no $.prompt.edit");
   return prompt.edit(e);
+};
+
+const change = ($: Engine, text: string, origin: Args<"prompt.change">["origin"]): Promise<unknown> => {
+  const prompt: { fill: unknown; change?: EngineCall<"prompt.change"> } = $.prompt;
+  if (prompt.change === undefined) throw new Error("this engine offers no $.prompt.change");
+  return prompt.change({ text, cursor: text.length, origin });
 };
 
 const mount = ($: Engine, surface: (typeof SURFACES)[number], bodyColumns = 120) =>
@@ -569,6 +576,34 @@ test("a digit with no shown Button, or a digit with more text, still clears the 
   await edit($, "1", "2");
   await band.redraw();
   expect(await buttons(band)).toEqual([]);
+});
+
+test("a prompt filled from history, an undo, the engine or another plugin clears the actions", async ($, on) => {
+  world(on, bound(12, 46, { [STATUS]: statusFile("just test") }));
+  await start($);
+  const band = await mount($, "terminal");
+
+  for (const origin of [{ kind: "history" }, { kind: "undo" }, { kind: "engine" }, { kind: "plugin", name: "other-plugin" }] as const) {
+    await turn($);
+    await band.redraw();
+    expect((await buttons(band)).length, origin.kind).toBe(2);
+    await change($, "earlier draft", origin);
+    await band.redraw();
+    expect(await buttons(band), origin.kind).toEqual([]);
+  }
+});
+
+test("the band's own fill, an emptied prompt and a lone shown hotkey keep the actions", async ($, on) => {
+  world(on, bound(12, 46, { [STATUS]: statusFile("just test") }));
+  await start($);
+  await turn($);
+  const band = await mount($, "terminal");
+
+  await change($, "Start work", { kind: "plugin", name: "oh-my-claudeagent" });
+  await change($, "", { kind: "clear" });
+  await change($, "1", { kind: "engine" });
+  await band.redraw();
+  expect((await buttons(band)).map((button) => button.hotkey)).toEqual(["1", "2"]);
 });
 
 test("at 40 columns no Text in the band is wider than 40 cells", async ($, on) => {
