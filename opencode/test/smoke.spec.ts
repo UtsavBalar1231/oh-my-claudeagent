@@ -1,13 +1,13 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
-import { type Agent, commit, countLines, git, installPackage, isolatedEnv, type Listing, opencodeBin, packageFixture, removeDir, scratchDir, type Server, startServer, until, writeConfig } from "./harness.ts"
+import { type Agent, commit, countLines, git, INSTALL_MS, installPackage, isolatedEnv, type Listing, opencodeBin, packageFixture, removeDir, scratchDir, type Server, startServer, until, writeConfig } from "./harness.ts"
 
 type Fixture = { root: string; server: Server; packageServer: Server; a: string; b: string; c: string; stopPackage(): Promise<void> }
 type Session = { data?: { id?: string; location?: { directory?: string } } }
 type Named = { id?: string; name?: string; autoinvoke?: boolean; status?: { status?: string } }
 
-const SLOW = 180_000
+const SLOW = INSTALL_MS + 60_000
 let fixture: Fixture | undefined
 
 function need(): Fixture {

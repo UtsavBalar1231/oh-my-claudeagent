@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { bindPlan } from "../state.ts"
-import { type Agent, type Listing, opencodeBin, packageFixture, removeDir, scratchDir, type Server, startServer, startStubProvider, until, writeConfig } from "./harness.ts"
+import { type Agent, installPackage, isolatedEnv, type Listing, opencodeBin, packageFixture, removeDir, scratchDir, type Server, startServer, startStubProvider, until, writeConfig } from "./harness.ts"
 
 const tmux = Bun.which("tmux")
 if (process.env.CI === "true" && process.env.RUNNER_OS === "Linux" && (!tmux || !opencodeBin)) throw new Error("Linux CI requires OpenCode and tmux; terminal coverage must not silently skip")
@@ -33,6 +33,9 @@ describe.skipIf(!opencodeBin || !tmux || process.platform === "win32")("native O
       },
       plugins: [plugin.spec],
     })
+    // Installing the package pulls its peer dependencies from npm, which takes far longer than
+    // registration when npm's cache is cold, so it finishes before the registration wait starts.
+    await installPackage(plugin.spec, isolatedEnv(root, ws), ws)
     const server = await startServer(root, ws)
     fixture = { root, ws, server, sessionID: "", socket: `omca-tui-${crypto.randomUUID()}`, stopProvider: provider.stop, stopPackage: plugin.stop }
     await until("OMCA primary registered", 20_000, async () => (await server.api<Listing<Agent>>("GET", "/api/agent", ws)).body?.data?.some((agent) => agent.id === "omca"), () => server.log().split("\n").filter((line) => /failed|WARN|ERROR/.test(line)).slice(-3).join("\n"))

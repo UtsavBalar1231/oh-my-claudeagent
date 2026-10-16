@@ -1,4 +1,4 @@
-import { closeSync, cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { closeSync, cpSync, existsSync, mkdirSync, mkdtempSync, openSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
@@ -193,13 +193,30 @@ export function isolatedEnv(root: string, cwd: string, extraEnv: Env = {}): Env 
   return env
 }
 
+// The package's peer dependencies come from npm: about 380 packages and 200 MB, 25 s from a cold
+// cache on Linux and longer than 150 s on a Windows runner.
+export const INSTALL_MS = 420_000
+
+function installedEntries(dir: string, depth = 0): number {
+  if (depth > 3 || !existsSync(dir)) return 0
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .reduce((sum, entry) => sum + (entry.name === "node_modules" ? readdirSync(join(dir, entry.name)).length : installedEntries(join(dir, entry.name), depth + 1)), 0)
+}
+
 export async function installPackage(spec: string, env: Env, cwd: string): Promise<void> {
-  const trace = join(env["XDG_CACHE_HOME"]!, "git-install.trace")
+  const cache = env["XDG_CACHE_HOME"]!
+  const trace = join(cache, "git-install.trace")
   const child = Bun.spawn([opencodeBin ?? "opencode", "plugin", "add", spec], { cwd, env: { ...env, GIT_TRACE: trace }, stdout: "pipe", stderr: "pipe" })
-  const timer = setTimeout(() => endTree(child), 150_000)
+  let isStopped = false
+  const timer = setTimeout(() => {
+    isStopped = true
+    endTree(child)
+  }, INSTALL_MS)
   try {
     const [code, stdout, stderr] = await Promise.all([child.exited, new Response(child.stdout).text(), new Response(child.stderr).text()])
-    if (code !== 0) throw new Error(`Package installation exited ${code}:\n${stdout}\n${stderr}\n${existsSync(trace) ? readFileSync(trace, "utf8") : "No Git process traced"}`)
+    const outcome = isStopped ? `was stopped after ${INSTALL_MS / 1000}s with ${installedEntries(join(cache, "opencode", "npm"))} entries in node_modules` : `exited ${code}`
+    if (isStopped || code !== 0) throw new Error(`Package installation ${outcome}:\n${stdout}\n${stderr}\n${existsSync(trace) ? readFileSync(trace, "utf8") : "No Git process traced"}`)
   } finally {
     clearTimeout(timer)
   }
