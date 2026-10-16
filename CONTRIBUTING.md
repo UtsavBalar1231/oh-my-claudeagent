@@ -152,9 +152,10 @@ contains `origin/plugin`, a `## [<version>]` heading in `CHANGELOG.md` and no ex
 It then packages that tag's tracked files as a commit on the orphan `plugin` branch tagged
 `plugin-v<version>`. `EXCLUDES` in `scripts/package.ts` leaves out the repository tooling: the
 specs, `tests/`, `scripts/` except `scripts/setup-statusline.ts`, `package.json`, `bun.lock`,
-the typecheck and lint configs, `CONTRIBUTING.md`, the OpenCode adapter and `video/`. Without
-`package.json` and a lockfile, an install fetches no npm packages. A second commit on `main`
-records the packaged commit's SHA in `marketplace.json`, as a `url` source with `ref: plugin`.
+the typecheck and lint configs, `CONTRIBUTING.md`, the OpenCode adapter, `video/` and
+`design-lab/`. Without `package.json` and a lockfile, an install fetches no npm packages.
+A second commit on `main` records the packaged commit's SHA in `marketplace.json`, as a
+`url` source with `ref: plugin`.
 
 The script never pushes. It prints one atomic push of both branches and both tags,
 `git push --atomic origin main plugin v<version> plugin-v<version>`, so the stamped SHA never

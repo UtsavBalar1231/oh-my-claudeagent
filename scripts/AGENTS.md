@@ -25,9 +25,10 @@ under `servers/hooks/`. Every file is TypeScript on bun.
   `*.spec.ts`, `tests/`, `scripts/` except `scripts/setup-statusline.ts` (`KEEP`), the root
   `package.json`, `bun.lock`, `bunfig.toml`, the tsconfig files, `.oxlintrc.json`, `justfile`,
   `.pre-commit-config.yaml`, `.editorconfig`, `CONTRIBUTING.md`, `opencode/`, `.opencode/` and
-  `video/`. Claude Code installs npm packages whenever the plugin root holds `package.json` and a
-  lockfile. A leading `/` in `EXCLUDES` anchors a pattern at the root. Packaging deletes whatever
-  in `<dest>` is not on the shipped list, so it refuses a `<dest>` that is the repository or a
+  `video/` and `design-lab/`. Claude Code installs npm packages whenever the plugin root holds
+  `package.json` and a lockfile. A leading `/` in `EXCLUDES` anchors a pattern at the root.
+  Packaging deletes whatever in `<dest>` is not on the shipped list, so it refuses a `<dest>`
+  that is the repository or a
   directory holding it, and a non-empty `<dest>` that is not an earlier package (one whose
   `.claude-plugin/plugin.json` names `oh-my-claudeagent`). A spec checks that every relative
   import and every path a shipped file names resolves inside the shipped tree.

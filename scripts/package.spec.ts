@@ -55,6 +55,8 @@ const EXCLUDED: Record<string, string> = {
   "video/bun.lock": "x",
   "video/src/Root.tsx": "x",
   "video/public/placeholder/hero.png": "x",
+  "design-lab/src/App.tsx": "x",
+  "design-lab/package.json": "{}\n",
 };
 
 const UNTRACKED: Record<string, string> = {
