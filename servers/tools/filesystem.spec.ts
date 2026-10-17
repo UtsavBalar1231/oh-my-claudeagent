@@ -129,7 +129,7 @@ test("a line over 2000 characters is cut with a marker giving the dropped count"
   );
 });
 
-test("a 100 MB single-line file read with limit 1 is cut at the line cap without holding the line", async () => {
+test.skipIf(process.platform === "win32")("a 100 MB single-line file read with limit 1 is cut at the line cap without holding the line (skipped on Windows: the runner takes 5 s to over 30 s to write and read the file, and the reader has no Windows path)", async () => {
   const path = join(dir, "bundle.min.js");
   writeFileSync(path, Buffer.alloc(100 * 1024 * 1024, "q"));
   const started = performance.now();
