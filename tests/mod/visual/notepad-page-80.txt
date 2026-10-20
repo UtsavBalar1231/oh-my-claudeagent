@@ -1,5 +1,5 @@
 
- ▐▛███▛█   Claude Code v2.1.301
+ ▐▛███▛█   Claude Code v2.1.304
 ▝▜██████▀  Opus 5.5 · API Usage Billing
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
 
@@ -20,7 +20,7 @@
 
 
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
-│ 1: Agents  2: Plan  3: Evidence  4: Notepad  5: Stats  6: Doctor             │
+│ 1: Agents  2: Plan  3: Evidence  4: Notepad                                  │
 │ checkout-redesign · Learnings · 3 entries                                    │
 │ ── 10-01 15:12 ──────────────────────────────────────────────────────────    │
 │ The cart totals were computed in three places. CheckoutPage, OrderEmail      │

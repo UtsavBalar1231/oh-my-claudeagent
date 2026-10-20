@@ -19,7 +19,7 @@
   ⎿  Tip: Start with small features or bug fixes, tell Claude to propose a plan,
      and verify its suggested edits
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
-│ 1: Agents  2: Plan  3: Evidence  4: Notepad  5: Stats  6: Doctor             │
+│ 1: Agents  2: Plan  3: Evidence  4: Notepad                                  │
 │   ▄▄▀▀▀▀▀▀▄▄      explorer · Map the router callers                         │
 │     ▀▀  ▀▀ ▀▄▄▀   running · Ns · NN.Nk tokens                               │
 │    ▀▀▀▀▀▀▀▀   ▀  sonnet-5-5 · high                                           │

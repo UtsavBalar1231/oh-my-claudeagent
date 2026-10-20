@@ -1,5 +1,5 @@
 
- ▐▛███▛█   Claude Code v2.1.294
+ ▐▛███▛█   Claude Code v2.1.304
 ▝▜██████▀  Opus 5.5 · API Usage Billing
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
 
@@ -20,7 +20,7 @@
 
 
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
-│ 1: Agents  2: Plan  3: Evidence  4: Notepad  5: Stats  6: Doctor             │
+│ 1: Agents  2: Plan  3: Evidence  4: Notepad  Doctor                          │
 │ r: Run again    3 warn   1 info   9 ok  checked HH:MM                     │
 │   WARN  omca server   No hook has reached the server in this session yet    │
 │                        m: Use /mcp                                           │

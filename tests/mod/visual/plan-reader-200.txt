@@ -1,5 +1,5 @@
                                                                                                    │                                                                                                  ✕
- ▐▛███▛█   Claude Code v2.1.304                                                                    │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Stats  6: Doctor
+ ▐▛███▛█   Claude Code v2.1.304                                                                    │1: Agents  2: Plan  3: Evidence  4: Notepad
 ▝▜██████▀  Opus 5.5 · API Usage Billing                                                            │─────────────────────────────────────────────────────────────────────────────────────────────────
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd            │╭───────────────────────────────────────────────────────────────────────────────────────────────╮
                                                                                                    ││ Rebuild the billing export on the shared ledger                                               │
@@ -10,11 +10,11 @@
                                                                                                    │╰───────────────────────────────────────────────────────────────────────────────────────────────╯
  executor  Reconcile totals                                                            background │                                                              │ 5. Reconcile totals against the
   ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)                                           │── Milestone 0: Foundations ── ████████ 2/2 ───────────────── │ invoice table
-                                                                                                   │ 1 Define the export schema and its version field    PROVEN  │  IN PROGRESS   executor
-● The executor is reconciling the totals.                                                          │ 2 Read the ledger in one pass                       PROVEN  │
+                                                                                                   │ 1 Define the export schema and its version field    proven │  IN PROGRESS   executor
+● The executor is reconciling the totals.                                                          │ 2 Read the ledger in one pass                       proven │
                                                                                                    │── Milestone 1: Exporter ── █████▍██ 2/3 ──────────────────── │ Do
-✻ Waiting for executor · NN.Nk in NN out · $X.XX                                                   │ 3 Write rows in the schema's order                UNPROVEN  │ Sum each customer's rows and
-                                                                                                   │ 4 Round negative totals toward zero                 PROVEN  │ compare with the invoice table;
+✻ Waiting for executor · NN.Nk in NN out · $X.XX                                                   │ 3 Write rows in the schema's order                unproven │ Sum each customer's rows and
+                                                                                                   │ 4 Round negative totals toward zero                 proven │ compare with the invoice table;
                                                                                                    │ 5 Reconcile totals against the invoice table      executor │ list every mismatch.
                                                                                                    │── Milestone 2: Rollout ── ████████ 0/4 ───────────────────── │
                                                                                                    │ 6 Run the new export beside the old one for a week          │ Done when
@@ -36,10 +36,10 @@
                                                                                                    │                                                              │     since its files changed 1h
                                                                                                    │                                                              │     ago.
                                                                                                    │                                                              │   Last pass, before that change:
+                                                                                                   │                                                              │    test just test
+                                                                                                   │                                                              │          exit 0 · 17d ago
                                                                                                    │                                                              │ ↓ more · wheel to scroll
-                                                                                                   │k: Run check  s: Start here  c: Copy  e: Evidence  o: Open only  x: Failing  f: Find  t: Sections
-                                                                                                   │l: Plans
-██▎██ 4/9 · next 5 Reconcile totals against the invoice table ·  3 proven   1 unproven       [-] │↑↓ move · enter open · esc close
+██▎██ 4/9 · next 5 Reconcile totals against the invoice table ·  3 proven   1 unproven       [-] │k: Run check  s: Start here  c: Copy  m: More
                                                                                ◐ medium · /effort  │
 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── OMCA: billing-export ─
 ❯ 

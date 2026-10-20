@@ -1,5 +1,5 @@
 
- ▐▛███▛█   Claude Code v2.1.294
+ ▐▛███▛█   Claude Code v2.1.304
 ▝▜██████▀  Opus 5.5 · API Usage Billing
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
 
@@ -20,7 +20,7 @@
 
 
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
-│ 1: Agents  2: Plan  3: Evidence  4: Notepad  5: Stats  6: Doctor             │
+│ 1: Agents  2: Plan  3: Evidence  4: Notepad                                  │
 │  COMPLETE  proof-ledger   build   test   lint   manual  10-02 13:35      │
 │   ↑ 1 more                                                                   │
 │ ── Fri 2026-10-02 ───────────────────────────────────────────────────────    │

@@ -19,17 +19,17 @@
 
 
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
-│ 1: Agents  2: Plan  3: Evidence  4: Notepad  5: Stats  6: Doctor             │
+│ 1: Agents  2: Plan  3: Evidence  4: Notepad                                  │
 │ Rebuild the billing export on the s… ████▌▋████ 4/9  3   1   1 running    │
 │   ↑ 2 more                                                                   │
-│  3 Write rows in the schema's order                            UNPROVEN     │
-│  4 Round negative totals toward zero                             PROVEN     │
+│  3 Write rows in the schema's order                            unproven    │
+│  4 Round negative totals toward zero                             proven    │
 │  5 Reconcile totals against the invoice table                  executor    │
 │      Sum each customer's rows and compare with the invoice table; list e…    │
 │      $ DB_PASSWORD=‹masked› just test-db                                     │
 │ ── Milestone 2: Rollout ── ████████ 0/4 ─────────────────────────────────    │
 │   ↓ 4 more                                                                   │
-│ k: Run  s: Start  c: Copy  e: Evidence  o: Open  x:   f:   t:   l:           │
+│ k: Run check  s: Start here  c: Copy  m: More                                │
 ╰──────────────────────────────────────────────────────────────────────────────╯
                                                             ◐ medium · /effort
 ───────────────────────────────────────────────────────── OMCA: billing-export ─

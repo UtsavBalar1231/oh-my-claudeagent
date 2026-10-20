@@ -19,7 +19,7 @@
 
 ✻ Waiting for explorer, architect · NN.Nk in N out · $X.XX
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
-│ 1: Agents  2: Plan  3: Evidence  4: Notepad  5: Stats  6: Doctor             │
+│ 1: Agents  2: Plan  3: Evidence  4: Notepad                                  │
 │  explorer · Map the router callers             sonnet-5-5  high       Ns    │
 │   ✻ Bash sleep 90                                                 4 calls    │
 │                                                                              │

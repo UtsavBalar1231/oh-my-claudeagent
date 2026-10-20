@@ -1,5 +1,5 @@
                                                                │                                                      ✕
- ▐▛███▛█   Claude Code v2.1.301                                │1: A  2: P  3: E  4: Notepad  5: S  6: D
+ ▐▛███▛█   Claude Code v2.1.304                                │1: Agents  2: Plan  3: Evidence  4: Notepad
 ▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │checkout-redesign · Learnings · 3 entries
                                                                │── 10-01 15:12 ──────────────────────────────────────
