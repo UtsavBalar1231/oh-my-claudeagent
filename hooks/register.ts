@@ -12,7 +12,7 @@ import { metrics } from "./metrics.ts";
 import { modMarker } from "./mod-marker.ts";
 import { router } from "./omca-router.ts";
 import { pane } from "./pane.ts";
-import { receipts } from "./receipts.ts";
+import { groupRows } from "./group-rows.ts";
 import { serverCheck } from "./server-check.ts";
 import { spinner } from "./spinner.ts";
 
@@ -178,7 +178,7 @@ export const register: Register = (on, pluginOptions) => {
   const turnRender = featuresFor("ui.render TurnDuration", { footer });
   const noticeRender = featuresFor("ui.render UserMessage", { agentRows });
   const launchRender = featuresFor("ui.render ToolUse", { agentRows });
-  const groupRender = featuresFor("ui.render ToolGroup", { receipts });
+  const groupRender = featuresFor("ui.render ToolGroup", { groupRows });
   const sessionCompact = featuresFor("session.compact", { compact });
 
   on("tool.check", { tool: /^(?:Bash|PowerShell)$/ }, ($, e, next) =>

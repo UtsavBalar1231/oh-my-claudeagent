@@ -67,6 +67,8 @@ export type World = {
   surfaces: RenderSurface[];
   invalidations: number;
   toasts: string[];
+  /** Why `ui.blit` refuses, as the engine says it for an Image that draws its alt; undefined takes every blit. */
+  blitDeny: string | undefined;
   blits: { requestId: string; key: string; cells: string | undefined; columns: number | undefined; rows: number | undefined }[];
   conversations: Map<string, SessionMessage[]>;
   opened: unknown[];
@@ -130,6 +132,7 @@ export function world(
     surfaces: ["terminal"],
     invalidations: 0,
     toasts: [],
+    blitDeny: undefined,
     blits: [],
     conversations: new Map(),
     opened: [],
@@ -208,7 +211,7 @@ export function world(
   on("ui.blit", (_$, e) => {
     const raster = "cells" in e ? e : undefined;
     w.blits.push({ requestId: e.requestId, key: e.key, cells: raster?.cells, columns: raster?.columns, rows: raster?.rows });
-    return { value: {} };
+    return { value: w.blitDeny === undefined ? {} : { deny: w.blitDeny } };
   });
   on("session.messages", (_$, e) => {
     const found = e.agentId === undefined ? undefined : w.conversations.get(e.agentId);

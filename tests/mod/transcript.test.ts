@@ -170,3 +170,56 @@ test("ctrl+o, a call still streaming its input and another surface keep the engi
   expect(await launch($, { input: {} })).toEqual([ENGINE_ROW]);
   expect(await launch($, { input: EXECUTOR }, "desktop")).toEqual([ENGINE_ROW]);
 });
+
+const shot = (n: number): ToolGroupCall => ({
+  tool_use_id: `toolu_read_${n}`,
+  tool: "Read",
+  input: { file_path: `shots/step-${n}.png` },
+  isRunning: false,
+  isErrored: false,
+  isInterrupted: false,
+  output: { type: "image", file: { base64: PNG, type: "image/png", originalSize: 2048, dimensions: { originalWidth: 1600, originalHeight: 400 } } },
+});
+
+const PNG = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+
+async function groupDrawing($: Engine, calls: ToolGroupCall[]) {
+  const mounted = await $.ui.mount({ plugin: PLUGIN, surface: "terminal", component: "ToolGroup", requestId: "group-images", props: { calls, isActive: false, isExpanded: false } });
+  const rows = rowsOf(await mounted.findAll({ type: "Text" }));
+  const images = (await mounted.findAll({ type: "Image" })).map(({ props }) => props);
+  await mounted.unmount();
+  return { rows, images };
+}
+
+test("a PNG a Read call returned is previewed under its group, at its aspect, with its name and size", async ($, on) => {
+  await engine($, on);
+  const { rows, images } = await groupDrawing($, [shot(1)]);
+  expect(rows).toEqual([ENGINE_ROW, "  ⎿  step-1.png · 1600×400"]);
+  expect(images).toEqual([{ key: "preview-0", source: { png: PNG }, columns: 72, rows: 9, alt: "shots/step-1.png" }]);
+});
+
+test("a terminal that draws only the alt, as tmux does, keeps the caption alone once the first preview's probe says so", async ($, on) => {
+  const w = await engine($, on);
+  w.blitDeny = "the Image draws its alt there";
+  expect((await groupDrawing($, [shot(1)])).images).toHaveLength(1);
+  await w.clock.advance(300);
+  const after = await groupDrawing($, [shot(1)]);
+  expect(after.images).toEqual([]);
+  expect(after.rows).toEqual([ENGINE_ROW, "  ⎿  step-1.png · 1600×400"]);
+});
+
+test("past three reads in one group the rest keep their captions alone", async ($, on) => {
+  await engine($, on);
+  const { rows, images } = await groupDrawing($, [shot(1), shot(2), shot(3), shot(4)]);
+  expect(images.map((image) => image["key"])).toEqual(["preview-0", "preview-1", "preview-2"]);
+  expect(rows.slice(1)).toEqual(["  ⎿  step-1.png · 1600×400", "  ⎿  step-2.png · 1600×400", "  ⎿  step-3.png · 1600×400", "  ⎿  step-4.png · 1600×400"]);
+});
+
+test("an image whose bytes are not a PNG keeps its caption, and the group's receipts still draw", async ($, on) => {
+  await engine($, on);
+  const broken = { ...shot(1), output: { type: "image", file: { base64: "iVBORw0KGgo=", type: "image/png", dimensions: { originalWidth: 4, originalHeight: 3 } } } };
+  const passed = bash("just test", { output: { stdout: "12 pass\n", stderr: "", interrupted: false, isImage: false } });
+  const { rows, images } = await groupDrawing($, [broken, passed]);
+  expect(images).toEqual([]);
+  expect(rows).toEqual([ENGINE_ROW, "  ⎿  ✓ just test · 12 pass", "  ⎿  step-1.png · 4×3"]);
+});
