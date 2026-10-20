@@ -15,6 +15,7 @@ const RECORD: TurnRecord = {
 };
 const LINE = { word: "Cooked", durationMs: 21_219, doneAt: "3:35 AM", waiting: [], record: RECORD };
 const text = (pieces: readonly { text: string }[]) => pieces.map((piece) => piece.text).join("");
+const ran = (command: string): TurnRecord => ({ ...RECORD, receipt: { command, at: 20, isLogged: false } });
 
 describe("turnDuration", () => {
   test("words a duration the way the engine's turn line does", () => {
@@ -44,7 +45,7 @@ describe("turnLine", () => {
     const widths = [82, 81, 80, 70, 60, 45, 36];
     expect(widths.map((width) => text(turnLine(LINE, U, width)))).toEqual([
       "Cooked for 21s · done 3:35 AM · 26.6k in 48 out · $0.1082 · ! just test not logged",
-      "Cooked for 21s · done 3:35 AM · 26.6k in 48 out · $0.1082 · ! just te… not logged",
+      "Cooked for 21s · 26.6k in 48 out · $0.1082 · ! just test not logged",
       "Cooked for 21s · 26.6k in 48 out · $0.1082 · ! just test not logged",
       "Cooked for 21s · 26.6k in 48 out · $0.1082 · ! just test not logged",
       "Cooked for 21s · 26.6k in 48 out · ! just test not logged",
@@ -52,6 +53,24 @@ describe("turnLine", () => {
       "Cooked for 21s · ! just… not logged",
     ]);
     for (const width of widths) expect(piecesWidth(turnLine(LINE, U, width))).toBeLessThanOrEqual(width);
+  });
+
+  test("a command of up to 16 cells is cut only once no part is left to give up", () => {
+    const widths = [89, 88, 45];
+    expect(widths.map((width) => text(turnLine({ ...LINE, record: ran("npx tsc --noEmit") }, U, width)))).toEqual([
+      "Cooked for 21s · done 3:35 AM · 26.6k in 48 out · $0.1082 · ! npx tsc --noEmit not logged",
+      "Cooked for 21s · 26.6k in 48 out · $0.1082 · ! npx tsc --noEmit not logged",
+      "Cooked for 21s · ! npx tsc --noEm… not logged",
+    ]);
+  });
+
+  test("a longer command is cut to keep the parts, down to 8 cells of it", () => {
+    const widths = [88, 81, 80];
+    expect(widths.map((width) => text(turnLine({ ...LINE, record: ran("bun run typecheck") }, U, width)))).toEqual([
+      "Cooked for 21s · done 3:35 AM · 26.6k in 48 out · $0.1082 · ! bun run typech… not logged",
+      "Cooked for 21s · done 3:35 AM · 26.6k in 48 out · $0.1082 · ! bun run… not logged",
+      "Cooked for 21s · 26.6k in 48 out · $0.1082 · ! bun run typecheck not logged",
+    ]);
   });
 
   test("a turn with nothing recorded is the engine's line", () => {
@@ -78,6 +97,11 @@ describe("turnFacts", () => {
     expect(text(turnFacts(RECORD, U, 80))).toBe("26.6k in 48 out · $0.1082 · ! just test not logged");
     expect(text(turnFacts({ ...RECORD, tokens: null, costUsd: null }, U, 80))).toBe("! just test not logged");
     expect(turnFacts({ ...RECORD, tokens: null, costUsd: null, receipt: null }, U, 80)).toEqual([]);
+  });
+
+  test("gives up a part before it cuts a short command, and cuts a longer one first", () => {
+    expect(text(turnFacts(RECORD, U, 49))).toBe("26.6k in 48 out · ! just test not logged");
+    expect(text(turnFacts(ran("bun run typecheck"), U, 49))).toBe("26.6k in 48 out · $0.1082 · ! bun run… not logged");
   });
 
   test("fits its cells", () => {
