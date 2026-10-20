@@ -6,7 +6,8 @@ export const REGISTER = "hooks/register.ts";
 
 // The built-in sec-default guard continues these past user-tier mods wherever it loads.
 const GUARDED = ["prompt.context", "prompt.section", "prompt.compose", "skill.prompt", "attribution.text", "settings.read"];
-const ON = /(?<![\w$.])on\(\s*(["'`])([^"'`]+)\1\s*(?:,\s*(\{[^{}]*\}))?/g;
+// A matcher may nest one object, as `{ component: "ToolUse", props: { tool: "Agent" } }` does.
+const ON = /(?<![\w$.])on\(\s*(["'`])([^"'`]+)\1\s*(?:,\s*(\{(?:[^{}]|\{[^{}]*\})*\}))?/g;
 
 export type Source = { path: string; text: string };
 export type Registration = { path: string; event: string; matcher: string; call: string };

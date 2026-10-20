@@ -26,6 +26,7 @@ describe("registrations", () => {
       "on('command.run', {command:'omca'}, hook);",
       'on("tool.check", { tool: /^(?:Bash|PowerShell)$/ }, hook);',
       'on("session.start", hook);',
+      'on("ui.render", { component: "ToolUse", props: { tool: "Agent" } }, hook);',
       'emitter.on("x", f);',
       'addon("y");',
     ].join("\n");
@@ -33,6 +34,7 @@ describe("registrations", () => {
       ["command.run", '{command:"omca"}', 'on("command.run", {command:"omca"})'],
       ["tool.check", "{tool:/^(?:Bash|PowerShell)$/}", 'on("tool.check", {tool:/^(?:Bash|PowerShell)$/})'],
       ["session.start", "", 'on("session.start")'],
+      ["ui.render", '{component:"ToolUse",props:{tool:"Agent"}}', 'on("ui.render", {component:"ToolUse",props:{tool:"Agent"}})'],
     ]);
   });
 });
