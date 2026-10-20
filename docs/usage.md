@@ -196,15 +196,41 @@ own after about 54 minutes idle (`idleCompaction`; see `docs/references.md` for 
 Type `@agent-oh-my-claudeagent:<name>` to send a request to one agent, for example
 `@agent-oh-my-claudeagent:architect what is the right shape for this cache?`.
 
-## The band, the pane and the plan board
+## The transcript, the band and the pane
+
+### In the transcript
+
+On a terminal OMCA redraws Claude Code's own transcript rows, so what it tracks shows up where
+the work happens:
+
+- **The turn line.** The dim line that closes each main turn (`✻ Cooked for 21s`) also carries the
+  turn's input and output tokens, its cost on an account billed by the token, and a receipt for a
+  verification command the turn ran: `✓ just test logged`, or `! just test not logged` when no
+  evidence was logged after it. While background agents are still working it names them in
+  their colors, as in `Waiting for executor, architect`. As the window narrows the line drops the
+  clock, then the cost, then the tokens; the receipt stays.
+- **An agent's launch.** The row of a single Agent call shows the agent's icon and name in its
+  color and its task, with `background` flush right when it runs on its own, in place of
+  `oh-my-claudeagent:executor(…)`. Several agents launched together keep Claude Code's own block.
+- **A finished agent.** Claude Code's `Agent "…" finished` row becomes the agent's status mark,
+  its name in its color and its task, with its duration, tool calls and tokens flush right, and
+  the first line of its reply beneath. A failed or stopped agent says so in the theme's error or warning color. Press
+  `ctrl+o` for Claude Code's full notification.
+- **A verification run.** Under a folded group of shell commands, each test, build or lint run
+  gets one row with its result: `✓ just test · 12 pass, 0 fail`, or `✗ just lint · exit 1 · 1
+  problem (1 error)`, read from the command's own output. The runners are the ones the
+  verification gate records.
+
+Running agents are listed by Claude Code itself, under the prompt. A session without a terminal
+gets the turn's figures as one text row beneath the answer instead.
 
 ### The band
 
 The band sits above the prompt. It shows the bound plan's progress as a bar with its done and
 total tasks, the next open task, how many tasks are proven, unproven and failed (see
-[proof](#proof)), a verification command whose evidence was not logged, and how many agents are
-running. As the window narrows it drops the verification first, then the proof counts, the next
-task and the running count; the bar stays. The prompt's border names the plan.
+[proof](#proof)), and a verification command whose evidence was not logged. As the window narrows
+it drops the proof counts first, then the next task, then the verification; the bar stays. With
+no plan bound and no step to offer, it draws nothing. The prompt's border names the plan.
 
 Below it, numbered buttons offer the next step: log the evidence, start work, run the final
 verification, or review the changes with architect. Press a button's digit in an empty prompt, or
@@ -214,13 +240,6 @@ buttons are held while an agent's transcript is in the main view and return with
 conversation.
 
 Set the `showBand` option to `false` to hide it.
-
-### The turn footer
-
-After each main-session turn, OMCA prints one line with the turn's duration and its input and
-output tokens. An account billed by the token also sees the turn's cost. When a verification
-command ran during the turn and no evidence was logged after it, a warning naming the command
-takes the cost's place.
 
 ### The pane
 
@@ -274,14 +293,10 @@ of content with a cue above or below it, and the keys; spare rows go to wrapped 
 key row. When the tab labels do not fit on one row, the tabs other than the shown one show their
 initial. A wide terminal gives the docked pane up to 120 columns while the transcript keeps 100.
 
-The pane opens by itself on a session's first wave of subagents, and not again once you close it
-or in a session without a terminal. Below 144 columns the pane waits undrawn, and below 110 once
-you have opened it yourself, until the window is wide enough.
+The pane opens only when you ask for it; the transcript reports each agent as it finishes.
 
-A toast appears when a wave of subagents finishes (one per wave, not one per agent), when a
-verification fails, and when the plan completes. With no plan bound, the band still shows the
-running agents. While a turn runs, the spinner's line ends with the plan's position and the agent
-count, as in `… · task 7/14 · 3 agents`.
+A toast appears when a verification fails and when the plan completes. While a turn runs, the
+spinner's line ends with the plan's position, as in `… · task 7/14`.
 
 #### Mascots
 
@@ -297,7 +312,7 @@ under the name `fork`, with a fork icon in place of the agent's own. A fork of t
 conversation wears the main agent's, which is the orchestrator unless your `agent` setting names
 another; with no main agent set, a fork draws no mascot.
 
-The band and the pane draw every color from your Claude Code theme, so a custom theme in
+The transcript rows, the band and the pane draw every color from your Claude Code theme, so a custom theme in
 `~/.claude/themes/` applies to them too. Each state also carries a glyph, and a word where the
 row has room for it beside the agent's name, so nothing depends on color alone. Secrets in
 commands, output and notes, such as API keys, tokens, `password=` values and the password in a
@@ -508,7 +523,7 @@ and the Doctor tab reports bun as missing. Make bun reachable from the app's `PA
 by linking it into a directory the app searches, and restart the app.
 
 The Code tab in Desktop runs its own bundled copy of Claude Code. OMCA's mod
-(the guard, band, pane, toasts and guard dialog) runs there only when that copy is 2.1.300 or
+(the guard, transcript rows, band, pane, toasts and guard dialog) runs there only when that copy is 2.1.300 or
 later; `/status` in a Code-tab session shows its version. On an older copy the agents, skills,
 MCP tools and stop gates still work and the mod does not load. Desktop for Linux is a beta for
 Debian and Ubuntu that updates through the package manager, so a newer bundled copy arrives with
@@ -536,6 +551,8 @@ On Desktop the mod draws differently:
 - `f` opens a Find field, but Desktop keeps the keyboard on the pane's buttons, so click the field
   before typing.
 - Copy can report that the surface has no clipboard, and the spinner keeps Desktop's own text.
+- The transcript keeps Desktop's own rows: Desktop draws its own turn footer, so the turn's
+  figures and receipt arrive as a text row beneath the answer.
 
 The VS Code chat panel runs OMCA's hooks but draws none of its interface: no band, no pane and
 no guard dialog ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)).

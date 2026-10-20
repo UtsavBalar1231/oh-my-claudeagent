@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Receipts in the transcript:** on a terminal the line that closes each turn carries its
+  tokens, its cost and a receipt for the verification it ran (`✓ just test logged` or
+  `! just test not logged`), and names the background agents it still waits on in their colors.
+  The separate turn footer row, with its plugin-name prefix, is gone; a session without a
+  terminal keeps it as text.
+- **Agents in their own colors:** a single Agent call's row shows the agent's icon, name and
+  task in its color, with `background` when it runs on its own, in place of
+  `oh-my-claudeagent:executor(…)`. Claude Code's `Agent "…" finished` row shows the agent's
+  status mark, name and task, its duration, tool calls and tokens, and the first line of its
+  reply. ctrl+o shows Claude Code's full rows.
+- **Verification results under shell commands:** a folded group of shell commands gets one row
+  per test, build or lint run with its result, such as `✗ just lint · exit 1 · 1 problem (1
+  error)`, read from the run's own output.
+
+### Changed
+
+- **The pane opens only on `/omca`:** it no longer opens by itself on the first wave of
+  subagents, and the toast that reported each finished wave is gone, since the transcript
+  reports every agent as it finishes.
+- **Less repeated state:** the band no longer counts running agents or says `no plan bound`,
+  and the spinner's suffix names only the plan's next task; Claude Code lists running agents
+  under the prompt.
+
 ## [3.2.0] - 2026-10-17
 
 ### Added

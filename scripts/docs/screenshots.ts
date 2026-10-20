@@ -512,7 +512,43 @@ export const SHOTS: readonly Still[] = [
       main: [{ content: [bash("just test", "Run the tests"), TASK_7] }, { content: [text("The tests pass, and the executor is on task 7.")] }],
       subagent: [{ content: [tool("Read", { file_path: "src/steps/summary.ts" })] }, { content: [WATCH_SUMMARY] }],
     },
-    ready: (screen) => screen.includes("evidence not logged") && screen.includes("1 running"),
+    ready: (screen) => screen.includes("evidence not logged") && screen.includes("just test · 42 passed"),
+  },
+  {
+    name: "transcript",
+    format: "png",
+    cols: 120,
+    rows: 52,
+    command: "Run the tests, then map the validation messages",
+    keys: [],
+    script: {
+      main: [
+        { content: [text("The tests first."), bash("just test", "Run the tests")] },
+        {
+          content: [
+            text("They pass. The explorer and the architect can start."),
+            agent("explorer", "Map the validation messages", "Task 8: list every validation message the forms build today."),
+            agent("architect", "Review the checkout flow", "Review how the draft order and the summary panel share state."),
+          ],
+        },
+        { content: [text("Both agents are on it.")] },
+        { content: [text("The explorer mapped the messages.")] },
+        { content: [text("The architect's review is in.")] },
+      ],
+      subagent: [],
+      agents: {
+        "validation message": [
+          { content: [tool("Grep", { pattern: "error", path: "src/forms" })] },
+          { content: [text("The forms build seven messages: four in src/forms/address.ts and three in src/forms/card.ts.")] },
+        ],
+        "share state": [
+          { content: [tool("Read", { file_path: "src/steps/summary.ts" })] },
+          { content: [text("They share state only through the cart store; keep the draft order out of it.")], delayMs: 2_500 },
+        ],
+      },
+    },
+    ready: (screen) =>
+      screen.includes("just test · 42 passed") && /explorer {2}Map the validation messages/.test(screen) && /architect {2}Review the checkout flow/.test(screen),
   },
   {
     name: "plan",
