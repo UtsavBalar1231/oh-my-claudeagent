@@ -18,7 +18,7 @@ event is unregistered on purpose; `docs/references.md` carries the per-event rea
 try/catch. `host.ts` defines the `Host` closures a feature receives in place of `$`, so a
 feature module takes `host` and never `$`. The features are `bash-guard`, `server-check`,
 `mod-marker`, `compact`, `agents-tracker`, `agent-rows`, `metrics`, `band`, `pane` with its `tabs/`,
-`footer`, `receipts`, `spinner`, `completion` and `omca-router`. `doctor.ts` runs the Doctor page's checks and fixes for
+`footer`, `group-rows`, `spinner`, `completion` and `omca-router`. `doctor.ts` runs the Doctor page's checks and fixes for
 `tabs/doctor.ts`; it registers no event. Pure logic lives in `src/core/`.
 
 `spinner` rewrites only the `suffix` of the terminal's main-loop Spinner, to `… · task 7/14`, from
@@ -45,8 +45,13 @@ atoms written once per turn or per finished agent, since a row subscribes to eve
   `notices` atom at the agent's `turn.complete`, after `agents-tracker` has closed its row, and
   redraws the `UserMessage` row of origin `task-notification` whose `task.id` it holds.
   `isExpanded` (ctrl+o) keeps the engine's rows.
-- `receipts` appends one row per verification call (`isVerificationCommand`) under a folded
-  `ToolGroup`, read from the call's own output, and leaves an expanded group as drawn.
+- `group-rows` appends rows under a folded `ToolGroup`, read from its calls' own output: one per
+  verification call (`isVerificationCommand`), and for a Read that returned a PNG a name row and
+  an `Image` of the picture (the first three per group; the rest keep the name row). A picture
+  whose bytes do not open as a PNG keeps its name row, since one bad `Image` refuses the whole
+  tree. After the first picture it draws, the feature blits it once: a refusal that names the alt
+  means the terminal shows only text, as tmux does, and every later preview is the name row alone.
+  An expanded group is left as drawn.
 
 `agents-tracker` also owns the agent page that `tabs/agent-page.ts` draws on the Agents tab: a
 Button keyed `open-<agent id>` on each lane opens it, and `b`, `c`, `r` and `v` go back, copy the

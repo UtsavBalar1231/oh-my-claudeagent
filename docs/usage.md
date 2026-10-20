@@ -220,6 +220,11 @@ the work happens:
   gets one row with its result: `✓ just test · 12 pass, 0 fail`, or `✗ just lint · exit 1 · 1
   problem (1 error)`, read from the command's own output. The runners are the ones the
   verification gate records.
+- **A picture Claude reads.** Under a folded group with a Read of a PNG, a row names the file and
+  its size, and a terminal that draws pictures (kitty, Ghostty) shows the picture beneath it, at
+  most 72 columns by 20 rows. A terminal that cannot, tmux included, keeps the name row alone:
+  OMCA asks the terminal once, after the first picture it draws. A group of more than three
+  pictures previews three and names the rest.
 
 Running agents are listed by Claude Code itself, under the prompt. A session without a terminal
 gets the turn's figures as one text row beneath the answer instead.
@@ -513,8 +518,8 @@ against that limit.
 The subagent status line gives each running agent a row with its model, state, effort and
 context use.
 
-The status line and the `/omca` pane draw Nerd Font icons, and the status line's cache icon and
-usage rings need Nerd Fonts v3. Set `OMCA_GLYPHS=unicode` when the terminal font has none or is an
+The status line, the transcript rows and the `/omca` pane draw solid Nerd Font icons, and the
+status line's cache and clock icons and its usage rings need Nerd Fonts v3. Set `OMCA_GLYPHS=unicode` when the terminal font has none or is an
 older Nerd Font, or `OMCA_GLYPHS=ascii` for plain text; `/oh-my-claudeagent:omca-setup`
 asks and writes it for you. [`statusline/README.md`](../statusline/README.md) has the layout rules.
 

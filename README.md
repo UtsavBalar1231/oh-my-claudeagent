@@ -64,8 +64,9 @@ verification logged, OMCA sends it back to work with the reason.
 
 OMCA shows its work in Claude Code's own transcript. The line that closes each turn carries its
 tokens, its cost and a receipt for the verification it ran. An agent starts and finishes in its
-own color, the finish with its duration, tool calls, tokens and the first line of its reply. A test, build
-or lint run gets its result under the shell commands that ran it.
+own color, the finish with its duration, tool calls, tokens and the first line of its reply. A
+test, build or lint run gets its result under the shell commands that ran it, and a screenshot
+Claude reads shows as a picture where the terminal draws them.
 
 <img src=".github/assets/transcript.png" width="900" alt="A Claude Code turn on the checkout project: under Ran 1 shell command, a receipt reads just test, 42 passed. Two background agents start, and each reports as it finishes: the explorer on Map the validation messages and the architect on Review the checkout flow, each with its duration, tool calls and tokens flush right and the first line of its reply beneath. The dim line that closes each turn names the agents still running, then the turn's tokens and cost.">
 

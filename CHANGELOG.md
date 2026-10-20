@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `oh-my-claudeagent:executor(…)`. Claude Code's `Agent "…" finished` row shows the agent's
   status mark, name and task, its duration, tool calls and tokens, and the first line of its
   reply. ctrl+o shows Claude Code's full rows.
+- **Pictures in the transcript:** a PNG Claude reads is previewed under its Read group with its
+  name and size, on terminals that draw pictures (kitty, Ghostty). Where pictures cannot show,
+  tmux included, the name row stays alone.
 - **Verification results under shell commands:** a folded group of shell commands gets one row
   per test, build or lint run with its result, such as `✗ just lint · exit 1 · 1 problem (1
   error)`, read from the run's own output.
@@ -28,6 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **The pane opens only on `/omca`:** it no longer opens by itself on the first wave of
   subagents, and the toast that reported each finished wave is gone, since the transcript
   reports every agent as it finishes.
+- **Solid icons:** the Nerd Font set draws solid marks where the font has them: a filled check,
+  a half-filled circle for work in progress and a filled minus for blocked or stopped, and the
+  architect, explorer and reviewer draw a sitemap, binoculars and a gavel. The status line's
+  clock and pull request states are solid too. Pending keeps its hollow circle.
 - **Less repeated state:** the band no longer counts running agents or says `no plan bound`,
   and the spinner's suffix names only the plan's next task; Claude Code lists running agents
   under the prompt.

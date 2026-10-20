@@ -152,7 +152,7 @@ server's `omca_hook` tool, which dispatches through `servers/hooks/registry.ts`.
 | `agent.spawn`, `turn.step` | The Agents tab and delegation records |
 | `tool.call` | A subagent's tool calls, kept for its page on the Agents tab; only a subagent's call reaches the mod, and a main-loop call skips it |
 | `session.compact` | Asks the summarizer to keep the bound plan and its next ten open tasks. It does not run for a user-installed plugin where an organization manages Claude Code; the server's `SessionStart` `compact` handler re-injects the plan context there |
-| `ui.render`, `ui.focus`, `ui.scroll`, `ui.close`, `prompt.edit`, `prompt.change`, `command.run` | The turn line, an agent's launch and finish rows and the receipts under shell commands in the transcript, the band, the pane and the commands |
+| `ui.render`, `ui.focus`, `ui.scroll`, `ui.close`, `prompt.edit`, `prompt.change`, `command.run` | The turn line, an agent's launch and finish rows, and the receipts and picture previews under tool groups in the transcript, the band, the pane and the commands |
 
 `tool.check` runs before every Bash and PowerShell call in every permission mode and never
 returns an allow, which would skip the auto-mode classifier.
@@ -217,7 +217,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | Variable | Effect |
 | --- | --- |
 | `OMCA_COMMENT_GATE` | `advise` (default) lets a write through with a note; `deny` blocks it; `off` skips the check |
-| `OMCA_GLYPHS` | The glyph set of the pane, band, transcript rows, dialog and status line: `nerd` (default, Nerd Font icons; the status line's cache icon and rings need Nerd Fonts v3), `unicode` (no Nerd Font needed) or `ascii` (plain text) |
+| `OMCA_GLYPHS` | The glyph set of the pane, band, transcript rows, dialog and status line: `nerd` (default, Nerd Font icons; the status line's cache and clock icons and its rings need Nerd Fonts v3), `unicode` (no Nerd Font needed) or `ascii` (plain text) |
 | `CLAUDE_CODE_EFFORT_LEVEL` | Read by the doctor. A level other than `auto` runs every agent at it, whatever the agent declares, and the doctor warns |
 | `CLAUDE_AFK_TIMEOUT_MS` | Read by the doctor. A whole number of milliseconds after which an unanswered question continues on its own, so a plan interview can settle on its defaults; it outranks `askUserQuestionTimeout`. Claude Code ignores it in project and local settings, and so does the doctor |
 | `OMCA_NATIVE_AGENTS_MD` | `1` stops the context injector from adding `AGENTS.md` where Claude Code already loads it natively and no project `CLAUDE.md` is on the path |
@@ -314,7 +314,7 @@ ledger, notepads and the registry, and links the JSON Schemas for the ledger and
 | Guard decisions | Yes | When the app's Claude Code is 2.1.300 or later | Yes | Yes | Unless `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks` |
 | Guard review dialog | Yes | As guard decisions | No: held commands are decided without you | No: decided as in `-p` | As the guard |
 | Band, pane, plan reader, doctor | Yes | As guard decisions, with [Desktop's differences](usage.md#desktop-and-vs-code) | No | No ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)) | As the guard |
-| Turn line, agent rows and receipts in the transcript | Yes | No: Desktop keeps its own rows, and the turn's figures and receipt arrive as a text row beneath the answer | No | No | As the guard |
+| Turn line, agent rows, receipts and image previews in the transcript | Yes, pictures where the terminal draws them (kitty, Ghostty) | No: Desktop keeps its own rows, and the turn's figures and receipt arrive as a text row beneath the answer | No | No | As the guard |
 | Status line | Yes | Not documented | No | Not documented | Unless `allowManagedHooksOnly` or `disableAllHooks` |
 
 Where the built-in `sec-default` guard loads (a machine whose managed settings set at least one
