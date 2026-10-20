@@ -196,7 +196,7 @@ describe("laneRows", () => {
 
   test("the Nerd set draws each roster agent's own icon", () => {
     const [head = []] = laneRows(lane({ type: "oh-my-claudeagent:architect" }), look(73, { g: glyphs("nerd") }), HOME);
-    expect(head[0]).toEqual({ text: "\u{f0eb} ", color: "purple_FOR_SUBAGENTS_ONLY" });
+    expect(head[0]).toEqual({ text: "\u{f0e8} ", color: "purple_FOR_SUBAGENTS_ONLY" });
   });
 });
 

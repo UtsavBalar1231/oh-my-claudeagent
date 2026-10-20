@@ -262,7 +262,7 @@ describe("glyphs", () => {
     const nerd = glyphs("nerd");
     const unicode = glyphs("unicode");
     const icons = ["check", "cross", "warn", "info", "pending", "running", "progress", "blocked", "agent"] as const;
-    expect(icons.map((name) => nerd[name].codePointAt(0)?.toString(16))).toEqual(["f05d", "f057", "f06a", "f05a", "f10c", "f111", "f192", "f05e", "f007"]);
+    expect(icons.map((name) => nerd[name].codePointAt(0)?.toString(16))).toEqual(["f058", "f057", "f06a", "f05a", "f10c", "f111", "f042", "f056", "f007"]);
     for (const name of icons) expect(displayWidth(nerd[name])).toBe(1);
     for (const name of ["pointer", "up", "down", "dot", "rule", "vrule", "ellipsis", "mask"] as const) expect(nerd[name]).toBe(unicode[name]);
     expect([nerd.tier, unicode.tier, glyphs("ascii").tier]).toEqual(["nerd", "unicode", "ascii"]);
@@ -270,7 +270,7 @@ describe("glyphs", () => {
 
   test("an agent draws its own icon in the Nerd set, the default icon when unknown, and the shared glyph otherwise", () => {
     const nerd = glyphs("nerd");
-    expect(agentGlyph("oh-my-claudeagent:architect", nerd)).toBe("\u{f0eb}");
+    expect(agentGlyph("oh-my-claudeagent:architect", nerd)).toBe("\u{f0e8}");
     expect(agentGlyph("oh-my-claudeagent:build-fixer", nerd)).toBe("\u{f0ad}");
     expect(agentGlyph("other-plugin:planner", nerd)).toBe("\u{f007}");
     expect(agentGlyph("executor", nerd)).toBe("\u{f085}");

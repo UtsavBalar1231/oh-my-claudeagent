@@ -241,9 +241,9 @@ describe("pull request segment", () => {
   });
 
   test.each([
-    ["approved", G, "\uf00c", "+"],
-    ["changes_requested", RED, "\uf00d", "!"],
-    ["pending", Y, "\uf017", "?"],
+    ["approved", G, "\u{f058}", "+"],
+    ["changes_requested", RED, "\u{f057}", "!"],
+    ["pending", Y, "\u{f0954}", "?"],
     ["draft", D, "\uf040", "d"],
   ])("review state %s is %s with a Nerd Font glyph and an ASCII fallback", (state, color, nerd, ascii) => {
     const data = withPr({ number: 5, review_state: state });
@@ -790,7 +790,7 @@ describe("prompt cache", () => {
     const data = warm(3600, cause("tools_changed"));
     expect(visible(cached(data)[2] ?? "")).toBe("~ 0s · C: warm 60m · miss: tools changed");
     expect(visible(cached(data, PLAIN)[2] ?? "")).toBe("~ 0s | C: warm 60m | miss: tools changed");
-    expect(visible(cached(data, NERD)[2] ?? "")).toBe("\uf017 0s · \u{f00e8} warm 60m · miss: tools changed");
+    expect(visible(cached(data, NERD)[2] ?? "")).toBe("\u{f0954} 0s · \u{f00e8} warm 60m · miss: tools changed");
   });
 
   describe("when the usage row sheds segments", () => {

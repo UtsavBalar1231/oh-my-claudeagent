@@ -965,9 +965,9 @@ test("by default the rows and the checklist draw Nerd Font outcome glyphs and ea
   world(on, await proofFiles(), {}, { OMCA_GLYPHS: "" });
   const ui = await openEvidence($, INLINE_80);
   expect((await body(ui, INLINE_80)).slice(0, 3)).toEqual([
-    " COMPLETE  sample  \u{f05d} build  \u{f05d} test  \u{f057} lint  \u{f05d} manual  10-02 11:45",
+    " COMPLETE  sample  \u{f058} build  \u{f058} test  \u{f057} lint  \u{f058} manual  10-02 11:45",
     "── Fri 2026-10-02 ───────────────────────────────────────────────────────",
-    "❯ \u{f05d}  11:45  final   just ci                                \u{f001} orchestrator",
+    "❯ \u{f058}  11:45  final   just ci                                \u{f001} orchestrator",
   ]);
   const drawn = (await body(ui, INLINE_80)).join("\n");
   expect([...drawn.matchAll(/[\u{e000}-\u{f8ff}](?=\S)/gu)].map((match) => match[0])).toEqual([]);

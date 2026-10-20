@@ -588,7 +588,7 @@ test("by default each agent draws its own Nerd Font icon, a space after it", asy
 
   const rows = body(await ui.drawn());
   expect(rows[0]).toStartWith("\u{f085} executor · ");
-  expect(rows[2]).toStartWith("\u{f05d} architect · Review the ledger design · T…");
+  expect(rows[2]).toStartWith("\u{f058} architect · Review the ledger design · T…");
   await ui.unmount();
 });
 

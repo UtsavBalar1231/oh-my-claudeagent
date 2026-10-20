@@ -258,14 +258,14 @@ var UNICODE = { tier: "unicode", ...UNICODE_SET };
 var NERD = {
   ...UNICODE,
   tier: "nerd",
-  check: "\uF05D",
+  check: "\uF058",
   cross: "\uF057",
   warn: "\uF06A",
   info: "\uF05A",
   pending: "\uF10C",
   running: "\uF111",
-  progress: "\uF192",
-  blocked: "\uF05E",
+  progress: "\uF042",
+  blocked: "\uF056",
   agent: "\uF007"
 };
 var WIDE_SYMBOLS = [
