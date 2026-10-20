@@ -158,7 +158,7 @@ describe("the real tree", () => {
     for (const check of checks) expect(await check.run(ctx)).toMatchObject({ status: "pass" });
   });
 
-  test("the real register.ts is read: its three ui.render matchers count as three registrations", () => {
+  test("the real register.ts is read: each of its ui.render matchers counts as its own registration", () => {
     const ctx = createContext(join(import.meta.dir, "..", ".."));
     const calls = registrations(hookSources(ctx)).map((r) => r.call);
     expect(calls).toContain('on("command.run", {command:"omca"})');
@@ -166,6 +166,10 @@ describe("the real tree", () => {
       'on("ui.render", {component:"AbovePrompt"})',
       'on("ui.render", {component:"Pane"})',
       'on("ui.render", {component:"Spinner"})',
+      'on("ui.render", {component:"TurnDuration"})',
+      'on("ui.render", {component:"UserMessage"})',
+      'on("ui.render", {component:"ToolUse",props:{tool:"Agent"}})',
+      'on("ui.render", {component:"ToolGroup"})',
     ]);
   });
 });

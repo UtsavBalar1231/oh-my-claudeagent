@@ -121,6 +121,26 @@ declare module "claude-code" {
         };
       };
       costSample: { turnId: string; usd: number | null; at: number };
+      notices: {
+        readonly [agentId: string]: {
+          type: string;
+          description: string;
+          status: "answer" | "aborted" | "refusal" | "error" | "gone";
+          durationMs: number | null;
+          calls: number;
+          tokens: number;
+          result: string;
+        };
+      };
+      turns: readonly {
+        turnId: string;
+        startedAt: number;
+        endedAt: number;
+        tokens: { input: number; output: number } | null;
+        costUsd: number | null;
+        receipt: { command: string; at: number; isLogged: boolean } | null;
+        waiting: readonly string[];
+      }[];
       doctor: {
         isRunning: boolean;
         checks: readonly {

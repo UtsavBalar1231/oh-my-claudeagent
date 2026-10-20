@@ -1,7 +1,7 @@
 import type { On, SessionRateLimit, TurnUsage } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
 import { displayWidth } from "../../src/core/ui-kit.ts";
-import { LEDGER, ROOT, SESSION, type World, world } from "./world.ts";
+import { LEDGER, PLUGIN, ROOT, SESSION, type World, world } from "./world.ts";
 
 const STATUS = `${ROOT}/.omca/state/session/${SESSION}.json`;
 const STARTED_MS = Date.UTC(2026, 9, 2, 12, 0, 0);
@@ -19,8 +19,10 @@ const USAGE: TurnUsage = {
 
 type Meter = { usd: number | undefined; rateLimits: SessionRateLimit[] };
 
+// The text footer is what a session with no terminal gets; a terminal closes the turn with its own line.
 function engine(on: On, files: Readonly<Record<string, string>> = {}, env: Readonly<Record<string, string>> = {}) {
   const w = world(on, files, {}, env);
+  w.surfaces = ["desktop"];
   const meter: Meter = { usd: 0.25, rateLimits: [] };
   on("session.usage", () => ({
     value: {
@@ -166,3 +168,148 @@ for (const [glyphSet, env, line] of [
     expect(displayWidth(`● oh-my-claudeagent: ${text}`)).toBeLessThanOrEqual(72);
   });
 }
+
+const ENGINE_LINE = "engine turn line";
+const NOW = Date.UTC(2026, 9, 2, 12, 0, 0);
+
+function terminal(on: On, files: Readonly<Record<string, string>> = {}) {
+  const made = engine(on, files);
+  made.w.surfaces = ["terminal"];
+  on("ui.render", ($, e) => {
+    const { Text } = $.ui.resolve(e);
+    return Text({ children: [ENGINE_LINE] });
+  });
+  return made;
+}
+
+type TurnProps = { word: string; durationMs: number; isExpanded?: boolean; waitingFor?: { agents: { id: string; agentType: string }[]; workflows: number } };
+
+async function line($: Engine, requestId: string, props: TurnProps = { word: "Cooked", durationMs: 4_200 }) {
+  const mounted = await $.ui.mount({ plugin: PLUGIN, surface: "terminal", component: "TurnDuration", requestId, props: props as { word: string; durationMs: number } });
+  const texts = (await mounted.findAll({ type: "Text" })).map((element) => element.text).filter((text) => text !== "");
+  await mounted.unmount();
+  return texts;
+}
+
+const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+test("on a terminal the turn's facts move into the line that closes it, and no text row follows the answer", async ($, on) => {
+  const { w, meter } = terminal(on, { [STATUS]: statusFile("just test", STARTED_S + 2) });
+  ledgerAt(w, STARTED_S - 600);
+  await $.turn.start({ text: "Run the tests", turnId: "t-1" });
+  expect(await turn($, w, meter, 0.2812)).toEqual({ text: "The tests ran." });
+
+  const [mark, text] = await line($, "turn-1");
+  expect(mark).toBe("✻");
+  // 78 cells beside the mark of an 80-column row: the clock gives way to the receipt.
+  expect(text).toBe("Cooked for 4s · 12.3k in 845 out · $0.0312 · ! just test not logged");
+});
+
+test("with room, the line also says when the turn was done", async ($, on) => {
+  const { w, meter } = terminal(on);
+  await $.turn.start({ text: "Run the tests", turnId: "t-1" });
+  await turn($, w, meter, 0.2812);
+
+  expect((await line($, "turn-1"))[1]).toBe(`Cooked for 4s · done ${clock(NOW + 4_200)} · 12.3k in 845 out · $0.0312`);
+});
+
+test("a logged verification reads logged on the line", async ($, on) => {
+  const { w, meter } = terminal(on, { [STATUS]: statusFile("just test", STARTED_S + 2) });
+  ledgerAt(w, STARTED_S + 3);
+  await $.turn.start({ text: "Run the tests", turnId: "t-1" });
+  await turn($, w, meter, 0.2812);
+
+  expect((await line($, "turn-1"))[1]).toEndWith("· ✓ just test logged");
+});
+
+test("a line drawn before its turn's facts land keeps the engine's line, and takes them once they do", async ($, on) => {
+  const { w, meter } = terminal(on);
+  await $.turn.start({ text: "Run the tests", turnId: "t-1" });
+  expect(await line($, "turn-1")).toEqual([ENGINE_LINE]);
+  await turn($, w, meter, 0.2812);
+  expect((await line($, "turn-1"))[1]).toStartWith("Cooked for 4s · done");
+});
+
+test("a line belongs to the turn that started last before it was first drawn: an older line drawn again keeps the engine's", async ($, on) => {
+  const { w, meter } = terminal(on);
+  expect(await line($, "turn-old")).toEqual([ENGINE_LINE]);
+  await $.turn.start({ text: "Run the tests", turnId: "t-1" });
+  expect(await line($, "turn-new")).toEqual([ENGINE_LINE]);
+  await turn($, w, meter, 0.2812);
+
+  expect(await line($, "turn-old")).toEqual([ENGINE_LINE]);
+  expect((await line($, "turn-new"))[1]).toStartWith("Cooked for 4s");
+});
+
+test("a turn that ends before the previous turn's facts land still draws its own facts, each line its turn's", async ($, on) => {
+  const { w, meter } = terminal(on);
+  const complete = (turnId: string, output: number) =>
+    $.turn.complete({ answer: "ok", durationMs: 100, isAborted: false, turnId, reason: "answer", usage: { ...USAGE, output_tokens: output } });
+  await $.turn.start({ text: "Delegate", turnId: "t-1" });
+  await w.clock.advance(300);
+  expect(await line($, "line-1")).toEqual([ENGINE_LINE]);
+  await w.clock.advance(150);
+  await $.turn.start({ text: "", turnId: "t-2" });
+  await w.clock.advance(50);
+  expect(await line($, "line-2")).toEqual([ENGINE_LINE]);
+  meter.usd = 0.3;
+  await complete("t-1", 11);
+  await complete("t-2", 22);
+
+  expect((await line($, "line-1"))[1]).toContain("12.3k in 11 out");
+  expect((await line($, "line-2"))[1]).toContain("12.3k in 22 out");
+});
+
+test("a line drawn before any turn started, as after /resume, keeps the engine's line", async ($, on) => {
+  const { w, meter } = terminal(on);
+  expect(await line($, "turn-resumed")).toEqual([ENGINE_LINE]);
+  await w.clock.advance(1_000);
+  await $.turn.start({ text: "Run the tests", turnId: "t-1" });
+  await turn($, w, meter, 0.2812);
+  expect(await line($, "turn-resumed")).toEqual([ENGINE_LINE]);
+});
+
+test("a client that names the agents a turn waits on gets them on the line, in place of the duration", async ($, on) => {
+  const { w, meter } = terminal(on);
+  await $.turn.start({ text: "Delegate", turnId: "t-1" });
+  await turn($, w, meter, 0.2812);
+
+  const waiting = { agents: [{ id: "a-1", agentType: "oh-my-claudeagent:executor" }, { id: "a-2", agentType: "oh-my-claudeagent:architect" }], workflows: 0 };
+  expect((await line($, "turn-1", { word: "Cooked", durationMs: 4_200, isExpanded: false, waitingFor: waiting }))[1]).toBe("Waiting for executor, architect · 12.3k in 845 out · $0.0312");
+  expect((await line($, "turn-1", { word: "Cooked", durationMs: 4_200, isExpanded: false }))[1]).toStartWith("Cooked for 4s · done");
+});
+
+test("a client that names no waited-on agents keeps its own line while agents run, with the facts on a row beneath", async ($, on) => {
+  const { w, meter } = terminal(on);
+  on("agent.spawn", () => ({ model: "claude-sonnet-5-5", agentId: "a-1" }));
+  await $.agent.spawn({
+    tool_use_id: "toolu_1",
+    prompt: "work",
+    description: "work",
+    subagentType: "oh-my-claudeagent:executor",
+    provider: { plugin: PLUGIN, tier: "user" },
+    parentModel: "claude-opus-5-5",
+    background: true,
+    fork: false,
+  });
+  await $.turn.start({ text: "Delegate", turnId: "t-1" });
+  await turn($, w, meter, 0.2812);
+
+  expect((await line($, "turn-1")).slice(0, 2)).toEqual([ENGINE_LINE, "12.3k in 845 out · $0.0312"]);
+});
+
+test("a run already on one turn's line is not repeated on the next, which starts in the same second", async ($, on) => {
+  const { w } = terminal(on, { [STATUS]: statusFile("just test", STARTED_S) });
+  ledgerAt(w, STARTED_S - 600);
+  await $.turn.start({ text: "Run the tests", turnId: "t-1" });
+  expect(await line($, "line-1")).toEqual([ENGINE_LINE]);
+  await $.turn.complete({ answer: "ok", durationMs: 100, isAborted: false, turnId: "t-1", reason: "answer", usage: USAGE });
+  await w.clock.advance(200);
+  await $.turn.start({ text: "", turnId: "t-2" });
+  await w.clock.advance(100);
+  expect(await line($, "line-2")).toEqual([ENGINE_LINE]);
+  await $.turn.complete({ answer: "ok", durationMs: 100, isAborted: false, turnId: "t-2", reason: "answer", usage: USAGE });
+
+  expect((await line($, "line-1"))[1]).toEndWith("! just test not logged");
+  expect((await line($, "line-2"))[1]).not.toContain("just test");
+});

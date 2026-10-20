@@ -12,10 +12,12 @@ const ATOMS = [
   "lanes",
   "ledger",
   "nextActions",
+  "notices",
   "pages",
   "pane",
   "plan",
   "stats",
+  "turns",
 ].map((key) => ({ plugin: PLUGIN, key }));
 
 test("the module registers exactly the dispatchers, env reads and atoms of the contract", async ($, on) => {

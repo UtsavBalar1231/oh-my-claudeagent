@@ -19,6 +19,10 @@ type Sites = {
   "ui.render AbovePrompt": [RenderInput<"AbovePrompt">, RenderElement];
   "ui.render Pane": [RenderInput<"Pane">, RenderElement];
   "ui.render Spinner": [RenderInput<"Spinner">, RenderElement];
+  "ui.render TurnDuration": [RenderInput<"TurnDuration">, RenderElement];
+  "ui.render UserMessage": [RenderInput<"UserMessage">, RenderElement];
+  "ui.render ToolUse": [RenderInput<"ToolUse">, RenderElement];
+  "ui.render ToolGroup": [RenderInput<"ToolGroup">, RenderElement];
   "session.compact": [Args<"session.compact">, EventResult<"session.compact">];
 };
 
