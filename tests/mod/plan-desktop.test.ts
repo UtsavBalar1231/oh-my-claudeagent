@@ -122,6 +122,8 @@ for (const columns of [56, 90]) {
     const tree = await ui.drawn();
 
     expect(await ui.find({ type: "Text", text: "This view is more than Claude Desktop draws at once." })).toBeDefined();
+    expect(await ui.find({ key: "f" })).toBeUndefined();
+    await ui.press({ key: "m" });
     expect(await ui.find({ key: "f" })).toBeDefined();
     expect(await ui.find({ key: "l" })).toBeDefined();
     expect(isDrawable(sizeOf(tree))).toBe(true);
@@ -138,6 +140,7 @@ for (const columns of [56, 90]) {
     await $.command.run(run("plan", columns));
     const ui = await $.ui.mount(docked("desktop", columns));
 
+    await ui.press({ key: "m" });
     await ui.press({ key: "f" });
     expect(await ui.find({ key: "filter" })).toBeDefined();
     expect(isDrawable(sizeOf(await ui.drawn()))).toBe(true);
@@ -156,6 +159,7 @@ for (const surface of ["desktop", "terminal"] as const) {
     await $.command.run(run("plan", 90));
     const ui = await $.ui.mount(docked(surface, 90));
 
+    await ui.press({ key: "m" });
     await ui.press({ key: "f" });
     const field = await ui.find({ key: "filter" });
     expect(field).toBeDefined();
@@ -187,6 +191,7 @@ test("on desktop a section opened from the contents focuses its Contents key, an
   await $.command.run(run("plan", 56));
   const ui = await $.ui.mount(docked("desktop", 56));
 
+  await ui.press({ key: "m" });
   await ui.press({ key: "t" });
   await ui.press({ key: "row-3" });
   await w.clock.advance(1);

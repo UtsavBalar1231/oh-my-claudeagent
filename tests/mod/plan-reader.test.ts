@@ -60,6 +60,7 @@ for (const layout of LAYOUTS) {
       expect((await ui.find({ key: "task-2" }))?.props["autoFocus"]).toBe(true);
       expect(await ui.find({ key: "task-9" })).toBeUndefined();
 
+      await ui.press({ key: "m" });
       await ui.press({ key: "t" });
       expect(await ui.find({ type: "Text", text: "Ship the thing" })).toBeDefined();
       expect(await ui.find({ type: "Text", text: "1/2 tasks done · ~/.claude/plans/ship.md" })).toBeDefined();
@@ -81,6 +82,7 @@ for (const layout of LAYOUTS) {
       // The test kit cannot resolve a plugin's own $.ui.focus, so the refocus shows as its refusal.
       expect(w.logs.at(-1)).toBe("omca plan could not focus row-5: no implementation for ui.focus");
       await ui.press({ key: "b" });
+      await ui.press({ key: "m" });
       await ui.unmount();
     }
   });
@@ -133,6 +135,7 @@ for (const layout of LAYOUTS) {
 
     await $.command.run(run("plan"));
     const ui = await $.ui.mount(pane("terminal"));
+    await ui.press({ key: "m" });
     await ui.press({ key: "l" });
 
     expect((await ui.find({ key: "pick-1" }))?.props["label"]).toBe("ship");
@@ -183,9 +186,9 @@ test("on the board a page key moves the cursor by the tasks the window shows, Ho
   const { ui, engine, current, key } = await windowed($, on, { [`${POSIX.plans}/long.md`]: LONG }, "plan long");
   expect(await current()).toEqual(["task-1"]);
 
-  expect(await key(16)).toEqual(["task-9"]);
-  expect(await key(16)).toEqual(["task-18"]);
-  expect(await key(-16)).toEqual(["task-9"]);
+  expect(await key(16)).toEqual(["task-10"]);
+  expect(await key(16)).toEqual(["task-20"]);
+  expect(await key(-16)).toEqual(["task-10"]);
   expect(await key(17)).toEqual(["task-30"]);
   expect(await key(16)).toEqual(["task-30"]);
   expect(await key(-17)).toEqual(["task-1"]);
@@ -200,12 +203,12 @@ test("on the board a page key moves the cursor by the tasks the window shows, Ho
 });
 
 test("on the Sections list a page key moves the pointer by the rows the window shows, Home and End go to the ends, and a wheel tick moves it by its rows", async ($, on) => {
-  const { ui, engine, current, key } = await windowed($, on, { [`${POSIX.plans}/long.md`]: LONG }, "plan long", DOCK, ["t"]);
+  const { ui, engine, current, key } = await windowed($, on, { [`${POSIX.plans}/long.md`]: LONG }, "plan long", DOCK, ["m", "t"]);
   expect(await current()).toEqual(["row-1"]);
 
-  expect(await key(16)).toEqual(["row-7"]);
-  expect(await key(16)).toEqual(["row-14"]);
-  expect(await key(-16)).toEqual(["row-7"]);
+  expect(await key(16)).toEqual(["row-8"]);
+  expect(await key(16)).toEqual(["row-16"]);
+  expect(await key(-16)).toEqual(["row-8"]);
   expect(await key(17)).toEqual(["row-30"]);
   expect(await key(16)).toEqual(["row-30"]);
   expect(await key(-17)).toEqual(["row-1"]);
@@ -221,7 +224,7 @@ test("on the Sections list a page key moves the pointer by the rows the window s
 
 test("where the body and the tree are the same height a page key pages and does not jump to the end", async ($, on) => {
   const inline: Size = { columns: 80, rows: 40, placement: "inline" };
-  const { ui, current, key } = await windowed($, on, { [`${POSIX.plans}/long.md`]: LONG }, "plan long", inline, ["t"]);
+  const { ui, current, key } = await windowed($, on, { [`${POSIX.plans}/long.md`]: LONG }, "plan long", inline, ["m", "t"]);
   expect(await current()).toEqual(["row-1"]);
   expect(await key(12, 12, 12)).toEqual(["row-6"]);
   expect(await key(-12, 12, 12)).toEqual(["row-1"]);
@@ -234,7 +237,7 @@ test("on the Plans list a page key, Home and End and a wheel tick move the point
 
   expect(await key(17)).toEqual(["pick-11"]);
   expect(await key(-17)).toEqual(["pick-0"]);
-  expect(await key(16)).toEqual(["pick-7"]);
+  expect(await key(16)).toEqual(["pick-8"]);
   expect(await key(-16)).toEqual(["pick-0"]);
   expect(await key(1)).toEqual(["pick-1"]);
   expect(await key(-3)).toEqual(["pick-0"]);
@@ -246,6 +249,7 @@ test("on a section's page and a task's page the scroll keys reach the engine, wh
   const { ui, engine, key } = await windowed($, on, { [`${POSIX.plans}/long.md`]: LONG }, "plan long", DOCK, ["task-1"]);
   for (const by of [16, 31, -16]) await key(by, 31);
   await ui.press({ key: "b" });
+  await ui.press({ key: "m" });
   await ui.press({ key: "t" });
   await ui.press({ key: "row-1" });
   for (const by of [16, 31, -31, -16]) await key(by, 31);
@@ -254,24 +258,27 @@ test("on a section's page and a task's page the scroll keys reach the engine, wh
   await ui.unmount();
 });
 
-test("every Plan view names Esc as the way out", async ($, on) => {
+test("no Plan view draws a navigation hint", async ($, on) => {
   const { ui } = await windowed($, on, { [`${POSIX.plans}/long.md`]: LONG }, "plan long");
-  expect(await ui.find({ type: "Text", text: "↑↓ move · enter open · esc close" })).toBeDefined();
+  const hints = async () => spreadRows(await ui.drawn()).filter((row) => row.includes("esc close"));
+  expect(await hints()).toEqual([]);
 
   await ui.press({ key: "task-1" });
-  expect(await ui.find({ type: "Text", text: "↑↓ scroll · esc close" })).toBeDefined();
+  expect(await hints()).toEqual([]);
 
   await ui.press({ key: "b" });
+  await ui.press({ key: "m" });
   await ui.press({ key: "t" });
-  expect(await ui.find({ type: "Text", text: "↑↓ move · enter open · esc close" })).toBeDefined();
+  expect(await hints()).toEqual([]);
 
   await ui.press({ key: "l" });
-  expect(await ui.find({ type: "Text", text: "↑↓ move · enter open · esc close" })).toBeDefined();
+  expect(await hints()).toEqual([]);
 
   await ui.press({ key: "pick-0" });
+  await ui.press({ key: "m" });
   await ui.press({ key: "t" });
   await ui.press({ key: "row-1" });
-  expect(await ui.find({ type: "Text", text: "↑↓ scroll · esc close" })).toBeDefined();
+  expect(await hints()).toEqual([]);
   await ui.unmount();
 });
 
@@ -416,36 +423,36 @@ test("the board shows the plan's Status, progress, proof and next task, then eac
   boardWorld(on);
   for (const surface of ["terminal", "desktop"] as const) {
     const ui = await mountBoard($, PAGE, surface);
+    expect(await Promise.all(["1", "2", "3", "4"].map(async (key) => (await ui.find({ key }))?.props["label"]))).toEqual(["Agents", "Plan", "Evidence", "Notepad"]);
+    if (surface === "terminal") expect(rows(await ui.drawn())[0]).toBe("1: Agents  2: Plan  3: Evidence  4: Notepad");
     // The desktop carries a row's chips to its end with a spacer and wraps one row of keys itself.
     const tasks =
       surface === "terminal"
         ? [
-            "✓ 1 Parse the plan                          PROVEN ",
-            "✓ 2 Prove each task                         PROVEN ",
+            "✓ 1 Parse the plan                         ✓ proven",
+            "✓ 2 Prove each task                        ✓ proven",
             "── Milestone 2: Board ── ████████ 0/3 ─────────────",
             "○ 3 Draw the board                                 ",
             "○ 4 Wire the hotkeys                               ",
             "⊘ 5 Write the docs                     blocked by 3",
             " ",
-            "k: Run  s: Start  c: Copy  e: Evidence  o: Open",
-            "x: Failing  f: Find  t: Sections  l: Plans",
+            "k: Run check  s: Start here  c: Copy  m: More",
           ]
         : [
-            "✓ 1 Parse the plan  PROVEN ",
-            "✓ 2 Prove each task  PROVEN ",
+            "✓ 1 Parse the plan ✓ proven",
+            "✓ 2 Prove each task ✓ proven",
             "── Milestone 2: Board ── ████████ 0/3 ─────────────",
             "○ 3 Draw the board",
             "○ 4 Wire the hotkeys",
             "⊘ 5 Write the docs blocked by 3",
             " ",
-            "k: Run  s: Start  c: Copy  e: Evidence  o: Open  x: Failing  f: Find  t: Sections  l: Plans",
+            "k: Run check  s: Start here  c: Copy  m: More",
           ];
     expect(rows(await ui.drawn()).slice(2)).toEqual([
       "Ship the board█████████▋██████████████ 2/5 · ⊘ 1 blocked✓ 2 proven · ! 0 unproven · ✗ 0 failednext 3 Draw the board",
       " ",
       "── Milestone 1: Core ── ████████ 2/2 ──────────────",
       ...tasks,
-      "↑↓ move · enter open · esc close",
     ]);
     expect(await ui.find({ type: "Text", text: /Hill/ })).toBeUndefined();
     const header = await ui.find({ key: "plan-header" });
@@ -480,7 +487,8 @@ test("each row carries its state as a glyph, a word and a color, and done rows a
     { text: "✓ ", color: "success" },
     { text: "1", dimColor: true },
     { text: "Parse the plan", dimColor: true },
-    { text: " PROVEN ", color: "inverseText", backgroundColor: "success", bold: true },
+    { text: "✓", color: "success" },
+    { text: " proven", color: "inactive" },
   ]);
   expect(await row(3)).toEqual([
     { text: "○ ", color: "text", bold: true },
@@ -560,12 +568,16 @@ test("the plan author's Status FINAL draws no chip on any header", async ($, on)
   }
 });
 
-test("PROVEN and UNPROVEN show only on done tasks, in rows, on the task page and in the header's counts", async ($, on) => {
+test("proven and unproven show only on done tasks, as a word in rows, a chip on the task page and in the header's counts", async ($, on) => {
   const { w } = boardWorld(on);
   w.files.set(`${ROOT}/src/parse.ts`, { text: "x", mtimeMs: NOW - HOUR / 4 });
   const ui = await mountBoard($, PAGE);
-  expect((await ui.find({ key: "line-task-1" }))?.text).toBe("✓ 1 Parse the plan                        UNPROVEN ");
-  expect((await ui.find({ key: "line-task-2" }))?.text).toBe("✓ 2 Prove each task                         PROVEN ");
+  expect((await ui.find({ key: "line-task-1" }))?.text).toBe("✓ 1 Parse the plan                       ! unproven");
+  expect((await ui.find({ key: "line-task-2" }))?.text).toBe("✓ 2 Prove each task                        ✓ proven");
+  expect(spans(await ui.find({ key: "line-task-1" })).slice(-2)).toEqual([
+    { text: "!", color: "warning" },
+    { text: " unproven" },
+  ]);
   expect((await ui.find({ key: "line-task-3" }))?.text).toBe("○ 3 Draw the board                                 ");
   expect((await ui.find({ key: "line-task-4" }))?.text).toBe("○ 4 Wire the hotkeys                               ");
   expect(spans(await ui.find({ key: "plan-header" })).filter((span) => / (un)?proven/.test(span.text))).toEqual([
@@ -605,23 +617,28 @@ test("a running agent whose prompt names a task marks that task in progress in t
   await ui.unmount();
 });
 
-test("FAILED marks every task whose newest run since its change failed, and an unreadable ledger proves nothing", async ($, on) => {
+test("failed marks every task whose newest run since its change failed, and an unreadable ledger proves nothing", async ($, on) => {
   const { w } = boardWorld(on, [...PASSING, entry("build", "bun run build", 2, NOW - HOUR / 8)]);
   const ui = await mountBoard($, PAGE);
-  expect((await ui.find({ key: "line-task-1" }))?.text).toBe("✓ 1 Parse the plan                          FAILED ");
-  expect((await ui.find({ key: "line-task-3" }))?.text).toBe("○ 3 Draw the board                          FAILED ");
+  expect((await ui.find({ key: "line-task-1" }))?.text).toBe("✓ 1 Parse the plan                         ✗ failed");
+  expect((await ui.find({ key: "line-task-3" }))?.text).toBe("○ 3 Draw the board                         ✗ failed");
+  expect(spans(await ui.find({ key: "line-task-1" })).slice(-2)).toEqual([
+    { text: "✗", color: "error" },
+    { text: " failed" },
+  ]);
   expect(await ui.find({ type: "Text", text: "✗ 4 failed" })).toBeDefined();
 
+  await ui.press({ key: "m" });
   await ui.press({ key: "x" });
   expect(rows(await ui.drawn()).slice(3, 11)).toEqual([
     "Find:   FAILING  4 of 5",
     " ",
     "── Milestone 1: Core ── ████████ 2/2 ──────────────",
-    "✓ 1 Parse the plan                          FAILED ",
-    "✓ 2 Prove each task                         FAILED ",
+    "✓ 1 Parse the plan                         ✗ failed",
+    "✓ 2 Prove each task                        ✗ failed",
     "── Milestone 2: Board ── ████████ 0/3 ─────────────",
-    "○ 3 Draw the board                          FAILED ",
-    "○ 4 Wire the hotkeys                        FAILED ",
+    "○ 3 Draw the board                         ✗ failed",
+    "○ 4 Wire the hotkeys                       ✗ failed",
   ]);
   await ui.press({ key: "x" });
 
@@ -636,7 +653,7 @@ test("FAILED marks every task whose newest run since its change failed, and an u
   await ui.unmount();
 });
 
-test("a registered plan counts only file changes since its start: earlier ones show no verdict, later ones keep FAILED", async ($, on) => {
+test("a registered plan counts only file changes since its start: earlier ones show no verdict, later ones keep failed", async ($, on) => {
   const { w } = boardWorld(on, [...PASSING, entry("build", "bun run build", 2, NOW - HOUR / 8)]);
   const started = new Date(NOW - HOUR).toISOString();
   write(
@@ -646,7 +663,7 @@ test("a registered plan counts only file changes since its start: earlier ones s
   );
   const ui = await mountBoard($, PAGE);
   expect((await ui.find({ key: "line-task-1" }))?.text).toBe("✓ 1 Parse the plan                                 ");
-  expect((await ui.find({ key: "line-task-3" }))?.text).toBe("○ 3 Draw the board                          FAILED ");
+  expect((await ui.find({ key: "line-task-3" }))?.text).toBe("○ 3 Draw the board                         ✗ failed");
   expect((await ui.find({ key: "line-task-4" }))?.text).toBe("○ 4 Wire the hotkeys                               ");
   expect(await ui.find({ type: "Text", text: "✗ 1 failed" })).toBeDefined();
   await ui.unmount();
@@ -740,8 +757,8 @@ test("in the split tier a wheel tick over the detail scrolls it and leaves the c
   await ui.unmount();
 });
 
-// The tab bar and two header lines, then eleven rows of the split board: the list's nine in columns 0
-// to 55, the rule in 56 and the detail from 58; then the keys and the hint. The tree is the body and
+// The tab bar and two header lines, then twelve rows of the split board: the list's ten in columns 0
+// to 55, the rule in 56 and the detail from 58; then the keys. The tree is the body and
 // the padding row that brings the wheel here.
 const SPLIT_SHORT: Size = { columns: 230, rows: 20, placement: "dock" };
 const wheel = ($: Engine, column: number, row: number, by: number, contentRows = 17) =>
@@ -894,7 +911,6 @@ test("Enter opens a task's page with its files and the runs that prove it; n, p 
     "    changed 15m ago.",
     "  Last pass, before that change:",
     "  ✓ test just test-mod exit 0 · 30m ago",
-    "↑↓ scroll · esc close",
   ]);
   expect(await ui.find({ type: "Text", text: "exits 0" })).toBeDefined();
   expect((await ui.find({ type: "Code" }))?.props).toMatchObject({ source: "$ just test-mod", language: "bash" });
@@ -910,7 +926,6 @@ test("Enter opens a task's page with its files and the runs that prove it; n, p 
     "  ✓ test just test-mod exit 0 · 30m ago",
     "  ✗ lint just lint exit 1 · 1h ago",
     "  ✓ test bun test src/parse.spec.ts exit 0 · 2h ago",
-    "↑↓ scroll · esc close",
   ]);
   expect(four).toContain(" OPEN ");
   expect(four).toContain(" ○ 3 ");
@@ -920,7 +935,7 @@ test("Enter opens a task's page with its files and the runs that prove it; n, p 
   const five = spreadRows(await ui.drawn());
   expect(five).toContain(" BLOCKED  by 3");
   expect(five).toContain(" ○ 3  blocked by 3");
-  expect(five.slice(five.indexOf("Evidence"))).toEqual(["Evidence", "  Lists no files, so no run can prove it.", "↑↓ scroll · esc close"]);
+  expect(five.slice(five.indexOf("Evidence"))).toEqual(["Evidence", "  Lists no files, so no run can prove it."]);
   expect((await ui.find({ key: "n" }))?.props["dimColor"]).toBe(true);
   expect((await ui.find({ key: "k" }))?.props["dimColor"]).toBe(true);
 
@@ -954,6 +969,7 @@ test("k, s and c fill the prompt or copy the focused task, never submitting, and
   await $.ui.focus({ component: "Pane", requestId: "omca", element: "task-2", origin: { kind: "person" } });
   expect((await ui.find({ key: "s" }))?.props["dimColor"]).toBe(true);
 
+  await ui.press({ key: "m" });
   await ui.press({ key: "e" });
   expect((await ui.find({ key: "3" }))?.props["dimColor"]).toBeUndefined();
   expect((await ui.find({ key: "2" }))?.props["dimColor"]).toBe(true);
@@ -968,10 +984,61 @@ test("a copy the surface refuses says so", async ($, on) => {
   await ui.unmount();
 });
 
+test("a note follows the last key when it fits beside it and takes a row under the keys when it does not", async ($, on) => {
+  boardWorld(on);
+  const beside = await mountBoard($, { columns: 200, rows: 40, placement: "dock" });
+  await beside.press({ key: "c" });
+  expect(rows(await beside.drawn()).filter((row) => row.startsWith("k:"))).toEqual(["k: Run check  s: Start here  c: Copy  m: More  Copied task 3."]);
+  await beside.unmount();
+
+  const under = await mountBoard($, PAGE);
+  await under.press({ key: "c" });
+  expect(rows(await under.drawn()).slice(-2)).toEqual(["k: Run check  s: Start here  c: Copy  m: More", "Copied task 3."]);
+  await under.press({ key: "m" });
+  expect(rows(await under.drawn()).slice(-3)).toEqual([
+    "k: Run check  s: Start here  c: Copy  e: Evidence",
+    "o: Open only  x: Failing  f: Find  t: Sections",
+    "l: Plans  m: Less  Copied task 3.",
+  ]);
+  await under.unmount();
+
+  const inline = await mountBoard($, SHORT);
+  await inline.press({ key: "c" });
+  expect(rows(await inline.drawn()).filter((row) => row.startsWith("k:"))).toEqual(["k: Run check  s: Start here  c: Copy  m: More  Copied task 3."]);
+  await inline.unmount();
+});
+
+test("a note on a desktop board rides the one key row", async ($, on) => {
+  boardWorld(on);
+  const ui = await mountBoard($, PAGE, "desktop");
+  await ui.press({ key: "c" });
+  expect(rows(await ui.drawn()).slice(-1)).toEqual(["k: Run check  s: Start here  c: Copy  m: More  Copied task 3."]);
+  await ui.press({ key: "m" });
+  expect(rows(await ui.drawn()).slice(-1)).toEqual([
+    "k: Run check  s: Start here  c: Copy  e: Evidence  o: Open only  x: Failing  f: Find  t: Sections  l: Plans  m: Less  Copied task 3.",
+  ]);
+  await ui.unmount();
+});
+
+test("a task page draws a note under its body only while one lasts", async ($, on) => {
+  boardWorld(on);
+  const ui = await mountBoard($, PAGE);
+  await ui.press({ key: "task-3" });
+  expect(spreadRows(await ui.drawn()).at(-1)).toBe("  ✓ test just test-mod exit 0 · 30m ago");
+
+  await ui.press({ key: "c" });
+  expect(spreadRows(await ui.drawn()).slice(-2)).toEqual(["  ✓ test just test-mod exit 0 · 30m ago", "Copied task 3."]);
+
+  await ui.press({ key: "n" });
+  expect(spreadRows(await ui.drawn()).at(-1)).toBe("  ✓ test bun test src/parse.spec.ts exit 0 · 2h ago");
+  await ui.unmount();
+});
+
 test("o keeps open tasks, f opens the Find field, and a filter that matches nothing says so", async ($, on) => {
   boardWorld(on);
   const ui = await mountBoard($, PAGE);
 
+  await ui.press({ key: "m" });
   await ui.press({ key: "o" });
   expect((await ui.find({ key: "o" }))?.props["dimColor"]).toBeUndefined();
   expect(rows(await ui.drawn()).slice(3, 9)).toEqual([
@@ -1010,16 +1077,14 @@ test("OMCA_GLYPHS=ascii draws the board, its chips and bars from the ASCII set",
     "Ship the board[#########====.........] 2/5 | / 1 blocked+ 2 proven | ! 0 unproven | x 0 failednext 3 Draw the board@ executor on 3",
     " ",
     "-- Milestone 1: Core -- [######] 2/2 --------------",
-    "+ 1 Parse the plan                         [PROVEN]",
-    "+ 2 Prove each task                        [PROVEN]",
+    "+ 1 Parse the plan                         + proven",
+    "+ 2 Prove each task                        + proven",
     "-- Milestone 2: Board -- [......] 0/3 -------------",
     "~ 3 Draw the board                       @ executor",
     "o 4 Wire the hotkeys                               ",
     "/ 5 Write the docs                     blocked by 3",
     " ",
-    "k: Run  s: Start  c: Copy  e: Evidence  o: Open",
-    "x: Failing  f: Find  t: Sections  l: Plans",
-    "^v move - enter open - esc close",
+    "k: Run check  s: Start here  c: Copy  m: More",
   ]);
   await ui.unmount();
 });
@@ -1098,6 +1163,10 @@ test("every Plan view hands the engine no more rows than the pane has, and one b
     await $.command.run(run("plan", size.columns));
     const ui = await $.ui.mount(pane("terminal", size));
     const focused = async () => (await ui.findAll({ type: "Button" })).find((button) => button.props["autoFocus"] === true)?.key ?? "";
+    // A pane wide enough for all nine keys on one row has no More.
+    const more = async () => {
+      if ((await ui.find({ key: "m" })) !== undefined) await ui.press({ key: "m" });
+    };
     const check = async (name: string) => {
       const children = topRows(await ui.drawn());
       const used = children.reduce<number>((sum, child) => sum + heightOf(child), 0);
@@ -1107,6 +1176,8 @@ test("every Plan view hands the engine no more rows than the pane has, and one b
       expect(used - chrome - (pad ? 1 : 0), `${size.columns}x${size.rows} ${size.placement} ${name}`).toBeLessThanOrEqual(room);
     };
     await check("board");
+    await more();
+    await check("board with every key");
     await ui.press({ key: "f" });
     await check("find");
     await ui.input({ key: "filter", text: "port", kind: "change" });
@@ -1126,7 +1197,7 @@ test("every Plan view hands the engine no more rows than the pane has, and one b
   }
 });
 
-test("a short pane draws a one-line header, a list row with its cues and one key row, the rest as bare hotkeys", async ($, on) => {
+test("a short pane draws a one-line header, a list row with its cues and one key row of the focused task's keys and More", async ($, on) => {
   boardWorld(on);
   const ui = await mountBoard($, SHORT);
   expect(rows(await ui.drawn()).slice(1)).toEqual([
@@ -1135,16 +1206,18 @@ test("a short pane draws a one-line header, a list row with its cues and one key
     `── Milestone 2: Board ── ████████ 0/3 ${"─".repeat(35)}`,
     `○ 3 Draw the board${" ".repeat(55)}`,
     "  ↓ 2 more",
-    "k: Run  s: Start  c: Copy  e: Evidence  o: Open  x:   f:   t:   l: ",
+    "k: Run check  s: Start here  c: Copy  m: More",
     " ",
   ]);
-  expect((await ui.find({ key: "l" }))?.props["hotkey"]).toBe("l");
+  expect((await ui.find({ key: "m" }))?.props["hotkey"]).toBe("m");
+  expect(await ui.find({ key: "l" })).toBeUndefined();
   await ui.unmount();
 });
 
-test("a filter on a short pane keeps its state and drops the milestone rows", async ($, on) => {
+test("a filter on a short pane keeps its state and drops the milestone rows, with every key on the one row left", async ($, on) => {
   boardWorld(on);
   const ui = await mountBoard($, SHORT);
+  await ui.press({ key: "m" });
   await ui.press({ key: "f" });
   await ui.input({ key: "filter", text: "hot" });
   expect(rows(await ui.drawn()).slice(1)).toEqual([
@@ -1153,36 +1226,79 @@ test("a filter on a short pane keeps its state and drops the milestone rows", as
     " ",
     `○ 4 Wire the hotkeys${" ".repeat(53)}`,
     " ",
-    "k: Run  s: Start  c: Copy  e: Evidence  o: Open  x:   f:   t:   l: ",
+    "k: Run  s: Start  c: Copy  e: Evidence  o: Open  x:   f:   t:   l:   m: ",
   ]);
   await ui.unmount();
 });
 
-test("the key rows are two from 30 rows or while the list leaves rows to spare, else one with the keys past it bare", async ($, on) => {
+const keyRows = async (ui: Awaited<ReturnType<typeof mountBoard>>) => rows(await ui.drawn()).filter((row) => /^[a-z]: /.test(row));
+
+test("the board draws the focused task's keys and More, which shows every key and folds them again", async ($, on) => {
   boardWorld(on);
-  const twoRows = ["k: Run  s: Start  c: Copy  e: Evidence  o: Open", "x: Failing  f: Find  t: Sections  l: Plans"];
-  const tall = await mountBoard($, PAGE);
-  expect(rows(await tall.drawn()).slice(-3)).toEqual([...twoRows, "↑↓ move · enter open · esc close"]);
-  await tall.unmount();
-  const spare = await mountBoard($, { columns: 120, rows: 20, placement: "dock" });
-  expect(rows(await spare.drawn()).filter((row) => /^[kx]:/.test(row))).toEqual(twoRows);
-  await spare.unmount();
+  const ui = await mountBoard($, PAGE);
+  expect(await keyRows(ui)).toEqual(["k: Run check  s: Start here  c: Copy  m: More"]);
+  expect((await ui.find({ key: "m" }))?.props["label"]).toBe("More");
+
+  await ui.press({ key: "m" });
+  expect(await keyRows(ui)).toEqual([
+    "k: Run check  s: Start here  c: Copy  e: Evidence",
+    "o: Open only  x: Failing  f: Find  t: Sections",
+    "l: Plans  m: Less",
+  ]);
+  expect((await ui.find({ key: "m" }))?.props["label"]).toBe("Less");
+
+  await ui.press({ key: "m" });
+  expect(await keyRows(ui)).toEqual(["k: Run check  s: Start here  c: Copy  m: More"]);
+  await ui.unmount();
 });
 
-test("a list that needs every row keeps one key row, the keys past it bare", async ($, on) => {
+test("More lays every key out over two rows below 30 rows and three from 30, the labels cut to fit", async ($, on) => {
+  boardWorld(on);
+  const tall = await mountBoard($, PAGE);
+  await tall.press({ key: "m" });
+  expect(await keyRows(tall)).toEqual([
+    "k: Run check  s: Start here  c: Copy  e: Evidence",
+    "o: Open only  x: Failing  f: Find  t: Sections",
+    "l: Plans  m: Less",
+  ]);
+  await tall.unmount();
+  const low = await mountBoard($, { columns: 120, rows: 20, placement: "dock" });
+  await low.press({ key: "m" });
+  expect(await keyRows(low)).toEqual([
+    "k: Run  s: Start  c: Copy  e: Evidence  o: Open",
+    "x: Failing  f: Find  t: Sections  l: Plans  m: Less",
+  ]);
+  await low.unmount();
+  const narrow = await mountBoard($, { columns: 44, rows: 40, placement: "inline" });
+  await narrow.press({ key: "m" });
+  expect(await keyRows(narrow)).toEqual(["k: Run  s: Start  c: Copy  e:   o: ", "x:   f:   t:   l:   m: "]);
+  await narrow.unmount();
+});
+
+test("a pane wide enough for all nine keys on one row draws them and no More", async ($, on) => {
+  boardWorld(on);
+  const ui = await mountBoard($, SPLIT);
+  expect(await keyRows(ui)).toEqual([
+    "k: Run check  s: Start here  c: Copy  e: Evidence  o: Open only  x: Failing  f: Find  t: Sections  l: Plans",
+  ]);
+  expect(await ui.find({ key: "m" })).toBeUndefined();
+  await ui.unmount();
+});
+
+test("a list that needs every row keeps the one key row of the focused task's keys and More", async ($, on) => {
   boardWorld(on, PASSING, {}, LONG_BOARD);
   const low = await mountBoard($, { columns: 120, rows: 20, placement: "dock" });
-  expect(rows(await low.drawn()).filter((row) => row.startsWith("k:"))).toEqual(["k: Run  s: Start  c:   e:   o:   x:   f:   t:   l: "]);
+  expect(rows(await low.drawn()).filter((row) => row.startsWith("k:"))).toEqual(["k: Run check  s: Start here  c: Copy  m: More"]);
   await low.unmount();
 });
 
 test("a list shorter than its window cut ends in one blank row, and an uncut one in none", async ($, on) => {
   boardWorld(on, PASSING, {}, LONG_BOARD);
   const cut = await mountBoard($, { columns: 120, rows: 20, placement: "dock" });
-  expect(rows(await cut.drawn()).slice(-2)).toEqual(["↑↓ move · enter open · esc close", " "]);
+  expect(rows(await cut.drawn()).slice(-2)).toEqual(["k: Run check  s: Start here  c: Copy  m: More", " "]);
   await cut.unmount();
   const whole = await mountBoard($, { columns: 120, rows: 60, placement: "dock" });
-  expect(rows(await whole.drawn()).at(-1)).toBe("↑↓ move · enter open · esc close");
+  expect(rows(await whole.drawn()).at(-1)).toBe("k: Run check  s: Start here  c: Copy  m: More");
   await whole.unmount();
 });
 
@@ -1243,6 +1359,16 @@ test("the split list takes the width its longest title asks for, at least 56 cel
   await ui.unmount();
 });
 
+test("a split list row whose title would not fit beside the proof word shows the glyph alone", async ($, on) => {
+  const long = "Parse the plan and every file it names across the whole repository, then compare each file's change time with the ledger and the runs it records, one by one";
+  boardWorld(on, PASSING, {}, BOARD.replace("Parse the plan", long));
+  const ui = await mountBoard($, SPLIT);
+  const tail = spans(await ui.find({ key: "line-task-1" })).filter((span) => span.text.trim() !== "").slice(-2);
+  expect(tail.map((span) => span.text)).toEqual([expect.stringContaining("…"), "✓"]);
+  expect(tail.at(-1)).toEqual({ text: "✓", color: "success" });
+  await ui.unmount();
+});
+
 test("a done-when command is drawn once with its prompt, and the split detail wraps instead of cutting", async ($, on) => {
   boardWorld(on);
   const ui = await mountBoard($, SPLIT);
@@ -1273,6 +1399,7 @@ test("a task page and a section page keep their header and keys and scroll their
   expect(engine).toEqual([]);
 
   await ui.press({ key: "b" });
+  await ui.press({ key: "m" });
   await ui.press({ key: "t" });
   const row = (await ui.findAll({ type: "Button" })).find((button) => button.props["autoFocus"] === true);
   await ui.press({ key: row?.key ?? "" });
@@ -1298,6 +1425,7 @@ test("the header gives up its proof note before the title drops under 40% of the
 test("the Sections list pads task numbers like the board", async ($, on) => {
   boardWorld(on, PASSING, {}, LONG_BOARD);
   const ui = await mountBoard($, { columns: 160, rows: 60, placement: "dock" });
+  await ui.press({ key: "m" });
   await ui.press({ key: "t" });
   const labels = (await ui.findAll({ type: "Button" })).map((button) => String(button.props["label"] ?? ""));
   expect(labels).toContain("    [x]  1. Parse the plan");
@@ -1317,6 +1445,7 @@ test("the Plans list shows each plan's progress and marks the bound one", async 
   w.files.set(zed, { text: PLAN.replace("- [ ] 2.", "- [x] 2."), mtimeMs: Date.UTC(2026, 9, 2) });
   await $.command.run(run("plan"));
   const ui = await $.ui.mount(pane("terminal", PAGE));
+  await ui.press({ key: "m" });
   await ui.press({ key: "l" });
   const listed = rows(await ui.drawn()).filter((row) => /^[❯ ] (ship|zed)/.test(row));
   expect(listed).toEqual([expect.stringMatching(/^ {2}zed\s+2\/2\s+2026-10-02$/), expect.stringMatching(/^❯ ship\s*bound\s+1\/2\s+2026-01-02$/)]);
@@ -1392,6 +1521,7 @@ test("/omca plan <name> loads a plan from .omca/plans, and /omca plan <registry 
   ] as const) {
     await $.command.run(run(args));
     const ui = await $.ui.mount(pane("terminal"));
+    await ui.press({ key: "m" });
     await ui.press({ key: "t" });
     expect(await ui.find({ type: "Text", text: `1/2 tasks done · ${shown}` }), args).toBeDefined();
     await ui.unmount();

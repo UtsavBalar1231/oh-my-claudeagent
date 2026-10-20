@@ -13,6 +13,7 @@ import {
   nodeByKey,
   pane,
   POSIX,
+  resettableState,
   ROOT,
   rows,
   run,
@@ -106,7 +107,7 @@ for (const layout of LAYOUTS) {
     [SETTINGS]: USER_TEXT,
   };
 
-  test(`/omca doctor opens the Doctor tab, draws the loading state while the checks run, then the problem rows and one folded line for the passing checks${suffix}`, { options: { guardMode: "deny" } }, async ($, on) => {
+  test(`/omca doctor opens the Doctor page, draws the loading state while the checks run, then the problem rows and one folded line for the passing checks${suffix}`, { options: { guardMode: "deny" } }, async ($, on) => {
     const w = engine(on, world(on, FILES, structuredClone(USER), {}, layout), { hold: true });
 
     const pending = $.command.run(run("doctor", 120));
@@ -271,11 +272,12 @@ for (const layout of LAYOUTS) {
     await ui.unmount();
   });
 
-  test(`the tab's empty state offers r, and a failed run shows its reason with r to run again${suffix}`, async ($, on) => {
+  test(`the page's empty state offers r, and a failed run shows its reason with r to run again${suffix}`, async ($, on) => {
+    const atoms = resettableState(on);
     const w = engine(on, world(on, FILES, structuredClone(USER), {}, layout));
-    await $.command.run(run(""));
+    await $.command.run(run("doctor"));
+    atoms.reset("doctor");
     const ui = await $.ui.mount(pane("desktop", { columns: 120, rows: 40, placement: "dock" }));
-    await ui.press({ key: "6" });
     expect(rows(await ui.drawn()).slice(-2)).toEqual(["The doctor checks have not run in this session.", "r: Run checks"]);
 
     w.version = undefined;
@@ -289,7 +291,7 @@ for (const layout of LAYOUTS) {
     await ui.unmount();
   });
 
-  test(`the tab's hotkeys are r, i and o, never a pane key, and every row fits at 80, 120 and 200 columns on both surfaces${suffix}`, async ($, on) => {
+  test(`the page's hotkeys are r, i and o, never a pane key, and every row fits at 80, 120 and 200 columns on both surfaces${suffix}`, async ($, on) => {
     const w = engine(on, world(on, FILES, structuredClone(USER), {}, layout));
     await $.command.run(run("doctor"));
     w.reads.length = 0;

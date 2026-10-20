@@ -4,7 +4,7 @@ import { isGlyphTier } from "./ui-kit.ts";
 import type { Level } from "./visual.ts";
 
 export type Fix = "add-refresh-interval";
-/** `prompt` is a command the person can run to fix the check; the Doctor tab fills the prompt with it and never submits. */
+/** `prompt` is a command the person can run to fix the check; the Doctor page fills the prompt with it and never submits. */
 export type Check = { id: string; label: string; level: Level; detail: string; fix?: Fix; prompt?: string };
 
 export const SETUP_COMMAND = "/oh-my-claudeagent:omca-setup";

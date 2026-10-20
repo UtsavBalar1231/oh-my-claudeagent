@@ -24,7 +24,7 @@ import {
   taskMarkdown,
 } from "../../src/core/plan-reader.ts";
 import { ago, type Proof, proofSummary, type Run, shownProof, timeAgo, type Verdict } from "../../src/core/proof.ts";
-import { agentGlyph, dayOf, displayWidth, fitEnd, fitMiddle, KEYS, keyHint, padStart, shortType, wrapText } from "../../src/core/ui-kit.ts";
+import { agentGlyph, dayOf, displayWidth, fitEnd, fitMiddle, KEYS, padStart, shortType, wrapText } from "../../src/core/ui-kit.ts";
 import {
   agentKey,
   bar,
@@ -74,17 +74,18 @@ const ROW = "row-";
 const PICK = "pick-";
 const TASK = "task-";
 const FILTER = "filter";
+const MORE = "m";
 const UNRESOLVED_PLANS = "~/.claude/plans";
 const MIN_LIST_ROWS = 3;
-// Docked and full: title, meta, rule, two edge lines, rule, hint line, then the key rows.
-const FULL_CHROME_ROWS = 7;
+// Docked and full: title, meta, rule, two edge lines and a rule, then the key rows.
+const FULL_CHROME_ROWS = 6;
 // Otherwise: the title line, two edge lines, then the key rows.
 const COMPACT_CHROME_ROWS = 3;
 const DATE = 10;
 const KEY_GAP = 3;
 const BOARD_KEY_GAP = 2;
 const TWO_KEY_ROWS_FROM = 30;
-// Below this many rows the header is one line and the hint line goes.
+// Below this many rows the board's header is one line.
 const SHORT_ROWS = 12;
 // A docked board shorter than this draws its header as two plain lines instead of a card.
 const CARD_FROM_ROWS = 24;
@@ -130,6 +131,7 @@ let drawn: { [L in List]?: Drawn } = {};
 let planned: { list: List; start: number } | undefined;
 let isRingOnRow = false;
 let filter: Filter = { text: "", isOpenOnly: false, isFailingOnly: false, isEditing: false };
+let isKeysOpen = false;
 let note: { text: string; level: Level } | undefined;
 let facts: ProofFacts = { changes: new Map(), proving: [], ledgerError: null, ledgerSeen: "", startedAt: undefined };
 let factsSignature = "";
@@ -251,6 +253,7 @@ async function load(host: Host, path: string, { keepPlace = false, isTick = fals
       cursor = startCursor(plan);
       task = startTask(board);
       filter = { text: "", isOpenOnly: false, isFailingOnly: false, isEditing: false };
+      isKeysOpen = false;
       return;
     }
     if (mode === "page" && page >= plan.pages.length) mode = "contents";
@@ -618,15 +621,13 @@ function frameFor(view: View, keys: readonly Key[]): Frame {
 function frame(
   view: View,
   { isFull, keys }: Frame,
-  parts: { title: string; meta: string; shortMeta: string; above: string; below: string; rows: RenderElement[]; hint: string },
+  parts: { title: string; meta: string; shortMeta: string; above: string; below: string; rows: RenderElement[] },
 ): RenderElement[] {
   const { Box, Text } = view.kit;
   const ellipsis = view.g.ellipsis;
   if (!isFull) {
     const meta = ` ${view.g.dot} ${parts.shortMeta}`;
     const title = fitEnd(parts.title, Math.max(1, view.width - displayWidth(meta)), ellipsis);
-    const keysWidth = (keys[0] ?? []).reduce((sum, key) => sum + keyCells(key) + KEY_GAP, 0);
-    const hint = fitEnd(parts.hint, view.width - keysWidth, ellipsis);
     return [
       Box({
         flexDirection: "row",
@@ -638,7 +639,7 @@ function frame(
       edge(view, parts.above),
       ...parts.rows,
       edge(view, parts.below),
-      ...keyRowsOf(view, keys, KEY_GAP, keys.length === 1 ? Text({ dimColor: true, children: [hint === "" ? " " : hint] }) : undefined),
+      ...keyRowsOf(view, keys, KEY_GAP),
     ];
   }
   return [
@@ -650,7 +651,6 @@ function frame(
     edge(view, parts.below),
     rule(view),
     ...keyRowsOf(view, keys, KEY_GAP),
-    Text({ dimColor: true, children: [fitEnd(parts.hint, view.width, ellipsis)] }),
   ];
 }
 
@@ -662,9 +662,6 @@ function pointerRow(view: View, key: string, isCurrent: boolean, child: RenderEl
     children: [Text({ bold: true, children: [isCurrent ? `${view.g.pointer} ` : "  "] }), child],
   });
 }
-
-const moveHint = (view: View) =>
-  keyHint([[`${view.g.up}${view.g.down}`, "move"], ["enter", "open"], [KEYS.back, "close"]], view.g);
 
 const masked = (view: View, text: string) => redact(text, view.home, view.g.mask).text;
 
@@ -789,8 +786,11 @@ function rightPieces(view: View, ctx: Ctx, card: Card, isShort: boolean): Piece[
   }
   const proof = cardProof(card);
   if (proof !== undefined) {
-    const { word, tone, level } = PROOF[proof];
-    pieces.push({ text: " " }, chip(isShort ? levelMark(level, view.g).glyph : word, tone, view.isAscii));
+    const { word, level } = PROOF[proof];
+    const { glyph, color } = levelMark(level, view.g);
+    // Proven is the expected state and reads quietly; the exceptions keep their word at full strength.
+    const tone = proof === "proven" ? { color: TONE_KEYS.muted } : {};
+    pieces.push({ text: " " }, { text: glyph, color }, ...(isShort ? [] : [{ text: ` ${word.toLowerCase()}`, ...tone }]));
   }
   return pieces;
 }
@@ -922,17 +922,28 @@ function selectTask(host: Host, n: number): void {
   refocus(host, `${TASK}${n}`);
 }
 
-function actionKeys(host: Host, view: View, plan: Loaded, card: Card | undefined): Key[] {
+function taskKeys(host: Host, view: View, plan: Loaded, card: Card | undefined): Key[] {
   return [
     ["k", "Run check", () => runCheck(host, view, card), card === undefined || card.checks.length === 0],
     ["s", "Start here", () => startHere(host, view, plan, card), card === undefined || card.done],
     ["c", "Copy", () => copyTask(host, view, plan, card), card === undefined],
-    ["e", "Evidence", () => toEvidence(host, view)],
   ];
 }
 
+const actionKeys = (host: Host, view: View, plan: Loaded, card: Card | undefined): Key[] => [
+  ...taskKeys(host, view, plan, card),
+  ["e", "Evidence", () => toEvidence(host, view)],
+];
+
+function toggleKeys(host: Host): void {
+  isKeysOpen = !isKeysOpen;
+  host.ui.invalidate();
+  refocus(host, `${TASK}${task}`);
+}
+
+// Every key when one row holds them all; otherwise the focused task's keys and `m`, which shows the rest beside them.
 function boardKeys(host: Host, view: View, plan: Loaded, card: Card | undefined): Key[] {
-  return [
+  const all: Key[] = [
     ...actionKeys(host, view, plan, card),
     ["o", "Open only", () => toggle(host, { isOpenOnly: !filter.isOpenOnly }), !filter.isOpenOnly],
     ["x", "Failing", () => toggle(host, { isFailingOnly: !filter.isFailingOnly }), !filter.isFailingOnly],
@@ -940,6 +951,9 @@ function boardKeys(host: Host, view: View, plan: Loaded, card: Card | undefined)
     [KEYS.contents, "Sections", () => toContents(host)],
     [KEYS.list, "Plans", () => showPlans(host)],
   ];
+  if (wrapAt(all, view.width, BOARD_KEY_GAP, keyCells).length === 1) return all;
+  const more: Key = [MORE, isKeysOpen ? "Less" : "More", () => toggleKeys(host)];
+  return isKeysOpen ? [...all, more] : [...taskKeys(host, view, plan, card), more];
 }
 
 function filterRow(host: Host, view: View, shown: number, total: number): RenderElement {
@@ -1210,17 +1224,21 @@ function boardView(host: Host, view: View, ctx: Ctx): RenderElement[] {
   const ellipsis = view.g.ellipsis;
   const head = headOf(view);
   const showFilter = filter.isEditing || isFiltered();
-  const hintRows = view.isInline || (head === "line" && note === undefined) ? 0 : 1;
   const top = headerRows(ctx, head) + (showFilter ? 1 : 0);
   const isRemoteView = isRemote(view.kit);
-  const lean = !isRemoteView && isFiltered() && view.rows - (top + 2 + 1 + hintRows) <= LEAN_ROWS;
+  const lean = !isRemoteView && isFiltered() && view.rows - (top + 2 + 1 + (note === undefined ? 0 : 1)) <= LEAN_ROWS;
   if (!isRemoteView) isLean = lean;
   const items = itemsOf(board, lean);
   const list = boardList(items);
   const card = items.length === 0 ? undefined : ctx.byN.get(task);
-  const keySet = boardKeys(host, view, plan, card);
-  let layout = keyLayout(view, keySet, BOARD_KEY_GAP);
-  const chrome = top + 2 + layout.length + hintRows;
+  // Every row the keys and a note take leaves the list at least one row between its two edges.
+  const spare = view.rows - (top + 3);
+  const layout = keyLayout(view, boardKeys(host, view, plan, card), BOARD_KEY_GAP, isKeysOpen ? Math.max(1, Math.min(view.rows < TWO_KEY_ROWS_FROM ? 2 : 3, spare)) : 1);
+  const notePiece: Piece | undefined = note === undefined ? undefined : { text: note.text, color: levelMark(note.level, view.g).color };
+  const keysEnd = (layout.at(-1) ?? []).reduce((sum, key) => sum + keyCells(key) + BOARD_KEY_GAP, 0);
+  const isNoteBeside = notePiece !== undefined && (isRemoteView || keysEnd + displayWidth(notePiece.text) <= view.width);
+  const noteRow = notePiece === undefined || isNoteBeside || spare <= layout.length ? undefined : Line(view.kit, fitPieces([notePiece], view.width, ellipsis));
+  const chrome = top + 2 + layout.length + (noteRow === undefined ? 0 : 1);
   const base = Math.max(1, view.rows - chrome);
   const numWidth = Math.max(1, ...board.cards.map((each) => String(each.n).length));
   const isSplit = view.tier === "split" && view.rows >= SPLIT_FROM_ROWS && card !== undefined;
@@ -1228,14 +1246,8 @@ function boardView(host: Host, view: View, ctx: Ctx): RenderElement[] {
   const rowWidth = isSplit ? listWidth - 1 : listWidth;
   const canExpand = !isSplit && view.tier !== "page" && card !== undefined && base - EXPANSION_MIN >= MIN_LIST_ROWS;
   const under = canExpand ? expansion(view, card, rowWidth, Math.max(EXPANSION_MIN, base - 1 - 2 * NEIGHBOURS)) : [];
-  let size = roomFor(view, chrome) - under.length;
-  // A list with rows to spare gives them to the keys, so fewer keys draw bare.
-  const fuller = keyLayout(view, keySet, BOARD_KEY_GAP, 2);
-  if (fuller.length > layout.length && items.length + fuller.length - layout.length <= size) {
-    size -= fuller.length - layout.length;
-    layout = fuller;
-  }
-  const keys = keyRowsOf(view, layout, BOARD_KEY_GAP);
+  const size = roomFor(view, chrome) - under.length;
+  const keys = keyRowsOf(view, layout, BOARD_KEY_GAP, isNoteBeside ? Line(view.kit, [notePiece]) : undefined);
   const { start, end } =
     items.length === 0 ? { start: 0, end: 0 } : windowFor(host, view, "board", list, size, (index) => `${TASK}${taskAt(items, index)?.n ?? task}`);
   const rows = items.slice(start, end).flatMap((item) => {
@@ -1306,8 +1318,6 @@ function boardView(host: Host, view: View, ctx: Ctx): RenderElement[] {
           }),
         ]
       : column;
-  const hint: Piece =
-    note === undefined ? { text: moveHint(view), color: TONE_KEYS.muted } : { text: note.text, color: levelMark(note.level, view.g).color };
   const shownCount = items.filter((item) => item.kind === "task").length;
   if (isFieldClosing && !filter.isEditing) {
     isFieldClosing = false;
@@ -1318,7 +1328,7 @@ function boardView(host: Host, view: View, ctx: Ctx): RenderElement[] {
     ...(showFilter ? [filterRow(host, view, shownCount, board.cards.length)] : []),
     ...body,
     ...keys,
-    ...(hintRows === 0 ? [] : [Line(view.kit, fitPieces([hint], view.width, ellipsis))]),
+    ...(noteRow === undefined ? [] : [noteRow]),
   ];
 }
 
@@ -1328,17 +1338,15 @@ type PageParts = {
   counter: string;
   keys: readonly Key[];
   units: readonly Unit[];
-  hint: { text: string; color: ThemeKey };
-  isNote: boolean;
 };
 
-// A page keeps its header and keys in place and scrolls its body in a region; short panes drop the rule and the hint.
-function pageOf(view: View, { id, title, counter, keys, units, hint, isNote }: PageParts): RenderElement[] {
+// A page keeps its header and keys in place and scrolls its body in a region, with a note under it while one lasts; short panes drop the rule.
+function pageOf(view: View, { id, title, counter, keys, units }: PageParts): RenderElement[] {
   const { Box, Text } = view.kit;
   const ellipsis = view.g.ellipsis;
   const keysShown = keyRows(view, keys, BOARD_KEY_GAP);
   const ruleRows = view.rows >= TWO_KEY_ROWS_FROM ? 1 : 0;
-  const hintRows = view.rows >= SHORT_ROWS || isNote ? 1 : 0;
+  const noteRows = note === undefined ? 0 : 1;
   const above = 1 + keysShown.length + ruleRows;
   if (pageShown !== id && !isRemote(view.kit)) {
     resetOffset(PAGE_REGION);
@@ -1362,11 +1370,11 @@ function pageOf(view: View, { id, title, counter, keys, units, hint, isNote }: P
       left: 0,
       top: above,
       width: view.width,
-      height: Math.max(1, view.rows - above - hintRows),
+      height: Math.max(1, view.rows - above - noteRows),
       units: [...units],
       layout: view.layout,
     }),
-    ...(hintRows === 0 ? [] : [Text({ color: hint.color, children: [fitEnd(hint.text, view.width, ellipsis)] })]),
+    ...(note === undefined ? [] : [Text({ color: levelMark(note.level, view.g).color, children: [fitEnd(note.text, view.width, ellipsis)] })]),
   ];
 }
 
@@ -1402,11 +1410,6 @@ function detailView(host: Host, view: View, ctx: Ctx): RenderElement[] {
       ...actionKeys(host, view, ctx.plan, card),
     ],
     units: detail(view, ctx, card, view.width),
-    hint:
-      note === undefined
-        ? { text: keyHint([[`${view.g.up}${view.g.down}`, "scroll"], [KEYS.back, "close"]], view.g), color: TONE_KEYS.muted }
-        : { text: note.text, color: levelMark(note.level, view.g).color },
-    isNote: note !== undefined,
   });
 }
 
@@ -1473,7 +1476,6 @@ function contentsView(host: Host, view: View, plan: Loaded): RenderElement[] {
           ? `  ${hidden} more past the first ${CONTENTS_CAP}; page on with ${KEYS.next}`
           : "",
     rows,
-    hint: moveHint(view),
   });
 }
 
@@ -1528,8 +1530,6 @@ function pageView(host: Host, view: View, plan: Loaded): RenderElement[] {
         ? []
         : [blank, one(Text({ dimColor: true, children: [fitEnd(`next: ${markOf(upcoming)}${upcoming.title}`, view.width, ellipsis)] }))]),
     ],
-    hint: { text: keyHint([[`${view.g.up}${view.g.down}`, "scroll"], [KEYS.back, "close"]], view.g), color: TONE_KEYS.muted },
-    isNote: false,
   });
 }
 
@@ -1621,7 +1621,6 @@ function plansView(host: Host, view: View, pane: State["pane"] | undefined, plan
     above: start > 0 ? `  ${view.g.up} ${start} more` : "",
     below: end < list.total ? `  ${view.g.down} ${list.total - end} more` : "",
     rows: [...failure, ...rows],
-    hint: moveHint(view),
   });
 }
 

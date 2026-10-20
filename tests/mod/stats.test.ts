@@ -249,13 +249,11 @@ test("at the split tier the tokens card takes half the body and the cost card th
   expect(width - 2 - half).toBe(half + 1);
 });
 
-test("a drawn table's only key is r, and after the stats atom resets the tab says it is reading, with no key", async ($, on) => {
+test("a drawn table's only key is r, and after the stats atom resets the page says it is reading, with no key", async ($, on) => {
   const atoms = resettableState(on);
   world(on, FILES);
-  await $.command.run(run(""));
+  await $.command.run(run("stats"));
   const ui = await $.ui.mount(pane("terminal", DOCK_200));
-  await ui.press({ key: "5" });
-  await ui.redraw();
   const keys = async () => (await ui.findAll({ type: "Button" })).flatMap((found) => (/^\d$/.test(String(found.props["hotkey"])) ? [] : [found.props["hotkey"]]));
   expect(await keys()).toEqual(["r"]);
 
@@ -296,7 +294,7 @@ test("a table taller than its window draws a more-below cue over the window's la
 
 const SURFACES = ["terminal", "desktop"] as const;
 
-test("the Stats tab aggregates two sessions by agent type with exact rows, on the terminal and the desktop", async ($, on) => {
+test("the Stats page aggregates two sessions by agent type with exact rows, on the terminal and the desktop", async ($, on) => {
   world(on, FIXTURE);
   expect(await $.command.run(run("stats", 200))).toEqual({});
   const summary = "7 delegations in 2 sessions · 1 running · 1 unreadable record skipped";
@@ -496,26 +494,25 @@ test("Stats rows stay inside the body less the gutter at every size, docked and 
   }
 });
 
-test("digit 5 reads the records afresh each time, r reloads a drawn table, and a failed read shows its reason", async ($, on) => {
+test("/omca stats reads the records afresh each time, r reloads a drawn table, and a failed read shows its reason", async ($, on) => {
   const w = world(on);
-  await $.command.run(run(""));
+  await $.command.run(run("stats"));
   const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
   const body = async () => {
     const all = rows(await ui.drawn());
     return all.slice(all.findIndex((text) => text.startsWith("─")) + 1);
   };
 
-  await ui.press({ key: "5" });
   expect(await body()).toEqual(["No delegation statistics have been collected yet.", "r: Reload"]);
 
   write(w, `${METRICS}/${S1}/broken.json`, "{");
   await ui.press({ key: "1" });
-  await ui.press({ key: "5" });
+  await $.command.run(run("stats"));
   expect(await body()).toEqual(["No delegation statistics have been collected yet.", "1 unreadable record skipped", "r: Reload"]);
 
   write(w, `${METRICS}/${S1}/a-e1.json`, record(S1, "a-e1", {}));
   await ui.press({ key: "1" });
-  await ui.press({ key: "5" });
+  await $.command.run(run("stats"));
   expect((await body())[0]).toBe("1 delegation in 1 session · 1 skipped");
 
   w.files.clear();
@@ -525,7 +522,7 @@ test("digit 5 reads the records afresh each time, r reloads a drawn table, and a
   await ui.unmount();
 });
 
-test("OMCA_GLYPHS=ascii draws the Stats tab from the ASCII set", async ($, on) => {
+test("OMCA_GLYPHS=ascii draws the Stats page from the ASCII set", async ($, on) => {
   world(on, FIXTURE, {}, { OMCA_GLYPHS: "ascii" });
   await $.command.run(run("stats", 80));
   const ui = await $.ui.mount(pane("terminal", { columns: 80, rows: 40, placement: "inline" }));
