@@ -214,12 +214,12 @@ test("with room, the line also says when the turn was done", async ($, on) => {
 });
 
 test("a logged verification reads logged on the line", async ($, on) => {
-  const { w, meter } = terminal(on, { [STATUS]: statusFile("just test", STARTED_S + 2) });
+  const { w, meter } = terminal(on, { [STATUS]: statusFile("bun test", STARTED_S + 2) });
   ledgerAt(w, STARTED_S + 3);
   await $.turn.start({ text: "Run the tests", turnId: "t-1" });
   await turn($, w, meter, 0.2812);
 
-  expect((await line($, "turn-1"))[1]).toEndWith("· ✓ just test logged");
+  expect((await line($, "turn-1"))[1]).toEndWith("· ✓ bun test logged");
 });
 
 test("a line drawn before its turn's facts land keeps the engine's line, and takes them once they do", async ($, on) => {
