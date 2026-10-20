@@ -1,5 +1,5 @@
 
- ▐▛███▛█   Claude Code v2.1.294
+ ▐▛███▛█   Claude Code v2.1.304
 ▝▜██████▀  Opus 5.5 · API Usage Billing
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
 
@@ -8,15 +8,15 @@
 
   Ran 1 shell command
 
-● oh-my-claudeagent:executor(Reconcile totals)
+ executor  Reconcile totals                                         background
   ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
 
 ● The executor is reconciling the totals.
 
-✻ Waiting for 1 background agent to finish
+✻ Waiting for executor · NN.Nk in NN out · $X.XX
 
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · NN.Nk in NN out ·
-  $X.XX engine cost
+
+
 
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
 │ 1: Agents  2: Plan  3: Evidence  4: Notepad  5: Stats  6: Doctor             │

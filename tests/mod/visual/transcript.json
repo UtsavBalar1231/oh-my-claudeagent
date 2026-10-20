@@ -1,0 +1,6 @@
+{
+  "command": "Fix the cart totals and wire the summary",
+  "keys": ["Escape", "PageUp", "PageUp"],
+  "mockScript": "transcript",
+  "fixture": "transcript"
+}

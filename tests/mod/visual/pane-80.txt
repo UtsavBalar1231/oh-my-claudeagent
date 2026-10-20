@@ -1,3 +1,8 @@
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
+
+
+❯ Fix the parser with the executor
+
 ● 3 background agents launched (↓ to manage)
    ├ oh-my-claudeagent:executor (Fix the heading parser)
    ├ oh-my-claudeagent:explorer (Map the router callers)
@@ -5,19 +10,14 @@
 
 ● Three agents are on it.
 
-✻ Waiting for 3 background agents to finish
+✻ Waiting for executor, explorer, architect · NN.Nk in NN out · $X.XX
 
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · NN.Nk in NN out ·
-  $X.XX engine cost
-
-● Agent "Fix the heading parser" finished · 1s
+ executor  Fix the heading parser                     1s · 2 calls · 16.2k tok
+  ⎿  Fenced lines are skipped now, and the heading tests pass.
 
 ● ok
 
-✻ Waiting for 2 background agents to finish
-
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · NN.Nk in N out ·
-  $X.XX engine cost
+✻ Waiting for explorer, architect · NN.Nk in N out · $X.XX
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
 │ 1: Agents  2: Plan  3: Evidence  4: Notepad  5: Stats  6: Doctor             │
 │  explorer · Map the router callers             sonnet-5-5  high       Ns    │
@@ -26,7 +26,7 @@
 │  architect · Review the ledger design          fable-5-1   xhigh      Ns    │
 │   ✻ Bash sleep 90                                                 2 calls    │
 │  executor · Fix the heading parser · Fenced lines are skipped n…      1s    │
-│ d: Details  2 running · 1 finished · NNNk tokens                             │
+│ d: Details  2 running · 1 finished · NN.Nk tokens                            │
 │                                                                              │
 │                                                                              │
 │                                                                              │

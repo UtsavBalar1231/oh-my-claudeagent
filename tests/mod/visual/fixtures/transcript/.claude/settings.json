@@ -1,0 +1,7 @@
+{
+  "plansDirectory": "{{cwd}}/plans",
+  "permissions": {
+    "defaultMode": "default",
+    "allow": ["Read", "Grep", "Glob", "Edit(src/**)", "Bash(just test)", "Bash(just lint)", "Bash(sleep 2)"]
+  }
+}

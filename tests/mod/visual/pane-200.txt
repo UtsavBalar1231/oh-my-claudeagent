@@ -1,5 +1,5 @@
                                                                                                    │                                                                                                  ✕
- ▐▛███▛█   Claude Code v2.1.294                                                                    │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Stats  6: Doctor
+ ▐▛███▛█   Claude Code v2.1.304                                                                    │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Stats  6: Doctor
 ▝▜██████▀  Opus 5.5 · API Usage Billing                                                            │─────────────────────────────────────────────────────────────────────────────────────────────────
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd            │   ▄▄▀▀▀▀▀▀▄▄     explorer                                                       running      Ns
                                                                                                    │     ▀▀  ▀▀ ▀▄▄▀  Map the router callers
@@ -13,17 +13,14 @@
                                                                                                    │Finished
 ● Three agents are on it.                                                                          │    ▄▀ ▀▀ ▀▄ ▄▄▄  executor                                                       done         1s
                                                                                                    │ ▀   ▀▀   ▀       Fix the heading parser
-✻ Waiting for 3 background agents to finish                                                        │ ▀  ▀ ▀▀▀▀ ▀ ▀    Fenced lines are skipped now, and the heading tests pass.
+✻ Waiting for executor, explorer, architect · NN.Nk in NN out · $X.XX                              │ ▀  ▀ ▀▀▀▀ ▀ ▀    Fenced lines are skipped now, and the heading tests pass.
                                                                                                    │    ▀▀▀▀▀▀▀▀      sonnet-5-5 · high · NN.Nk tokens
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · NN.Nk in NN out · $X.XX engine cost                  │d: Details  2 running · 1 finished · NNNk tokens
-                                                                                                   │
-● Agent "Fix the heading parser" finished · 1s                                                     │
+ executor  Fix the heading parser                                        1s · 2 calls · 16.2k tok │d: Details  2 running · 1 finished · NN.Nk tokens
+  ⎿  Fenced lines are skipped now, and the heading tests pass.                                     │
                                                                                                    │
 ● ok                                                                                               │
                                                                                                    │
-✻ Waiting for 2 background agents to finish                                                        │
-                                                                                                   │
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · NN.Nk in N out · $X.XX engine cost                   │
+✻ Waiting for explorer, architect · NN.Nk in N out · $X.XX                                         │
                                                                                                    │
                                                                                                    │
                                                                                                    │
@@ -38,7 +35,10 @@
                                                                                                    │
                                                                                                    │
                                                                                                    │
-█▎███ 12/46 · next 13 Port the snapshot and the ledger onto the shared rout… ·  2 running     [-] │
+                                                                                                   │
+                                                                                                   │
+                                                                                                   │
+█▎███ 12/46 · next 13 Port the snapshot and the ledger onto the shared router                  [-] │
                                                                                ◐ medium · /effort  │
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── OMCA: 46-task-plan ─
 ❯ 
@@ -46,5 +46,5 @@
   ⏸ manual mode on · /tasks to see subagents · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:explorer   Map the router callers                                                                                                                            Ns · ↓ NN.Nk tokens
+  ◯ oh-my-claudeagent:explorer   Map the router callers                                                                                                                             Ns · ↓ N.Nk tokens
   ◯ oh-my-claudeagent:architect  Review the ledger design                                                                                                                          Ns · ↓ NN.Nk tokens

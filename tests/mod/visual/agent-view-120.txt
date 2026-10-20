@@ -1,5 +1,5 @@
                                                                │                                                      ✕
- ▐▛███▛█   Claude Code v2.1.301                                │1: Agents  2: P  3: E  4: N  5: S  6: D
+ ▐▛███▛█   Claude Code v2.1.304                                │1: Agents  2: P  3: E  4: N  5: S  6: D
 ▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │                   explorer · Map the router callers
                                                                │      ▄▄▄▄         running · Ns · NN.Nk tokens
@@ -25,10 +25,10 @@
                                                                │
                                                                │
                                                                │
-● Working… (Ns · ↓ NN.Nk tokens)                               │
+● Working… (Ns · ↓ N.Nk tokens)                                │
   ⎿  Tip: Start with small features or bug fixes, tell Claude  │
      to propose a plan, and verify its suggested edits         │
-█▎███ 12/46 · next 13 Port the snapshot… ·  2 running     [-] │
+█▎███ 12/46 · next 13 Port the snapshot and the ledge…     [-] │
                                            ◐ medium · /effort  │
 ─────────────────────────────────────────────────────────────────────────────────────────────── Map the router callers ─
 ❯ Message @oh-my-claudeagent:e……
@@ -36,5 +36,5 @@
   ⏸ manual mode on · /tasks to see subagents · ← for agents · ↓ to manage
 
   ◯ main
-  ● oh-my-claudeagent:explorer   Map the router callers                                            Ns · ↓ NN.Nk tokens
+  ● oh-my-claudeagent:explorer   Map the router callers                                             Ns · ↓ N.Nk tokens
   ◯ oh-my-claudeagent:architect  Review the ledger design                                          Ns · ↓ NN.Nk tokens

@@ -1,5 +1,5 @@
                                                                                                    │                                                                                                  ✕
- ▐▛███▛█   Claude Code v2.1.294                                                                    │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Stats  6: Doctor
+ ▐▛███▛█   Claude Code v2.1.304                                                                    │1: Agents  2: Plan  3: Evidence  4: Notepad  5: Stats  6: Doctor
 ▝▜██████▀  Opus 5.5 · API Usage Billing                                                            │─────────────────────────────────────────────────────────────────────────────────────────────────
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd            │╭───────────────────────────────────────────────────────────────────────────────────────────────╮
                                                                                                    ││ Rebuild the billing export on the shared ledger                                               │
@@ -8,14 +8,14 @@
                                                                                                    ││ next 5 Reconcile totals against the invoice table                                             │
   Ran 1 shell command                                                                              ││  executor on 5                                                                               │
                                                                                                    │╰───────────────────────────────────────────────────────────────────────────────────────────────╯
-● oh-my-claudeagent:executor(Reconcile totals)                                                     │                                                              │ 5. Reconcile totals against the
+ executor  Reconcile totals                                                            background │                                                              │ 5. Reconcile totals against the
   ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)                                           │── Milestone 0: Foundations ── ████████ 2/2 ───────────────── │ invoice table
                                                                                                    │ 1 Define the export schema and its version field    PROVEN  │  IN PROGRESS   executor
 ● The executor is reconciling the totals.                                                          │ 2 Read the ledger in one pass                       PROVEN  │
                                                                                                    │── Milestone 1: Exporter ── █████▍██ 2/3 ──────────────────── │ Do
-✻ Waiting for 1 background agent to finish                                                         │ 3 Write rows in the schema's order                UNPROVEN  │ Sum each customer's rows and
+✻ Waiting for executor · NN.Nk in NN out · $X.XX                                                   │ 3 Write rows in the schema's order                UNPROVEN  │ Sum each customer's rows and
                                                                                                    │ 4 Round negative totals toward zero                 PROVEN  │ compare with the invoice table;
-● oh-my-claudeagent+cc-plugin-agents-md: 0s · NN.Nk in NN out · $X.XX engine cost                  │ 5 Reconcile totals against the invoice table      executor │ list every mismatch.
+                                                                                                   │ 5 Reconcile totals against the invoice table      executor │ list every mismatch.
                                                                                                    │── Milestone 2: Rollout ── ████████ 0/4 ───────────────────── │
                                                                                                    │ 6 Run the new export beside the old one for a week          │ Done when
                                                                                                    │ 7 Document the export columns for finance                   │ $ DB_PASSWORD=‹masked› just
@@ -39,7 +39,7 @@
                                                                                                    │                                                              │ ↓ more · wheel to scroll
                                                                                                    │k: Run check  s: Start here  c: Copy  e: Evidence  o: Open only  x: Failing  f: Find  t: Sections
                                                                                                    │l: Plans
-██▎██ 4/9 · next 5 Reconcile totals against the… ·  4 proven   2 unproven ·  1 running      [-] │↑↓ move · enter open · esc close
+██▎██ 4/9 · next 5 Reconcile totals against the invoice table ·  3 proven   1 unproven       [-] │↑↓ move · enter open · esc close
                                                                                ◐ medium · /effort  │
 ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── OMCA: billing-export ─
 ❯ 
@@ -47,4 +47,4 @@
   ⏸ manual mode on · ? for shortcuts · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:executor  Reconcile totals                                                                                                                                   Ns · ↓ NN.Nk tokens
+  ◯ oh-my-claudeagent:executor  Reconcile totals                                                                                                                                    Ns · ↓ N.Nk tokens

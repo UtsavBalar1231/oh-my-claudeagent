@@ -1,0 +1,6 @@
+test:
+	@echo "12 pass, 0 fail"
+lint:
+	@echo "src/cart.ts:2:9 qty is not declared"
+	@echo "1 problem (1 error)"
+	@exit 1

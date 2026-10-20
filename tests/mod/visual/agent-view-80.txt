@@ -1,5 +1,5 @@
 
- ▐▛███▛█   Claude Code v2.1.301
+ ▐▛███▛█   Claude Code v2.1.304
 ▝▜██████▀  Opus 5.5 · API Usage Billing
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
 
@@ -15,7 +15,7 @@
 
 
 
-● Working… (Ns · ↓ NN.Nk tokens)
+● Working… (Ns · ↓ N.Nk tokens)
   ⎿  Tip: Start with small features or bug fixes, tell Claude to propose a plan,
      and verify its suggested edits
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
