@@ -110,7 +110,6 @@ export function patchPane(host: Host, change: (pane: Pane) => Pane): Promise<voi
         notepad: null,
         plans: null,
         errors: { notepad: null, plans: null },
-        auto: "pending",
         readAt: 0,
       },
     ),
@@ -184,7 +183,6 @@ export async function open(host: Host, e: Input<"command.run">, tab: Tab): Promi
   // The first drawing must already know whether the person prefers reduced motion.
   await mascots.ensure(host);
   const opened = await host.ui.open({ id: PANE, title: "OMCA", focus: true, closeOnEscape: true, rows: INLINE_ROWS, columns });
-  await patchPane(host, (pane) => ((pane.auto ?? "pending") === "pending" ? { ...pane, auto: "opened" } : pane));
   await start(host);
   if (opened.isPlaced) return {};
   if (opened.reason.startsWith("no-surface")) {
@@ -449,18 +447,6 @@ export const pane: Features = {
       return undefined;
     },
   },
-  "agent.spawn": {
-    async post(host, e, result) {
-      if (e.isTeammate === true || result.deny !== undefined) return undefined;
-      if (((await host.state.pane.get()).value?.auto ?? "pending") !== "pending") return undefined;
-      if (!(await host.session.surfaces()).includes("terminal")) return undefined;
-      await mascots.ensure(host);
-      await host.ui.open({ id: PANE, title: "OMCA", rows: INLINE_ROWS });
-      await patchPane(host, (pane) => ({ ...pane, auto: "opened" }));
-      await start(host);
-      return undefined;
-    },
-  },
   "turn.complete": {
     async post(host, e) {
       if (timer === undefined) return undefined;
@@ -470,10 +456,8 @@ export const pane: Features = {
     },
   },
   "ui.close": {
-    async pre(host, e) {
-      if (e.id !== PANE) return undefined;
-      stop();
-      if (e.origin.kind === "person") await patchPane(host, (pane) => (pane.auto === "declined" ? pane : { ...pane, auto: "declined" }));
+    pre(_host, e) {
+      if (e.id === PANE) stop();
       return undefined;
     },
   },

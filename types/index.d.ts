@@ -61,7 +61,6 @@ declare module "claude-code" {
           files: readonly { name: string; path: string; mtimeMs: number }[];
         } | null;
         errors: { notepad: string | null; plans: string | null };
-        auto: "pending" | "opened" | "declined";
         readAt: number;
       };
       ledger: {

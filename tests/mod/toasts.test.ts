@@ -46,25 +46,17 @@ const finish = ($: Engine, agentId: string, reason: "answer" | "error" = "answer
 const mainTurn = ($: Engine) =>
   $.turn.complete({ answer: "done", durationMs: 1, isAborted: false, turnId: "t-main", reason: "answer" });
 
-test("three agents finishing at different ticks give one toast when the last one ends", async ($, on) => {
+test("finished agents raise no toast, by their own turn or by the agent list: the transcript reports each one", async ($, on) => {
   const w = setup(on);
+  await $.command.run(run(""));
   await spawn($, 1, "executor");
   await spawn($, 2, "explorer");
-  await spawn($, 3, "architect");
+  await spawn($, 3, "architect", true);
   await finish($, "a-1");
-  await finish($, "a-2");
+  await finish($, "a-3");
+  w.agents = [{ id: "a-2", description: "", type: "x", status: "killed" }];
+  await w.clock.advance(4000);
   expect(w.toasts).toEqual([]);
-  await finish($, "a-3", "error");
-  expect(w.toasts).toEqual(["3 agents finished · 1 failed"]);
-});
-
-test("a lone agent is named, and the next wave starts from an empty tally", async ($, on) => {
-  const w = setup(on);
-  await spawn($, 1, "explorer");
-  await finish($, "a-1");
-  await spawn($, 2, "executor");
-  await finish($, "a-2");
-  expect(w.toasts).toEqual(["explorer finished", "executor finished"]);
 });
 
 test("a nonzero verification toasts once, and one from before the session toasts never", async ($, on) => {
@@ -123,30 +115,4 @@ test("an engine that raises no notification still toasts the plan's end and logs
   await mainTurn($);
   expect(w.toasts).toEqual(["Plan complete: widget 14/14"]);
   expect(w.logs.some((line) => line.startsWith("band: notifying failed:"))).toBe(true);
-});
-
-test("an idle teammate gives no toast", async ($, on) => {
-  const w = setup(on);
-  await spawn($, 1, "executor", true);
-  await finish($, "a-1");
-  expect(w.toasts).toEqual([]);
-});
-
-test("an agent the list reports killed joins the wave once, beside one that ended by its turn", async ($, on) => {
-  const w = setup(on);
-  await $.command.run(run(""));
-  await spawn($, 1, "executor");
-  await spawn($, 2, "explorer");
-  w.agents = [
-    { id: "a-1", description: "", type: "x", status: "running" },
-    { id: "a-2", description: "", type: "x", status: "running" },
-  ];
-  await finish($, "a-1");
-  expect(w.toasts).toEqual([]);
-  w.agents = [
-    { id: "a-1", description: "", type: "x", status: "completed" },
-    { id: "a-2", description: "", type: "x", status: "killed" },
-  ];
-  await w.clock.advance(4000);
-  expect(w.toasts).toEqual(["2 agents finished · 1 stopped"]);
 });

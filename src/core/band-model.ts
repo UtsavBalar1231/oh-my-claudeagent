@@ -21,15 +21,14 @@ export type BandButton = { key: NextActionKind; hotkey: string; label: string; p
 export type BandView = { status: readonly Span[]; buttons: readonly BandButton[] };
 
 type Part = Span & { isFlexible?: true; isTrailing?: true; min?: number };
-type Words = { noPlan: string; logged: string; unlogged: string; proof: Readonly<Record<keyof Proof, string>> };
+type Words = { logged: string; unlogged: string; proof: Readonly<Record<keyof Proof, string>> };
 
 const FULL: Words = {
-  noPlan: "no plan bound",
   logged: " evidence logged",
   unlogged: " evidence not logged",
   proof: { proven: " proven", unproven: " unproven", failed: " failed" },
 };
-const COMPACT: Words = { noPlan: "no plan", logged: " logged", unlogged: " not logged", proof: { proven: "", unproven: "", failed: "" } };
+const COMPACT: Words = { logged: " logged", unlogged: " not logged", proof: { proven: "", unproven: "", failed: "" } };
 
 // Below this many cells a flexible part (task title, command) stops reading as a name.
 const MIN_FLEXIBLE = 14;
@@ -47,9 +46,9 @@ const MIN_TITLE = 4;
 const FULL_TITLE_MIN = MIN_FLEXIBLE + 1;
 
 // The order a narrowing band gives segments up in, last first: progress is the one fact that
-// always stays, then the unverified-evidence warning, whether agents run, what comes next, the
-// proof, then a logged verification.
-const PRIORITY = { progress: 1, unlogged: 2, running: 3, next: 4, proof: 5, logged: 6 } as const;
+// always stays, then the unverified-evidence warning, what comes next, the proof, then a logged
+// verification.
+const PRIORITY = { progress: 1, unlogged: 2, next: 3, proof: 4, logged: 5 } as const;
 
 /** The numbered tasks' tally and the first open one, read the way every plan reader reads them. */
 export function planTally(text: string): { done: number; total: number; next: NextTask | null } {
@@ -86,15 +85,13 @@ function proofParts(proof: Proof, g: Glyphs, words: Words): Part[] {
     ]);
 }
 
-function statusSegments(band: Band, words: Words, g: Glyphs, ascii: boolean, running: number, titleMin: number): Segment[] {
+function statusSegments(band: Band, words: Words, g: Glyphs, ascii: boolean, titleMin: number): Segment[] {
   if (band.error !== null) {
     return [segment(0, [{ text: `${g.cross} `, tone: "fail" }, { text: oneLine(band.error), tone: "plain", isFlexible: true }])];
   }
   const { plan, verification, proof } = band;
   const segments: Segment[] = [];
-  if (plan === null) {
-    if (running === 0) segments.push(segment(PRIORITY.progress, [{ text: words.noPlan, tone: "muted" }]));
-  } else {
+  if (plan !== null) {
     const cells = bar({ done: plan.done, todo: plan.total - plan.done }, BAR_CELLS, ascii).map((piece): Span => ({ ...piece, tone: "plain" }));
     segments.push(segment(PRIORITY.progress, [...cells, { text: ` ${plan.done}/${plan.total}`, tone: "muted" }]));
     if (plan.next !== null) {
@@ -116,14 +113,6 @@ function statusSegments(band: Band, words: Words, g: Glyphs, ascii: boolean, run
         { text: `${isLogged ? g.check : g.warn} `, tone: isLogged ? "ok" : "warn" },
         { text: oneLine(verification.command), tone: "plain", isFlexible: true },
         { text: isLogged ? words.logged : words.unlogged, tone: isLogged ? "muted" : "plain" },
-      ]),
-    );
-  }
-  if (running > 0) {
-    segments.push(
-      segment(PRIORITY.running, [
-        { text: `${g.agent} `, tone: "active" },
-        { text: `${running} running`, tone: "plain" },
       ]),
     );
   }
@@ -170,13 +159,13 @@ function clip(spans: readonly Span[], width: number, g: Glyphs): Span[] {
   return out.filter((span) => span.text !== "");
 }
 
-function statusRow(band: Band, width: number, tier: GlyphTier, running: number): Span[] {
+function statusRow(band: Band, width: number, tier: GlyphTier): Span[] {
   const g = glyphs(tier);
   const ascii = tier === "ascii";
   const gap = displayWidth(` ${g.dot} `);
-  const full = statusSegments(band, FULL, g, ascii, running, FULL_TITLE_MIN);
+  const full = statusSegments(band, FULL, g, ascii, FULL_TITLE_MIN);
   const kept = arrange(full, width, gap);
-  const chosen = kept.length === full.length ? kept : arrange(statusSegments(band, COMPACT, g, ascii, running, 0), width, gap);
+  const chosen = kept.length === full.length ? kept : arrange(statusSegments(band, COMPACT, g, ascii, 0), width, gap);
   return clip(fitParts(joined(chosen, g), width, g), width, g);
 }
 
@@ -195,16 +184,10 @@ function buttonRow(actions: readonly NextAction[], width: number, g: Glyphs): Ba
 }
 
 /** Nothing to draw (undefined) until the first snapshot, and while neither section has content. */
-export function bandView(
-  band: Band | undefined,
-  actions: readonly NextAction[],
-  columns: number,
-  tier: GlyphTier,
-  running = 0,
-): BandView | undefined {
-  if (band === undefined || (band.plan === null && band.error === null && actions.length === 0 && running === 0)) return undefined;
+export function bandView(band: Band | undefined, actions: readonly NextAction[], columns: number, tier: GlyphTier): BandView | undefined {
+  if (band === undefined || (band.plan === null && band.error === null && actions.length === 0)) return undefined;
   return {
-    status: statusRow(band, Math.max(0, columns - MARK_CELLS), tier, running),
+    status: statusRow(band, Math.max(0, columns - MARK_CELLS), tier),
     buttons: buttonRow(actions, usableColumns(columns), glyphs(tier)),
   };
 }

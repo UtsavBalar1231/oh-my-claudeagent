@@ -50,27 +50,23 @@ async function drawn($: Engine, surface: "terminal" | "desktop", requestId: stri
   return text;
 }
 
-test("the main spinner's suffix names the next task and the running agents", async ($, on) => {
-  world(on, plan(6, 14));
-  await $.agent.spawn(spawn("1"));
-  await $.agent.spawn(spawn("2"));
-  await $.agent.spawn(spawn("3"));
-  await $.agent.spawn(spawn("4", { isTeammate: true }));
-
-  expect(await drawn($, "terminal", "main")).toBe("Sauteing… · task 7/14 · 3 agents");
-});
-
-test("the suffix drops the parts that do not apply", async ($, on) => {
-  world(on, null);
-  expect(await drawn($, "terminal", "main")).toBe("Sauteing…");
-  await $.agent.spawn(spawn("1"));
-  await $.agent.spawn(spawn("2"));
-  expect(await drawn($, "terminal", "main")).toBe("Sauteing… · 2 agents");
-});
-
-test("with a plan and no agents the suffix names only the task", async ($, on) => {
+test("the main spinner's suffix names the next task, and running agents add nothing to it", async ($, on) => {
   world(on, plan(6, 14));
   expect(await drawn($, "terminal", "main")).toBe("Sauteing… · task 7/14");
+  await $.agent.spawn(spawn("1"));
+  await $.agent.spawn(spawn("2", { isTeammate: true }));
+  expect(await drawn($, "terminal", "main")).toBe("Sauteing… · task 7/14");
+});
+
+test("with no plan the engine's suffix stands, agents or not", async ($, on) => {
+  world(on, null);
+  await $.agent.spawn(spawn("1"));
+  expect(await drawn($, "terminal", "main")).toBe("Sauteing…");
+});
+
+test("a finished plan leaves the suffix alone", async ($, on) => {
+  world(on, plan(14, 14));
+  expect(await drawn($, "terminal", "main")).toBe("Sauteing…");
 });
 
 test("a subagent's spinner and every desktop spinner pass through unchanged", async ($, on) => {

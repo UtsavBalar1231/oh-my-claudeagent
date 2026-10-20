@@ -210,7 +210,7 @@ test("with no plan an unlogged verification still draws the band, its only actio
   await turn($);
 
   await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toBe("no plan bound · ! just test evidence not logged");
+    expect(await statusRow(band)).toBe("! just test evidence not logged");
     expect(await buttons(band)).toEqual([{ key: "log-evidence", label: "Log evidence", hotkey: "1", plain: true }]);
   });
 });
@@ -359,12 +359,12 @@ test("start-work is withheld while an agent is running", async ($, on) => {
   await turn($);
 
   await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13 · ◆ 1 running");
+    expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13");
     expect(await buttons(band)).toEqual([]);
   });
 });
 
-test("the band counts the agents running now and drops the count when the last one ends", async ($, on) => {
+test("running agents leave the band as it was, since the engine lists them under the prompt", async ($, on) => {
   world(on, bound(12, 46));
   await start($);
   const band = await mount($, "terminal");
@@ -373,17 +373,10 @@ test("the band counts the agents running now and drops the count when the last o
   await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_1" });
   await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_2" });
   await band.redraw();
-  expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13 · ◆ 2 running");
-
-  await turn($, "agent-toolu_1");
-  await band.redraw();
-  expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13 · ◆ 1 running");
-  await turn($, "agent-toolu_2");
-  await band.redraw();
   expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13");
 });
 
-test("the bar, the glyphs and the running count draw in their theme keys, the words plain or inactive", async ($, on) => {
+test("the bar and the glyphs draw in their theme keys, the words plain or inactive", async ($, on) => {
   world(on, bound(12, 46, { [STATUS]: statusFile("just test") }));
   await start($);
   await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_1" });
@@ -406,9 +399,6 @@ test("the bar, the glyphs and the running count draw in their theme keys, the wo
     ["! ", "warning"],
     ["just test", "plain"],
     [" evidence not logged", "plain"],
-    [" · ", "inactive"],
-    ["◆ ", "claude"],
-    ["1 running", "plain"],
   ]);
 });
 
@@ -761,7 +751,7 @@ test("a turn that changes nothing writes nothing to the band", async ($, on) => 
   expect([await texts(band), await buttons(band)]).toEqual(before.drawn);
 });
 
-test("running agents show on the band with no plan bound, without the no-plan text", async ($, on) => {
+test("with no plan bound, running agents draw no band and the engine's drawing stands", async ($, on) => {
   world(on, files({}));
   await start($);
   await turn($);
@@ -771,21 +761,5 @@ test("running agents show on the band with no plan bound, without the no-plan te
   await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_1" });
   await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_2" });
   await band.redraw();
-  expect(await statusRow(band)).toBe("◆ 2 running");
-
-  await turn($, "agent-toolu_1");
-  await turn($, "agent-toolu_2");
-  await band.redraw();
   expect(await texts(band)).toEqual(["engine band"]);
-});
-
-test("an idle teammate is not counted among the agents running", async ($, on) => {
-  world(on, bound(12, 46));
-  await start($);
-  const band = await mount($, "terminal");
-  await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_1" });
-  await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_2", isTeammate: true });
-  await turn($, "agent-toolu_2");
-  await band.redraw();
-  expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13 · ◆ 1 running");
 });

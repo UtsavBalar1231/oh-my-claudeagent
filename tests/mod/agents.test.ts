@@ -877,7 +877,7 @@ test("a resumed agent reopens its row and lane with the start and totals it had,
   expect(ended).toMatchObject({ status: "answer", inputTokens: 2000, outputTokens: 500 });
   expect(ended?.["costUsd"]).toBeGreaterThan(0);
   expect(ended?.["endedAt"]).not.toBeNull();
-  expect(w.toasts).toEqual(["executor finished"]);
+  expect(w.toasts).toEqual([]);
 
   await w.clock.advance(20_000);
   await $.agent.spawn({ ...spawnOf(2, "executor", "Fix the heading parser", "Also skip indented fences."), resume: { agentId: "a-1" } });
@@ -889,5 +889,5 @@ test("a resumed agent reopens its row and lane with the start and totals it had,
   expect(row()).toMatchObject({ status: "answer", startedAt: ended?.["startedAt"], inputTokens: 5000, outputTokens: 1200 });
   expect(row()?.["endedAt"]).not.toBeNull();
   expect(row()?.["costUsd"]).toBe((ended?.["costUsd"] as number) * 2);
-  expect(w.toasts).toEqual(["executor finished", "executor finished"]);
+  expect(w.toasts).toEqual([]);
 });

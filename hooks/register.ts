@@ -154,7 +154,7 @@ export const register: Register = (on, pluginOptions) => {
   const turnStart = featuresFor("turn.start", { footer, modMarker });
   const turnStep = featuresFor("turn.step", { metrics, agentsTracker });
   const turnComplete = featuresFor("turn.complete", { band, agentsTracker, metrics, pane, footer });
-  const agentSpawn = featuresFor("agent.spawn", { agentsTracker, pane, metrics });
+  const agentSpawn = featuresFor("agent.spawn", { agentsTracker, metrics });
   const promptEdit = featuresFor("prompt.edit", { band });
   const promptChange = featuresFor("prompt.change", { band });
   const promptAutocomplete = featuresFor("prompt.autocomplete", { completion });

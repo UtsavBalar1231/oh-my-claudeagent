@@ -2,8 +2,6 @@ import type { On } from "claude-code";
 import { type Engine, expect, type Plugin, test } from "claude-code/testing";
 import { joinPath } from "../../src/core/path.ts";
 import { usableColumns } from "../../src/core/ui-kit.ts";
-import type { Host } from "../../hooks/host.ts";
-import { pane as paneFeature } from "../../hooks/pane.ts";
 import {
   bodyColumns,
   BOULDER,
@@ -806,116 +804,16 @@ test("the timer reads the surfaces again on each tick", async ($, on) => {
   await ui.unmount();
 });
 
-const AUTO = { id: "omca", title: "OMCA", rows: 12 };
-
-test("the first subagent spawn opens the pane unasked, once, and starts its timer", async ($, on) => {
+test("a subagent spawn opens no pane: the transcript reports agents, and /omca opens the pane focused", async ($, on) => {
   const w = world(on, FILES);
   agentEngine(on);
 
   await $.agent.spawn(SPAWN);
-  expect(w.opened).toEqual([AUTO]);
-  w.agents = [{ id: "a-1", description: "Fix the parser", type: "oh-my-claudeagent:executor", status: "running" }];
-  const ui = await $.ui.mount(pane("terminal"));
-  const before = w.invalidations;
-  await w.clock.advance(3000);
-  expect(w.invalidations).toBeGreaterThan(before);
-
-  await $.agent.spawn(SPAWN);
-  expect(w.opened).toEqual([AUTO]);
-  await ui.unmount();
-});
-
-test("a teammate spawn opens nothing, and the first subagent after it still does", async ($, on) => {
-  const w = world(on, FILES);
-  agentEngine(on);
-
   await $.agent.spawn({ ...SPAWN, isTeammate: true });
   expect(w.opened).toEqual([]);
-  await $.agent.spawn(SPAWN);
-  expect(w.opened).toEqual([AUTO]);
-});
-
-test("a surface without a terminal opens nothing on a spawn", async ($, on) => {
-  const w = world(on, FILES);
-  w.surfaces = ["desktop"];
-  agentEngine(on);
-
-  await $.agent.spawn(SPAWN);
-  expect(w.opened).toEqual([]);
-});
-
-function paneAtom(auto: "pending" | "opened" | "declined") {
-  const state = { tab: "agents", notepad: null, plans: null, errors: { notepad: null, plans: null }, auto, readAt: 0 } as const;
-  const atoms = new Map<string, { value: unknown; version: number }>([["pane", { value: state, version: 1 }]]);
-  return {
-    atoms,
-    install(on: On) {
-      on("state.get", (_$, e) => ({ value: atoms.get(e.key) ?? { value: undefined, version: 0 } }));
-      on("state.set", (_$, e) => {
-        const version = (atoms.get(e.key)?.version ?? 0) + 1;
-        atoms.set(e.key, { value: e.value, version });
-        return { value: { isSet: true, version } };
-      });
-    },
-  };
-}
-
-test("a declined auto-open stays closed on a spawn, and /omca still opens the pane focused", async ($, on) => {
-  paneAtom("declined").install(on);
-  const w = world(on, FILES);
-  agentEngine(on);
-
-  await $.agent.spawn(SPAWN);
-  expect(w.opened).toEqual([]);
 
   await $.command.run(run(""));
   expect(w.opened).toEqual([{ id: "omca", title: "OMCA", focus: true, closeOnEscape: true, rows: 12, columns: 56 }]);
-});
-
-test("a pane the person opened with /omca takes the place of the auto-open on the first spawn", async ($, on) => {
-  const w = world(on, FILES);
-  agentEngine(on);
-
-  await $.command.run(run(""));
-  await $.agent.spawn(SPAWN);
-  expect(w.opened).toEqual([{ id: "omca", title: "OMCA", focus: true, closeOnEscape: true, rows: 12, columns: 56 }]);
-});
-
-test("a person's close declines the auto-open, and another origin's close does not", async () => {
-  const held = paneAtom("opened");
-  const host = {
-    state: {
-      pane: {
-        get: async () => held.atoms.get("pane"),
-        set: async (value: unknown, options: { ifVersion: number }) => {
-          held.atoms.set("pane", { value, version: options.ifVersion + 1 });
-          return { isSet: true, version: options.ifVersion + 1 };
-        },
-      },
-    },
-  } as unknown as Host;
-  const auto = () => {
-    const pane = held.atoms.get("pane");
-    if (pane === undefined) throw new Error("the pane atom is missing");
-    return (pane.value as { auto: string }).auto;
-  };
-
-  await paneFeature["ui.close"]?.pre?.(host, { id: "omca", origin: { kind: "plugin" } });
-  expect(auto()).toBe("opened");
-  await paneFeature["ui.close"]?.pre?.(host, { id: "other", origin: { kind: "person" } });
-  expect(auto()).toBe("opened");
-  await paneFeature["ui.close"]?.pre?.(host, { id: "omca", origin: { kind: "person" } });
-  expect(auto()).toBe("declined");
-});
-
-test("a plugin's close does not decline the auto-open", { plugins: [CLOSER] }, async ($, on) => {
-  const w = world(on, FILES);
-  agentEngine(on);
-
-  await $.agent.spawn(SPAWN);
-  await $.command.run(closeRun);
-  await $.agent.spawn(SPAWN);
-  expect(w.opened).toEqual([AUTO]);
 });
 
 const metric = (agentId: string) =>

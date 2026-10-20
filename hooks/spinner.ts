@@ -7,13 +7,8 @@ export const spinner: Features = {
       const [{ value: snapshot }, { value: agents = {} }] = await Promise.all([host.state.band.get(), host.state.agents.get()]);
       if (agents[e.requestId] !== undefined) return undefined;
       const plan = snapshot?.plan;
-      const running = Object.values(agents).filter((agent) => agent.status === "running" && !agent.teammate).length;
-      const parts = [
-        ...(plan === null || plan === undefined || plan.done >= plan.total ? [] : [`task ${plan.done + 1}/${plan.total}`]),
-        ...(running === 0 ? [] : [`${running} ${running === 1 ? "agent" : "agents"}`]),
-      ];
-      if (parts.length === 0) return undefined;
-      return { event: { ...e, props: { ...e.props, suffix: ["…", ...parts].join(" · ") } } };
+      if (plan === null || plan === undefined || plan.done >= plan.total) return undefined;
+      return { event: { ...e, props: { ...e.props, suffix: `… · task ${plan.done + 1}/${plan.total}` } } };
     },
   },
 };
