@@ -31,6 +31,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Less repeated state:** the band no longer counts running agents or says `no plan bound`,
   and the spinner's suffix names only the plan's next task; Claude Code lists running agents
   under the prompt.
+- **Four pane tabs:** the tab bar holds Agents, Plan, Evidence and Notepad on `1` to `4`, so it
+  reads in full in a docked pane. Stats and Doctor are pages that `/omca stats` and
+  `/omca doctor` open, and the bar names the one shown after the tabs.
+- **One key row on the plan board:** the board shows the focused task's keys (`k`, `s`, `c`)
+  and `m`, which shows the rest beside them; a pane wide enough for every key shows them all.
+  The `↑↓ move · enter open · esc close` and `↑↓ scroll · esc close` rows are gone from every
+  Plan view, and a note such as `Copied task 6.` follows the keys while it lasts.
+- **Quieter proof on board rows:** a task row ends with its proof mark in the theme's color and
+  the word beside it (`✓ proven`, `! unproven`, `✗ failed`) in place of a solid chip, with
+  `proven` drawn muted. The task's detail keeps its chips.
 
 ## [3.2.0] - 2026-10-17
 

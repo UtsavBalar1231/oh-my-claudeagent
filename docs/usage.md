@@ -276,21 +276,25 @@ Set the `showBand` option to `false` to hide it.
    row opens that section's page, every entry under its date, which the mouse wheel scrolls a
    row at a time; `b` goes back to the rows. `f` finds text in the entries on either view, `w`
    clears the search, and `l` picks another plan's notepad from the rows.
-5. **Stats**: runs per agent type, the evidence rate of executor and build-fixer, the agents that
-   run checks, tokens per finished delegation, and the estimated cost by agent, across the
-   project's recorded sessions. Runs on a model without a
-   known price are counted as excluded rather than estimated. `r` reloads the records.
-6. **Doctor**: the checks described below.
 
-`/omca plan`, `/omca stats` and `/omca doctor` open the pane on that tab. As you type, the
-prompt's typeahead offers these subcommands, and the plans in your plans directory after
+Two pages have no digit key. `/omca stats` and `/omca doctor` open them, the tab bar names the
+one shown after the tabs, and a digit goes back to a tab:
+
+- **Stats**: runs per agent type, the evidence rate of executor and build-fixer, the agents that
+  run checks, tokens per finished delegation, and the estimated cost by agent, across the
+  project's recorded sessions. Runs on a model without a
+  known price are counted as excluded rather than estimated. `r` reloads the records.
+- **Doctor**: the checks described below.
+
+`/omca plan` opens the pane on the Plan tab. As you type, the
+prompt's typeahead offers the subcommands, and the plans in your plans directory after
 `/omca plan`. Press Ctrl+X then Tab,
 or click the pane, to focus it. Esc, the close mark in the pane's corner, or Ctrl+X then X close
-it. Every key letter below works only while its tab is shown.
+it. Every key letter below works only while its tab is shown and its key is drawn.
 
 Each tab fits the pane it gets. A short pane keeps the tab's header, any filter, at least one row
-of content with a cue above or below it, and the keys; spare rows go to wrapped text and a second
-key row. When the tab labels do not fit on one row, the tabs other than the shown one show their
+of content with a cue above or below it, and the keys; spare rows go to wrapped text and the
+keys. When the tab labels do not fit on one row, the tabs other than the shown one show their
 initial. A wide terminal gives the docked pane up to 120 columns while the transcript keeps 100.
 
 The pane opens only when you ask for it; the transcript reports each agent as it finishes.
@@ -325,7 +329,7 @@ the plans directory, `.omca/plans` under the project and every registered plan w
 exists, and a name resolves against both directories and the registry. A plan with
 numbered tasks opens on its board: a header with a DRAFT chip while the plan is a draft, a
 progress bar, the proof counts, the next task and the running agents, then the tasks grouped by
-milestone. Each task row shows whether it is done, in progress, open or blocked, its proof chip,
+milestone. Each task row shows whether it is done, in progress, open or blocked, its proof mark,
 the agent working on it, and the tasks that block it. A task whose only unfinished dependency is
 the task just before it is next in line, so it reads as open. A plan without numbered tasks opens
 on its sections.
@@ -338,6 +342,12 @@ that bear on it.
 The mouse wheel over the list moves the focus as Up and Down do, and over the detail beside it
 scrolls the detail. In a wide pane a click on a task's title selects it and a second click opens
 it; in a narrower one a click opens it.
+
+The board's key row holds the keys for the focused task, `k`, `s` and `c`, and `m`, which shows
+every other key beside them until you press it again or open another plan. A pane wide enough for
+all of them on one row shows them all and no `m`. A key works only while it is drawn, so on a narrower pane press
+`m` before `e`, `o`, `x`, `f`, `t` or `l`. A note such as `Copied task 6.` follows the keys
+while it lasts.
 
 | Key | On the board | On a task page |
 | --- | --- | --- |
@@ -353,6 +363,7 @@ it; in a narrower one a click opens it.
 | `f` | Find tasks by their text | |
 | `t` | The plan's sections | |
 | `l` | Recent plans | |
+| `m` | Show or fold the keys past `c` | |
 | `b` | | Back to the board |
 | Esc | Close the pane | Close the pane |
 
@@ -362,14 +373,16 @@ returns to the list. The board reloads the file when it changes on disk and keep
 
 #### Proof
 
-A task's proof chip compares the files its `File:` line lists with the evidence log. The newest
+A task's proof mark compares the files its `File:` line lists with the evidence log. The newest
 test, build or lint run since any of those files last changed decides it: **PROVEN** when it
 passed, **FAILED** when it failed, **UNPROVEN** when no such run has happened yet. A task that
-lists no file, or whose files do not exist, gets no chip. For a registered plan, only changes
+lists no file, or whose files do not exist, gets no mark. For a registered plan, only changes
 made since the plan started count, so a task whose files have not changed since then gets no
-chip from an earlier or unrelated run. PROVEN and UNPROVEN describe finished work, so a task
-still open shows a chip only when it is FAILED, and the proof counts on the board and the band
-count the chips.
+mark from an earlier or unrelated run. PROVEN and UNPROVEN describe finished work, so a task
+still open shows a mark only when it is FAILED, and the proof counts on the board and the band
+count the marks. A board row ends with the mark's glyph in the theme's color and its word,
+`✓ proven`, `! unproven` or `✗ failed`, with `proven` drawn muted; a row too narrow for the word
+keeps the glyph. The task's detail shows the state as a chip.
 
 ### The proof ledger
 
@@ -452,7 +465,7 @@ server's whole normalized name followed by `__*`. A shorter prefix such as
 
 ## The doctor
 
-`/omca doctor` opens the Doctor tab and runs its checks:
+`/omca doctor` opens the Doctor page and runs its checks:
 
 - the OMCA version that is loaded, and whether Claude Code meets the 2.1.300 floor;
 - whether bun 1.4.2 or later is on the session's `PATH`;
@@ -519,7 +532,7 @@ in `.omca/rules/` replaces a shipped rule, and an empty one turns it off. OMCA k
 Desktop and VS Code start `.mcp.json` with the GUI's `PATH`, which can lack `~/.bun/bin`. When
 it does, the `omca` server never starts, and the MCP tools, the injected guidance and the stop
 gates are off. At session start OMCA writes a line in the transcript that bun is not on `PATH`,
-and the Doctor tab reports bun as missing. Make bun reachable from the app's `PATH`, for example
+and the Doctor page reports bun as missing. Make bun reachable from the app's `PATH`, for example
 by linking it into a directory the app searches, and restart the app.
 
 The Code tab in Desktop runs its own bundled copy of Claude Code. OMCA's mod

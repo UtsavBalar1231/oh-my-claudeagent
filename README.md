@@ -78,7 +78,7 @@ buttons fill the prompt with the next step.
 `/omca plan` opens the plan board: the tasks grouped by milestone, each with its state, its proof
 and the agent working on it. A wide pane shows the focused task's detail beside the list.
 
-<img src=".github/assets/plan.png" width="680" alt="The Plan tab of the OMCA pane shows the checkout-redesign board at 6 of 14 tasks, with 6 proven and 4 blocked. Tasks 1 to 6 are done and proven, the executor is on task 7, tasks 8, 9 and 11 are open, and tasks 10, 12, 13 and 14 name the tasks that block them. Beside the list, task 6, Build the payment step, shows its steps, its done-when command, its dependencies, its file changed 3h ago and the passing runs since then.">
+<img src=".github/assets/plan.png" width="680" alt="The Plan tab of the OMCA pane shows the checkout-redesign board at 6 of 14 tasks, with 6 proven and 4 blocked. Tasks 1 to 6 are done and proven, the executor is on task 7, tasks 8, 9 and 11 are open, and tasks 10, 12, 13 and 14 name the tasks that block them. Beside the list, task 6, Build the payment step, shows its steps, its done-when command, its dependencies, its file changed 3h ago and the passing runs since then. The keys for the focused task and the board fill one row under the list.">
 
 The Evidence tab is the proof ledger: a verdict on the plan's final verification, then every
 logged run grouped by day.
@@ -104,7 +104,7 @@ The guard holds a destructive shell command for your review and shows what it wo
 change how OMCA runs. A check with a known fix offers a key that fills the prompt with it, and
 the passing checks fold into one line that `o` opens.
 
-<img src=".github/assets/doctor.png" width="680" alt="The Doctor tab counts 1 warning, 1 info row and 11 passing checks. The warning says maxEffortLevel high holds the architect below the xhigh it declares, the info row offers a: Use /advisor fable, and one line beside o: Show passing folds the passing checks, naming OMCA, Claude Code, bun, the omca server, ast-grep, the options, the agent models and the mod policy before it is cut.">
+<img src=".github/assets/doctor.png" width="680" alt="The Doctor page, named after the four tabs in the tab bar, counts 1 warning, 1 info row and 11 passing checks. The warning says maxEffortLevel high holds the architect below the xhigh it declares, the info row offers a: Use /advisor fable, and one line beside o: Show passing folds the passing checks, naming OMCA, Claude Code, bun, the omca server, ast-grep, the options, the agent models and the mod policy before it is cut.">
 
 The status line shows the session (model, agent and the plan's next task), the workspace
 (context window and git state) and usage (duration, usage limits, and cost for accounts billed
@@ -161,7 +161,7 @@ the UI. It reads these environment variables: `CLAUDE_AFK_TIMEOUT_MS`,
 **What `omca-setup` writes.** Only after it prints a diff and you confirm, it sets `statusLine`
 and `subagentStatusLine` in `~/.claude/settings.json`, optionally `env.OMCA_GLYPHS`, and copies
 a launcher to `~/.claude/omca/statusline.ts`. The previous file is kept as
-`settings.json.omca-bak`. `--uninstall` removes those entries and the launcher. The Doctor tab's
+`settings.json.omca-bak`. `--uninstall` removes those entries and the launcher. The Doctor page's
 `i` fix adds `refreshInterval: 5` the same way, with a backup.
 
 **State.** The plan registry, the evidence ledger, notepads, session status files, mod markers,

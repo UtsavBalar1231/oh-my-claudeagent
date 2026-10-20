@@ -279,7 +279,7 @@ OMCA keeps its state in the project's `.omca/` directory, which it gitignores ex
 
 - through `omca-setup`, the status line keys in `~/.claude/settings.json`, a backup of that file
   as `settings.json.omca-bak`, and the status line launcher;
-- through the Doctor tab's `i` fix, `refreshInterval` in the same `settings.json`, with the same
+- through the Doctor page's `i` fix, `refreshInterval` in the same `settings.json`, with the same
   backup;
 - through `omca-setup` with `disableForceOrchestrationStyle` on, the installed copy of
   `output-styles/omca-default.md` in the plugin cache;
@@ -292,7 +292,7 @@ OMCA keeps its state in the project's `.omca/` directory, which it gitignores ex
 | `.omca/notepads/<plan>/<section>.md` | `notepad_write`, `notepad_compact` | Plan notepads |
 | `.omca/state/session/<session id>.json` | the server | The last hook call and the last verification command |
 | `.omca/state/mod/<session id>.json` | the mod | Proof the mod ran this session, and its options. `health_check` and the first-prompt notice read it from any worktree of the repository |
-| `.omca/metrics/<session id>/<agent id>.json` | the mod | One record per delegation, read by the Stats tab |
+| `.omca/metrics/<session id>/<agent id>.json` | the mod | One record per delegation, read by the Stats page |
 | `.omca/logs/file-access.jsonl` | `file_read` | One line per call |
 | `.omca/state/hook-trace.jsonl` | the server, with `OMCA_HOOK_TRACE=1` | One line per hook call |
 | `.omca/rules/*.md` | you | Project rules, injected by file name pattern |
