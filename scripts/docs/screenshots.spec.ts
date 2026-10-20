@@ -22,7 +22,7 @@ describe("SHOTS", () => {
   });
 
   test("the plan scene is ready only once the executor holds task 7 and task 6 is focused", () => {
-    const board = "◆ executor on 7\n◐ 7 Wire the order summary panel  UNPROVEN\n↑↓ move · enter open";
+    const board = "◆ executor on 7\n✓ 6 proven · ! 1 unproven\n◐ 7 Wire the order summary panel  ! unproven\nk: Run check  s: Start here  c: Copy  m: More";
     expect(still("plan")?.ready(`${board}\n6. Build the payment step`)).toBe(true);
     expect(still("plan")?.ready(board)).toBe(false);
   });
@@ -86,7 +86,7 @@ describe("CLIPS", () => {
     expect(marks(clip("clip-guard"))).toEqual(["cmd-typed", "dialog", "refused"]);
     expect(targets(clip("clip-guard"))).toEqual(["discard-lines"]);
     expect(marks(clip("clip-verify"))).toEqual(["cmd-typed", "tests-pass", "evidence-logged", "complete"]);
-    expect(marks(clip("clip-tour"))).toEqual(["cmd-typed", "agents-tab", "plan-tab", "evidence-tab", "notepad-tab", "stats-tab"]);
+    expect(marks(clip("clip-tour"))).toEqual(["cmd-typed", "agents-tab", "plan-tab", "evidence-tab", "notepad-tab", "stats-typed", "stats-tab"]);
     expect(targets(clip("clip-verify"))).toEqual(["complete-chip", "verdict-line"]);
     expect(targets(clip("clip-tour"))).toEqual(["band", "cost-row", "notepad-card", "stats-header"]);
   });
@@ -119,9 +119,9 @@ describe("CLIPS", () => {
     expect(CLIPS.filter((shot) => shot.env?.["OMCA_DISABLED_HOOKS"] === "").map((shot) => shot.name)).toEqual(["clip-refusal", "clip-verify"]);
   });
 
-  test("the board target tells a PROVEN chip from an UNPROVEN one", () => {
-    const screen = "7 Wire  UNPROVEN\n1 Add the cart  PROVEN";
-    expect(locate(screen, target(clip("clip-board"), "proven-chip") ?? /^$/)).toEqual({ row: 1, col: 16, len: 6, rows: 1 });
+  test("the board target finds a row's proven mark, not an unproven one or the header's count", () => {
+    const screen = "│ ✓ 6 proven · ! 1 unproven │\n7 Wire  ! unproven\n1 Add the cart  ✓ proven";
+    expect(locate(screen, target(clip("clip-board"), "proven-chip") ?? /^$/)).toEqual({ row: 2, col: 16, len: 8, rows: 1 });
   });
 
   test("a target over two rows spans from its leftmost text, skipping the indent", () => {

@@ -133,7 +133,7 @@ const PLAN_SCRIPT: Script = {
   ],
 };
 const NO_SCRIPT: Script = { main: [], subagent: [] };
-const planReady = (screen: string) => screen.includes("executor on 7") && screen.includes("PROVEN") && screen.includes("enter open");
+const planReady = (screen: string) => screen.includes("executor on 7") && /\d+ proven/.test(screen) && screen.includes("k: Run check");
 const GUARD_SCRIPT: Script = {
   main: [{ content: [bash("rm -rf build", "Remove the build output")] }, { content: [text("The build is clean.")] }],
   subagent: [],
@@ -151,9 +151,9 @@ const PAIR_ROWS = 34;
 const PAIR_FONT = 35;
 const has = (...parts: string[]) => (screen: string) => parts.every((part) => screen.includes(part));
 // On the prompt row itself: the slash-command menu lists a command before it is fully typed.
-const command = (line: string): Step[] => [
+const command = (line: string, mark = "cmd-typed"): Step[] => [
   { type: line },
-  { until: (screen) => screen.split("\n").some((row) => /^❯\s/.test(row) && row.slice(2).trimEnd() === line), mark: "cmd-typed", hold: 0 },
+  { until: (screen) => screen.split("\n").some((row) => /^❯\s/.test(row) && row.slice(2).trimEnd() === line), mark, hold: 0 },
   { key: "Enter" },
 ];
 const RUN_GATES = { OMCA_DISABLED_HOOKS: "" };
@@ -236,7 +236,7 @@ const BOARD_STEPS: readonly Step[] = [
   {
     until: (screen) => planReady(screen) && screen.includes("7. Wire the order summary panel"),
     mark: "board",
-    targets: { "proven-chip": /(?<!UN)PROVEN/ },
+    targets: { "proven-chip": /\S proven(?= *(?:│|$))/m },
   },
   { key: "Up" },
   { until: has("6. Build the payment step"), mark: "focus-moved", hold: 1_400 },
@@ -461,7 +461,7 @@ export const CLIPS: readonly Clip[] = [
   { name: "clip-board-light", format: "clip", cols: CLIP_COLS, rows: CLIP_ROWS, theme: "light", script: PLAN_SCRIPT, steps: BOARD_STEPS },
   {
     // The pane's tabs while an executor works, on a project with notes and delegation history,
-    // ending on the Stats tab.
+    // ending on the Stats page.
     name: "clip-tour",
     format: "clip",
     cols: CLIP_COLS,
@@ -479,12 +479,13 @@ export const CLIPS: readonly Clip[] = [
       ...command("/omca"),
       { until: has("1: Agents", "Wire the order summary panel"), mark: "agents-tab" },
       { key: "2", gap: 0 },
-      { until: has("Ship the checkout redesign", "PROVEN"), mark: "plan-tab" },
+      { until: (screen) => screen.includes("Ship the checkout redesign") && /\d+ proven/.test(screen), mark: "plan-tab" },
       { key: "3", gap: 0 },
       { until: has("Final verification"), mark: "evidence-tab" },
       { key: "4", gap: 0 },
       { until: has("Learnings · "), mark: "notepad-tab", targets: { "notepad-card": /╭─+╮(?=[^\n]*\n[^\n]*Learnings · \d+ entr)/ } },
-      { key: "5", gap: 0 },
+      { key: "Escape", gap: 0 },
+      ...command("/omca stats", "stats-typed"),
       { until: has("delegations in"), mark: "stats-tab", hold: 1_200, targets: { "stats-header": /agent +runs +median +tokens[^\n│]*outcomes/ } },
     ],
   },
