@@ -21,11 +21,11 @@
 
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
 │ 1: Agents  2: Plan  3: Evidence  4: Notepad                                  │
-│  COMPLETE  proof-ledger   build   test   lint   manual  10-02 13:35      │
+│  COMPLETE  proof-ledger   build   test   lint   manual  10-02 13:35      │
 │   ↑ 1 more                                                                   │
 │ ── Fri 2026-10-02 ───────────────────────────────────────────────────────    │
-│     13:00  test    just test-mod                           executor        │
-│ ❯   12:40  manual  curl -fsS -H 'Auth…ample.test/healthz   orchestrator    │
+│     13:00  test    just test-mod                           executor        │
+│ ❯   12:40  manual  curl -fsS -H 'Auth…ample.test/healthz   orchestrator    │
 │     curl -fsS -H 'Authorization: Bearer ‹masked›'                            │
 │     https://staging.example.test/healthz                                     │
 │     2026-10-02 12:40:00 ·  orchestrator · 2 secrets masked                  │

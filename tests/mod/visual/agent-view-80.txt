@@ -20,7 +20,7 @@
      and verify its suggested edits
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
 │ 1: Agents  2: Plan  3: Evidence  4: Notepad                                  │
-│   ▄▄▀▀▀▀▀▀▄▄      explorer · Map the router callers                         │
+│   ▄▄▀▀▀▀▀▀▄▄      explorer · Map the router callers                         │
 │     ▀▀  ▀▀ ▀▄▄▀   running · Ns · NN.Nk tokens                               │
 │    ▀▀▀▀▀▀▀▀   ▀  sonnet-5-5 · high                                           │
 │    ▀▀▀▀▀▀▀▀      4 tool calls                                                │

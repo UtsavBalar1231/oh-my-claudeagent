@@ -1,7 +1,7 @@
                                                                │                                                      ✕
  ▐▛███▛█   Claude Code v2.1.304                                │1: Agents  2: Plan  3: Evidence  4: Notepad
 ▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │                   explorer · Map the router callers
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │                   explorer · Map the router callers
                                                                │      ▄▄▄▄         running · Ns · NN.Nk tokens
                                                                │     ▀▀▀▀▀▀       sonnet-5-5 · high
 ❯ Find every caller of the shared router and say which ones    │   ▀▀▀▀▀▀▀▀▀▀     4 tool calls
@@ -14,7 +14,7 @@
                                                                │ones bypass the harness.
                                                                │
                                                                │Tool calls · 1
-                                                               │ Bash ls plans                                   Nms
+                                                               │ Bash ls plans                                   Nms
                                                                │
                                                                │Reply
                                                                │none yet

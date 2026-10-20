@@ -7,7 +7,7 @@
 ❯ Run the tests
 
   Ran 1 shell command
-  ⎿   just test · 12 passed
+  ⎿   just test · 12 passed
 
 ● The tests ran.
 

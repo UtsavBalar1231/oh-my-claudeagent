@@ -6,13 +6,13 @@
                                                                ││ Agents · 8 types                                  │
                                                                ││   agent        runs  median  est. cost  evidence  │
                                                                ││  executor        8   3m28s      $6.86      86%  │
-                                                               ││  explorer        4     24s     $0.31+       n/a  │
-                                                               ││  architect       2   6m24s      $5.27       n/a  │
+                                                               ││  explorer        4     24s     $0.31+       n/a  │
+                                                               ││  architect       2   6m24s      $5.27       n/a  │
                                                                ││  researcher      2   1m05s      $0.40       n/a  │
                                                                ││  analyzer        1   3m08s      $0.34       n/a  │
-                                                               ││  build-fixer     1   2m23s      $0.65     100%  │
+                                                               ││  build-fixer     1   2m23s      $0.65     100%  │
                                                                ││  planner         1   6m52s      $0.67       n/a  │
-                                                               ││  reviewer        1   4m01s      $0.39       n/a  │
+                                                               ││  reviewer        1   4m01s      $0.39       n/a  │
                                                                │╰───────────────────────────────────────────────────╯
                                                                │╭───────────────────────────────────────────────────╮
                                                                ││ Tokens per delegation · 19 delegations            │

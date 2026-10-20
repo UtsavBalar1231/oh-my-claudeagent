@@ -19,7 +19,7 @@
       4  }
 
   Ran 2 shell commands
-  ⎿   just test · 12 pass, 0 fail
+  ⎿   just test · 12 pass, 0 fail
   ⎿   just lint · exit 1 · 1 problem (1 error)
 
 ● 3 background agents launched (↓ to manage)
@@ -39,7 +39,7 @@
   │ Rounding review │ architect │
   └─────────────────┴───────────┘
 
-✻ Worked for 0s · done HH:MM · NN.Nk in NN out · $X.XX ·  just test not logged
+✻ Worked for 1s · done HH:MM · NN.Nk in NN out · $X.XX ·  just test not logged
                                                                                        Jump to bottom (ctrl+End) ↓
 █▎███ 12/46 · next 13 Port the snapshot and the ledger onto the shared router ·  just test evidence not logged                                                                                     [-]
 1: Log evidence   2: Start work

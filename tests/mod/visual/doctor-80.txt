@@ -21,7 +21,7 @@
 
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
 │ 1: Agents  2: Plan  3: Evidence  4: Notepad  Doctor                          │
-│ r: Run again    3 warn   1 info   9 ok  checked HH:MM                     │
+│ r: Run again    3 warn   1 info   9 ok  checked HH:MM                     │
 │   WARN  omca server   No hook has reached the server in this session yet    │
 │                        m: Use /mcp                                           │
 │   WARN  Effort cap    maxEffortLevel high holds the architect below the     │

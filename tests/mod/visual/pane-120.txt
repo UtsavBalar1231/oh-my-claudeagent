@@ -11,11 +11,11 @@
    ├ oh-my-claudeagent:explorer (Map the router callers)       │    ▀▀▀▀▀▀▀▀      ✻ Bash sleep 90             2 calls
    └ oh-my-claudeagent:architect (Review the ledger design)    │    ▀▀▀▀▀▀▀▀      fable-5-1 · xhigh · NN.Nk tokens
                                                                │Finished
-● Three agents are on it.                                      │    ▄▀ ▀▀ ▀▄ ▄▄▄  executor           done         1s
+● Three agents are on it.                                      │    ▄▀ ▀▀ ▀▄ ▄▄▄  executor           done         1s
                                                                │ ▀   ▀▀   ▀       Fix the heading parser
 ✻ Waiting for executor, explorer, architect · NN.Nk in NN out  │ ▀  ▀ ▀▀▀▀ ▀ ▀    Fenced lines are skipped now, and
                                                                │    ▀▀▀▀▀▀▀▀      the heading tests pass.
- executor  Fix the heading parser    1s · 2 calls · 16.2k tok │                  sonnet-5-5 · high · NN.Nk tokens
+ executor  Fix the heading parser    1s · 2 calls · 16.2k tok │                  sonnet-5-5 · high · NN.Nk tokens
   ⎿  Fenced lines are skipped now, and the heading tests pass. │d: Details  2 running · 1 finished · NN.Nk tokens
                                                                │
 ● ok                                                           │

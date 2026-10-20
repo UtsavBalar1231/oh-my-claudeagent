@@ -1,7 +1,7 @@
                                                                │                                                      ✕
  ▐▛███▛█   Claude Code v2.1.304                                │1: Agents  2: Plan  3: Evidence  4: Notepad  Doctor
 ▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │r: Run again    3 warn   1 info   9 ok
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │r: Run again    3 warn   1 info   9 ok
                                                                │  WARN  omca server
                                                                │  No hook has reached the server in this session yet
                                                                │  m: Use /mcp
@@ -16,7 +16,7 @@
                                                                │  No advisorModel; /advisor fable turns the advisor
                                                                │  on
                                                                │  a: Use /advisor fable
-                                                               │o: Show passing    9 ok · OMCA, Claude Code, bun, a…
+                                                               │o: Show passing    9 ok · OMCA, Claude Code, bun, a…
                                                                │
                                                                │
                                                                │

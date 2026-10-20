@@ -4,12 +4,12 @@
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │╭───────────────────────────────────────────────────╮
                                                                ││ Final verification · proof-ledger                 │
                                                                ││  COMPLETE  matches the current plan · 10-02 13:35 │
-                                                               ││  build   test   lint   manual                 │
+                                                               ││  build   test   lint   manual                 │
                                                                │╰───────────────────────────────────────────────────╯
                                                                │── Fri 2026-10-02 ───────────────────────────────────
-                                                               │    13:35  final   just ci && just visual evidence
-                                                               │    13:00  test    just test-mod
-                                                               │❯   12:40  manual  curl -fsS -H 'Au…ple.test/healthz
+                                                               │    13:35  final   just ci && just visual evidence
+                                                               │    13:00  test    just test-mod
+                                                               │❯   12:40  manual  curl -fsS -H 'Au…ple.test/healthz
                                                                │    curl -fsS -H 'Authorization: Bearer ‹masked›'
                                                                │    https://staging.example.test/healthz
                                                                │    HTTP/2 200
@@ -18,18 +18,18 @@
                                                                │    rerun with DEPLOY_TOKEN=‹masked› to redeploy
                                                                │    2026-10-02 12:40:00 ·  orchestrator
                                                                │    2 secrets masked
-                                                               │    12:10  test    bun test src ser…atusline scripts
+                                                               │    12:10  test    bun test src ser…atusline scripts
                                                                │── Thu 2026-10-01 ───────────────────────────────────
-                                                               │    18:45  test    just validate --check engine
+                                                               │    18:45  test    just validate --check engine
                                                                │    17:00  final   just ci && just visual evidence
-                                                               │    15:32  lint    just typecheck
+                                                               │    15:32  lint    just typecheck
                                                                │    15:15  lint    just typecheck
-                                                               │    14:30  build   bun run build
-                                                               │    13:50  test    just test-mod
+                                                               │    14:30  build   bun run build
+                                                               │    13:50  test    just test-mod
                                                                │    13:25  test    just test-mod
                                                                │── Wed 2026-09-30 ───────────────────────────────────
-                                                               │    16:10  manual  just visual plan-reader
-                                                               │    14:35  test    bun test src/core
+                                                               │    16:10  manual  just visual plan-reader
+                                                               │    14:35  test    bun test src/core
                                                                │  ↓ 3 more
                                                                │t: Type  x: Fails  f: Find  c: Copy  r: Rerun
 █████ 6/6                                                  [-] │3/16 · ↑↓ move

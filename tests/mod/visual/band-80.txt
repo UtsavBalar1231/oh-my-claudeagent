@@ -7,7 +7,7 @@
 ❯ Run the tests
 
   Ran 1 shell command
-  ⎿   just test · 12 passed
+  ⎿   just test · 12 passed
 
  executor  Port the snapshot onto the router                        background
   ⎿  Backgrounded agent (↓ to manage · ctrl+o to expand)
