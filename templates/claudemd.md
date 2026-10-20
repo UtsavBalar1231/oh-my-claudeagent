@@ -16,7 +16,7 @@ Slash commands always available. Keyword triggers activate only when `enableKeyw
 | Fix broken build         | "fix build"            | /oh-my-claudeagent:build-fixer           |
 | Session handoff          | "handoff" (advisory nudge only) | /oh-my-claudeagent:handoff      |
 
-`/omca` opens OMCA's pane (Agents, Plan, Evidence, Notepad, Stats, Doctor). `/omca doctor` checks the environment.
+`/omca` opens OMCA's pane (Agents, Plan, Evidence, Notepad). `/omca stats` shows what each agent cost, and `/omca doctor` checks the environment.
 
 ## Agent catalog
 

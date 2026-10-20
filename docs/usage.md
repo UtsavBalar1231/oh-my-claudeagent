@@ -196,15 +196,46 @@ own after about 54 minutes idle (`idleCompaction`; see `docs/references.md` for 
 Type `@agent-oh-my-claudeagent:<name>` to send a request to one agent, for example
 `@agent-oh-my-claudeagent:architect what is the right shape for this cache?`.
 
-## The band, the pane and the plan board
+## The transcript, the band and the pane
+
+### In the transcript
+
+On a terminal OMCA redraws Claude Code's own transcript rows, so what it tracks shows up where
+the work happens:
+
+- **The turn line.** The dim line that closes each main turn (`✻ Cooked for 21s`) also carries the
+  turn's input and output tokens, its cost on an account billed by the token, and a receipt for a
+  verification command the turn ran: `✓ just test logged`, or `! just test not logged` when no
+  evidence was logged after it. While background agents are still working it names them in
+  their colors, as in `Waiting for executor, architect`. As the window narrows the line drops the
+  clock, then the cost, then the tokens; the receipt stays.
+- **An agent's launch.** The row of a single Agent call shows the agent's icon and name in its
+  color and its task, with `background` flush right when it runs on its own, in place of
+  `oh-my-claudeagent:executor(…)`. Several agents launched together keep Claude Code's own block.
+- **A finished agent.** Claude Code's `Agent "…" finished` row becomes the agent's status mark,
+  its name in its color and its task, with its duration, tool calls and tokens flush right, and
+  the first line of its reply beneath. A failed or stopped agent says so in the theme's error or warning color. Press
+  `ctrl+o` for Claude Code's full notification.
+- **A verification run.** Under a folded group of shell commands, each test, build or lint run
+  gets one row with its result: `✓ just test · 12 pass, 0 fail`, or `✗ just lint · exit 1 · 1
+  problem (1 error)`, read from the command's own output. The runners are the ones the
+  verification gate records.
+- **A picture Claude reads.** Under a folded group with a Read of a PNG, a row names the file and
+  its size, and a terminal that draws pictures (kitty, Ghostty) shows the picture beneath it, at
+  most 72 columns by 20 rows. A terminal that cannot, tmux included, keeps the name row alone:
+  OMCA asks the terminal once, after the first picture it draws. A group of more than three
+  pictures previews three and names the rest.
+
+Running agents are listed by Claude Code itself, under the prompt. A session without a terminal
+gets the turn's figures as one text row beneath the answer instead.
 
 ### The band
 
 The band sits above the prompt. It shows the bound plan's progress as a bar with its done and
 total tasks, the next open task, how many tasks are proven, unproven and failed (see
-[proof](#proof)), a verification command whose evidence was not logged, and how many agents are
-running. As the window narrows it drops the verification first, then the proof counts, the next
-task and the running count; the bar stays. The prompt's border names the plan.
+[proof](#proof)), and a verification command whose evidence was not logged. As the window narrows
+it drops the proof counts first, then the next task, then the verification; the bar stays. With
+no plan bound and no step to offer, it draws nothing. The prompt's border names the plan.
 
 Below it, numbered buttons offer the next step: log the evidence, start work, run the final
 verification, or review the changes with architect. Press a button's digit in an empty prompt, or
@@ -214,13 +245,6 @@ buttons are held while an agent's transcript is in the main view and return with
 conversation.
 
 Set the `showBand` option to `false` to hide it.
-
-### The turn footer
-
-After each main-session turn, OMCA prints one line with the turn's duration and its input and
-output tokens. An account billed by the token also sees the turn's cost. When a verification
-command ran during the turn and no evidence was logged after it, a warning naming the command
-takes the cost's place.
 
 ### The pane
 
@@ -257,31 +281,31 @@ takes the cost's place.
    row opens that section's page, every entry under its date, which the mouse wheel scrolls a
    row at a time; `b` goes back to the rows. `f` finds text in the entries on either view, `w`
    clears the search, and `l` picks another plan's notepad from the rows.
-5. **Stats**: runs per agent type, the evidence rate of executor and build-fixer, the agents that
-   run checks, tokens per finished delegation, and the estimated cost by agent, across the
-   project's recorded sessions. Runs on a model without a
-   known price are counted as excluded rather than estimated. `r` reloads the records.
-6. **Doctor**: the checks described below.
 
-`/omca plan`, `/omca stats` and `/omca doctor` open the pane on that tab. As you type, the
-prompt's typeahead offers these subcommands, and the plans in your plans directory after
+Two pages have no digit key. `/omca stats` and `/omca doctor` open them, the tab bar names the
+one shown after the tabs, and a digit goes back to a tab:
+
+- **Stats**: runs per agent type, the evidence rate of executor and build-fixer, the agents that
+  run checks, tokens per finished delegation, and the estimated cost by agent, across the
+  project's recorded sessions. Runs on a model without a
+  known price are counted as excluded rather than estimated. `r` reloads the records.
+- **Doctor**: the checks described below.
+
+`/omca plan` opens the pane on the Plan tab. As you type, the
+prompt's typeahead offers the subcommands, and the plans in your plans directory after
 `/omca plan`. Press Ctrl+X then Tab,
 or click the pane, to focus it. Esc, the close mark in the pane's corner, or Ctrl+X then X close
-it. Every key letter below works only while its tab is shown.
+it. Every key letter below works only while its tab is shown and its key is drawn.
 
 Each tab fits the pane it gets. A short pane keeps the tab's header, any filter, at least one row
-of content with a cue above or below it, and the keys; spare rows go to wrapped text and a second
-key row. When the tab labels do not fit on one row, the tabs other than the shown one show their
+of content with a cue above or below it, and the keys; spare rows go to wrapped text and the
+keys. When the tab labels do not fit on one row, the tabs other than the shown one show their
 initial. A wide terminal gives the docked pane up to 120 columns while the transcript keeps 100.
 
-The pane opens by itself on a session's first wave of subagents, and not again once you close it
-or in a session without a terminal. Below 144 columns the pane waits undrawn, and below 110 once
-you have opened it yourself, until the window is wide enough.
+The pane opens only when you ask for it; the transcript reports each agent as it finishes.
 
-A toast appears when a wave of subagents finishes (one per wave, not one per agent), when a
-verification fails, and when the plan completes. With no plan bound, the band still shows the
-running agents. While a turn runs, the spinner's line ends with the plan's position and the agent
-count, as in `… · task 7/14 · 3 agents`.
+A toast appears when a verification fails and when the plan completes. While a turn runs, the
+spinner's line ends with the plan's position, as in `… · task 7/14`.
 
 #### Mascots
 
@@ -297,7 +321,7 @@ under the name `fork`, with a fork icon in place of the agent's own. A fork of t
 conversation wears the main agent's, which is the orchestrator unless your `agent` setting names
 another; with no main agent set, a fork draws no mascot.
 
-The band and the pane draw every color from your Claude Code theme, so a custom theme in
+The transcript rows, the band and the pane draw every color from your Claude Code theme, so a custom theme in
 `~/.claude/themes/` applies to them too. Each state also carries a glyph, and a word where the
 row has room for it beside the agent's name, so nothing depends on color alone. Secrets in
 commands, output and notes, such as API keys, tokens, `password=` values and the password in a
@@ -310,7 +334,7 @@ the plans directory, `.omca/plans` under the project and every registered plan w
 exists, and a name resolves against both directories and the registry. A plan with
 numbered tasks opens on its board: a header with a DRAFT chip while the plan is a draft, a
 progress bar, the proof counts, the next task and the running agents, then the tasks grouped by
-milestone. Each task row shows whether it is done, in progress, open or blocked, its proof chip,
+milestone. Each task row shows whether it is done, in progress, open or blocked, its proof mark,
 the agent working on it, and the tasks that block it. A task whose only unfinished dependency is
 the task just before it is next in line, so it reads as open. A plan without numbered tasks opens
 on its sections.
@@ -323,6 +347,12 @@ that bear on it.
 The mouse wheel over the list moves the focus as Up and Down do, and over the detail beside it
 scrolls the detail. In a wide pane a click on a task's title selects it and a second click opens
 it; in a narrower one a click opens it.
+
+The board's key row holds the keys for the focused task, `k`, `s` and `c`, and `m`, which shows
+every other key beside them until you press it again or open another plan. A pane wide enough for
+all of them on one row shows them all and no `m`. A key works only while it is drawn, so on a narrower pane press
+`m` before `e`, `o`, `x`, `f`, `t` or `l`. A note such as `Copied task 6.` follows the keys
+while it lasts.
 
 | Key | On the board | On a task page |
 | --- | --- | --- |
@@ -338,6 +368,7 @@ it; in a narrower one a click opens it.
 | `f` | Find tasks by their text | |
 | `t` | The plan's sections | |
 | `l` | Recent plans | |
+| `m` | Show or fold the keys past `c` | |
 | `b` | | Back to the board |
 | Esc | Close the pane | Close the pane |
 
@@ -347,14 +378,16 @@ returns to the list. The board reloads the file when it changes on disk and keep
 
 #### Proof
 
-A task's proof chip compares the files its `File:` line lists with the evidence log. The newest
+A task's proof mark compares the files its `File:` line lists with the evidence log. The newest
 test, build or lint run since any of those files last changed decides it: **PROVEN** when it
 passed, **FAILED** when it failed, **UNPROVEN** when no such run has happened yet. A task that
-lists no file, or whose files do not exist, gets no chip. For a registered plan, only changes
+lists no file, or whose files do not exist, gets no mark. For a registered plan, only changes
 made since the plan started count, so a task whose files have not changed since then gets no
-chip from an earlier or unrelated run. PROVEN and UNPROVEN describe finished work, so a task
-still open shows a chip only when it is FAILED, and the proof counts on the board and the band
-count the chips.
+mark from an earlier or unrelated run. PROVEN and UNPROVEN describe finished work, so a task
+still open shows a mark only when it is FAILED, and the proof counts on the board and the band
+count the marks. A board row ends with the mark's glyph in the theme's color and its word,
+`✓ proven`, `! unproven` or `✗ failed`, with `proven` drawn muted; a row too narrow for the word
+keeps the glyph. The task's detail shows the state as a chip.
 
 ### The proof ledger
 
@@ -437,7 +470,7 @@ server's whole normalized name followed by `__*`. A shorter prefix such as
 
 ## The doctor
 
-`/omca doctor` opens the Doctor tab and runs its checks:
+`/omca doctor` opens the Doctor page and runs its checks:
 
 - the OMCA version that is loaded, and whether Claude Code meets the 2.1.300 floor;
 - whether bun 1.4.2 or later is on the session's `PATH`;
@@ -485,8 +518,8 @@ against that limit.
 The subagent status line gives each running agent a row with its model, state, effort and
 context use.
 
-The status line and the `/omca` pane draw Nerd Font icons, and the status line's cache icon and
-usage rings need Nerd Fonts v3. Set `OMCA_GLYPHS=unicode` when the terminal font has none or is an
+The status line, the transcript rows and the `/omca` pane draw solid Nerd Font icons, and the
+status line's cache and clock icons and its usage rings need Nerd Fonts v3. Set `OMCA_GLYPHS=unicode` when the terminal font has none or is an
 older Nerd Font, or `OMCA_GLYPHS=ascii` for plain text; `/oh-my-claudeagent:omca-setup`
 asks and writes it for you. [`statusline/README.md`](../statusline/README.md) has the layout rules.
 
@@ -504,11 +537,11 @@ in `.omca/rules/` replaces a shipped rule, and an empty one turns it off. OMCA k
 Desktop and VS Code start `.mcp.json` with the GUI's `PATH`, which can lack `~/.bun/bin`. When
 it does, the `omca` server never starts, and the MCP tools, the injected guidance and the stop
 gates are off. At session start OMCA writes a line in the transcript that bun is not on `PATH`,
-and the Doctor tab reports bun as missing. Make bun reachable from the app's `PATH`, for example
+and the Doctor page reports bun as missing. Make bun reachable from the app's `PATH`, for example
 by linking it into a directory the app searches, and restart the app.
 
 The Code tab in Desktop runs its own bundled copy of Claude Code. OMCA's mod
-(the guard, band, pane, toasts and guard dialog) runs there only when that copy is 2.1.300 or
+(the guard, transcript rows, band, pane, toasts and guard dialog) runs there only when that copy is 2.1.300 or
 later; `/status` in a Code-tab session shows its version. On an older copy the agents, skills,
 MCP tools and stop gates still work and the mod does not load. Desktop for Linux is a beta for
 Debian and Ubuntu that updates through the package manager, so a newer bundled copy arrives with
@@ -536,6 +569,8 @@ On Desktop the mod draws differently:
 - `f` opens a Find field, but Desktop keeps the keyboard on the pane's buttons, so click the field
   before typing.
 - Copy can report that the surface has no clipboard, and the spinner keeps Desktop's own text.
+- The transcript keeps Desktop's own rows: Desktop draws its own turn footer, so the turn's
+  figures and receipt arrive as a text row beneath the answer.
 
 The VS Code chat panel runs OMCA's hooks but draws none of its interface: no band, no pane and
 no guard dialog ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)).

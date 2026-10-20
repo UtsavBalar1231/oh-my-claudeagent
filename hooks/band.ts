@@ -228,17 +228,12 @@ export const band: Features = {
     pre: async (host, e) => {
       isAgentInView = e.props.view.agentId !== undefined;
       if (!host.options.showBand || e.props.hasSurvey) return undefined;
-      const [{ value: snapshot }, { value: actions = [] }, { value: agents = {} }] = await Promise.all([
-        host.state.band.get(),
-        host.state.nextActions.get(),
-        host.state.agents.get(),
-      ]);
-      const running = Object.values(agents).filter((agent) => agent.status === "running").length;
-      const view = bandView(snapshot, isAgentInView ? [] : actions, e.props.bodyColumns, glyphTier, running);
+      const [{ value: snapshot }, { value: actions = [] }] = await Promise.all([host.state.band.get(), host.state.nextActions.get()]);
+      const view = bandView(snapshot, isAgentInView ? [] : actions, e.props.bodyColumns, glyphTier);
       if (view === undefined) return undefined;
       const kit = kitOf(host.ui.resolve(e), e.surface);
       const { Box, Button } = kit;
-      const rows = [Box({ key: "status", children: [row(kit, view.status)] })];
+      const rows = view.status.length === 0 ? [] : [Box({ key: "status", children: [row(kit, view.status)] })];
       if (view.buttons.length > 0) {
         rows.push(
           Box({

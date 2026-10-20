@@ -17,13 +17,41 @@ event is unregistered on purpose; `docs/references.md` carries the per-event rea
 `dispatch.ts`, which runs the features that share the event in a fixed order, each in its own
 try/catch. `host.ts` defines the `Host` closures a feature receives in place of `$`, so a
 feature module takes `host` and never `$`. The features are `bash-guard`, `server-check`,
-`mod-marker`, `compact`, `agents-tracker`, `metrics`, `band`, `pane` with its `tabs/`,
-`footer`, `spinner`, `completion` and `omca-router`. `doctor.ts` runs the Doctor tab's checks and fixes for
+`mod-marker`, `compact`, `agents-tracker`, `agent-rows`, `metrics`, `band`, `pane` with its `tabs/`,
+`footer`, `group-rows`, `spinner`, `completion` and `omca-router`. `doctor.ts` runs the Doctor page's checks and fixes for
 `tabs/doctor.ts`; it registers no event. Pure logic lives in `src/core/`.
 
-`spinner` rewrites only the `suffix` of the terminal's main-loop Spinner, to `… · task 7/14 · 3 agents`,
-from the band and agents atoms. A Spinner whose `requestId` is a tracked agent id, and every desktop
-Spinner, pass through unchanged.
+`spinner` rewrites only the `suffix` of the terminal's main-loop Spinner, to `… · task 7/14`, from
+the band atom. A Spinner whose `requestId` is a tracked agent id, and every desktop Spinner, pass
+through unchanged.
+
+Three features redraw Claude Code's own transcript rows on the terminal, and every other surface
+keeps the engine's rows. None of them reads a file during a drawing, and the row hooks read only
+atoms written once per turn or per finished agent, since a row subscribes to every atom it reads.
+
+- `footer` keeps each main turn's tokens, cost, verification receipt and the agents still running
+  in the `turns` atom at `turn.complete`, and draws them in the `TurnDuration` line. A line belongs
+  to the main turn that started last before the line was first drawn (`turn.start` times, kept in
+  the module), so a turn that ends before the previous turn's facts land still draws its own; a
+  line first drawn before any start, as after /resume, and a line whose turn has no record yet keep
+  the engine's.
+  A client whose props carry `isExpanded` names the waited-on agents in `waitingFor`; an older one
+  keeps its own waiting line, with the facts on a row beneath. A session without a terminal gets
+  the facts as the `turn.complete` text instead.
+- `agent-rows` redraws the `ToolUse` row of a single Agent call from its own input (registered
+  with `props: { tool: "Agent" }`, so no other tool row reaches the mod); several agents
+  launched together are one engine block no hook reaches. It also keeps a finished subagent's
+  type, task, status, duration, call count, tokens and the first line of its reply in the
+  `notices` atom at the agent's `turn.complete`, after `agents-tracker` has closed its row, and
+  redraws the `UserMessage` row of origin `task-notification` whose `task.id` it holds.
+  `isExpanded` (ctrl+o) keeps the engine's rows.
+- `group-rows` appends rows under a folded `ToolGroup`, read from its calls' own output: one per
+  verification call (`isVerificationCommand`), and for a Read that returned a PNG a name row and
+  an `Image` of the picture (the first three per group; the rest keep the name row). A picture
+  whose bytes do not open as a PNG keeps its name row, since one bad `Image` refuses the whole
+  tree. After the first picture it draws, the feature blits it once: a refusal that names the alt
+  means the terminal shows only text, as tmux does, and every later preview is the name row alone.
+  An expanded group is left as drawn.
 
 `agents-tracker` also owns the agent page that `tabs/agent-page.ts` draws on the Agents tab: a
 Button keyed `open-<agent id>` on each lane opens it, and `b`, `c`, `r` and `v` go back, copy the

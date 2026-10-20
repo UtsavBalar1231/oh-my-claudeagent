@@ -4,7 +4,7 @@ export type Slot = "subcommand" | "plan";
 
 export const SUBCOMMAND_WORDS: readonly Word[] = [
   { text: "plan", description: "Read a plan in the pane: /omca plan [name|path]" },
-  { text: "stats", description: "Open the Stats tab" },
+  { text: "stats", description: "Open the Stats page" },
   { text: "doctor", description: "Check the environment" },
 ];
 

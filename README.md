@@ -62,16 +62,24 @@ verification logged, OMCA sends it back to work with the reason.
 
 ## What you see
 
-The band above the prompt shows the bound plan's progress, the next open task, how many tasks are
-proven, unproven and failed, a verification whose evidence was not logged, and how many agents
-are running. The numbered buttons fill the prompt with the next step.
+OMCA shows its work in Claude Code's own transcript. The line that closes each turn carries its
+tokens, its cost and a receipt for the verification it ran. An agent starts and finishes in its
+own color, the finish with its duration, tool calls, tokens and the first line of its reply. A
+test, build or lint run gets its result under the shell commands that ran it, and a screenshot
+Claude reads shows as a picture where the terminal draws them.
 
-<img src=".github/assets/band.png" width="680" alt="The band above the prompt reads 6/14, next 7 Wire the order summary panel, 6 proven, warns that the evidence for just test was not logged, and counts 1 running agent, with the button 1: Log evidence below it.">
+<img src=".github/assets/transcript.png" width="900" alt="A Claude Code turn on the checkout project: under Ran 1 shell command, a receipt reads just test, 42 passed. Two background agents start, and each reports as it finishes: the explorer on Map the validation messages and the architect on Review the checkout flow, each with its duration, tool calls and tokens flush right and the first line of its reply beneath. The dim line that closes each turn names the agents still running, then the turn's tokens and cost.">
+
+The band above the prompt shows the bound plan's progress, the next open task, how many tasks are
+proven, unproven and failed, and a verification whose evidence was not logged. The numbered
+buttons fill the prompt with the next step.
+
+<img src=".github/assets/band.png" width="680" alt="The band above the prompt reads 6/14, next 7 Wire the order summary panel, 6 proven, and warns that the evidence for just test was not logged, with the button 1: Log evidence below it. Above it, the receipt under the shell command reads just test, 42 passed, and the turn line ends with just test not logged.">
 
 `/omca plan` opens the plan board: the tasks grouped by milestone, each with its state, its proof
 and the agent working on it. A wide pane shows the focused task's detail beside the list.
 
-<img src=".github/assets/plan.png" width="680" alt="The Plan tab of the OMCA pane shows the checkout-redesign board at 6 of 14 tasks, with 6 proven and 4 blocked. Tasks 1 to 6 are done and proven, the executor is on task 7, tasks 8, 9 and 11 are open, and tasks 10, 12, 13 and 14 name the tasks that block them. Beside the list, task 6, Build the payment step, shows its steps, its done-when command, its dependencies, its file changed 3h ago and the passing runs since then.">
+<img src=".github/assets/plan.png" width="680" alt="The Plan tab of the OMCA pane shows the checkout-redesign board at 6 of 14 tasks, with 6 proven and 4 blocked. Tasks 1 to 6 are done and proven, the executor is on task 7, tasks 8, 9 and 11 are open, and tasks 10, 12, 13 and 14 name the tasks that block them. Beside the list, task 6, Build the payment step, shows its steps, its done-when command, its dependencies, its file changed 3h ago and the passing runs since then. The keys for the focused task and the board fill one row under the list.">
 
 The Evidence tab is the proof ledger: a verdict on the plan's final verification, then every
 logged run grouped by day.
@@ -85,7 +93,7 @@ earlier ones shrink to a line, and in a short pane each lane keeps to two rows.
 <img src=".github/assets/agents.png" width="680" alt="The Agents tab shows two running executors, each led by its mascot in a hard hat with a hammer: one on Wire the order summary panel and one on Persist the draft order, each beside its watch command, its count of tool calls, and its model, effort and tokens, with a blank row between them. Under a Finished label, an explorer from an earlier wave is one line with its task and the first line of its result.">
 
 When the pane has room, each lane gets four rows of its own. The agent page opens a subagent's brief, tool calls, reply and cost, and toasts report
-finished waves, failed verifications and a completed plan.
+failed verifications and a completed plan.
 
 <img src=".github/assets/mascots.png" width="680" alt="The Agents tab with three agents running at once, each lane led by its pixel mascot: a green executor in a yellow hard hat with a hammer, a blue explorer in a safari hat with a spyglass, and a purple architect with a lit bulb beside its head. Beside each mascot, four rows give the agent's name with its running time, its task, its running Bash sleep with one call, and its model, effort and tokens, with a blank row between agents.">
 
@@ -97,19 +105,19 @@ The guard holds a destructive shell command for your review and shows what it wo
 change how OMCA runs. A check with a known fix offers a key that fills the prompt with it, and
 the passing checks fold into one line that `o` opens.
 
-<img src=".github/assets/doctor.png" width="680" alt="The Doctor tab counts 1 warning, 1 info row and 11 passing checks. The warning says maxEffortLevel high holds the architect below the xhigh it declares, the info row offers a: Use /advisor fable, and one line beside o: Show passing folds the passing checks, naming OMCA, Claude Code, bun, the omca server, ast-grep, the options, the agent models and the mod policy before it is cut.">
+<img src=".github/assets/doctor.png" width="680" alt="The Doctor page, named after the four tabs in the tab bar, counts 1 warning, 1 info row and 11 passing checks. The warning says maxEffortLevel high holds the architect below the xhigh it declares, the info row offers a: Use /advisor fable, and one line beside o: Show passing folds the passing checks, naming OMCA, Claude Code, bun, the omca server, ast-grep, the options, the agent models and the mod policy before it is cut.">
 
 The status line shows the session (model, agent and the plan's next task), the workspace
 (context window and git state) and usage (duration, usage limits, and cost for accounts billed
 by the token) on rows of their own, and fits itself to the terminal's width. The subagent status
 line gives each running agent a row.
 
-<img src=".github/assets/statusline.png" width="900" alt="The OMCA status line under the prompt shows three rows: the model, effort and plan progress with the next task; a context bar, the git branch with change counts and the project; and the session cost and duration. Below it, one row for each of two running subagents shows its type, model, state, effort, context and task. Above, the OMCA pane has opened by itself on the two executors' lanes.">
+<img src=".github/assets/statusline.png" width="900" alt="The OMCA status line under the prompt shows three rows: the model, effort and plan progress with the next task; a context bar, the git branch with change counts and the project; and the session cost and duration. Below it, one row for each of two running subagents shows its type, model, state, effort, context and task. Above, the turn line waits on the two executors.">
 
 In motion: `/omca plan` opens the board, Down moves the focus, Enter opens the task as a page,
 and the number keys switch between the pane's tabs.
 
-<img src=".github/assets/pane-tour.gif" width="900" alt="An animation: a prompt hands task 7 to the executor and the OMCA pane opens by itself beside the session, its Agents tab showing the executor's lane led by its mascot, then /omca plan switches the pane to the board with task 7 expanded, Down moves to task 8 and Enter opens it as a page, 1 switches to the Agents tab with the executor's lane, 3 to the Evidence tab, and 2 returns to task 8 on the Plan tab.">
+<img src=".github/assets/pane-tour.gif" width="900" alt="An animation: a prompt hands task 7 to the executor, then /omca plan opens the OMCA pane beside the session on the board with task 7 expanded, Down moves to task 8 and Enter opens it as a page, 1 switches to the Agents tab with the executor's lane led by its mascot, 3 to the Evidence tab, and 2 returns to task 8 on the Plan tab.">
 
 The guard dialog arrives the moment the model asks for a destructive command.
 
@@ -154,7 +162,7 @@ the UI. It reads these environment variables: `CLAUDE_AFK_TIMEOUT_MS`,
 **What `omca-setup` writes.** Only after it prints a diff and you confirm, it sets `statusLine`
 and `subagentStatusLine` in `~/.claude/settings.json`, optionally `env.OMCA_GLYPHS`, and copies
 a launcher to `~/.claude/omca/statusline.ts`. The previous file is kept as
-`settings.json.omca-bak`. `--uninstall` removes those entries and the launcher. The Doctor tab's
+`settings.json.omca-bak`. `--uninstall` removes those entries and the launcher. The Doctor page's
 `i` fix adds `refreshInterval: 5` the same way, with a backup.
 
 **State.** The plan registry, the evidence ledger, notepads, session status files, mod markers,

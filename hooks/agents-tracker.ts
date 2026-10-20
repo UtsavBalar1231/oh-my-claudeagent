@@ -1,6 +1,6 @@
 import type { AgentInfo, TurnUsage } from "claude-code";
 import { FORK, lookOf } from "../src/core/agent-type.ts";
-import { firstLine, lastLine, STATUS_WORDS, toolDetail } from "../src/core/mission.ts";
+import { firstLine, lastLine, toolDetail } from "../src/core/mission.ts";
 import { taskReference } from "../src/core/plan-reader.ts";
 import { estimateCostUsd } from "../src/core/pricing.ts";
 import { fitEnd, glyphs, oneLine } from "../src/core/ui-kit.ts";
@@ -51,26 +51,6 @@ async function forkedFrom(host: Host, parentAgentId: string | undefined): Promis
 async function maskedText(host: Host, text: string, max: number): Promise<string> {
   const g = glyphs((await sessionOf(host)).glyphTier);
   return redact(text, "", g.mask).text.slice(0, max).replace(/[\uD800-\uDBFF]$/, "");
-}
-
-const WAVE_TOAST_MS = 5000;
-// The subagents that ended since the last wave closed; a wave closes when none is left running.
-const finished: { name: string; status: Status }[] = [];
-
-async function closeWave(host: Host): Promise<void> {
-  const { value: agents = {} } = await host.state.agents.get();
-  if (finished.length === 0 || Object.values(agents).some((row) => !row.teammate && row.status === "running")) return;
-  const { dot } = glyphs((await sessionOf(host)).glyphTier);
-  const [only] = finished;
-  const counts = new Map<Status, number>();
-  for (const { status } of finished) if (status !== "answer") counts.set(status, (counts.get(status) ?? 0) + 1);
-  const unlike = [...counts].map(([status, count]) => `${count} ${STATUS_WORDS[status] ?? "ended"}`).join(` ${dot} `);
-  const text =
-    only !== undefined && finished.length === 1
-      ? `${only.name} ${only.status === "answer" ? "finished" : (STATUS_WORDS[only.status] ?? "ended")}`
-      : `${finished.length} agents finished${unlike === "" ? "" : ` ${dot} ${unlike}`}`;
-  finished.length = 0;
-  host.ui.toast(text, { timeoutMs: WAVE_TOAST_MS });
 }
 
 // Deleting first moves the agent to the newest end, so the cap drops the agent idle longest.
@@ -156,9 +136,7 @@ const LISTED_STATUS: Readonly<Record<string, Status>> = { completed: "answer", f
 const LISTED_OPEN: Readonly<Record<string, Status>> = { running: "running", idle: "idle", waiting: "waiting", pending: "pending" };
 
 export async function reconcile(host: Host, listed: readonly AgentInfo[], at: number): Promise<void> {
-  let ended: { name: string; status: Status }[] = [];
   await update(host.state.agents, (agents) => {
-    ended = [];
     if (agents === undefined) return agents;
     const changed = Object.entries(agents).flatMap(([id, row]) => {
       if (row.endedAt !== null) return [];
@@ -166,14 +144,10 @@ export async function reconcile(host: Host, listed: readonly AgentInfo[], at: nu
       const open = info === undefined ? undefined : LISTED_OPEN[info.status];
       if (open !== undefined) return open === row.status ? [] : [[id, { ...row, status: open }] as const];
       const status = info === undefined ? "gone" : (LISTED_STATUS[info.status] ?? "gone");
-      if (!row.teammate) ended.push({ name: row.type.replace(/^.*:/, ""), status });
       return [[id, { ...row, status, endedAt: at }] as const];
     });
     return changed.length === 0 ? agents : { ...agents, ...Object.fromEntries(changed) };
   });
-  if (ended.length === 0) return;
-  finished.push(...ended);
-  await closeWave(host);
 }
 
 export const agentsTracker: Features = {
@@ -223,13 +197,7 @@ export const agentsTracker: Features = {
   "turn.complete": {
     async post(host, e) {
       if (e.agentId === undefined) return undefined;
-      const { value: agents } = await host.state.agents.get();
-      const before = agents?.[e.agentId];
       await endAgent(host, e.agentId, e.reason, e.usage, await host.clock.now());
-      if (before !== undefined && before.endedAt === null && !before.teammate) {
-        finished.push({ name: before.type.replace(/^.*:/, ""), status: e.reason });
-        await closeWave(host);
-      }
       const result = await masked(host, firstLine(e.answer), LINE_CELLS);
       await editLane(host, e.agentId, (lane) => ({ ...lane, tool: null, result }));
       for (const [callId, call] of startedAt) if (call.agentId === e.agentId) startedAt.delete(callId);

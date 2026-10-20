@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.0] - 2026-10-20
+
+### Added
+
+- **Receipts in the transcript:** on a terminal the line that closes each turn carries its
+  tokens, its cost and a receipt for the verification it ran (`✓ just test logged` or
+  `! just test not logged`), and names the background agents it still waits on in their colors.
+  The separate turn footer row, with its plugin-name prefix, is gone; a session without a
+  terminal keeps it as text.
+- **Agents in their own colors:** a single Agent call's row shows the agent's icon, name and
+  task in its color, with `background` when it runs on its own, in place of
+  `oh-my-claudeagent:executor(…)`. Claude Code's `Agent "…" finished` row shows the agent's
+  status mark, name and task, its duration, tool calls and tokens, and the first line of its
+  reply. ctrl+o shows Claude Code's full rows.
+- **Pictures in the transcript:** a PNG Claude reads is previewed under its Read group with its
+  name and size, on terminals that draw pictures (kitty, Ghostty). Where pictures cannot show,
+  tmux included, the name row stays alone.
+- **Verification results under shell commands:** a folded group of shell commands gets one row
+  per test, build or lint run with its result, such as `✗ just lint · exit 1 · 1 problem (1
+  error)`, read from the run's own output.
+
+### Changed
+
+- **The pane opens only on `/omca`:** it no longer opens by itself on the first wave of
+  subagents, and the toast that reported each finished wave is gone, since the transcript
+  reports every agent as it finishes.
+- **Solid icons:** the Nerd Font set draws solid marks where the font has them: a filled check,
+  a half-filled circle for work in progress and a filled minus for blocked or stopped, and the
+  architect, explorer and reviewer draw a sitemap, binoculars and a gavel. The status line's
+  clock and pull request states are solid too. Pending keeps its hollow circle.
+- **Less repeated state:** the band no longer counts running agents or says `no plan bound`,
+  and the spinner's suffix names only the plan's next task; Claude Code lists running agents
+  under the prompt.
+- **Four pane tabs:** the tab bar holds Agents, Plan, Evidence and Notepad on `1` to `4`, so it
+  reads in full in a docked pane. Stats and Doctor are pages that `/omca stats` and
+  `/omca doctor` open, and the bar names the one shown after the tabs.
+- **One key row on the plan board:** the board shows the focused task's keys (`k`, `s`, `c`)
+  and `m`, which shows the rest beside them; a pane wide enough for every key shows them all.
+  The `↑↓ move · enter open · esc close` and `↑↓ scroll · esc close` rows are gone from every
+  Plan view, and a note such as `Copied task 6.` follows the keys while it lasts.
+- **Quieter proof on board rows:** a task row ends with its proof mark in the theme's color and
+  the word beside it (`✓ proven`, `! unproven`, `✗ failed`) in place of a solid chip, with
+  `proven` drawn muted. The task's detail keeps its chips.
+
 ## [3.2.0] - 2026-10-17
 
 ### Added
@@ -3078,6 +3122,7 @@ for multi-agent orchestration.
 - Shellcheck fixes applied across all hook scripts
 - Ruff fixes applied to Python MCP servers
 
+[3.3.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.2.0...v3.3.0
 [3.2.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.0.1...v3.1.0
 [3.0.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.0.0...v3.0.1

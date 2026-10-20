@@ -61,9 +61,10 @@ const TABS: readonly (readonly [Tab, string])[] = [
   ["plan", "Plan"],
   ["evidence", "Evidence"],
   ["notepad", "Notepad"],
-  ["stats", "Stats"],
-  ["doctor", "Doctor"],
 ];
+
+// Reached by `/omca stats` and `/omca doctor`; the bar names the one shown after the tabs.
+const PAGES: Readonly<Partial<Record<Tab, string>>> = { stats: "Stats", doctor: "Doctor" };
 
 // Resolved at call time: the tab modules import this one, so whichever loads first would
 // otherwise read the other's exports before they exist.
@@ -110,7 +111,6 @@ export function patchPane(host: Host, change: (pane: Pane) => Pane): Promise<voi
         notepad: null,
         plans: null,
         errors: { notepad: null, plans: null },
-        auto: "pending",
         readAt: 0,
       },
     ),
@@ -184,7 +184,6 @@ export async function open(host: Host, e: Input<"command.run">, tab: Tab): Promi
   // The first drawing must already know whether the person prefers reduced motion.
   await mascots.ensure(host);
   const opened = await host.ui.open({ id: PANE, title: "OMCA", focus: true, closeOnEscape: true, rows: INLINE_ROWS, columns });
-  await patchPane(host, (pane) => ((pane.auto ?? "pending") === "pending" ? { ...pane, auto: "opened" } : pane));
   await start(host);
   if (opened.isPlaced) return {};
   if (opened.reason.startsWith("no-surface")) {
@@ -265,10 +264,7 @@ export function refocusRemote(host: Host, view: View, key: string, tab: Tab): vo
 
 export const tabKey = (tab: Tab): string => String(TABS.findIndex(([id]) => id === tab) + 1);
 
-async function selectTab(host: Host, tab: Tab): Promise<void> {
-  if (tab === "stats") await stats.load(host);
-  await patchPane(host, (pane) => (pane.tab === tab ? pane : { ...pane, tab }));
-}
+const selectTab = (host: Host, tab: Tab): Promise<void> => patchPane(host, (pane) => (pane.tab === tab ? pane : { ...pane, tab }));
 
 // Desktop's scrollbar takes two cells from the tab bar whenever the body is taller than the pane.
 const SCROLLBAR_CELLS = 2;
@@ -276,14 +272,15 @@ const SCROLLBAR_CELLS = 2;
 type TabCell = readonly [Tab, string, string];
 
 // One row: the full labels when they fit, else only the active tab keeps its label and the rest shrink to their initial, which no two tabs share.
-function tabBar(width: number, active: Tab): { gap: number; cells: TabCell[] } {
+function tabBar(width: number, active: Tab): { gap: number; cells: TabCell[]; page: string | undefined } {
+  const page = PAGES[active];
   const full = TABS.map(([id, label], index): TabCell => [id, label, String(index + 1)]);
   const across = (cells: readonly TabCell[], gap: number) =>
-    cells.reduce((sum, [, label, key]) => sum + displayWidth(`${key}: ${label}`), 0) + gap * (cells.length - 1);
+    cells.reduce((sum, [, label, key]) => sum + displayWidth(`${key}: ${label}`), 0) + gap * (cells.length - 1 + (page === undefined ? 0 : 1)) + displayWidth(page ?? "");
   const gap = [COLUMN_GAP, 1].find((candidate) => across(full, candidate) <= width);
-  if (gap !== undefined) return { gap, cells: full };
+  if (gap !== undefined) return { gap, cells: full, page };
   const cells = full.map(([id, label, key]): TabCell => [id, id === active ? label : label.charAt(0), key]);
-  return { gap: across(cells, COLUMN_GAP) <= width ? COLUMN_GAP : 1, cells };
+  return { gap: across(cells, COLUMN_GAP) <= width ? COLUMN_GAP : 1, cells, page };
 }
 
 function bodyRows(host: Host, e: Input<"ui.render Pane">, isInline: boolean): number {
@@ -323,19 +320,22 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
       key: "tabs-0",
       flexDirection: "row",
       columnGap: bar.gap,
-      children: bar.cells.map(([id, label, key]) =>
-        Button({
-          key,
-          hotkey: key,
-          label,
-          plain: true,
-          ...(id === active ? {} : { dimColor: true }),
-          onPress: press(async () => {
-            await selectTab(host, id);
-            if (isRemote(kit)) refocus(host, key, id);
+      children: [
+        ...bar.cells.map(([id, label, key]) =>
+          Button({
+            key,
+            hotkey: key,
+            label,
+            plain: true,
+            ...(id === active ? {} : { dimColor: true }),
+            onPress: press(async () => {
+              await selectTab(host, id);
+              if (isRemote(kit)) refocus(host, key, id);
+            }),
           }),
-        }),
-      ),
+        ),
+        ...(bar.page === undefined ? [] : [Text({ bold: true, children: [bar.page] })]),
+      ],
     }),
   ];
   const hasRule = !isInline && rows >= RULE_MIN_ROWS;
@@ -440,24 +440,12 @@ export const pane: Features = {
     async post(host) {
       await host.command.register({
         name: "omca",
-        description: "Open the OMCA pane: agents, plan, evidence, notepad, stats and doctor",
+        description: "Open the OMCA pane: agents, plan, evidence and notepad, or its stats and doctor pages",
         argumentHint: "[plan [name|path]|stats|doctor]",
         immediate: true,
       });
       await sessionOf(host);
       if ((await host.ui.panes()).some((open) => open.id === PANE)) await start(host);
-      return undefined;
-    },
-  },
-  "agent.spawn": {
-    async post(host, e, result) {
-      if (e.isTeammate === true || result.deny !== undefined) return undefined;
-      if (((await host.state.pane.get()).value?.auto ?? "pending") !== "pending") return undefined;
-      if (!(await host.session.surfaces()).includes("terminal")) return undefined;
-      await mascots.ensure(host);
-      await host.ui.open({ id: PANE, title: "OMCA", rows: INLINE_ROWS });
-      await patchPane(host, (pane) => ({ ...pane, auto: "opened" }));
-      await start(host);
       return undefined;
     },
   },
@@ -470,10 +458,8 @@ export const pane: Features = {
     },
   },
   "ui.close": {
-    async pre(host, e) {
-      if (e.id !== PANE) return undefined;
-      stop();
-      if (e.origin.kind === "person") await patchPane(host, (pane) => (pane.auto === "declined" ? pane : { ...pane, auto: "declined" }));
+    pre(_host, e) {
+      if (e.id === PANE) stop();
       return undefined;
     },
   },

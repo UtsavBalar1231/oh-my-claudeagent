@@ -1,4 +1,5 @@
 import type { EngineInterface, EventResult, PluginOptions, Register } from "claude-code";
+import { agentRows } from "./agent-rows.ts";
 import { agentsTracker } from "./agents-tracker.ts";
 import { band } from "./band.ts";
 import { bashGuard } from "./bash-guard.ts";
@@ -11,6 +12,7 @@ import { metrics } from "./metrics.ts";
 import { modMarker } from "./mod-marker.ts";
 import { router } from "./omca-router.ts";
 import { pane } from "./pane.ts";
+import { groupRows } from "./group-rows.ts";
 import { serverCheck } from "./server-check.ts";
 import { spinner } from "./spinner.ts";
 
@@ -117,6 +119,14 @@ function bindHost($: EngineInterface, options: Options): Host {
         set: (value, setOptions) =>
           $.state.set({ plugin: "oh-my-claudeagent", key: "costSample" }, value, setOptions),
       },
+      notices: {
+        get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "notices" }),
+        set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "notices" }, value, setOptions),
+      },
+      turns: {
+        get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "turns" }),
+        set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "turns" }, value, setOptions),
+      },
       doctor: {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "doctor" }),
         set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "doctor" }, value, setOptions),
@@ -153,8 +163,8 @@ export const register: Register = (on, pluginOptions) => {
   const sessionStart = featuresFor("session.start", { pane, modMarker, band, serverCheck });
   const turnStart = featuresFor("turn.start", { footer, modMarker });
   const turnStep = featuresFor("turn.step", { metrics, agentsTracker });
-  const turnComplete = featuresFor("turn.complete", { band, agentsTracker, metrics, pane, footer });
-  const agentSpawn = featuresFor("agent.spawn", { agentsTracker, pane, metrics });
+  const turnComplete = featuresFor("turn.complete", { band, agentsTracker, agentRows, metrics, pane, footer });
+  const agentSpawn = featuresFor("agent.spawn", { agentsTracker, metrics });
   const promptEdit = featuresFor("prompt.edit", { band });
   const promptChange = featuresFor("prompt.change", { band });
   const promptAutocomplete = featuresFor("prompt.autocomplete", { completion });
@@ -165,6 +175,10 @@ export const register: Register = (on, pluginOptions) => {
   const bandRender = featuresFor("ui.render AbovePrompt", { band });
   const paneRender = featuresFor("ui.render Pane", { pane });
   const spinnerRender = featuresFor("ui.render Spinner", { spinner });
+  const turnRender = featuresFor("ui.render TurnDuration", { footer });
+  const noticeRender = featuresFor("ui.render UserMessage", { agentRows });
+  const launchRender = featuresFor("ui.render ToolUse", { agentRows });
+  const groupRender = featuresFor("ui.render ToolGroup", { groupRows });
   const sessionCompact = featuresFor("session.compact", { compact });
 
   on("tool.check", { tool: /^(?:Bash|PowerShell)$/ }, ($, e, next) =>
@@ -197,6 +211,18 @@ export const register: Register = (on, pluginOptions) => {
   );
   on("ui.render", { component: "Spinner" }, ($, e, next) =>
     dispatch(bindHost($, options), "ui.render Spinner", spinnerRender, e, next),
+  );
+  on("ui.render", { component: "TurnDuration" }, ($, e, next) =>
+    dispatch(bindHost($, options), "ui.render TurnDuration", turnRender, e, next),
+  );
+  on("ui.render", { component: "UserMessage" }, ($, e, next) =>
+    dispatch(bindHost($, options), "ui.render UserMessage", noticeRender, e, next),
+  );
+  on("ui.render", { component: "ToolUse", props: { tool: "Agent" } }, ($, e, next) =>
+    dispatch(bindHost($, options), "ui.render ToolUse", launchRender, e, next),
+  );
+  on("ui.render", { component: "ToolGroup" }, ($, e, next) =>
+    dispatch(bindHost($, options), "ui.render ToolGroup", groupRender, e, next),
   );
   on("session.compact", ($, e, next) => dispatch(bindHost($, options), "session.compact", sessionCompact, e, next)).catch((_$, e, next) => next(e));
 };

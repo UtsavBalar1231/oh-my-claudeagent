@@ -35,19 +35,21 @@ export type Glyphs = { readonly tier: GlyphTier } & { readonly [K in keyof typeo
 
 const UNICODE: Glyphs = { tier: "unicode", ...UNICODE_SET };
 
-// Nerd Font glyphs present at the same code point in Nerd Fonts v2 and v3. A plain Nerd Font draws
-// them up to 1.9 cells wide on a one-cell advance, so each one is drawn before a space or a row's end.
+// Nerd Font glyphs present at the same code point in Nerd Fonts v2 and v3, solid wherever the set
+// has a solid form; pending stays hollow, since that is what tells it from running. A plain Nerd
+// Font draws them up to 1.9 cells wide on a one-cell advance, so each one is drawn before a space or
+// a row's end.
 const NERD: Glyphs = {
   ...UNICODE,
   tier: "nerd",
-  check: "\u{f05d}",
+  check: "\u{f058}",
   cross: "\u{f057}",
   warn: "\u{f06a}",
   info: "\u{f05a}",
   pending: "\u{f10c}",
   running: "\u{f111}",
-  progress: "\u{f192}",
-  blocked: "\u{f05e}",
+  progress: "\u{f042}",
+  blocked: "\u{f056}",
   agent: "\u{f007}",
 };
 
@@ -86,15 +88,15 @@ export function glyphs(tier: GlyphTier): Glyphs {
 /** Each roster agent's Nerd Font icon, shared with the status line. */
 export const AGENT_ICONS: Readonly<Record<string, string>> = {
   analyzer: "\u{f002}",
-  architect: "\u{f0eb}",
+  architect: "\u{f0e8}",
   "build-fixer": "\u{f0ad}",
   executor: "\u{f085}",
-  explorer: "\u{f14e}",
+  explorer: "\u{f1e5}",
   fork: "\u{f126}",
   orchestrator: "\u{f001}",
   planner: "\u{f0ea}",
   researcher: "\u{f02d}",
-  reviewer: "\u{f046}",
+  reviewer: "\u{f0e3}",
   viewer: "\u{f030}",
 };
 

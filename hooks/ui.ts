@@ -5,6 +5,7 @@ import type {
   CodeProps,
   ElementConstructor,
   ElementTable,
+  ImageProps,
   InputProps,
   LinkProps,
   MarkdownProps,
@@ -48,6 +49,8 @@ export type Kit = {
   Code: ElementConstructor<CodeProps>;
   Link: ElementConstructor<LinkProps>;
   Input?: ElementConstructor<InputProps>;
+  /** A picture, on the terminal alone: pixels where the terminal draws them, its `alt` elsewhere. */
+  Image?: ElementConstructor<ImageProps>;
   /** The agent's mascot, or null for an unknown agent or the ASCII tier. Mascot colors are fixed RGB, not theme keys. */
   mascot: (type: string, state: MascotState, key: string, frame: number, size?: MascotSize) => RenderElement | null;
 };
@@ -105,6 +108,7 @@ export const kitOf = (table: ElementTable, surface: RenderSurface, { tier = "ner
   Code: table.Code,
   Link: table.Link,
   ...(surface !== "mobile" && "Input" in table ? { Input: table.Input } : {}),
+  ...(surface === "terminal" && "Image" in table ? { Image: table.Image } : {}),
   mascot: (type, state, key, frame, size = "full") => mascotIn(table, surface, tier, isStill, type, state, key, frame, size),
 });
 

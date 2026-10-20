@@ -110,7 +110,7 @@ export const NERD_GLYPHS = {
   branch: "",
   folder: "",
   model: "",
-  clock: "",
+  clock: "\u{f0954}",
   vim: "",
   worktree: "",
   fiveHour: "",
@@ -167,9 +167,9 @@ export const ASCII_GLYPHS: Glyphs = {
 const DEFAULT_AGENT_GLYPH = "\u{f007}";
 
 const PR_STATES = new Map([
-  ["approved", { color: GREEN, nerd: "", ascii: "+" }],
-  ["changes_requested", { color: RED, nerd: "", ascii: "!" }],
-  ["pending", { color: YELLOW, nerd: "", ascii: "?" }],
+  ["approved", { color: GREEN, nerd: "\u{f058}", ascii: "+" }],
+  ["changes_requested", { color: RED, nerd: "\u{f057}", ascii: "!" }],
+  ["pending", { color: YELLOW, nerd: "\u{f0954}", ascii: "?" }],
   ["draft", { color: DIM, nerd: "", ascii: "d" }],
 ]);
 
