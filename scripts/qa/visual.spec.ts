@@ -131,13 +131,14 @@ test("maskScratch replaces the scratch directory's random suffix wherever the sc
   expect(maskScratch(screen, scratch)).toBe(`cwd ${join(tmpdir(), "omca-visual-120x40-XXXXXX")}/cwd\n…ual-120x40-XXXXXX/cwd │ Ab3dE`);
 });
 
-test("maskLive fixes the live session's times, engine cost, running seconds and token counts, footer tokens included, leaves a stored figure, and keeps a line's width beside a pane", () => {
+test("maskLive fixes the live session's times, engine cost, running seconds and token counts, leaves a stored figure, and keeps a line's width beside a pane", () => {
   const screen = [
     "✻ Sautéed for 0s · done 1:36 PM          │ pane",
     "r: Run again   ✓ 9 ok  checked 16:42",
     "  13:35  FINAL    ✓  0  just ci",
     "✻ Baked for 2s · done 10:07 PM",
-    "● omca: 0s · 38.2k\u00a0in\u00a013\u00a0out · $0.8787\u00a0engine\u00a0cost  │ pane",
+    "✻ Churned for 1m 4s · done 3:35 AM · 38.2k in 13 out · $0.8787 ·  just test not logged  │ pane",
+    "✻ Waiting for executor, architect · 26.7k in 48 out · $0.1024",
     "  $12.40 engine cost",
     "│  explorer · Map the router callers   sonnet-5-5  high       3s    │",
     "│   ▄▄▀▀▀▀▀▀▄▄     explorer           running     12s",
@@ -151,8 +152,9 @@ test("maskLive fixes the live session's times, engine cost, running seconds and 
     "r: Run again   ✓ 9 ok  checked HH:MM",
     "  13:35  FINAL    ✓  0  just ci",
     "✻ Worked for 2s · done HH:MM",
-    "● omca: 0s · NN.Nk\u00a0in\u00a0NN\u00a0out · $X.XX\u00a0engine\u00a0cost    │ pane",
-    "  $X.XX engine cost",
+    "✻ Worked for 1m 4s · done HH:MM · NN.Nk in NN out · $X.XX ·  just test not logged       │ pane",
+    "✻ Waiting for executor, architect · NN.Nk in NN out · $X.XX",
+    "  $12.40 engine cost",
     "│  explorer · Map the router callers   sonnet-5-5  high       Ns    │",
     "│   ▄▄▀▀▀▀▀▀▄▄     explorer           running     NNs",
     "  ◯ oh-my-claudeagent:explorer   Map the router callers      Ns · ↓ NN.Nk tokens",

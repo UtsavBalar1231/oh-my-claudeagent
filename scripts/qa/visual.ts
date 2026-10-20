@@ -130,20 +130,31 @@ export const sessionEnv = (): Record<string, string> => envWithout(/^(CLAUDE|ANT
 /** The screen with the random suffix `mkdtemp` gave `scratch` replaced by as many X, so a capture does not change from run to run. */
 export const maskScratch = (screen: string, scratch: string): string => screen.replaceAll(basename(scratch).slice(-MKDTEMP_SUFFIX), "X".repeat(MKDTEMP_SUFFIX));
 
-// Padding keeps a line's width where a pane is drawn beside it, so the pane stays in its column.
-const keepWidth = (masked: string, match: string, at: number, whole: string): string =>
-  at + match.length === whole.length || whole[at + match.length] === "\n" ? masked : masked.padEnd(match.length);
-
 const digitsOut = (text: string): string => text.replace(/\d/g, "N");
 
+// The line that closes a turn: Claude Code's random verb, the clock it ended at and its engine cost,
+// which counts whatever background agents spent before the turn ended. A line that waits on agents
+// keeps its words. A docked pane's border keeps its column.
+function maskTurnLine(line: string): string {
+  const at = line.indexOf("✻ ");
+  if (at === -1 || !/^✻ \p{Lu}\p{L}+ for /u.test(line.slice(at))) return line;
+  const border = line.indexOf("│", at);
+  const head = border === -1 ? line : line.slice(0, border);
+  const masked = head
+    .replace(/✻ (?!Waiting )\p{Lu}\p{L}+ for /u, "✻ Worked for ")
+    .replace(/( · done )\d{1,2}:\d{2}(?: [AP]M)?/, "$1HH:MM")
+    .replace(/( out · )\$\d+\.\d+/, "$1$X.XX");
+  if (border === -1) return masked;
+  const kept = masked.trimEnd();
+  return `${kept}${" ".repeat(Math.max(0, displayWidth(head) - displayWidth(kept)))}${line.slice(border)}`;
+}
+
 /**
- * The screen with the live session's own values fixed: the turn timer's line, whose verb Claude Code
- * picks at random, the Doctor's check time, a turn footer's engine cost, which
- * counts whatever background agents spent before the turn ended, the seconds a running agent has
+ * The screen with the live session's own values fixed: the turn line (see maskTurnLine), the Doctor's check time, the seconds a running agent has
  * run, in an OMCA lane, in an agent page's header and in Claude Code's task list, spinner and tool
  * lines, the spinner's verb, which Claude Code picks at random, an agent page's start time and its
  * tool calls' durations, a subagent's token count, whose requests
- * vary by a few hundred tokens from run to run, and a turn footer's tokens, which the mock sizes
+ * vary by a few hundred tokens from run to run, and a turn line's tokens, which the mock sizes
  * from the request and so move with every change to a prompt the plugin sends.
  */
 export const maskLive = (screen: string): string =>
@@ -158,12 +169,9 @@ export const maskLive = (screen: string): string =>
     .replace(/\(\d+s\)/g, digitsOut)
     .replace(/\b\d+(?:\.\d+)?[kM]? tokens\b/g, digitsOut)
     .replace(/\b\d+(?:\.\d+)?[kM]?[  ]in[  ]\d+(?:\.\d+)?[kM]?[  ]out\b/g, digitsOut)
-    .replace(/✻ \S+ for (\d+s) · done \d{1,2}:\d{2} [AP]M */g, (line: string, took: string, at: number, whole: string) =>
-      keepWidth(`✻ Worked for ${took} · done HH:MM`, line, at, whole),
-    )
-    .replace(/\$\d+\.\d+([\u00a0 ])engine([\u00a0 ])cost */g, (match: string, a: string, b: string, at: number, whole: string) =>
-      keepWidth(`$X.XX${a}engine${b}cost`, match, at, whole),
-    )
+    .split("\n")
+    .map(maskTurnLine)
+    .join("\n")
     .replace(/checked \d\d:\d\d/g, "checked HH:MM")
     .replace(/started \d\d:\d\d/g, "started HH:MM")
     .replace(/ +\d+ms\b/g, (match: string) => `${" ".repeat(match.length - 3)}Nms`);
