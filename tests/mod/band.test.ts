@@ -1,4 +1,4 @@
-import type { Args, On } from "claude-code";
+import type { Args, Elements, On, RenderElement } from "claude-code";
 import { type Engine, type EngineCall, expect, mock, type Mounted, test } from "claude-code/testing";
 import { sha256Hex } from "../../src/core/sha256.ts";
 import { displayWidth } from "../../src/core/ui-kit.ts";
@@ -24,6 +24,9 @@ const START_FILL = `/oh-my-claudeagent:start-work ${PLAN_PATH}`;
 type Files = Map<string, { text: string; mtimeMs: number }>;
 type Band = Mounted<"terminal" | "desktop", "AbovePrompt">;
 type World = { fills: string[]; submits: string[]; logs: string[] };
+type Kit = Elements[keyof Elements];
+
+const engineBand = ({ Text }: Kit): RenderElement => Text({ children: ["engine band"] });
 
 function planText(done: number, total: number): string {
   const tasks = Array.from({ length: total }, (_, i) => `- [${i < done ? "x" : " "}] ${i + 1}. Port module ${i + 1}`);
@@ -57,7 +60,7 @@ function files(entries: Record<string, string | { text: string; mtimeMs: number 
 const bound = (done: number, total: number, extra: Record<string, string | { text: string; mtimeMs: number }> = {}) =>
   files({ [BOULDER]: BOUND, [PLAN_PATH]: planText(done, total), ...extra });
 
-function world(on: On, disk: Files): World {
+function world(on: On, disk: Files, beneath: (kit: Kit) => RenderElement = engineBand): World {
   const fills: string[] = [];
   const submits: string[] = [];
   const logs: string[] = [];
@@ -88,10 +91,7 @@ function world(on: On, disk: Files): World {
   on("prompt.submit", (_$, e) => (submits.push(e.text), { text: e.text }));
   on("ui.log", (_$, e) => (logs.push(e.text), { value: undefined }));
   on("agent.spawn", (_$, e) => ({ model: "claude-sonnet-5-5", agentId: `agent-${e.tool_use_id}` }));
-  on("ui.render", ($, e) => {
-    const { Text } = $.ui.resolve(e);
-    return Text({ children: ["engine band"] });
-  });
+  on("ui.render", ($, e) => beneath($.ui.resolve(e)));
   return { fills, submits, logs };
 }
 
@@ -399,6 +399,7 @@ test("the bar and the glyphs draw in their theme keys, the words plain or inacti
     ["! ", "warning"],
     ["just test", "plain"],
     [" evidence not logged", "plain"],
+    ["engine band", "plain"],
   ]);
 });
 
@@ -623,7 +624,7 @@ test("at 40 columns no Text in the band is wider than 40 cells", async ($, on) =
     $,
     async (band) => {
       const rows = await texts(band);
-      expect(rows).toEqual(["█▎███ 12/46", "█", "▎", "███", " 12/46"]);
+      expect(rows).toEqual(["█▎███ 12/46", "█", "▎", "███", " 12/46", "engine band"]);
       for (const text of rows) expect(displayWidth(text), text).toBeLessThanOrEqual(40);
       for (const button of await buttons(band)) expect(displayWidth(`1: ${button.label}`)).toBeLessThanOrEqual(40);
     },
@@ -706,6 +707,33 @@ test("the band yields to a survey", async ($, on) => {
     expect(await texts(band)).toEqual(["engine band"]);
     await band.unmount();
   }
+});
+
+test("another mod's band stays beneath the rows, in a Box with no size, position, display or overflow, its Button still pressable", async ($, on) => {
+  const presses: string[] = [];
+  const otherBand = ({ Box, Button, Text }: Kit): RenderElement =>
+    Box({
+      key: "other-band",
+      children: [Text({ children: ["other mod's band"] }), Button({ key: "other-press", label: "Theme", onPress: () => void presses.push("other-press") })],
+    });
+  world(on, bound(12, 46, { [STATUS]: statusFile("just test") }), otherBand);
+  await start($);
+  await turn($);
+
+  await onEachSurface($, async (band) => {
+    const rows = await texts(band);
+    expect(rows[0]).toBe("█▎███ 12/46 · next 13 Port module 13 · ! just test evidence not logged");
+    expect(rows.at(-1)).toBe("other mod's band");
+    expect((await buttons(band)).map((button) => button.key)).toEqual(["log-evidence", "start-work", "other-press"]);
+    const holder = await band.find({ key: "omca-band" });
+    expect(holder?.type).toBe("Box");
+    const layout = ["width", "height", "minWidth", "minHeight", "position", "top", "left", "right", "bottom", "display", "overflow"];
+    expect(Object.keys(holder?.props ?? {}).filter((prop) => layout.includes(prop))).toEqual([]);
+  });
+
+  const band = await mount($, "terminal");
+  await band.press({ key: "other-press", plugin: "test" });
+  expect(presses).toEqual(["other-press"]);
 });
 
 test("a burst of turn ends leaves the mounted band on the last state, drawn without any invalidate", async ($, on) => {

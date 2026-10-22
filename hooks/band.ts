@@ -225,7 +225,7 @@ export const band: Features = {
     },
   },
   "ui.render AbovePrompt": {
-    pre: async (host, e) => {
+    post: async (host, e, beneath) => {
       isAgentInView = e.props.view.agentId !== undefined;
       if (!host.options.showBand || e.props.hasSurvey) return undefined;
       const [{ value: snapshot }, { value: actions = [] }] = await Promise.all([host.state.band.get(), host.state.nextActions.get()]);
@@ -257,7 +257,9 @@ export const band: Features = {
           }),
         );
       }
-      return { answer: Box({ key: "omca-band", flexDirection: "column", children: rows }) };
+      // The engine refuses the whole band when the Box holding `beneath`, or any Box around it,
+      // sets a size, a position, `display` or `overflow`.
+      return Box({ key: "omca-band", flexDirection: "column", children: [...rows, beneath] });
     },
   },
 };
