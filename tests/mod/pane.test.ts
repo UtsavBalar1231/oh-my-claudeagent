@@ -667,7 +667,8 @@ test("drawing the pane reads, stats and lists nothing, whatever the tab, size or
   }
 });
 
-test("every row stays inside the body less the close-mark gutter at 80, 120 and 200 columns, docked and inline", async ($, on) => {
+// It walks every tab, page and agent page at each size on two surfaces: 4.2 s on a CI runner, near the default 5 s.
+test("every row stays inside the body less the close-mark gutter at 80, 120 and 200 columns, docked and inline", { timeoutMs: 20_000 }, async ($, on) => {
   const w = world(on, FILES);
   agentEngine(on);
   await $.command.run(run(""));
