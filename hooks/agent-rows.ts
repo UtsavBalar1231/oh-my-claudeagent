@@ -53,9 +53,8 @@ export const agentRows: Features = {
   },
   "ui.render ToolUse": {
     pre(host, e) {
-      const props: Readonly<Record<string, unknown>> = { ...e.props };
       const type = inputText(e.props.input, "subagent_type");
-      if (e.surface !== "terminal" || props["isExpanded"] === true || type === "") return undefined;
+      if (e.surface !== "terminal" || e.props.isExpanded === true || type === "") return undefined;
       const launch: Launch = {
         type,
         description: inputText(e.props.input, "description"),

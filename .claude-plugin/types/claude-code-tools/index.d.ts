@@ -739,6 +739,12 @@ declare module 'claude-code' {
         activeForm: string
       }>
     }
+    ToolSearch: {
+      /** Query to find deferred tools. Use "select:<tool_name>" for direct selection, or keywords to search. */
+      query: string
+      /** Maximum number of results to return (default: 5) */
+      max_results: number
+    }
     WaitForMcpServers: {
       /** Server names to wait for (default: all pending) */
       servers?: string[]
@@ -5242,6 +5248,17 @@ declare module 'claude-code' {
         status: "pending" | "in_progress" | "completed"
         activeForm: string
       }>
+    }
+    ToolSearch: {
+      matches: string[]
+      query: string
+      total_deferred_tools: number
+      pending_mcp_servers?: string[]
+      failed_mcp_servers?: {
+        name: string
+        errorCode?: string
+        error?: string
+      }[]
     }
     WaitForMcpServers: {
       ready: boolean

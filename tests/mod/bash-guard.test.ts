@@ -87,7 +87,8 @@ function world(on: On, w: World = {}) {
     if (w.answer === "dismiss") return { deny: "The user doesn't want to proceed with this tool use." };
     return { result: { questions: [], answers: { [q.question]: w.answer ?? "Refuse" } } };
   });
-  on("tool.check", (_$, e) => (checked.push(e), ENGINE));
+  // The engine asks the person through AskUserQuestion, which core lets through to its dialog.
+  on("tool.check", (_$, e) => (e.tool === "AskUserQuestion" ? { decision: "allow" } : (checked.push(e), ENGINE)));
   return { asked, checked };
 }
 
