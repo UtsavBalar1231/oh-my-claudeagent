@@ -35,9 +35,10 @@ atoms written once per turn or per finished agent, since a row subscribes to eve
   the module), so a turn that ends before the previous turn's facts land still draws its own; a
   line first drawn before any start, as after /resume, and a line whose turn has no record yet keep
   the engine's.
-  A client whose props carry `isExpanded` names the waited-on agents in `waitingFor`; an older one
-  keeps its own waiting line, with the facts on a row beneath. A session without a terminal gets
-  the facts as the `turn.complete` text instead.
+  The line names the agents the engine lists in `waitingFor`. The engine keeps its own line, with
+  the facts on a row beneath, in the ctrl+o view (`isExpanded`), while the turn waits on a
+  workflow, and while agents run that the props do not name, as from a client older than
+  `waitingFor`. A session without a terminal gets the facts as the `turn.complete` text instead.
 - `agent-rows` redraws the `ToolUse` row of a single Agent call from its own input (registered
   with `props: { tool: "Agent" }`, so no other tool row reaches the mod); several agents
   launched together are one engine block no hook reaches. It also keeps a finished subagent's
@@ -49,8 +50,10 @@ atoms written once per turn or per finished agent, since a row subscribes to eve
   verification call (`isVerificationCommand`), and for a Read that returned a PNG a name row and
   an `Image` of the picture (the first three per group; the rest keep the name row). A picture
   whose bytes do not open as a PNG keeps its name row, since one bad `Image` refuses the whole
-  tree. After the first picture it draws, the feature blits it once: a refusal that names the alt
-  means the terminal shows only text, as tmux does, and every later preview is the name row alone.
+  tree. A picture over 2 MiB is passed as its file. After the first picture of each kind it draws,
+  bytes or a file, the feature blits it once: a refusal that names the alt means the terminal shows
+  that kind only as text, and every later preview of that kind is the name row alone. tmux shows
+  neither kind; iTerm2 3.5 and later draws bytes and not a file.
   An expanded group is left as drawn.
 
 `agents-tracker` also owns the agent page that `tabs/agent-page.ts` draws on the Agents tab: a

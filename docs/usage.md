@@ -221,9 +221,10 @@ the work happens:
   problem (1 error)`, read from the command's own output. The runners are the ones the
   verification gate records.
 - **A picture Claude reads.** Under a folded group with a Read of a PNG, a row names the file and
-  its size, and a terminal that draws pictures (kitty, Ghostty) shows the picture beneath it, at
-  most 72 columns by 20 rows. A terminal that cannot, tmux included, keeps the name row alone:
-  OMCA asks the terminal once, after the first picture it draws. A group of more than three
+  its size, and a terminal that draws pictures (kitty, Ghostty, iTerm2 3.5 or later in fullscreen
+  rendering) shows the picture beneath it, at most 72 columns by 20 rows. A terminal that cannot,
+  tmux included, keeps the name row alone: OMCA asks the terminal once, after the first picture it
+  draws. iTerm2 keeps the name row alone for a picture over 2 MiB. A group of more than three
   pictures previews three and names the rest.
 
 Running agents are listed by Claude Code itself, under the prompt. A session without a terminal

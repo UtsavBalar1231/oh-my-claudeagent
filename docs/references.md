@@ -314,17 +314,18 @@ ledger, notepads and the registry, and links the JSON Schemas for the ledger and
 | Guard decisions | Yes | When the app's Claude Code is 2.1.300 or later | Yes | Yes | Unless `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks` |
 | Guard review dialog | Yes | As guard decisions | No: held commands are decided without you | No: decided as in `-p` | As the guard |
 | Band, pane, plan reader, doctor | Yes | As guard decisions, with [Desktop's differences](usage.md#desktop-and-vs-code) | No | No ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)) | As the guard |
-| Turn line, agent rows, receipts and image previews in the transcript | Yes, pictures where the terminal draws them (kitty, Ghostty) | No: Desktop keeps its own rows, and the turn's figures and receipt arrive as a text row beneath the answer | No | No | As the guard |
+| Turn line, agent rows, receipts and image previews in the transcript | Yes, pictures where the terminal draws them (kitty, Ghostty, iTerm2 3.5 or later) | No: Desktop keeps its own rows, and the turn's figures and receipt arrive as a text row beneath the answer | No | No | As the guard |
 | Status line | Yes | Not documented | No | Not documented | Unless `allowManagedHooksOnly` or `disableAllHooks` |
 
 Where the built-in `sec-default` guard loads (a machine whose managed settings set at least one
-key, or a Team or Enterprise sign-in), it runs ahead of OMCA's mod. OMCA's mod only denies, so
+key, or a session signed in with `/login` on a Team or Enterprise plan, not a long-lived
+`CLAUDE_CODE_OAUTH_TOKEN`), it runs ahead of OMCA's mod. OMCA's mod only denies, so
 the guard leaves its decisions in place. A Desktop session in WSL loads no plugins.
 
 ## Platform support
 
 CI runs the validator, the lint, the type checks, the bun specs, the mod tests, a smoke session
-and the OpenCode adapter specs on Linux, macOS and Windows against Claude Code 2.1.301. The
+and the OpenCode adapter specs on Linux, macOS and Windows against Claude Code 2.1.308. The
 guard reads Bash and PowerShell commands, including `cmd /c` and `Invoke-Expression`, and
 resolves home and project paths per platform. The README screenshots are captured with tmux,
 kitty and Xvfb, so capturing them needs Linux or WSL.
