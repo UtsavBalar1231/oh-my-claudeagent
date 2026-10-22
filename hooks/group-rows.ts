@@ -16,10 +16,15 @@ const PREVIEW_INDENT = 5;
 // Long enough for the terminal to have drawn the first preview, or its alt, before the probe asks which.
 const PROBE_MS = 300;
 
-// Whether the terminal draws pictures, unknown until the first preview's probe answers. A terminal
-// that draws only the alt, as tmux does, gets the caption alone from then on.
-let pictures: boolean | undefined;
-let isProbing = false;
+type Kind = "png" | "file";
+
+const kindOf = (source: ImageSource): Kind => ("file" in source ? "file" : "png");
+
+// Whether the terminal draws each kind of source, unknown until the first preview of that kind is
+// probed. A kind drawn only as the alt gets the caption alone from then on: tmux draws no picture,
+// iTerm2 draws bytes but not a file.
+const pictures: Partial<Record<Kind, boolean>> = {};
+const probing = new Set<Kind>();
 
 async function sourceOf(host: Host, { base64, path }: ImagePreview): Promise<ImageSource | undefined> {
   if (base64 === "") return undefined;
@@ -30,17 +35,19 @@ async function sourceOf(host: Host, { base64, path }: ImagePreview): Promise<Ima
 }
 
 function probe(host: Host, requestId: string, key: string, source: ImageSource): void {
-  if (pictures !== undefined || isProbing) return;
-  isProbing = true;
+  const kind = kindOf(source);
+  if (pictures[kind] !== undefined || probing.has(kind)) return;
+  probing.add(kind);
   host.clock.after(PROBE_MS, async () => {
     try {
       const { deny } = await host.ui.blit({ requestId, key, source });
-      pictures = deny === undefined || !/\balt\b/.test(deny);
-      if (!pictures) host.ui.invalidate();
+      const isDrawn = deny === undefined || !/\balt\b/.test(deny);
+      pictures[kind] = isDrawn;
+      if (!isDrawn) host.ui.invalidate();
     } catch (error) {
       host.log(`group rows: cannot tell whether the terminal draws pictures: ${reason(error)}`);
     } finally {
-      isProbing = false;
+      probing.delete(kind);
     }
   });
 }
@@ -57,7 +64,7 @@ async function previewRows(host: Host, kit: Kit, e: Input<"ui.render ToolGroup">
   return previews.flatMap((preview, index) => {
     const caption = Line(kit, previewCaption(preview, g, columns));
     const source = sources[index];
-    if (pictures === false || kit.Image === undefined || source === undefined) return [caption];
+    if (kit.Image === undefined || source === undefined || pictures[kindOf(source)] === false) return [caption];
     const key = `preview-${index}`;
     const box = previewBox(preview, columns - PREVIEW_INDENT);
     probe(host, e.requestId, key, source);

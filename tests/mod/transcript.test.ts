@@ -208,6 +208,23 @@ test("a terminal that draws only the alt, as tmux does, keeps the caption alone 
   expect(after.rows).toEqual([ENGINE_ROW, "  ⎿  step-1.png · 1600×400"]);
 });
 
+test("a terminal that draws bytes but only the alt for a file, as iTerm2 does, gives a large PNG its caption alone and keeps drawing small ones", async ($, on) => {
+  const w = await engine($, on);
+  w.blitDeny = (source) => (typeof source === "object" && source !== null && "file" in source ? "the Image draws its alt there" : undefined);
+  const large: ToolGroupCall = {
+    ...shot(9),
+    input: { file_path: "/work/shots/full.png" },
+    output: { type: "image", file: { base64: PNG + "A".repeat(3_000_000), type: "image/png", dimensions: { originalWidth: 1600, originalHeight: 400 } } },
+  };
+  expect((await groupDrawing($, [large])).images.map(({ source }) => source)).toEqual([{ file: "/work/shots/full.png", format: "png" }]);
+  await w.clock.advance(300);
+  const after = await groupDrawing($, [shot(1), large]);
+  expect(after.images.map(({ source }) => source)).toEqual([{ png: PNG }]);
+  expect(after.rows).toEqual([ENGINE_ROW, "  ⎿  step-1.png · 1600×400", "  ⎿  full.png · 1600×400"]);
+  await w.clock.advance(300);
+  expect((await groupDrawing($, [shot(1)])).images).toHaveLength(1);
+});
+
 test("past three reads in one group the rest keep their captions alone", async ($, on) => {
   await engine($, on);
   const { rows, images } = await groupDrawing($, [shot(1), shot(2), shot(3), shot(4)]);

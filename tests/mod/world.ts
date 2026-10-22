@@ -67,8 +67,8 @@ export type World = {
   surfaces: RenderSurface[];
   invalidations: number;
   toasts: string[];
-  /** Why `ui.blit` refuses, as the engine says it for an Image that draws its alt; undefined takes every blit. */
-  blitDeny: string | undefined;
+  /** Why `ui.blit` refuses, as the engine says it for an Image that draws its alt, for every source or by source; undefined takes every blit. */
+  blitDeny: string | ((source: unknown) => string | undefined) | undefined;
   blits: { requestId: string; key: string; cells: string | undefined; columns: number | undefined; rows: number | undefined }[];
   conversations: Map<string, SessionMessage[]>;
   opened: unknown[];
@@ -211,7 +211,8 @@ export function world(
   on("ui.blit", (_$, e) => {
     const raster = "cells" in e ? e : undefined;
     w.blits.push({ requestId: e.requestId, key: e.key, cells: raster?.cells, columns: raster?.columns, rows: raster?.rows });
-    return { value: w.blitDeny === undefined ? {} : { deny: w.blitDeny } };
+    const deny = typeof w.blitDeny === "function" ? w.blitDeny("source" in e ? e.source : undefined) : w.blitDeny;
+    return { value: deny === undefined ? {} : { deny } };
   });
   on("session.messages", (_$, e) => {
     const found = e.agentId === undefined ? undefined : w.conversations.get(e.agentId);
