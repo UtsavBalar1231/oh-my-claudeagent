@@ -1,5 +1,4 @@
 ❯ Fix the cart totals and wire the summary
-
 ● Update(src/cart.ts)
   ⎿  Added 2 lines, removed 1 line
       1  export function total(items: { price: number; qty: number }[]):
@@ -30,7 +29,8 @@
   ├─────────────────┼───────────┤
   │ Rounding review │ architect │
   └─────────────────┴───────────┘
-                           Jump to bottom (ctrl+End) ↓
+
+✻ Waiting for 3 background Jump to bottom (ctrl+End) ↓
 █▎███ 12/46 · next 13 Port the snaps… ·  just test evidence not logged     [-]
 1: Log evidence   2: Start work
                                                             ◐ medium · /effort

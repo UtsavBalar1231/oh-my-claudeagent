@@ -1,5 +1,5 @@
 
- ▐▛███▛█   Claude Code v2.1.304
+ ▐▛███▛█   Claude Code v2.1.308
 ▝▜██████▀  Opus 5.5 · API Usage Billing
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd
 
@@ -39,8 +39,8 @@
   │ Rounding review │ architect │
   └─────────────────┴───────────┘
 
-✻ Worked for 1s · done HH:MM · NN.Nk in NN out · $X.XX ·  just test not logged
-                                                                                       Jump to bottom (ctrl+End) ↓
+✻ Waiting for 3 background agents to finish
+  NN.Nk in NN out · $0.8755 ·  just test not logged                                   Jump to bottom (ctrl+End) ↓
 █▎███ 12/46 · next 13 Port the snapshot and the ledger onto the shared router ·  just test evidence not logged                                                                                     [-]
 1: Log evidence   2: Start work
                                                                                                                                                                                     ◐ medium · /effort

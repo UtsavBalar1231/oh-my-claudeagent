@@ -1,5 +1,4 @@
 ❯ Fix the cart totals and wire the summary
-
 ● I'll look at the cart module first.
 
   Searched for 2 patterns, read 1 file
@@ -30,7 +29,8 @@
   ├─────────────────┼───────────┤
   │ Summary panel   │ executor  │
   ├─────────────────┼───────────┤
-  │ Rounding review │ architect │              Jump to bottom (ctrl+End) ↓
+  │ Rounding review │ architect │
+  └─────────────────┴───────────┘              Jump to bottom (ctrl+End) ↓
 █▎███ 12/46 · next 13 Port the snapshot and the ledger onto the shared router ·  just test evidence not logged     [-]
 1: Log evidence   2: Start work
                                                                                                     ◐ medium · /effort

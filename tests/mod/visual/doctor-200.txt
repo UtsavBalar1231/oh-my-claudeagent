@@ -1,48 +1,48 @@
-                                                                                                   │                                                                                                  ✕
- ▐▛███▛█   Claude Code v2.1.304                                                                    │1: Agents  2: Plan  3: Evidence  4: Notepad  Doctor
-▝▜██████▀  Opus 5.5 · API Usage Billing                                                            │─────────────────────────────────────────────────────────────────────────────────────────────────
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd            │r: Run again    3 warn   1 info   9 ok  checked HH:MM
-                                                                                                   │  WARN  omca server   No hook has reached the server in this session yet
-                                                                                                   │                       m: Use /mcp
-                                                                                                   │  WARN  Effort cap    maxEffortLevel high holds the architect below the xhigh it declares
-                                                                                                   │  WARN  Status line   No refreshInterval, so it redraws on events only and goes stale while
-                                                                                                   │                       agents run
-                                                                                                   │                       s: Use /oh-my-claudeagent:omca-setup
-                                                                                                   │  INFO  Advisor       No advisorModel; /advisor fable turns the advisor on
-                                                                                                   │                       a: Use /advisor fable
-                                                                                                   │o: Show passing    9 ok · OMCA, Claude Code, bun, ast-grep, Options, Agent models, Mod policy,…
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                                                   │
-                                                                               ◐ medium · /effort  │
+                                                                                                              │                                                                                       ✕
+ ▐▛███▛█   Claude Code v2.1.308                                                                               │1: Agents  2: Plan  3: Evidence  4: Notepad  Doctor
+▝▜██████▀  Opus 5.5 · API Usage Billing                                                                       │──────────────────────────────────────────────────────────────────────────────────────
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                       │r: Run again    3 warn   1 info   9 ok  checked HH:MM
+                                                                                                              │  WARN  omca server   No hook has reached the server in this session yet
+                                                                                                              │                       m: Use /mcp
+                                                                                                              │  WARN  Effort cap    maxEffortLevel high holds the architect below the xhigh it
+                                                                                                              │                       declares
+                                                                                                              │  WARN  Status line   No refreshInterval, so it redraws on events only and goes stale
+                                                                                                              │                       while agents run
+                                                                                                              │                       s: Use /oh-my-claudeagent:omca-setup
+                                                                                                              │  INFO  Advisor       No advisorModel; /advisor fable turns the advisor on
+                                                                                                              │                       a: Use /advisor fable
+                                                                                                              │o: Show passing    9 ok · OMCA, Claude Code, bun, ast-grep, Options, Agent models, M…
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                          ◐ medium · /effort  │
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────

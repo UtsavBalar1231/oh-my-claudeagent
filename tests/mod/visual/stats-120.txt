@@ -1,39 +1,39 @@
-                                                               │                                                      ✕
- ▐▛███▛█   Claude Code v2.1.304                                │1: Agents  2: Plan  3: Evidence  4: Notepad  Stats
-▝▜██████▀  Opus 5.5 · API Usage Billing                        │─────────────────────────────────────────────────────
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd           │20 delegations in 3 sessions · 1 running · 1 skipped
-                                                               │╭───────────────────────────────────────────────────╮
-                                                               ││ Agents · 8 types                                  │
-                                                               ││   agent        runs  median  est. cost  evidence  │
-                                                               ││  executor        8   3m28s      $6.86      86%  │
-                                                               ││  explorer        4     24s     $0.31+       n/a  │
-                                                               ││  architect       2   6m24s      $5.27       n/a  │
-                                                               ││  researcher      2   1m05s      $0.40       n/a  │
-                                                               ││  analyzer        1   3m08s      $0.34       n/a  │
-                                                               ││  build-fixer     1   2m23s      $0.65     100%  │
-                                                               ││  planner         1   6m52s      $0.67       n/a  │
-                                                               ││  reviewer        1   4m01s      $0.39       n/a  │
-                                                               │╰───────────────────────────────────────────────────╯
-                                                               │╭───────────────────────────────────────────────────╮
-                                                               ││ Tokens per delegation · 19 delegations            │
-                                                               ││ ▂▂▂▂▆▄▃▂▇▁▁▅▂█▃▂▄▆▂ peak 631k                     │
-                                                               │╰───────────────────────────────────────────────────╯
-                                                               │╭───────────────────────────────────────────────────╮
-                                                               ││ Estimated cost                                    │
-                                                               ││ $14.89+ █████████████████████████████████████████ │
-                                                               ││ + excludes 1 unpriced run · 2026-10-11 list       │
-                                                               ││ prices                                            │
-                                                               │╰───────────────────────────────────────────────────╯
-                                                               │r: Reload
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                                               │
-                                           ◐ medium · /effort  │
+                                                                  │                                                   ✕
+ ▐▛███▛█   Claude Code v2.1.308                                   │1: Agents  2: Plan  3: Evidence  4: Notepad  Stats
+▝▜██████▀  Opus 5.5 · API Usage Billing                           │──────────────────────────────────────────────────
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd              │20 delegations in 3 sessions · 1 running · 1 skip…
+                                                                  │╭────────────────────────────────────────────────╮
+                                                                  ││ Agents · 8 types                               │
+                                                                  ││   agent        runs  est. cost  evidence       │
+                                                                  ││  executor        8      $6.86      86%       │
+                                                                  ││  explorer        4     $0.31+       n/a       │
+                                                                  ││  architect       2      $5.27       n/a       │
+                                                                  ││  researcher      2      $0.40       n/a       │
+                                                                  ││  analyzer        1      $0.34       n/a       │
+                                                                  ││  build-fixer     1      $0.65     100%       │
+                                                                  ││  planner         1      $0.67       n/a       │
+                                                                  ││  reviewer        1      $0.39       n/a       │
+                                                                  │╰────────────────────────────────────────────────╯
+                                                                  │╭────────────────────────────────────────────────╮
+                                                                  ││ Tokens per delegation · 19 delegations         │
+                                                                  ││ ▂▂▂▂▆▄▃▂▇▁▁▅▂█▃▂▄▆▂ peak 631k                  │
+                                                                  │╰────────────────────────────────────────────────╯
+                                                                  │╭────────────────────────────────────────────────╮
+                                                                  ││ Estimated cost                                 │
+                                                                  ││ $14.89+ ██████████████████████████████████████ │
+                                                                  ││ + excludes 1 unpriced run · 2026-10-11 list    │
+                                                                  ││ prices                                         │
+                                                                  │╰────────────────────────────────────────────────╯
+                                                                  │r: Reload
+                                                                  │
+                                                                  │
+                                                                  │
+                                                                  │
+                                                                  │
+                                                                  │
+                                                                  │
+                                                                  │
+                                              ◐ medium · /effort  │
 ─────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────

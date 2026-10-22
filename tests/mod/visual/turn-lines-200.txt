@@ -1,5 +1,4 @@
 
-
 ● The totals now round to cents and the tests pass.
 
   ┌─────────────────┬───────────┐
@@ -12,7 +11,8 @@
   │ Rounding review │ architect │
   └─────────────────┴───────────┘
 
-✻ Worked for 1s · done HH:MM · NN.Nk in NN out · $X.XX ·  just test not logged
+✻ Waiting for 3 background agents to finish
+  NN.Nk in NN out · $0.8755 ·  just test not logged
 
  explorer  Map the totals callers                                           0s · 2 calls · 7.5k tok
   ⎿  Only src/cart.ts defines total(); nothing else calls it yet.
@@ -21,7 +21,7 @@
 
 ✻ Waiting for executor, architect · NN.Nk in N out · $X.XX
 
- architect  Review the rounding rule                                        2s · 1 call · 10.9k tok
+ architect  Review the rounding rule                                        1s · 1 call · 10.9k tok
   ⎿  Rounding at the end is right; rounding each line would drift by a cent.
 
 ● ok
@@ -40,7 +40,7 @@
 
 ● ok
 
-✻ Worked for 4s · done HH:MM · NN.Nk in N out · $X.XX
+✻ Worked for 3s · done HH:MM · NN.Nk in N out · $X.XX
 █▎███ 12/46 · next 13 Port the snapshot and the ledger onto the shared router ·  just test evidence not logged                                                                                     [-]
 1: Log evidence   2: Start work
                                                                                                                                                                                     ◐ medium · /effort
