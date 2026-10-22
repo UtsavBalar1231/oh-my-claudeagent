@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   does not name, Claude Code keeps its own line and OMCA's tokens, cost and receipt go on a row
   beneath it, so no waiting text is lost. A short verification command, such as `just test`,
   stays whole while the clock, cost or tokens can still give way.
+- **Other mods' bands:** OMCA's band no longer hides a band another mod draws above the prompt;
+  that band stays beneath OMCA's rows.
 - **Pictures in iTerm2:** a picture over 2 MiB, which iTerm2 shows only as text, no longer turns
   off the previews of smaller pictures for the rest of the session.
 - **Delegation wording:** the output style and the triage skill tell a background child from a

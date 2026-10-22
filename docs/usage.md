@@ -245,7 +245,8 @@ clears the buttons, and so does filling the prompt from history, an undo or anot
 buttons are held while an agent's transcript is in the main view and return with the main
 conversation.
 
-Set the `showBand` option to `false` to hide it.
+Claude Code has one band for every mod, and a band another mod draws stays beneath OMCA's rows.
+Set the `showBand` option to `false` to hide OMCA's.
 
 ### The pane
 
