@@ -279,7 +279,7 @@ test("a client that names the agents a turn waits on gets them on the line, in p
   expect((await line($, "turn-1", { word: "Cooked", durationMs: 4_200, isExpanded: false }))[1]).toStartWith("Cooked for 4s · done");
 });
 
-test("a client that names no waited-on agents keeps its own line while agents run, with the facts on a row beneath", async ($, on) => {
+test("a line that names no waited-on agents keeps its own words while agents run, with the facts on a row beneath", async ($, on) => {
   const { w, meter } = terminal(on);
   on("agent.spawn", () => ({ model: "claude-sonnet-5-5", agentId: "a-1" }));
   await $.agent.spawn({
@@ -295,7 +295,27 @@ test("a client that names no waited-on agents keeps its own line while agents ru
   await $.turn.start({ text: "Delegate", turnId: "t-1" });
   await turn($, w, meter, 0.2812);
 
-  expect((await line($, "turn-1")).slice(0, 2)).toEqual([ENGINE_LINE, "12.3k in 845 out · $0.0312"]);
+  const kept = [ENGINE_LINE, "12.3k in 845 out · $0.0312"];
+  expect((await line($, "turn-1")).slice(0, 2)).toEqual(kept);
+  expect((await line($, "turn-1", { word: "Cooked", durationMs: 4_200, isExpanded: false })).slice(0, 2)).toEqual(kept);
+});
+
+test("a line that also waits on a workflow keeps the engine's words, with the facts on a row beneath", async ($, on) => {
+  const { w, meter } = terminal(on);
+  await $.turn.start({ text: "Delegate", turnId: "t-1" });
+  await turn($, w, meter, 0.2812);
+
+  const waiting = { agents: [{ id: "a-1", agentType: "oh-my-claudeagent:executor" }], workflows: 1 };
+  const drawn = await line($, "turn-1", { word: "Cooked", durationMs: 4_200, isExpanded: false, waitingFor: waiting });
+  expect(drawn.slice(0, 2)).toEqual([ENGINE_LINE, "12.3k in 845 out · $0.0312"]);
+});
+
+test("the expanded transcript keeps the engine's line, with the facts on a row beneath", async ($, on) => {
+  const { w, meter } = terminal(on);
+  await $.turn.start({ text: "Run the tests", turnId: "t-1" });
+  await turn($, w, meter, 0.2812);
+
+  expect((await line($, "turn-1", { word: "Cooked", durationMs: 4_200, isExpanded: true })).slice(0, 2)).toEqual([ENGINE_LINE, "12.3k in 845 out · $0.0312"]);
 });
 
 test("a run already on one turn's line is not repeated on the next, which starts in the same second", async ($, on) => {
