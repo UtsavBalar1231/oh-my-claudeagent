@@ -1,7 +1,7 @@
 import type { On } from "claude-code";
 import { type Engine, expect, type Plugin, test } from "claude-code/testing";
 import { joinPath } from "../../src/core/path.ts";
-import { usableColumns } from "../../src/core/ui-kit.ts";
+import { displayWidth, usableColumns } from "../../src/core/ui-kit.ts";
 import {
   bodyColumns,
   BOULDER,
@@ -730,7 +730,9 @@ test("every row stays inside the body less the close-mark gutter at 80, 120 and 
       }
       await ui.press({ key: "1" });
       await ui.press({ key: "open-a-1" });
-      expect(rows(await ui.drawn()).some((row) => row.includes("v: Show transcript")), `${size.columns} ${size.placement} ${surface} v key`).toBe(true);
+      const view = (await ui.findAll({ type: "Button" })).find((button) => button.key === "v");
+      const label = room >= displayWidth("b: Back c: Copy brief r: Reload v: Show transcript") ? "Show transcript" : "Transcript";
+      expect(view?.props["label"], `${size.columns} ${size.placement} ${surface} v key`).toBe(label);
       await fits("agent page");
       await ui.press({ key: "b" });
       expect(views).toHaveLength(6);

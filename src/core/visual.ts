@@ -428,8 +428,9 @@ export function rule(
 
 export type WidthTier = "page" | "inline" | "split";
 
-// Measured on 2.1.288: a dock at 120 columns has a 56-column body and one at 200 a 90-column
-// body, the narrowest where a master list and its detail both fit side by side.
+// The narrowest bodies where a master list and its detail both fit side by side, and where a
+// row's detail fits beneath it. A dock takes at most 45% of the terminal (measured on 2.1.308:
+// a 51-column body at 120 columns, 87 at 200), so a dock reaches the split from about 207 columns.
 const SPLIT_FROM = 90;
 const INLINE_FROM = 56;
 

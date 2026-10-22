@@ -267,13 +267,16 @@ export const run = (args: string, columns = 120) =>
     presentation: { isFullscreen: true, columns },
   }) as const;
 
-export type Size = { columns: number; rows: number; placement: "dock" | "inline" };
+export type Size = { columns: number; rows: number; placement: "dock" | "inline"; isCapped?: true };
 
 // The body a terminal of `columns` gives the pane: inline spans the width inside two borders,
-// a dock opens at the pane's requested share of the terminal, inside its frame.
+// a dock opens at the pane's requested width inside its frame. A capped dock is the 2.1.305+
+// one, which with its divider takes at most 45% of the terminal (measured on 2.1.308: a
+// 51-column body at 120 columns, 87 at 200); the terminal docks from 110 columns.
 export function bodyColumns(size: Size): number {
   if (size.placement === "inline") return size.columns - 4;
-  return Math.max(Math.min(96, Math.max(56, Math.round(size.columns * 0.45))), Math.min(120, size.columns - 100)) - 2;
+  const requested = Math.max(Math.min(96, Math.max(56, Math.round(size.columns * 0.45))), Math.min(120, size.columns - 100));
+  return size.isCapped ? Math.min(requested + 1, Math.floor(size.columns * 0.45)) - 3 : requested - 2;
 }
 
 export const SIZES: readonly Size[] = [
@@ -283,6 +286,9 @@ export const SIZES: readonly Size[] = [
   { columns: 80, rows: 40, placement: "dock" },
   { columns: 120, rows: 40, placement: "dock" },
   { columns: 200, rows: 50, placement: "dock" },
+  { columns: 110, rows: 40, placement: "dock", isCapped: true },
+  { columns: 120, rows: 40, placement: "dock", isCapped: true },
+  { columns: 200, rows: 50, placement: "dock", isCapped: true },
 ];
 
 export function pane<S extends RenderSurface>(surface: S, size: Size = { columns: 160, rows: 40, placement: "dock" }) {
