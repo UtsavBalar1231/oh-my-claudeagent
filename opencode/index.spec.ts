@@ -268,6 +268,24 @@ test("registers a visible coordinator without a duplicate MCP transport", async 
   expect(fake.tools.has("omca_evidence_log")).toBe(true)
 })
 
+test("only the coordinator denies built-in workers and preserves other permissions", async () => {
+  const fake = fakeContext()
+  const permissions = [{ action: "subagent", resource: "custom-worker", effect: "ask" }]
+  fake.agents.set("omca", { permissions: [...permissions] })
+  for (const id of ["build", "plan", "general", "explore", "custom-worker"]) {
+    fake.agents.set(id, { id, permissions: [...permissions] })
+  }
+  await plugin.setup(fake.ctx)
+  expect(fake.agents.get("omca")?.permissions).toEqual([
+    ...permissions,
+    { action: "subagent", resource: "general", effect: "deny" },
+    { action: "subagent", resource: "explore", effect: "deny" },
+  ])
+  for (const id of ["build", "plan", "general", "explore", "custom-worker"]) {
+    expect(fake.agents.get(id)).toEqual({ id, permissions })
+  }
+})
+
 test("native Plan omits mutation tools and allows only explicitly read-only children", async () => {
   const fake = fakeContext()
   await plugin.setup(fake.ctx)
