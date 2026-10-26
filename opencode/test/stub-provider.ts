@@ -16,6 +16,8 @@ const SCENARIOS: Record<string, { tool: string; args: Json }> = {
   "explore-write": { tool: "subagent", args: { description: "omca stub", prompt: "OMCA-SCENARIO:write-file" } },
   "plan-worker": { tool: "subagent", args: { agent: "omca-executor", description: "forbidden plan worker", prompt: "OMCA-SCENARIO:write-file" } },
   "plan-general": { tool: "subagent", args: { agent: "general", description: "forbidden general worker", prompt: "OMCA-SCENARIO:write-file" } },
+  "native-general": { tool: "subagent", args: { agent: "general", description: "native general worker", prompt: "OMCA-SCENARIO:warm-up" } },
+  "native-explore": { tool: "subagent", args: { agent: "explore", description: "native explore worker", prompt: "OMCA-SCENARIO:warm-up" } },
   "discover-tools": { tool: "execute", args: { code: 'return search({namespace:"omca",query:"ast_search"});' } },
   "plan-checkbox": { tool: "edit", args: { path: "work.md", oldString: "- [ ] 1. First task", newString: "- [x] 1. First task" } },
   "write-file": { tool: "write", args: { path: "explored.txt", content: "explored\n" } },

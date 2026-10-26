@@ -263,4 +263,26 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
     verify(!observed.some((request) => request.messages?.at(-1)?.role === "user" && lastText(request).includes("OMCA-SCENARIO:write-file")), "plan-worker: an implementation child received the forbidden task")
     verify(!existsSync(join(need().ws, "explored.txt")), "plan-worker: implementation changed the workspace")
   }, SLOW)
+
+  test.each(["native-general", "native-explore"])("OMCA refuses built-in delegation while Build retains it: %s", async (scenario) => {
+    for (const agent of ["omca", "build"]) {
+      const start = requests().length
+      await run(scenario, agent)
+      const observed = requests().slice(start)
+      const childStarted = observed.some((request) => request.messages?.at(-1)?.role === "user" && lastText(request).includes("OMCA-SCENARIO:warm-up"))
+      verify(childStarted === (agent === "build"), `${scenario}: unexpected child launch for ${agent}`)
+      if (agent === "omca") {
+        const result = observed.filter(lastIsTool).map(lastText).join("\n")
+        verify(/denied|not allowed|rejected/i.test(result), `${scenario}: no permission denial reached OMCA: ${result}`)
+      }
+    }
+  }, SLOW)
+
+  test("OMCA still launches its executor specialist", async () => {
+    const start = requests().length
+    await run("subagent", "omca")
+    const observed = requests().slice(start)
+    verify(observed.some((request) => system(request).includes(EXECUTOR)), "OMCA did not launch omca-executor")
+    verify(observed.filter(lastIsTool).map(lastText).join("\n").includes("omca guard:"), "OMCA executor did not run its scoped task")
+  }, SLOW)
 })

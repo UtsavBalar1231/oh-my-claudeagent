@@ -101,6 +101,7 @@ async function setup(ctx: Context) {
         agent.description = "Coordinate specialist agents with session-bound plans and verification evidence"
         agent.system = `${data.outputStyle}\n${COORDINATOR}`
         agent.color = "#f97316"
+        agent.permissions = [...agent.permissions, ...["general", "explore"].map((resource) => ({ action: "subagent", resource, effect: "deny" as const }))]
         if (!agent.model && models.opus) agent.model = models.opus
       })
     })

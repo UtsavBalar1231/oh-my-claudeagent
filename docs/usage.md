@@ -94,7 +94,10 @@ remain available. Specialists run as child sessions: `omca-explorer`,
 `omca-build-fixer` and `omca-executor`.
 Read-only specialists use native read/search tools without shell or file edits.
 With OMCA enabled, native Plan delegates only to Explore or OMCA's read-only
-specialists. Execution-capable children, including General, require Build or OMCA.
+specialists. Execution-capable children require Build or OMCA. The OMCA coordinator
+denies delegation to native General and Explore and routes work to its specialists.
+Build retains access to General and Explore. Other custom delegation targets keep
+their existing permissions.
 
 Commands:
 
