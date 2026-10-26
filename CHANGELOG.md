@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.1] - 2026-10-26
+
 ### Changed
 
 - **Claude Code 2.1.308:** OMCA is tested with Claude Code 2.1.308, and the engine types come from
@@ -29,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Delegation wording:** the output style and the triage skill tell a background child from a
   foreground one by what the Agent call returns, now that fork subagents are on by default in
   `claude -p` and the Agent SDK too.
+- **OpenCode specialist routing:** the OMCA coordinator denies delegation to native General and
+  Explore and explicitly routes work to its specialists. Native workflows and other custom
+  agents retain their existing permissions.
 
 ## [3.3.0] - 2026-10-20
 
@@ -3147,6 +3152,7 @@ for multi-agent orchestration.
 - Shellcheck fixes applied across all hook scripts
 - Ruff fixes applied to Python MCP servers
 
+[3.3.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.3.0...v3.3.1
 [3.3.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.2.0...v3.3.0
 [3.2.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.0.1...v3.1.0
