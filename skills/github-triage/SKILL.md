@@ -49,7 +49,7 @@ Applies to: bug root cause (file + line), "feature exists" (cite where), "fix co
 | Rule | Value |
 |------|-------|
 | Agent type for ALL items | `oh-my-claudeagent:executor` |
-| Execution mode | Background in an interactive session, where fork mode removes `run_in_background`; under `claude -p` and the Agent SDK a subagent may run in the foreground and return its result directly. Accept either |
+| Execution mode | Background by default, with the result in a `<task-notification>`; a subagent the platform runs in the foreground returns its result directly. Accept either |
 | Parallelism | Bounded batches, max 5 concurrent agents |
 | Total items per run | No platform cap. Bound the run yourself and record the overflow (see below) |
 | Result storage | `issue-{number}.md` or `pr-{number}.md` under `.omca/scratch/github-triage-{datetime}/` in the project root |

@@ -56,7 +56,8 @@ type Part = { priority: number; piece: Piece };
 
 // The highest number leaves first as the row narrows: the clock, then the cost, then the tokens.
 const PRIORITY = { done: 3, cost: 2, tokens: 1 } as const;
-// A receipt keeps at least this much of its command before a part is dropped for it.
+// Parts leave until a command this short fits whole, and until a longer one keeps `MIN_COMMAND` cells.
+const WHOLE_COMMAND = 16;
 const MIN_COMMAND = 8;
 
 function partsOf(doneAt: string | null, { tokens, costUsd }: TurnRecord): Part[] {
@@ -68,7 +69,7 @@ function partsOf(doneAt: string | null, { tokens, costUsd }: TurnRecord): Part[]
 }
 
 // `head`, then the parts and the receipt joined by dots, in `columns` cells: parts leave by
-// priority, and the receipt never leaves; its command is cut instead.
+// priority, and the receipt never leaves; its command is cut instead, a short one only once no part is left.
 function fitted(head: readonly Piece[], doneAt: string | null, record: TurnRecord, g: Glyphs, columns: number): Piece[] {
   const dot = dim(` ${g.dot} `);
   const { receipt } = record;
@@ -79,7 +80,7 @@ function fitted(head: readonly Piece[], doneAt: string | null, record: TurnRecor
   const segments = () => parts.length + (receipt === null ? 0 : 1);
   const dots = () => Math.max(0, segments() - (head.length === 0 ? 1 : 0)) * displayWidth(dot.text);
   const used = () => piecesWidth(head) + dots() + parts.reduce((sum, part) => sum + displayWidth(part.piece.text), 0) + piecesWidth(mark) + displayWidth(words);
-  const kept = Math.min(displayWidth(command), MIN_COMMAND);
+  const kept = displayWidth(command) <= WHOLE_COMMAND ? displayWidth(command) : MIN_COMMAND;
   while (parts.length > 0 && used() + kept > columns) {
     const first = parts.reduce((out, part) => (part.priority > out.priority ? part : out));
     parts.splice(parts.indexOf(first), 1);

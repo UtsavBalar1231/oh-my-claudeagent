@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [3.3.1] - 2026-10-26
+
+### Changed
+
+- **Claude Code 2.1.308:** OMCA is tested with Claude Code 2.1.308, and the engine types come from
+  it. The floor stays 2.1.300.
+- **Narrow docked pane:** Claude Code 2.1.305 and later keep a docked pane within 45% of the
+  terminal. The agent page shortens its key labels (`v: Transcript`) when they would not fit, and
+  the Plan board shows the focused task's detail beside the list from a 90-column pane body, about
+  a 207-column terminal, and beneath its row below that.
+
+### Fixed
+
+- **Turn line:** in the ctrl+o view, and while a turn waits on a workflow or on agents Claude Code
+  does not name, Claude Code keeps its own line and OMCA's tokens, cost and receipt go on a row
+  beneath it, so no waiting text is lost. A short verification command, such as `just test`,
+  stays whole while the clock, cost or tokens can still give way.
+- **Other mods' bands:** OMCA's band no longer hides a band another mod draws above the prompt;
+  that band stays beneath OMCA's rows.
+- **Pictures in iTerm2:** a picture over 2 MiB, which iTerm2 shows only as text, no longer turns
+  off the previews of smaller pictures for the rest of the session.
+- **Delegation wording:** the output style and the triage skill tell a background child from a
+  foreground one by what the Agent call returns, now that fork subagents are on by default in
+  `claude -p` and the Agent SDK too.
+- **OpenCode specialist routing:** the OMCA coordinator denies delegation to native General and
+  Explore and explicitly routes work to its specialists. Native workflows and other custom
+  agents retain their existing permissions.
+
 ## [3.3.0] - 2026-10-20
 
 ### Added
@@ -3122,6 +3152,7 @@ for multi-agent orchestration.
 - Shellcheck fixes applied across all hook scripts
 - Ruff fixes applied to Python MCP servers
 
+[3.3.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.3.0...v3.3.1
 [3.3.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.2.0...v3.3.0
 [3.2.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.0.1...v3.1.0

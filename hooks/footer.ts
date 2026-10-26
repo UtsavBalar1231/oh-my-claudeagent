@@ -56,16 +56,6 @@ function turnIdOf(requestId: string, now: number): string | undefined {
   return start.turnId;
 }
 
-/** The agent types the engine says the turn waits on, from a client that passes them; undefined from one that does not. */
-function engineWaiting(props: Readonly<Record<string, unknown>>): string[] | undefined {
-  if (!("isExpanded" in props)) return undefined;
-  const waiting = props["waitingFor"];
-  if (typeof waiting !== "object" || waiting === null || !("agents" in waiting) || !Array.isArray(waiting.agents)) return [];
-  return waiting.agents.flatMap((agent: unknown) =>
-    typeof agent === "object" && agent !== null && "agentType" in agent && typeof agent.agentType === "string" ? [agent.agentType] : [],
-  );
-}
-
 const clockOf = (ms: number): string => new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
 function lineRow(kit: Kit, pieces: readonly Piece[], g: Glyphs): RenderElement {
@@ -85,8 +75,11 @@ async function turnOf(host: Host, e: RenderInput<"TurnDuration">) {
   const turnId = turnIdOf(e.requestId, now);
   const record = turnId === undefined ? undefined : turns.find((turn) => turn.turnId === turnId);
   if (record === undefined) return undefined;
-  const props: Readonly<Record<string, unknown>> = { ...e.props };
-  return { record, waiting: engineWaiting(props) };
+  const { isExpanded, waitingFor } = e.props;
+  // The engine's own words stay where OMCA's line would drop something: the expanded view, a
+  // workflow, or agents the engine waits on without naming them.
+  const keepsEngine = isExpanded === true || (waitingFor === undefined ? record.waiting.length > 0 : waitingFor.workflows > 0);
+  return { record, keepsEngine, waiting: waitingFor?.agents.map((agent) => agent.agentType) ?? [] };
 }
 
 export const footer: Features = {
@@ -152,10 +145,9 @@ export const footer: Features = {
   "ui.render TurnDuration": {
     async pre(host, e) {
       const turn = await turnOf(host, e);
-      // A client that names no waited-on agents still draws its own waiting line, kept whole with the facts beneath it.
-      if (turn === undefined || (turn.waiting === undefined && turn.record.waiting.length > 0)) return undefined;
+      if (turn === undefined || turn.keepsEngine) return undefined;
       const g = glyphs(resolvedSession().glyphTier);
-      const waiting = turn.waiting ?? [];
+      const { waiting } = turn;
       const { word, durationMs } = e.props;
       const doneAt = waiting.length > 0 ? null : clockOf(turn.record.endedAt);
       const pieces = turnLine({ word, durationMs, doneAt, waiting, record: turn.record }, g, (e.viewport?.columns ?? 80) - MARK_CELLS);
@@ -163,7 +155,7 @@ export const footer: Features = {
     },
     async post(host, e, result) {
       const turn = await turnOf(host, e);
-      if (turn === undefined || turn.waiting !== undefined || turn.record.waiting.length === 0) return undefined;
+      if (turn === undefined || !turn.keepsEngine) return undefined;
       const facts = turnFacts(turn.record, glyphs(resolvedSession().glyphTier), (e.viewport?.columns ?? 80) - MARK_CELLS);
       if (facts.length === 0) return undefined;
       const kit = kitOf(host.ui.resolve(e), e.surface);

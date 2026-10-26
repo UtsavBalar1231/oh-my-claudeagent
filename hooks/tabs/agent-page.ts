@@ -117,19 +117,21 @@ export async function view(host: Host, view: View, lane: Lane): Promise<readonly
   const page = (await host.state.pages.get()).value?.[lane.id];
   const isViewing = view.viewing === lane.id;
   const buttons = [
-    [BACK, "Back", () => close(host, lane.id)],
-    ...(page === undefined ? [] : [[COPY, "Copy brief", () => copyBrief(host, page.brief)] as const]),
-    [KEYS.reload, "Reload", () => loadPage(host, lane.id)],
-    [VIEW, isViewing ? "Back to main" : "Show transcript", () => switchView(host, lane.id, isViewing)],
+    [BACK, "Back", "Back", () => close(host, lane.id)],
+    ...(page === undefined ? [] : [[COPY, "Copy brief", "Copy", () => copyBrief(host, page.brief)] as const]),
+    [KEYS.reload, "Reload", "Reload", () => loadPage(host, lane.id)],
+    [VIEW, isViewing ? "Back to main" : "Show transcript", isViewing ? "Main view" : "Transcript", () => switchView(host, lane.id, isViewing)],
   ] as const;
-  const cells = buttons.reduce((sum, [hotkey, label]) => sum + displayWidth(`${hotkey}: ${label}`), 0);
-  const keyGap = cells + COLUMN_GAP * (buttons.length - 1) <= view.width ? COLUMN_GAP : 1;
+  const across = (isShort: boolean, gap: number) =>
+    buttons.reduce((sum, [hotkey, label, short]) => sum + displayWidth(`${hotkey}: ${isShort ? short : label}`), 0) + gap * (buttons.length - 1);
+  const keyGap = across(false, COLUMN_GAP) <= view.width ? COLUMN_GAP : 1;
+  const isShort = across(false, keyGap) > view.width;
   const keys = kit.Box({
     key: "page-keys",
     flexDirection: "row",
     columnGap: keyGap,
     ...buttonRow(view),
-    children: buttons.map(([hotkey, label, work]) => keyButton(view, hotkey, label, work)),
+    children: buttons.map(([hotkey, label, short, work]) => keyButton(view, hotkey, isShort ? short : label, work)),
   });
   const head = header(view, lane);
   if (page === undefined) {

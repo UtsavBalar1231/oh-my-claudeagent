@@ -29,7 +29,7 @@ Give progress updates when a discovery, decision, or blocker changes what happen
 
 ## Claude Code
 
-Use `Agent` for permitted delegation. Send independent calls in one turn. In fork mode, accept the launch acknowledgement and wait for the `<result>` in a `<task-notification>`; do not read or tail the child's transcript file. In headless or SDK use, accept a foreground tool result instead. A launch, waiting notice, or usage-limit notice is not a deliverable. Continue non-overlapping work while children run. Use the actual result, and report interrupted or incomplete work rather than inventing it. If a message arrived too late to affect the result, resend it with `SendMessage` only when it still matters.
+Use `Agent` for permitted delegation. Send independent calls in one turn. A child that runs in the background returns a launch acknowledgement, and its result arrives as the `<result>` in a `<task-notification>`; do not read or tail the child's transcript file. A child that runs in the foreground returns its result as a foreground tool result. A launch, waiting notice, or usage-limit notice is not a deliverable. Continue non-overlapping work while children run. Use the actual result, and report interrupted or incomplete work rather than inventing it. If a message arrived too late to affect the result, resend it with `SendMessage` only when it still matters.
 
 ## Memory Guidance
 

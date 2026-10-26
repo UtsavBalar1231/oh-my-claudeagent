@@ -94,7 +94,10 @@ remain available. Specialists run as child sessions: `omca-explorer`,
 `omca-build-fixer` and `omca-executor`.
 Read-only specialists use native read/search tools without shell or file edits.
 With OMCA enabled, native Plan delegates only to Explore or OMCA's read-only
-specialists. Execution-capable children, including General, require Build or OMCA.
+specialists. Execution-capable children require Build or OMCA. The OMCA coordinator
+denies delegation to native General and Explore and routes work to its specialists.
+Build retains access to General and Explore. Other custom delegation targets keep
+their existing permissions.
 
 Commands:
 
@@ -221,9 +224,10 @@ the work happens:
   problem (1 error)`, read from the command's own output. The runners are the ones the
   verification gate records.
 - **A picture Claude reads.** Under a folded group with a Read of a PNG, a row names the file and
-  its size, and a terminal that draws pictures (kitty, Ghostty) shows the picture beneath it, at
-  most 72 columns by 20 rows. A terminal that cannot, tmux included, keeps the name row alone:
-  OMCA asks the terminal once, after the first picture it draws. A group of more than three
+  its size, and a terminal that draws pictures (kitty, Ghostty, iTerm2 3.5 or later in fullscreen
+  rendering) shows the picture beneath it, at most 72 columns by 20 rows. A terminal that cannot,
+  tmux included, keeps the name row alone: OMCA asks the terminal once, after the first picture it
+  draws. iTerm2 keeps the name row alone for a picture over 2 MiB. A group of more than three
   pictures previews three and names the rest.
 
 Running agents are listed by Claude Code itself, under the prompt. A session without a terminal
@@ -244,7 +248,8 @@ clears the buttons, and so does filling the prompt from history, an undo or anot
 buttons are held while an agent's transcript is in the main view and return with the main
 conversation.
 
-Set the `showBand` option to `false` to hide it.
+Claude Code has one band for every mod, and a band another mod draws stays beneath OMCA's rows.
+Set the `showBand` option to `false` to hide OMCA's.
 
 ### The pane
 
