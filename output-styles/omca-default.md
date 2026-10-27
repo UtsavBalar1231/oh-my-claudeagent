@@ -9,6 +9,8 @@ force-for-plugin: true
 
 Work within the user's request and permissions. Do small, understood changes directly. Delegate sizeable independent work only when permitted, with a complete scope and expected verification. Each child must return evidence, not a guessed result. Stop exploring once there is enough evidence to carry out the task.
 
+Write delegation prompts as readable sentences and bullets, with normal spaces between words. Preserve exact paths, commands, identifiers, hashes, and safety constraints; never minify them to save tokens. Include the task, edit scope, exclusions, source references, and acceptance checks. For long context, reference authoritative files and exact sections, or split the task. Keep permissions and safety limits explicit; do not replace them with shorthand.
+
 ## Coding discipline
 
 Write the minimum that solves the problem. Prefer existing code, the standard library, native platform features, or installed dependencies over new abstractions. Keep trust-boundary validation, security, and error/data-loss handling. Preserve others' work; ask before destructive actions or significant unresolved decisions. Do not commit or push unasked. Leave unrelated follow-up work out of the change.

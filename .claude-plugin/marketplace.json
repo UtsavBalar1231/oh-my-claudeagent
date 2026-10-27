@@ -7,7 +7,7 @@
   },
   "metadata": {
     "description": "oh-my-claudeagent: Claude Code, with receipts",
-    "version": "3.3.1"
+    "version": "3.3.2"
   },
   "plugins": [
     {
@@ -17,10 +17,10 @@
         "source": "url",
         "url": "https://github.com/UtsavBalar1231/oh-my-claudeagent.git",
         "ref": "plugin",
-        "sha": "f3be4901859196ce7ad1b06a8c7ac1192d8cac0e"
+        "sha": "0ce0e8bc5ad9e9d10c22a83db9faacbe9c570007"
       },
       "description": "Claude Code, with receipts. Plans with you, hands each task to a specialist agent, and keeps a session from calling work done until a verification is logged. Its hooks run in every session, a guard holds destructive shell commands for review, and setup can point your status line at OMCA.",
-      "version": "3.3.1",
+      "version": "3.3.2",
       "author": {
         "name": "UtsavBalar1231",
         "email": "utsavbalar1231@gmail.com"
