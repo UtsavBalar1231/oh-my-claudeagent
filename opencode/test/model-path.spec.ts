@@ -285,4 +285,16 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
     verify(observed.some((request) => system(request).includes(EXECUTOR)), "OMCA did not launch omca-executor")
     verify(observed.filter(lastIsTool).map(lastText).join("\n").includes("omca guard:"), "OMCA executor did not run its scoped task")
   }, SLOW)
+
+  test("delegation preserves readable multiline prompts and reaches both primary agents", async () => {
+    const expected = "You are a subagent spawned by another session.\nOMCA-SCENARIO:warm-up\n\nTask: Read `src/audio helper.ts` without editing files.\nConstraints: No network, hardware access, or commits.\nReference only: `printf '%s\\n' 'two words'`.\nKeep the 200–250 ms interval and the 30 s deadline."
+    for (const agent of ["omca", "build"]) {
+      const start = requests().length
+      await run("prompt-fidelity", agent)
+      const observed = requests().slice(start)
+      verify(observed.some((request) => !worker(request) && system(request).includes("never minify them to save tokens")), `${agent}: delegation fidelity guidance did not reach the parent`)
+      const child = observed.find((request) => system(request).includes(EXECUTOR) && request.messages?.at(-1)?.role === "user")
+      verify(child !== undefined && lastText(child) === expected, `${agent}: multiline delegation changed before reaching the child`)
+    }
+  }, SLOW)
 })

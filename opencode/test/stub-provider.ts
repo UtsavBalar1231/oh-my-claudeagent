@@ -11,6 +11,7 @@ if (!log) throw new Error("STUB_LOG is required")
 const SCENARIOS: Record<string, { tool: string; args: Json }> = {
   "shell-reset": { tool: "shell", args: { command: "git reset --hard HEAD~1" } },
   subagent: { tool: "subagent", args: { agent: "omca-executor", description: "omca stub", prompt: "OMCA-SCENARIO:shell-reset" } },
+  "prompt-fidelity": { tool: "subagent", args: { agent: "omca-executor", description: "Read task contract", prompt: "OMCA-SCENARIO:warm-up\n\nTask: Read `src/audio helper.ts` without editing files.\nConstraints: No network, hardware access, or commits.\nReference only: `printf '%s\\n' 'two words'`.\nKeep the 200–250 ms interval and the 30 s deadline." } },
   "skill-load": { tool: "skill", args: { id: "omca-handoff" } },
   "slop-write": { tool: "write", args: { path: "slop.sh", content: '# set the user name\nuser_name="$input_value"\n' } },
   "explore-write": { tool: "subagent", args: { description: "omca stub", prompt: "OMCA-SCENARIO:write-file" } },
