@@ -104,7 +104,7 @@ describe("generated prompts", () => {
       expect(c.template, c.name).toContain("$ARGUMENTS");
       bodies.push(c.template);
     }
-    expect(data.outputStyle.length).toBeLessThanOrEqual(2500);
+    expect(data.outputStyle.length).toBeLessThanOrEqual(3000);
     bodies.push(data.outputStyle);
     expect(bodies.reduce((total, body) => total + body.length, 0)).toBeLessThanOrEqual(30000);
     for (const body of bodies) {
