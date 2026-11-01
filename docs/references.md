@@ -146,7 +146,7 @@ server's `omca_hook` tool, which dispatches through `servers/hooks/registry.ts`.
 
 | Event | Feature |
 | --- | --- |
-| `tool.check` for Bash and PowerShell | The destructive-command guard and its review dialog |
+| `tool.check` for Bash, PowerShell and Monitor | The destructive-command guard and its review dialog; a Monitor command is read as bash |
 | `session.start` | Registers `/omca`, writes the session's mod marker, draws the band's first state, and writes a transcript line when the `omca` server is not connected, naming a missing bun or the server's error |
 | `prompt.submit` | Tracks user-origin submissions and cancels a pending refusal recovery when new user input arrives |
 | `turn.start`, `turn.complete` | The turn's tokens, cost and verification receipt for its closing line, a finished agent's notice, the band and its buttons, the pane's refresh. A main turn you started in an interactive session that still ends in a `reasoning_extraction` refusal, after Claude Code's own retry, gets at most one follow-up prompt from OMCA; the refusal itself stands |
@@ -157,7 +157,7 @@ server's `omca_hook` tool, which dispatches through `servers/hooks/registry.ts`.
 
 An observed user submission cancels a follow-up before it is queued. If user input races a
 follow-up already queued, neither competing turn qualifies for another automatic recovery.
-`tool.check` runs before every Bash and PowerShell call in every permission mode and never
+`tool.check` runs before every Bash, PowerShell and Monitor call in every permission mode and never
 returns an allow, which would skip the auto-mode classifier.
 
 Other refusal categories, such as `cyber`, `bio` and `frontier_llm`, get no follow-up. The
@@ -273,7 +273,7 @@ The plugin applies none of these.
 | `availableModels` | An allowlist must include `sonnet`, `opus` and `fable`, or the agents on a missing tier cannot run |
 | `permissions.deny` with `Agent(model:fable)` | Gates per-call escalations to the `fable` tier. It cannot cap an agent's declared tier, because those calls carry no `model` |
 | `subagentPromptCacheTtl` | `"1h"` keeps a long parallel run's cache warm, at a higher write price |
-| `idleCompaction` | On by default in a terminal session. About 54 minutes after the last request, a conversation over the threshold compacts before its one-hour cache expires. `false` turns it off, as does `DISABLE_AUTO_COMPACT` |
+| `idleCompaction` | On by default in the terminal, the Desktop app and VS Code. About an hour after the last request, a conversation over the threshold compacts before its one-hour cache expires. `false` turns it off, as does `DISABLE_AUTO_COMPACT` |
 | `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS` | Context size at which idle compaction applies. Default 200000, lowest 100000 |
 | `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` | Default 10. A wider parallel group runs in series |
 
@@ -322,7 +322,7 @@ ledger, notepads and the registry, and links the JSON Schemas for the ledger and
 | Guard decisions | Yes | When the app's Claude Code is 2.1.300 or later | Yes | Yes | Unless `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks` |
 | Guard review dialog | Yes | As guard decisions | No: held commands are decided without you | No: decided as in `-p` | As the guard |
 | Band, pane, plan reader, doctor | Yes | As guard decisions, with [Desktop's differences](usage.md#desktop-and-vs-code) | No | No ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)) | As the guard |
-| Turn line, agent rows, receipts and image previews in the transcript | Yes, pictures where the terminal draws them (kitty, Ghostty, iTerm2 3.5 or later) | No: Desktop keeps its own rows, and the turn's figures and receipt arrive as a text row beneath the answer | No | No | As the guard |
+| Turn line, agent rows, receipts and image previews in the transcript | Yes, pictures where the terminal draws them (kitty, Ghostty, iTerm2 3.5 or later, and tmux 3.3 or later with passthrough on) | No: Desktop keeps its own rows, and the turn's figures and receipt arrive as a text row beneath the answer | No | No | As the guard |
 | Status line | Yes | Not documented | No | Not documented | Unless `allowManagedHooksOnly` or `disableAllHooks` |
 
 Where the built-in `sec-default` guard loads (a machine whose managed settings set at least one

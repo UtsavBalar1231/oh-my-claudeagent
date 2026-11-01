@@ -50,10 +50,12 @@ atoms written once per turn or per finished agent, since a row subscribes to eve
   verification call (`isVerificationCommand`), and for a Read that returned a PNG a name row and
   an `Image` of the picture (the first three per group; the rest keep the name row). A picture
   whose bytes do not open as a PNG keeps its name row, since one bad `Image` refuses the whole
-  tree. A picture over 2 MiB is passed as its file. After the first picture of each kind it draws,
-  bytes or a file, the feature blits it once: a refusal that names the alt means the terminal shows
-  that kind only as text, and every later preview of that kind is the name row alone. tmux shows
-  neither kind; iTerm2 3.5 and later draws bytes and not a file.
+  tree. The previews share one tree's 2 MiB of picture bytes, the first first, and one that no
+  longer fits is passed as its file. After the first picture of each kind it draws, bytes or a file,
+  the feature blits it once: a refusal that names the alt means the terminal shows that kind only as
+  text, and every later preview of that kind is the name row alone. tmux and iTerm2 3.5 and later
+  draw bytes and not a file, and a refusal carrying `fix: "tmux-passthrough"` writes one transcript
+  line naming tmux's `allow-passthrough` and `focus-events`.
   An expanded group is left as drawn.
 
 `agents-tracker` also owns the agent page that `tabs/agent-page.ts` draws on the Agents tab: a
@@ -142,7 +144,8 @@ overflowing region, a row, a page (`bodyRows`) or an end (`contentRows`) at a ti
   verification, and the drift guard in that order and answers with the first block.
   `OMCA_DISABLED_HOOKS=stop-gates` turns off all three; `plan-continuation`,
   `final-verification`, or `drift-guard` turns off one.
-- The destructive-command guard lives in the mod, on `tool.check` for Bash and PowerShell
+- The destructive-command guard lives in the mod, on `tool.check` for Bash, PowerShell and Monitor
+  (whose commands are bash: Monitor needs Git Bash on Windows)
   (`hooks/bash-guard.ts`, with its patterns in `src/core/destructive.ts`). A recursive removal
   whose target is the filesystem root, home, the working directory, or a directory directly
   under root or home is denied outright. The destructive git family (hard reset, stash, clean,
@@ -162,7 +165,7 @@ overflowing region, a row, a page (`bodyRows`) or an end (`contentRows`) at a ti
   commands handed to another interpreter: `bash -c`, `sh -c`, `eval`, a heredoc fed to a shell,
   `pwsh -Command`, `cmd /c` and `Invoke-Expression` with a literal string. Anchoring on command position keeps a literal
   mention out of scope, since the `rm` in `grep -rn "rm -rf" scripts/` follows a quote rather than
-  a separator. `tool.check` runs before every Bash and PowerShell call in every permission mode,
+  a separator. `tool.check` runs before every Bash, PowerShell and Monitor call in every permission mode,
   so the guard never depends on a dialog being shown. The platform's critical-path check on `rm`
   and `rmdir` asks in the terminal or denies in auto mode, and the classifier does not review
   those removals. That check covers critical paths only, while the guard also covers the

@@ -14,6 +14,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   asking Claude to continue with conclusions, evidence and actions instead of its reasoning.
   Other refusals, such as a cybersecurity flag, are left to you, and
   `OMCA_DISABLED_HOOKS=refusal-recovery` turns the follow-up off.
+- **Pictures in tmux:** picture previews draw inside tmux 3.3 or later once tmux's
+  `allow-passthrough` and `focus-events` are on. When tmux holds them back, OMCA writes one line
+  in the transcript naming the two options.
+
+### Changed
+
+- **Claude Code 2.1.316:** OMCA is tested with Claude Code 2.1.316, and the engine types come from
+  it. The floor stays 2.1.300.
+- **Dependencies:** CI runs Bun 1.4.4, and the dev tools move to oxlint 1.90 and solid-js 1.9.18.
+  The OpenCode adapter now targets OpenCode 2.2.5 or later in the 2.x line, with
+  `@opencode/plugin` 2.2.5 and `@opentui` 0.8.1; CI loads it in OpenCode 2.2.5.
+- **Workflows:** the local ast-grep action and the release workflow's call into CI use GitHub's
+  `$/` same-repository syntax, which zizmor 1.31 asks for.
+
+### Fixed
+
+- **The guard and the Monitor tool:** a destructive command Claude starts through the Monitor tool
+  is now held for review like the same command in Bash. Before, only Claude Code's own permission
+  prompt saw it, and an allow rule or auto mode let it run.
+- **Several large pictures in one group:** the pictures under one tool group share the 2 MiB
+  Claude Code draws in one tree, so two or three large screenshots no longer keep the whole row
+  from drawing; a picture past the shared 2 MiB is drawn from its file.
+- **Doctor:** `CLAUDE_CODE_EFFORT_LEVEL=unset`, which sends no effort level, no longer warns as an
+  unknown level.
+- **Setup:** the force-style opt-out reports a refusal from
+  `permissions.blockWritesOutsideWorkingDirectories` instead of failing without a reason.
 
 ## [3.3.2] - 2026-10-27
 

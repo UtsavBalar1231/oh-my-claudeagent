@@ -191,8 +191,9 @@ the model cannot.
 ### After compaction
 
 Skills can go missing from the model's list after the conversation compacts. Run `/reload-skills`
-to send the full skill list again. A terminal session also compacts a long conversation on its
-own after about 54 minutes idle (`idleCompaction`; see `docs/references.md` for the settings).
+to send the full skill list again. Claude Code also compacts a long conversation on its own after
+about an hour idle, in the terminal, the Desktop app and VS Code (`idleCompaction`; see
+`docs/references.md` for the settings).
 
 ### Ask a specialist directly
 
@@ -225,10 +226,12 @@ the work happens:
   verification gate records.
 - **A picture Claude reads.** Under a folded group with a Read of a PNG, a row names the file and
   its size, and a terminal that draws pictures (kitty, Ghostty, iTerm2 3.5 or later in fullscreen
-  rendering) shows the picture beneath it, at most 72 columns by 20 rows. A terminal that cannot,
-  tmux included, keeps the name row alone: OMCA asks the terminal once, after the first picture it
-  draws. iTerm2 keeps the name row alone for a picture over 2 MiB. A group of more than three
-  pictures previews three and names the rest.
+  rendering) shows the picture beneath it, at most 72 columns by 20 rows. A terminal that cannot
+  keeps the name row alone: OMCA asks the terminal once, after the first picture it draws. Inside
+  tmux 3.3 or later, pictures draw once tmux's `allow-passthrough` and `focus-events` are on, and
+  OMCA says so in the transcript when tmux holds them back. A group of more than three pictures
+  previews three and names the rest, and the pictures in one group share 2 MiB: past that, and in
+  tmux and iTerm2, a picture drawn from its file keeps the name row alone.
 
 Running agents are listed by Claude Code itself, under the prompt. A session without a terminal
 gets the turn's figures as one text row beneath the answer instead.
@@ -420,7 +423,7 @@ focus, and a click anywhere on a run's row focuses that run (on Desktop, a click
 
 ## The guard
 
-OMCA's guard checks every Bash and PowerShell command before it runs, including commands handed
+OMCA's guard checks every Bash, PowerShell and Monitor command before it runs, including commands handed
 to another interpreter: `bash -c`, `sh -c`, `eval`, a heredoc fed to a shell, `pwsh -Command`,
 `cmd /c` and `Invoke-Expression` with a literal string. It also sees through wrappers such as
 `sudo`, `env`, `timeout`, `nice`, `nohup`, `stdbuf`, `ionice`, `chrt`, `setsid`, `time` and
@@ -515,7 +518,7 @@ the directory, the 5 hour limit, the cost and duration, the branch, the context 
 plan. The model always stays. No segment is cut in half, and a terminal under 60 columns gets one
 compact line.
 
-The usage limits appear for Claude.ai Pro and Max subscribers. The cost shows only when they are
+The usage limits appear for Claude.ai Pro, Max and Ultra subscribers. The cost shows only when they are
 absent and the cost is above zero, since a subscription is not billed by the token. Behind a
 Claude apps gateway that reports only a spend limit, the cost shows, followed by the dollars spent
 against that limit.
@@ -587,7 +590,9 @@ The [availability table](references.md#where-each-feature-works) lists each feat
 server connected, and when it did not, it writes one line in the transcript. Either bun is not on
 `PATH`: install bun 1.4.2 or later and restart Claude Code (for Desktop and VS Code, see above).
 Or the server failed: the line gives Claude Code's reason, and `/mcp` shows the server's state.
-A server listed there as pending approval needs your approval.
+A failed server is not started again on its own: choose Reconnect in `/mcp`, and in `claude -p`
+runs Claude Code skips it for 15 minutes after a failed start. A server listed there as pending
+approval needs your approval.
 
 **`evidence_log` fails partway through a plan.** The server was reconnecting or reloading. Call
 the tool again; do not skip the evidence.

@@ -147,8 +147,8 @@ bound plan, returns nothing.
 **What they read.** The prompt text, the inputs and outputs of Read, Write, Edit, Agent, Bash
 and PowerShell calls, and the tail of the transcript at Stop. The drift guard runs local `git`.
 
-**The mod.** `hooks/register.ts` handles `tool.check` for Bash and PowerShell (the
-destructive-command guard), `tool.call`, `session.start`, `turn.start`, `turn.step`,
+**The mod.** `hooks/register.ts` handles `tool.check` for Bash, PowerShell and Monitor (the
+destructive-command guard), `tool.call`, `session.start`, `prompt.submit`, `turn.start`, `turn.step`,
 `turn.complete`, `agent.spawn`, `prompt.edit`, `prompt.change`, `prompt.autocomplete`, `ui.close`,
 `ui.focus`, `ui.scroll`, `command.run` for `/omca`, `ui.render` and `session.compact`. `claude plugin
 validate .` lists them with the host calls the mod makes: the file system, the clock, local
