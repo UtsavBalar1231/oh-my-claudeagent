@@ -109,7 +109,7 @@ The launcher runs the renderer of the enabled plugin install that Claude Code re
 
 The `disableForceOrchestrationStyle` option is `${user_config.disableForceOrchestrationStyle}`; a placeholder means the default `false`. When it is not `true`, skip this phase.
 
-Only the installed cache copy is edited, because a `--plugin-dir` checkout is tracked source. When `${CLAUDE_PLUGIN_ROOT}` lies under `plugins/cache/` in the user settings directory, Read `${CLAUDE_PLUGIN_ROOT}/output-styles/omca-default.md`. If its frontmatter has the line `force-for-plugin: true`, remove that line with Edit and report that the user's own `outputStyle` now takes precedence. If the line is already gone, report that. A plugin update restores the line, so this phase has to run again after each update. Outside the cache, report that the opt-out applies only to an installed copy.
+Only the installed cache copy is edited, because a `--plugin-dir` checkout is tracked source. When `${CLAUDE_PLUGIN_ROOT}` lies under `plugins/cache/` in the user settings directory, Read `${CLAUDE_PLUGIN_ROOT}/output-styles/omca-default.md`. If its frontmatter has the line `force-for-plugin: true`, remove that line with Edit and report that the user's own `outputStyle` now takes precedence. If the line is already gone, report that. If Edit refuses the path because `permissions.blockWritesOutsideWorkingDirectories` is on, report that the opt-out needs that setting off for this one edit, and end the phase. A plugin update restores the line, so this phase has to run again after each update. Outside the cache, report that the opt-out applies only to an installed copy.
 
 ### Report
 
