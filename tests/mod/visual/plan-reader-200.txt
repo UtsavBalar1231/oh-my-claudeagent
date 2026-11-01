@@ -1,5 +1,5 @@
                                                                                                               │                                                                                       ✕
- ▐▛███▛█   Claude Code v2.1.308                                                                               │1: Agents  2: Plan  3: Evidence  4: Notepad
+ ▐▛███▛█   Claude Code v2.1.316                                                                               │1: Agents  2: Plan  3: Evidence  4: Notepad
 ▝▜██████▀  Opus 5.5 · API Usage Billing                                                                       │──────────────────────────────────────────────────────────────────────────────────────
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                       │╭────────────────────────────────────────────────────────────────────────────────────╮
                                                                                                               ││ Rebuild the billing export on the shared ledger                                    │
@@ -47,4 +47,4 @@
   ⏸ manual mode on · ? for shortcuts · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:executor  Reconcile totals                                                                                                                                    Ns · ↓ N.Nk tokens
+  ◯ oh-my-claudeagent:executor  Reconcile totals                                                                                                                                                    3s

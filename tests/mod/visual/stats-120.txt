@@ -1,5 +1,5 @@
                                                                   │                                                   ✕
- ▐▛███▛█   Claude Code v2.1.308                                   │1: Agents  2: Plan  3: Evidence  4: Notepad  Stats
+ ▐▛███▛█   Claude Code v2.1.316                                   │1: Agents  2: Plan  3: Evidence  4: Notepad  Stats
 ▝▜██████▀  Opus 5.5 · API Usage Billing                           │──────────────────────────────────────────────────
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd              │20 delegations in 3 sessions · 1 running · 1 skip…
                                                                   │╭────────────────────────────────────────────────╮

@@ -12,7 +12,7 @@
 
 ✻ Waiting for executor, explorer, architect · NN.Nk in NN out · $X.XX
 
- executor  Fix the heading parser                     1s · 2 calls · 16.2k tok
+ executor  Fix the heading parser                     1s · 2 calls · 16.4k tok
   ⎿  Fenced lines are skipped now, and the heading tests pass.
 
 ● ok
@@ -21,10 +21,10 @@
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
 │ 1: Agents  2: Plan  3: Evidence  4: Notepad                                  │
 │  explorer · Map the router callers             sonnet-5-5  high       Ns    │
-│   ✻ Bash sleep 90                                                 4 calls    │
+│   ✻ Bash ls plans                                                 3 calls    │
 │                                                                              │
 │  architect · Review the ledger design          fable-5-1   xhigh      Ns    │
-│   ✻ Bash sleep 90                                                 2 calls    │
+│   ✻ notepad_list                                                   1 call    │
 │  executor · Fix the heading parser · Fenced lines are skipped n…      1s    │
 │ d: Details  2 running · 1 finished · NN.Nk tokens                            │
 │                                                                              │

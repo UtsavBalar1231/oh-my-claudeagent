@@ -1,5 +1,5 @@
 
- ▐▛███▛█   Claude Code v2.1.308
+ ▐▛███▛█   Claude Code v2.1.316
 ▝▜██████▀  Opus 5.5 · API Usage Billing
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd
 
@@ -47,4 +47,4 @@
   ⏸ manual mode on · ? for shortcuts · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:executor  Port the snapshot onto the router                                                                                                                   Ns · ↓ N.Nk tokens
+  ◯ oh-my-claudeagent:executor  Port the snapshot onto the router                                                                                                                                   1s
