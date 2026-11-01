@@ -46,11 +46,11 @@
       { "content": [{ "type": "tool_use", "name": "Grep", "input": { "pattern": "router", "path": "plans" } }] },
       { "content": [{ "type": "tool_use", "name": "Glob", "input": { "pattern": "plans/*.md" } }] },
       { "content": [{ "type": "tool_use", "name": "Bash", "input": { "command": "ls plans", "description": "List the plans" } }] },
-      { "content": [{ "type": "tool_use", "name": "Bash", "input": { "command": "sleep 90", "description": "Wait for the build" } }] }
+      { "content": [{ "type": "tool_use", "name": "Bash", "input": { "command": "ls", "description": "Wait for the build" } }], "delayMs": 90000 }
     ],
     "ledger rotation": [
       { "content": [{ "type": "tool_use", "name": "mcp__plugin_oh-my-claudeagent_omca__notepad_list", "input": {} }] },
-      { "content": [{ "type": "tool_use", "name": "Bash", "input": { "command": "sleep 90", "description": "Wait for the test run" } }] }
+      { "content": [{ "type": "tool_use", "name": "Bash", "input": { "command": "ls", "description": "Wait for the test run" } }], "delayMs": 90000 }
     ]
   }
 }
