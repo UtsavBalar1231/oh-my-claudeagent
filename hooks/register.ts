@@ -183,7 +183,7 @@ export const register: Register = (on, pluginOptions) => {
   const groupRender = featuresFor("ui.render ToolGroup", { groupRows });
   const sessionCompact = featuresFor("session.compact", { compact });
 
-  on("tool.check", { tool: /^(?:Bash|PowerShell)$/ }, ($, e, next) =>
+  on("tool.check", { tool: /^(?:Bash|PowerShell|Monitor)$/ }, ($, e, next) =>
     dispatch(bindHost($, options), "tool.check", bash, e, next, guardFailed),
   ).catch((_$, _e, next) => guardFailed(next.error.message ?? next.error.kind));
   on("tool.call", { agentId: /./ }, ($, e, next) => dispatch(bindHost($, options), "tool.call", toolCall, e, next)).catch((_$, e, next) => next(e));

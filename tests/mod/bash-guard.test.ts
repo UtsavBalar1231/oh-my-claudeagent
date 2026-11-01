@@ -743,6 +743,18 @@ test("every PowerShell path that does not deny gets the engine's verdict unchang
   for (const command of commands) expect(await powershell($, command)).toEqual(ENGINE);
 });
 
+test("a Monitor command is held like a Bash command, and a WebSocket monitor reaches the engine untouched", async ($, on) => {
+  const { asked } = world(on, BUILD_WORLD);
+  const monitor = (input: Record<string, unknown>) => $.tool.check({ tool: "Monitor", input: { description: "watch", timeout_ms: 60_000, ...input } });
+
+  expect(await monitor({ command: "rm -rf ~" })).toEqual({ decision: "deny", reason: RM_CATASTROPHIC });
+  expect(await monitor({ command: BUILD_COMMAND })).toEqual({ decision: "deny", reason: REFUSED });
+  expect(asked.map((a) => a.question)).toEqual([BUILD_QUESTION]);
+  expect(await monitor({ ws: { url: "wss://feed.example.test/events" } })).toEqual(ENGINE);
+  expect(await monitor({ command: "tail -f build.log" })).toEqual(ENGINE);
+  expect(asked).toHaveLength(1);
+});
+
 test("a tool that only looks like a shell never reaches the guard", async ($, on) => {
   const { asked } = world(on);
 
