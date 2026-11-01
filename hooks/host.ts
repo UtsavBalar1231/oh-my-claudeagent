@@ -83,7 +83,7 @@ export type Host = {
     after: Engine["clock"]["after"];
     every: Engine["clock"]["every"];
   };
-  prompt: { fill: Engine["prompt"]["fill"] };
+  prompt: { fill: Engine["prompt"]["fill"]; submit: Engine["prompt"]["submit"] };
   state: { [K in keyof State]: AtomHost<K> };
 };
 

@@ -10,8 +10,8 @@ import { type Kit, kitOf, Line } from "./ui.ts";
 // A cell kept free at the row's end, as the transcript's other OMCA rows keep it.
 const GUTTER = 1;
 const MAX_PREVIEWS = 3;
-// The terminal takes at most 2 MiB of picture bytes from a plugin; a larger PNG is named by its path.
-const MAX_PNG_BYTES = 2 * 1024 * 1024;
+// The terminal draws at most 2 MiB of picture bytes in one tree; a picture past that is named by its path.
+const MAX_TREE_BYTES = 2 * 1024 * 1024;
 const PREVIEW_INDENT = 5;
 // Long enough for the terminal to have drawn the first preview, or its alt, before the probe asks which.
 const PROBE_MS = 300;
@@ -21,17 +21,31 @@ type Kind = "png" | "file";
 const kindOf = (source: ImageSource): Kind => ("file" in source ? "file" : "png");
 
 // Whether the terminal draws each kind of source, unknown until the first preview of that kind is
-// probed. A kind drawn only as the alt gets the caption alone from then on: tmux draws no picture,
-// iTerm2 draws bytes but not a file.
+// probed. A kind drawn only as the alt gets the caption alone from then on: tmux and iTerm2 draw
+// bytes but not a file, and tmux draws neither until its passthrough is on.
 const pictures: Partial<Record<Kind, boolean>> = {};
 const probing = new Set<Kind>();
+let isPassthroughNoted = false;
 
-async function sourceOf(host: Host, { base64, path }: ImagePreview): Promise<ImageSource | undefined> {
-  if (base64 === "") return undefined;
-  if ((base64.length * 3) / 4 <= MAX_PNG_BYTES) return { png: base64 };
+async function fileOf(host: Host, path: string): Promise<ImageSource | undefined> {
   if (path === "") return undefined;
   const { platform } = resolvedSession();
   return { file: isAbsolutePath(platform, path) ? path : joinPath(platform, await host.session.cwd(), path), format: "png" };
+}
+
+// The previews share one tree's byte budget, the first first; one that no longer fits goes by its path.
+async function sourcesOf(host: Host, previews: readonly ImagePreview[]): Promise<(ImageSource | undefined)[]> {
+  let room = MAX_TREE_BYTES;
+  const sources: (ImageSource | undefined)[] = [];
+  for (const { base64, path } of previews.slice(0, MAX_PREVIEWS)) {
+    const bytes = (base64.length * 3) / 4;
+    if (base64 === "") sources.push(undefined);
+    else if (bytes <= room) {
+      room -= bytes;
+      sources.push({ png: base64 });
+    } else sources.push(await fileOf(host, path));
+  }
+  return sources;
 }
 
 function probe(host: Host, requestId: string, key: string, source: ImageSource): void {
@@ -40,10 +54,14 @@ function probe(host: Host, requestId: string, key: string, source: ImageSource):
   probing.add(kind);
   host.clock.after(PROBE_MS, async () => {
     try {
-      const { deny } = await host.ui.blit({ requestId, key, source });
+      const { deny, fix } = await host.ui.blit({ requestId, key, source });
       const isDrawn = deny === undefined || !/\balt\b/.test(deny);
       pictures[kind] = isDrawn;
       if (!isDrawn) host.ui.invalidate();
+      if (fix === "tmux-passthrough" && !isPassthroughNoted) {
+        isPassthroughNoted = true;
+        host.ui.say("OMCA's picture previews are held back by tmux. Turn on tmux's allow-passthrough and focus-events, then start a new session to see them.");
+      }
     } catch (error) {
       host.log(`group rows: cannot tell whether the terminal draws pictures: ${reason(error)}`);
     } finally {
@@ -59,7 +77,7 @@ async function previewRows(host: Host, kit: Kit, e: Input<"ui.render ToolGroup">
   });
   if (previews.length === 0) return [];
   const g = glyphs(resolvedSession().glyphTier);
-  const sources = await Promise.all(previews.map((preview, index) => (index < MAX_PREVIEWS ? sourceOf(host, preview) : undefined)));
+  const sources = await sourcesOf(host, previews);
   // Past the first few, a read keeps its caption alone, so a burst of screenshots stays a list.
   return previews.flatMap((preview, index) => {
     const caption = Line(kit, previewCaption(preview, g, columns));

@@ -173,7 +173,7 @@ function effortCheck(cap: unknown): Check {
 const effortEnvCheck = (env: DoctorEnv): Check[] => {
   const raw = env.CLAUDE_CODE_EFFORT_LEVEL;
   const level = raw?.trim().toLowerCase() ?? "";
-  if (level === "" || level === "auto") return [];
+  if (level === "" || level === "auto" || level === "unset") return [];
   return [
     LEVELS.includes(level)
       ? check("effort-env", "Effort", "warn", `CLAUDE_CODE_EFFORT_LEVEL ${level} runs every agent at ${level}, whatever it declares`)

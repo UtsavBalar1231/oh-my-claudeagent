@@ -146,16 +146,23 @@ server's `omca_hook` tool, which dispatches through `servers/hooks/registry.ts`.
 
 | Event | Feature |
 | --- | --- |
-| `tool.check` for Bash and PowerShell | The destructive-command guard and its review dialog |
+| `tool.check` for Bash, PowerShell and Monitor | The destructive-command guard and its review dialog; a Monitor command is read as bash |
 | `session.start` | Registers `/omca`, writes the session's mod marker, draws the band's first state, and writes a transcript line when the `omca` server is not connected, naming a missing bun or the server's error |
-| `turn.start`, `turn.complete` | The turn's tokens, cost and verification receipt for its closing line, a finished agent's notice, the band and its buttons, the pane's refresh |
+| `prompt.submit` | Tracks user-origin submissions and cancels a pending refusal recovery when new user input arrives |
+| `turn.start`, `turn.complete` | The turn's tokens, cost and verification receipt for its closing line, a finished agent's notice, the band and its buttons, the pane's refresh. A main turn you started in an interactive session that still ends in a `reasoning_extraction` refusal, after Claude Code's own retry, gets at most one follow-up prompt from OMCA; the refusal itself stands |
 | `agent.spawn`, `turn.step` | The Agents tab and delegation records |
 | `tool.call` | A subagent's tool calls, kept for its page on the Agents tab; only a subagent's call reaches the mod, and a main-loop call skips it |
 | `session.compact` | Asks the summarizer to keep the bound plan and its next ten open tasks. It does not run for a user-installed plugin where an organization manages Claude Code; the server's `SessionStart` `compact` handler re-injects the plan context there |
 | `ui.render`, `ui.focus`, `ui.scroll`, `ui.close`, `prompt.edit`, `prompt.change`, `command.run` | The turn line, an agent's launch and finish rows, and the receipts and picture previews under tool groups in the transcript, the band, the pane and the commands |
 
-`tool.check` runs before every Bash and PowerShell call in every permission mode and never
+An observed user submission cancels a follow-up before it is queued. If user input races a
+follow-up already queued, neither competing turn qualifies for another automatic recovery.
+`tool.check` runs before every Bash, PowerShell and Monitor call in every permission mode and never
 returns an allow, which would skip the auto-mode classifier.
+
+Other refusal categories, such as `cyber`, `bio` and `frontier_llm`, get no follow-up. The
+engine validator allows `$.prompt.submit` only in that follow-up and its `Host` binding, and
+rejects `model.fork`, `http.fetch` and `store.*`.
 
 ### Settings hook events
 
@@ -196,6 +203,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | Name | Turns off |
 | --- | --- |
 | `bash-guard` | The guard's review and its refusals. The catastrophic-removal deny stays |
+| `refusal-recovery` | The follow-up prompt after a `reasoning_extraction` refusal |
 | `stop-gates` | Every stop gate |
 | `plan-continuation`, `final-verification`, `drift-guard` | One stop gate |
 | `task-completed` | The task completion check |
@@ -218,7 +226,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | --- | --- |
 | `OMCA_COMMENT_GATE` | `advise` (default) lets a write through with a note; `deny` blocks it; `off` skips the check |
 | `OMCA_GLYPHS` | The glyph set of the pane, band, transcript rows, dialog and status line: `nerd` (default, Nerd Font icons; the status line's cache and clock icons and its rings need Nerd Fonts v3), `unicode` (no Nerd Font needed) or `ascii` (plain text) |
-| `CLAUDE_CODE_EFFORT_LEVEL` | Read by the doctor. A level other than `auto` runs every agent at it, whatever the agent declares, and the doctor warns |
+| `CLAUDE_CODE_EFFORT_LEVEL` | Read by the doctor. A level other than `auto` or `unset`, which send no level, runs every agent at it, whatever the agent declares, and the doctor warns |
 | `CLAUDE_AFK_TIMEOUT_MS` | Read by the doctor. A whole number of milliseconds after which an unanswered question continues on its own, so a plan interview can settle on its defaults; it outranks `askUserQuestionTimeout`. Claude Code ignores it in project and local settings, and so does the doctor |
 | `OMCA_NATIVE_AGENTS_MD` | `1` stops the context injector from adding `AGENTS.md` where Claude Code already loads it natively and no project `CLAUDE.md` is on the path |
 | `OMCA_TRANSCRIPTS_ROOT` | The directory `session_search` reads instead of `~/.claude/projects` |
@@ -265,7 +273,7 @@ The plugin applies none of these.
 | `availableModels` | An allowlist must include `sonnet`, `opus` and `fable`, or the agents on a missing tier cannot run |
 | `permissions.deny` with `Agent(model:fable)` | Gates per-call escalations to the `fable` tier. It cannot cap an agent's declared tier, because those calls carry no `model` |
 | `subagentPromptCacheTtl` | `"1h"` keeps a long parallel run's cache warm, at a higher write price |
-| `idleCompaction` | On by default in a terminal session. About 54 minutes after the last request, a conversation over the threshold compacts before its one-hour cache expires. `false` turns it off, as does `DISABLE_AUTO_COMPACT` |
+| `idleCompaction` | On by default in the terminal, the Desktop app and VS Code. About an hour after the last request, a conversation over the threshold compacts before its one-hour cache expires. `false` turns it off, as does `DISABLE_AUTO_COMPACT` |
 | `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS` | Context size at which idle compaction applies. Default 200000, lowest 100000 |
 | `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` | Default 10. A wider parallel group runs in series |
 
@@ -314,7 +322,7 @@ ledger, notepads and the registry, and links the JSON Schemas for the ledger and
 | Guard decisions | Yes | When the app's Claude Code is 2.1.300 or later | Yes | Yes | Unless `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks` |
 | Guard review dialog | Yes | As guard decisions | No: held commands are decided without you | No: decided as in `-p` | As the guard |
 | Band, pane, plan reader, doctor | Yes | As guard decisions, with [Desktop's differences](usage.md#desktop-and-vs-code) | No | No ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)) | As the guard |
-| Turn line, agent rows, receipts and image previews in the transcript | Yes, pictures where the terminal draws them (kitty, Ghostty, iTerm2 3.5 or later) | No: Desktop keeps its own rows, and the turn's figures and receipt arrive as a text row beneath the answer | No | No | As the guard |
+| Turn line, agent rows, receipts and image previews in the transcript | Yes, pictures where the terminal draws them (kitty, Ghostty, iTerm2 3.5 or later, and tmux 3.3 or later with passthrough on) | No: Desktop keeps its own rows, and the turn's figures and receipt arrive as a text row beneath the answer | No | No | As the guard |
 | Status line | Yes | Not documented | No | Not documented | Unless `allowManagedHooksOnly` or `disableAllHooks` |
 
 Where the built-in `sec-default` guard loads (a machine whose managed settings set at least one
@@ -325,7 +333,7 @@ the guard leaves its decisions in place. A Desktop session in WSL loads no plugi
 ## Platform support
 
 CI runs the validator, the lint, the type checks, the bun specs, the mod tests, a smoke session
-and the OpenCode adapter specs on Linux, macOS and Windows against Claude Code 2.1.308. The
+and the OpenCode adapter specs on Linux, macOS and Windows against Claude Code 2.1.316. The
 guard reads Bash and PowerShell commands, including `cmd /c` and `Invoke-Expression`, and
 resolves home and project paths per platform. The README screenshots are captured with tmux,
 kitty and Xvfb, so capturing them needs Linux or WSL.

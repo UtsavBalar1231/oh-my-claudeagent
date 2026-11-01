@@ -15,7 +15,7 @@ workflow.
 
 ## Requirements
 
-- Claude Code 2.1.300 or later. Tested with 2.1.308.
+- Claude Code 2.1.300 or later. Tested with 2.1.316.
 - bun 1.4.2 or later, on the `PATH` Claude Code starts with. The `omca` server, its hooks and
   the status line run on bun.
 - `ast-grep` (or `sg`), optional. Only the structural code search tools need it.
@@ -38,7 +38,7 @@ checks the requirements above and offers to point your status line at OMCA's ren
 
 ### OpenCode V2
 
-The OpenCode adapter requires OpenCode 2.0.29 or later in the 2.0 release line.
+The OpenCode adapter requires OpenCode 2.2.5 or later in the 2.x release line.
 It adds a selectable `omca` coordinator, native specialist tools, and a terminal
 panel opened with `/omca`. Build and Plan remain available. See
 [OpenCode setup](docs/usage.md#use-it-from-opencode) for installation and limits.
@@ -147,8 +147,8 @@ bound plan, returns nothing.
 **What they read.** The prompt text, the inputs and outputs of Read, Write, Edit, Agent, Bash
 and PowerShell calls, and the tail of the transcript at Stop. The drift guard runs local `git`.
 
-**The mod.** `hooks/register.ts` handles `tool.check` for Bash and PowerShell (the
-destructive-command guard), `tool.call`, `session.start`, `turn.start`, `turn.step`,
+**The mod.** `hooks/register.ts` handles `tool.check` for Bash, PowerShell and Monitor (the
+destructive-command guard), `tool.call`, `session.start`, `prompt.submit`, `turn.start`, `turn.step`,
 `turn.complete`, `agent.spawn`, `prompt.edit`, `prompt.change`, `prompt.autocomplete`, `ui.close`,
 `ui.focus`, `ui.scroll`, `command.run` for `/omca`, `ui.render` and `session.compact`. `claude plugin
 validate .` lists them with the host calls the mod makes: the file system, the clock, local
