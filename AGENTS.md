@@ -2,7 +2,7 @@
 
 ## Commands and verification
 
-- Use Bun, not npm scripts: `bun install --frozen-lockfile`. CI pins Bun 1.4.2.
+- Use Bun, not npm scripts: `bun install --frozen-lockfile`. CI pins Bun 1.4.4.
   `just setup` only installs pre-commit hooks; it does not install dependencies.
 - Run `just ci` before claiming full verification. Its order is
   `lint -> typecheck -> validate -> test -> test-mod -> test-opencode -> smoke`.
@@ -16,7 +16,7 @@
   `just test` selects explicit roots; bare `bun test` also collects mod tests that need
   `just test-mod` (`claude plugin test .`). OpenCode specs run separately with `just test-opencode`.
 - Full checks need `ast-grep` (or `sg`) and Claude Code (CI pins 2.1.316).
-  OpenCode integration specs skip without `opencode` on PATH; CI installs 2.0.29.
+  OpenCode integration specs skip without `opencode` on PATH; CI installs 2.2.5.
   `just smoke` uses a mock model; `tests/plugin-evals/` calls a real model and is manual.
 
 ## Runtime boundaries

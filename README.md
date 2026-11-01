@@ -38,7 +38,7 @@ checks the requirements above and offers to point your status line at OMCA's ren
 
 ### OpenCode V2
 
-The OpenCode adapter requires OpenCode 2.0.29 or later in the 2.0 release line.
+The OpenCode adapter requires OpenCode 2.2.5 or later in the 2.x release line.
 It adds a selectable `omca` coordinator, native specialist tools, and a terminal
 panel opened with `/omca`. Build and Plan remain available. See
 [OpenCode setup](docs/usage.md#use-it-from-opencode) for installation and limits.

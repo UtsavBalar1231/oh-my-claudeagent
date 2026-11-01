@@ -16,7 +16,7 @@ jobs:
     name: CI
     permissions:
       contents: read
-    uses: ./.github/workflows/ci.yml
+    uses: $/.github/workflows/ci.yml
 
   release:
     name: Create Release

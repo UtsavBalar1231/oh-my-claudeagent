@@ -59,7 +59,7 @@ keeps its `.omca/` directory until you delete it.
 
 ### Use it from OpenCode
 
-The adapter supports OpenCode 2.0.29 in the 2.0 release line. Add the package to
+The adapter supports OpenCode 2.2.5 or later in the 2.x release line. Add the package to
 `plugins` in `~/.config/opencode/opencode.json(c)`:
 
 ```jsonc
