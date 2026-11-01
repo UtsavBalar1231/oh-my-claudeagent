@@ -11,6 +11,7 @@ import type { Host, Options } from "./host.ts";
 import { metrics } from "./metrics.ts";
 import { modMarker } from "./mod-marker.ts";
 import { router } from "./omca-router.ts";
+import { refusalRecovery } from "./refusal-recovery.ts";
 import { pane } from "./pane.ts";
 import { groupRows } from "./group-rows.ts";
 import { serverCheck } from "./server-check.ts";
@@ -79,7 +80,7 @@ function bindHost($: EngineInterface, options: Options): Host {
       after: (ms, fn) => $.clock.after(ms, fn),
       every: (ms, fn) => $.clock.every(ms, fn),
     },
-    prompt: { fill: (args) => $.prompt.fill(args) },
+    prompt: { fill: (args) => $.prompt.fill(args), submit: (args) => $.prompt.submit(args) },
     state: {
       agents: {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "agents" }),
@@ -160,12 +161,13 @@ export const register: Register = (on, pluginOptions) => {
   const options = readOptions(pluginOptions);
   const bash = featuresFor("tool.check", { bashGuard });
   const toolCall = featuresFor("tool.call", { agentsTracker });
-  const sessionStart = featuresFor("session.start", { pane, modMarker, band, serverCheck });
-  const turnStart = featuresFor("turn.start", { footer, modMarker });
+  const sessionStart = featuresFor("session.start", { refusalRecovery, pane, modMarker, band, serverCheck });
+  const promptSubmit = featuresFor("prompt.submit", { refusalRecovery });
+  const turnStart = featuresFor("turn.start", { refusalRecovery, footer, modMarker });
   const turnStep = featuresFor("turn.step", { metrics, agentsTracker });
-  const turnComplete = featuresFor("turn.complete", { band, agentsTracker, agentRows, metrics, pane, footer });
+  const turnComplete = featuresFor("turn.complete", { band, agentsTracker, agentRows, metrics, pane, footer, refusalRecovery });
   const agentSpawn = featuresFor("agent.spawn", { agentsTracker, metrics });
-  const promptEdit = featuresFor("prompt.edit", { band });
+  const promptEdit = featuresFor("prompt.edit", { band, refusalRecovery });
   const promptChange = featuresFor("prompt.change", { band });
   const promptAutocomplete = featuresFor("prompt.autocomplete", { completion });
   const paneClose = featuresFor("ui.close", { pane });
@@ -181,11 +183,12 @@ export const register: Register = (on, pluginOptions) => {
   const groupRender = featuresFor("ui.render ToolGroup", { groupRows });
   const sessionCompact = featuresFor("session.compact", { compact });
 
-  on("tool.check", { tool: /^(?:Bash|PowerShell)$/ }, ($, e, next) =>
+  on("tool.check", { tool: /^(?:Bash|PowerShell|Monitor)$/ }, ($, e, next) =>
     dispatch(bindHost($, options), "tool.check", bash, e, next, guardFailed),
   ).catch((_$, _e, next) => guardFailed(next.error.message ?? next.error.kind));
   on("tool.call", { agentId: /./ }, ($, e, next) => dispatch(bindHost($, options), "tool.call", toolCall, e, next)).catch((_$, e, next) => next(e));
   on("session.start", ($, e, next) => dispatch(bindHost($, options), "session.start", sessionStart, e, next));
+  on("prompt.submit", ($, e, next) => dispatch(bindHost($, options), "prompt.submit", promptSubmit, e, next));
   on("turn.start", ($, e, next) => dispatch(bindHost($, options), "turn.start", turnStart, e, next));
   on("turn.step", async function* ($, e, next) {
     return yield* dispatchStream(bindHost($, options), "turn.step", turnStep, e, next);

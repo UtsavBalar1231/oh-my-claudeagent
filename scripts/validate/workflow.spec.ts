@@ -88,7 +88,7 @@ describe("workflow contract", () => {
 
   test("ci.yml is callable, and release.yml runs it as the gate its release job needs", () => {
     expect(CI.on).toHaveProperty("workflow_call");
-    expect(RELEASE.jobs["ci"]).toMatchObject({ uses: "./.github/workflows/ci.yml" });
+    expect(RELEASE.jobs["ci"]).toMatchObject({ uses: "$/.github/workflows/ci.yml" });
     expect(RELEASE.jobs["release"]).toMatchObject({ needs: ["ci"] });
   });
 
@@ -116,7 +116,7 @@ describe("workflow contract", () => {
   });
 
   test("ast-grep comes from the local action, which pins an archive digest for each OS", () => {
-    const users = Object.entries(CI.jobs).filter(([, ci]) => ci.steps.some((step) => step.uses === "./.github/actions/ast-grep")).map(([name]) => name);
+    const users = Object.entries(CI.jobs).filter(([, ci]) => ci.steps.some((step) => step.uses === "$/.github/actions/ast-grep")).map(([name]) => name);
     expect(users.sort()).toEqual(["test-opencode", "typescript"]);
     expect(read(".github/workflows/ci.yml")).not.toContain("ast-grep/releases/download");
     expect(AST_GREP.runs.steps.map((step) => step.if)).toEqual(["runner.os == 'Linux'", "runner.os == 'macOS'", "runner.os == 'Windows'"]);

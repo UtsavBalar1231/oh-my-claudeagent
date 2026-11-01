@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { coreTypes, firstDifferentLine, forbiddenCalls, judgeCalls, judgeSkillTypes, judgeValidate, SKILL_TYPES, versionSkip } from "./engine.ts";
+import { coreTypes, firstDifferentLine, forbiddenCalls, judgeCalls, judgePromptSubmitSources, judgeSkillTypes, judgeValidate, SKILL_TYPES, versionSkip } from "./engine.ts";
 
 const REAL_OUTPUT = [
   "Validating hooks: /plugin/hooks/hooks.json",
@@ -47,7 +47,7 @@ describe("mod calls line", () => {
     expect(judgeCalls({ code: 0, stdout: REAL_OUTPUT, stderr: "" })).toMatchObject({ status: "pass" });
   });
 
-  test.each(["prompt.submit", "model.fork", "http.fetch", "store.get", "store.set"])("%s on the calls line fails", (call) => {
+  test.each(["model.fork", "http.fetch", "store.get", "store.set"])("%s on the calls line fails", (call) => {
     expect(judgeCalls({ code: 0, stdout: withCalls("fs.read", call), stderr: "" })).toEqual({
       status: "fail",
       detail: `the mod calls $.${call}`,
@@ -65,6 +65,18 @@ describe("mod calls line", () => {
 
   test("the calls line on stderr is read as well", () => {
     expect(judgeCalls({ code: 0, stdout: "", stderr: withCalls("model.fork") })).toMatchObject({ status: "fail" });
+  });
+
+  test("prompt.submit is accepted in the manifest only when the source boundary holds", () => {
+    expect(judgeCalls({ code: 0, stdout: withCalls("prompt.submit"), stderr: "" })).toMatchObject({ status: "pass" });
+    const allowed = { "hooks/register.ts": "submit: (args) => $.prompt.submit(args)", "hooks/refusal-recovery.ts": "await host.prompt.submit({ text })" };
+    expect(judgePromptSubmitSources(allowed)).toMatchObject({ status: "pass" });
+    expect(judgePromptSubmitSources({ ...allowed, "hooks/other.ts": "$.prompt.submit({ text: 'bad' })" })).toMatchObject({ status: "fail" });
+    expect(judgePromptSubmitSources({ ...allowed, "hooks/other.ts": "const submit = $.prompt.submit; submit({ text: 'bad' })" })).toMatchObject({ status: "fail" });
+    expect(judgePromptSubmitSources({ ...allowed, "hooks/other.ts": "engine.prompt['submit']({ text: 'bad' })" })).toMatchObject({ status: "fail" });
+    expect(judgePromptSubmitSources({ ...allowed, "hooks/register.ts": `${allowed["hooks/register.ts"]}; $.prompt.submit({ text: 'bad' })` })).toMatchObject({ status: "fail" });
+    expect(judgePromptSubmitSources({ ...allowed, "hooks/refusal-recovery.ts": "host.prompt.submit({ text })" })).toMatchObject({ status: "fail" });
+    expect(judgePromptSubmitSources({ "hooks/register.ts": allowed["hooks/register.ts"] })).toMatchObject({ status: "fail" });
   });
 });
 

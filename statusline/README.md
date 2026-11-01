@@ -62,8 +62,8 @@ state, using the first cause the payload names: `tools changed`, `system prompt 
 `refreshInterval` keeps the minutes current between events. The compact line leaves it out.
 
 **Cost** shows only for an account billed by the token. The payload says nothing about the
-account type, but `rate_limits` carries a `five_hour` or `seven_day` window only for Claude.ai Pro
-and Max subscribers, so a payload with either window shows no cost. Otherwise the cost shows once
+account type, but `rate_limits` carries a `five_hour` or `seven_day` window only for Claude.ai Pro,
+Max and Ultra subscribers, so a payload with either window shows no cost. Otherwise the cost shows once
 it is above zero, which also keeps a subscriber's first frames, before the first API response
 brings the windows, from showing `$0.00`. Behind a Claude apps gateway that reports only a
 `spend_limit`, the account is billed by spend and keeps its cost. The duration always shows.

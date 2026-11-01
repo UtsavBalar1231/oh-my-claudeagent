@@ -225,6 +225,37 @@ test("a terminal that draws bytes but only the alt for a file, as iTerm2 does, g
   expect((await groupDrawing($, [shot(1)])).images).toHaveLength(1);
 });
 
+// Valid base64 of about `bytes` decoded bytes that still opens as the PNG above.
+const pngOf = (bytes: number): string => {
+  const head = PNG.replace(/=+$/, "");
+  const chars = Math.ceil((bytes * 4) / 3);
+  return head + "A".repeat(chars + ((4 - ((head.length + chars) % 4)) % 4));
+};
+
+test("the previews in one group share 2 MiB of picture bytes, and one past that is drawn from its file", async ($, on) => {
+  await engine($, on);
+  const big = (n: number): ToolGroupCall => ({
+    ...shot(n),
+    input: { file_path: `/work/shots/big-${n}.png` },
+    output: { type: "image", file: { base64: pngOf(1_200_000), type: "image/png", dimensions: { originalWidth: 1600, originalHeight: 400 } } },
+  });
+  const { images } = await groupDrawing($, [big(1), big(2), shot(3)]);
+  expect(images.map(({ source }) => ("png" in (source as object) ? "png" : (source as { file: string }).file))).toEqual(["png", "/work/shots/big-2.png", "png"]);
+});
+
+test("a terminal inside tmux that holds pictures back says once how to let them through", async ($, on) => {
+  const w = await engine($, on);
+  w.blitDeny = "the Image draws its alt there: tmux holds images back";
+  w.blitFix = "tmux-passthrough";
+  await groupDrawing($, [shot(1)]);
+  await w.clock.advance(300);
+  await groupDrawing($, [{ ...shot(2), input: { file_path: "/work/shots/huge.png" }, output: { type: "image", file: { base64: PNG + "A".repeat(3_000_000), type: "image/png", dimensions: { originalWidth: 1600, originalHeight: 400 } } } }]);
+  await w.clock.advance(300);
+  expect(w.said.filter((line) => line.includes("allow-passthrough"))).toEqual([
+    "OMCA's picture previews are held back by tmux. Turn on tmux's allow-passthrough and focus-events, then start a new session to see them.",
+  ]);
+});
+
 test("past three reads in one group the rest keep their captions alone", async ($, on) => {
   await engine($, on);
   const { rows, images } = await groupDrawing($, [shot(1), shot(2), shot(3), shot(4)]);

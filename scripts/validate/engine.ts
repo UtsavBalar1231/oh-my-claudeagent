@@ -5,7 +5,7 @@ import { packageTree } from "../package.ts";
 import { type Check, type Context, envWithout, type Outcome, pass, run, type Run, skip, verdict } from "./core.ts";
 import { ENGINE_TYPES, writerVersion } from "./manifest.ts";
 
-const FORBIDDEN_CALL = /^(?:prompt\.submit|model\.fork|http\.fetch|store\..+)$/;
+const FORBIDDEN_CALL = /^(?:model\.fork|http\.fetch|store\..+)$/;
 
 export function forbiddenCalls(output: string): string[] {
   const calls = output.split(/\r?\n/).filter((line) => line.includes("calls:"));
@@ -24,8 +24,30 @@ export function judgeCalls(result: Run): Outcome {
   const found = forbiddenCalls(`${result.stdout}\n${result.stderr}`);
   return verdict(
     found.map((name) => `the mod calls $.${name}`),
-    "the mod's calls: line holds no prompt.submit, model.fork, store.* or http.fetch",
+    "the mod's calls: line holds no model.fork, store.* or http.fetch",
   );
+}
+
+export function judgePromptSubmitSources(sources: Readonly<Record<string, string>>): Outcome {
+  const expected: Readonly<Record<string, string>> = {
+    "hooks/register.ts": "submit: (args) => $.prompt.submit(args)",
+    "hooks/refusal-recovery.ts": "await host.prompt.submit({ text })",
+  };
+  const failures: string[] = [];
+  for (const [path, source] of Object.entries(sources)) {
+    const references = [...source.matchAll(/\.prompt(?:\.submit|\[["']submit["']\])/g)];
+    const allowed = expected[path];
+    if (references.length !== (allowed === undefined ? 0 : 1) || (allowed !== undefined && !source.includes(allowed))) {
+      failures.push(`${path} has an unapproved prompt.submit call`);
+    }
+  }
+  for (const path of Object.keys(expected)) if (!(path in sources)) failures.push(`${path} was not scanned`);
+  return verdict(failures, "only the recovery Host binding and feature call prompt.submit");
+}
+
+function promptSubmitSources(ctx: Context): Outcome {
+  const paths = [...new Set([...ctx.tracked().filter((path) => path.startsWith("hooks/") && path.endsWith(".ts")), "hooks/refusal-recovery.ts"])];
+  return judgePromptSubmitSources(Object.fromEntries(paths.map((path) => [path, readFileSync(join(ctx.root, path), "utf8")])));
 }
 
 type Runs = { manifest: Run; marketplace: Run };
@@ -132,5 +154,6 @@ export const checks: readonly Check[] = [
   { name: "validate manifest", run: needsClaude((ctx) => judgeValidate(validated(ctx).manifest, "the packaged manifest and hooks module under --strict")) },
   { name: "validate marketplace", run: needsClaude((ctx) => judgeValidate(validated(ctx).marketplace, "the packaged marketplace under --strict")) },
   { name: "mod calls line", run: needsClaude((ctx) => judgeCalls(validated(ctx).manifest)) },
+  { name: "prompt submit source boundary", run: promptSubmitSources },
   { name: "engine types match the skill", run: needsClaude(skillTypes) },
 ];

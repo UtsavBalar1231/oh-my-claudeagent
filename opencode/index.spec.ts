@@ -64,7 +64,7 @@ function fakeContext(options: Rec = {}, agentThrows = false) {
   })
   const ctx = {
     location: { directory },
-    app: { version: "2.0.29" },
+    app: { version: "2.2.5" },
     options,
     agent: {
       transform: async (callback: (editor: { update(id: string, fn: (agent: Rec) => void): void }) => void) => {

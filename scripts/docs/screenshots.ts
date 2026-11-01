@@ -618,8 +618,8 @@ export const SHOTS: readonly Still[] = [
     rows: 36,
     command: "Start the open checkout tasks",
     keys: ["/omca", "Enter"],
-    // Each subagent takes the next scripted turn, so the sleeps keep all three running while the
-    // pane draws their lanes, each led by its mini.
+    // Each subagent takes the next scripted turn, and the mock holds its last reply back, so all
+    // three stay running while the pane draws their lanes, each led by its mini.
     script: {
       main: [
         { content: [text("Three agents can start now."), TASK_7] },
@@ -630,9 +630,9 @@ export const SHOTS: readonly Still[] = [
         { content: [text("The executor, the explorer and the architect are running.")] },
       ],
       subagent: [
-        { content: [bash("sleep 600", "Hold the executor open")] },
-        { content: [bash("sleep 600", "Hold the explorer open")] },
-        { content: [bash("sleep 600", "Hold the architect open")] },
+        { content: [bash("ls", "Hold the executor open")], delayMs: 600_000 },
+        { content: [bash("ls", "Hold the explorer open")], delayMs: 600_000 },
+        { content: [bash("ls", "Hold the architect open")], delayMs: 600_000 },
       ],
     },
     ready: (screen) => ["executor", "explorer", "architect"].every((name) => new RegExp(`${name} {2,}\\S+ running`).test(screen)),

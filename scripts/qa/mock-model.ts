@@ -258,7 +258,8 @@ export function startServer({
       }
 
       if (bodyLogPath) appendFileSync(bodyLogPath, `${JSON.stringify({ queue: isSide ? "side" : queue, turn, body: rawBody })}\n`);
-      if (delayMs !== undefined) await Bun.sleep(delayMs);
+      // An unreferenced timer, so a reply still held back when the capture ends keeps no process alive.
+      if (delayMs !== undefined) await new Promise((resolve) => setTimeout(resolve, delayMs).unref());
 
       if (streaming) {
         return new Response(sseBody(content, tokensOf(rawBody)), {
