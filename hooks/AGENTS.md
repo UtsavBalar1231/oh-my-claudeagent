@@ -18,7 +18,7 @@ event is unregistered on purpose; `docs/references.md` carries the per-event rea
 try/catch. `host.ts` defines the `Host` closures a feature receives in place of `$`, so a
 feature module takes `host` and never `$`. The features are `bash-guard`, `server-check`,
 `mod-marker`, `compact`, `agents-tracker`, `agent-rows`, `metrics`, `band`, `pane` with its `tabs/`,
-`footer`, `group-rows`, `spinner`, `completion` and `omca-router`. `doctor.ts` runs the Doctor page's checks and fixes for
+`footer`, `group-rows`, `spinner`, `completion`, `refusal-recovery` and `omca-router`. `doctor.ts` runs the Doctor page's checks and fixes for
 `tabs/doctor.ts`; it registers no event. Pure logic lives in `src/core/`.
 
 `spinner` rewrites only the `suffix` of the terminal's main-loop Spinner, to `… · task 7/14`, from
@@ -108,6 +108,17 @@ keys carry no `pointer` and keep their own routing: the tab's list, then the aim
 overflowing region, a row, a page (`bodyRows`) or an end (`contentRows`) at a time.
 
 ## Current runtime contract
+
+- `refusal-recovery` handles only interactive, user-origin main turns whose structured
+  `turn.complete` refusal category is `reasoning_extraction`, which reaches the mod only after
+  Claude Code's own once-only retry was refused too. It queues one plugin-authored follow-up
+  after completion asking for conclusions, evidence and actions in place of reasoning,
+  preserves the refusal result, and does not recover the follow-up's own turn. A new user
+  prompt or edit cancels a follow-up before it is queued; competing turns after queueing are not
+  recovered. Every other category (`cyber`, `bio`, `frontier_llm`) is left to the person, and
+  `OMCA_DISABLED_HOOKS=refusal-recovery` turns the feature off. The engine validator allows
+  `prompt.submit` only through the Host binding in `register.ts` and this feature;
+  `model.fork`, `http.fetch` and `store.*` remain forbidden.
 
 - `UserPromptSubmit` and `UserPromptExpansion` route to the server's `keyword-detector` and
   `slash-mode-detector` handlers, and both to its `guidance` handler, which injects the

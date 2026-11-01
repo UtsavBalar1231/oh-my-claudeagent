@@ -622,6 +622,15 @@ Set `CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1` to clone over HTTPS everywhere.
 **A plan run stopped with no message.** A turn that ends in an API error, such as a rate limit,
 skips the stop checks. Resume with `/oh-my-claudeagent:start-work`.
 
+**A turn ended with a safeguards refusal.** Claude Code continues a flagged turn once on its
+own. When the turn still ends with `` Details: `[reasoning_extraction]` ``, OMCA sends one prompt,
+marked as from the plugin, asking Claude to continue the task with conclusions, evidence and the
+actions it took instead of its reasoning. It does so only for a turn you started in an
+interactive session, never for its own prompt's turn, and not once you start typing. Other
+refusals, such as a cybersecurity flag, are left to you: press Esc twice to rewind and rephrase,
+or report a false positive with `/feedback`. `OMCA_DISABLED_HOOKS=refusal-recovery` turns the
+follow-up off.
+
 **A worktree agent cannot see your latest commits.** New worktrees branch from
 `origin/<default branch>` by default, so unpushed commits are missing. Set
 `"worktree": { "baseRef": "head" }` in your user settings to branch from your local HEAD.

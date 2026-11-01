@@ -148,14 +148,21 @@ server's `omca_hook` tool, which dispatches through `servers/hooks/registry.ts`.
 | --- | --- |
 | `tool.check` for Bash and PowerShell | The destructive-command guard and its review dialog |
 | `session.start` | Registers `/omca`, writes the session's mod marker, draws the band's first state, and writes a transcript line when the `omca` server is not connected, naming a missing bun or the server's error |
-| `turn.start`, `turn.complete` | The turn's tokens, cost and verification receipt for its closing line, a finished agent's notice, the band and its buttons, the pane's refresh |
+| `prompt.submit` | Tracks user-origin submissions and cancels a pending refusal recovery when new user input arrives |
+| `turn.start`, `turn.complete` | The turn's tokens, cost and verification receipt for its closing line, a finished agent's notice, the band and its buttons, the pane's refresh. A main turn you started in an interactive session that still ends in a `reasoning_extraction` refusal, after Claude Code's own retry, gets at most one follow-up prompt from OMCA; the refusal itself stands |
 | `agent.spawn`, `turn.step` | The Agents tab and delegation records |
 | `tool.call` | A subagent's tool calls, kept for its page on the Agents tab; only a subagent's call reaches the mod, and a main-loop call skips it |
 | `session.compact` | Asks the summarizer to keep the bound plan and its next ten open tasks. It does not run for a user-installed plugin where an organization manages Claude Code; the server's `SessionStart` `compact` handler re-injects the plan context there |
 | `ui.render`, `ui.focus`, `ui.scroll`, `ui.close`, `prompt.edit`, `prompt.change`, `command.run` | The turn line, an agent's launch and finish rows, and the receipts and picture previews under tool groups in the transcript, the band, the pane and the commands |
 
+An observed user submission cancels a follow-up before it is queued. If user input races a
+follow-up already queued, neither competing turn qualifies for another automatic recovery.
 `tool.check` runs before every Bash and PowerShell call in every permission mode and never
 returns an allow, which would skip the auto-mode classifier.
+
+Other refusal categories, such as `cyber`, `bio` and `frontier_llm`, get no follow-up. The
+engine validator allows `$.prompt.submit` only in that follow-up and its `Host` binding, and
+rejects `model.fork`, `http.fetch` and `store.*`.
 
 ### Settings hook events
 
@@ -196,6 +203,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | Name | Turns off |
 | --- | --- |
 | `bash-guard` | The guard's review and its refusals. The catastrophic-removal deny stays |
+| `refusal-recovery` | The follow-up prompt after a `reasoning_extraction` refusal |
 | `stop-gates` | Every stop gate |
 | `plan-continuation`, `final-verification`, `drift-guard` | One stop gate |
 | `task-completed` | The task completion check |

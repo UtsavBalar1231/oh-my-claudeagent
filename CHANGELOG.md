@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Reasoning-extraction follow-up:** when a turn you started in an interactive session still
+  ends in a `reasoning_extraction` refusal after Claude Code's own retry, OMCA sends one prompt
+  asking Claude to continue with conclusions, evidence and actions instead of its reasoning.
+  Other refusals, such as a cybersecurity flag, are left to you, and
+  `OMCA_DISABLED_HOOKS=refusal-recovery` turns the follow-up off.
+
 ## [3.3.2] - 2026-10-27
 
 ### Changed
