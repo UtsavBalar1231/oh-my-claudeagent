@@ -69,6 +69,8 @@ export type World = {
   toasts: string[];
   /** Why `ui.blit` refuses, as the engine says it for an Image that draws its alt, for every source or by source; undefined takes every blit. */
   blitDeny: string | ((source: unknown) => string | undefined) | undefined;
+  /** The stable code a refused blit carries beside its `deny`, as `tmux-passthrough` for tmux holding pictures back. */
+  blitFix: "tmux-passthrough" | undefined;
   blits: { requestId: string; key: string; cells: string | undefined; columns: number | undefined; rows: number | undefined }[];
   conversations: Map<string, SessionMessage[]>;
   opened: unknown[];
@@ -133,6 +135,7 @@ export function world(
     invalidations: 0,
     toasts: [],
     blitDeny: undefined,
+    blitFix: undefined,
     blits: [],
     conversations: new Map(),
     opened: [],
@@ -212,7 +215,7 @@ export function world(
     const raster = "cells" in e ? e : undefined;
     w.blits.push({ requestId: e.requestId, key: e.key, cells: raster?.cells, columns: raster?.columns, rows: raster?.rows });
     const deny = typeof w.blitDeny === "function" ? w.blitDeny("source" in e ? e.source : undefined) : w.blitDeny;
-    return { value: deny === undefined ? {} : { deny } };
+    return { value: deny === undefined ? {} : { deny, ...(w.blitFix !== undefined && { fix: w.blitFix }) } };
   });
   on("session.messages", (_$, e) => {
     const found = e.agentId === undefined ? undefined : w.conversations.get(e.agentId);
