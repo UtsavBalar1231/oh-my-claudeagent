@@ -8,6 +8,7 @@ type Sites = {
   "turn.start": [Args<"turn.start">, EventResult<"turn.start">];
   "turn.step": [Args<"turn.step">, EventResult<"turn.step">];
   "turn.complete": [Args<"turn.complete">, EventResult<"turn.complete">];
+  "prompt.submit": [Args<"prompt.submit">, EventResult<"prompt.submit">];
   "agent.spawn": [Args<"agent.spawn">, EventResult<"agent.spawn">];
   "prompt.edit": [Args<"prompt.edit">, EventResult<"prompt.edit">];
   "prompt.change": [Args<"prompt.change">, EventResult<"prompt.change">];
