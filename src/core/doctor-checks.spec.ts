@@ -262,11 +262,12 @@ describe("CLAUDE_CODE_EFFORT_LEVEL", () => {
     });
   });
 
-  test("unset, empty, blank and auto add no row", () => {
+  test("no value, empty, blank, auto and unset add no row", () => {
     expect(row({}, "effort-env")).toBeUndefined();
     expect(row(effort(""), "effort-env")).toBeUndefined();
     expect(row(effort("  "), "effort-env")).toBeUndefined();
     expect(row(effort(" Auto "), "effort-env")).toBeUndefined();
+    expect(row(effort("UNSET"), "effort-env")).toBeUndefined();
   });
 
   test("it is a row of its own beside the maxEffortLevel cap, which stays", () => {
