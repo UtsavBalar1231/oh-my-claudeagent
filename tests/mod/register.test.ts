@@ -16,6 +16,7 @@ const ATOMS = [
   "pages",
   "pane",
   "plan",
+  "receipts",
   "stats",
   "turns",
 ].map((key) => ({ plugin: PLUGIN, key }));
@@ -88,6 +89,7 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
         "ui.notify",
         "ui.open",
         "ui.panes",
+        "ui.place",
         "ui.resolve",
         "ui.status",
         "ui.toast",

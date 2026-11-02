@@ -74,6 +74,10 @@ export type World = {
   blits: { requestId: string; key: string; cells: string | undefined; columns: number | undefined; rows: number | undefined }[];
   /** What `$.ui.status` was called with, in order; undefined clears the line. */
   statuses: (string | undefined)[];
+  /** The ids `$.ui.place` was called with, in order. */
+  placed: string[];
+  /** What `$.ui.place` answers: a result, or the reason it rejects as on a client with no placed rows. */
+  placeAnswer: { isPlaced: false; requestId?: string; reason: string } | { rejects: string } | undefined;
   conversations: Map<string, SessionMessage[]>;
   opened: unknown[];
   /** Why `ui.open` leaves a pane unplaced; undefined places every pane. */
@@ -140,6 +144,8 @@ export function world(
     blitFix: undefined,
     blits: [],
     statuses: [],
+    placed: [],
+    placeAnswer: undefined,
     conversations: new Map(),
     opened: [],
     unplaced: undefined,
@@ -221,6 +227,12 @@ export function world(
     return { value: deny === undefined ? {} : { deny, ...(w.blitFix !== undefined && { fix: w.blitFix }) } };
   });
   on("ui.status", (_$, e) => (w.statuses.push(e.text), { value: undefined }));
+  on("ui.place", (_$, e) => {
+    w.placed.push(e.id);
+    const answer = w.placeAnswer;
+    if (answer === undefined) return { value: { isPlaced: true, requestId: `placed-${e.id}` } };
+    return "rejects" in answer ? { deny: answer.rejects } : { value: answer };
+  });
   on("session.messages", (_$, e) => {
     const found = e.agentId === undefined ? undefined : w.conversations.get(e.agentId);
     return { value: found ?? { deny: `no conversation for ${e.agentId ?? "main"}` } };
