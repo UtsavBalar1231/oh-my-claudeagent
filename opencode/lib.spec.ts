@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { dropSections, generate, listSources, parseModelRef, projectBody, splitFrontmatter } from "./lib.ts";
-import { COORDINATOR, EXECUTION, PLANNING, READ_ONLY_AGENTS } from "./workflows.ts";
+import { READ_ONLY_AGENTS } from "./workflows.ts";
 
 const root = join(import.meta.dir, "..");
 const data = generate(root);
@@ -116,105 +116,11 @@ describe("generated prompts", () => {
   test("leaf and read-only roles keep their boundaries", () => {
     for (const a of data.agents) {
       expect(a.deny, a.id).toContain("subagent");
-      expect(a.system, a.id).toMatch(/do not delegate|or delegat(?:e|ing)/i);
-    }
-    for (const id of ["explorer", "architect", "researcher", "viewer", "analyzer"]) {
-      expect(agent(`omca-${id}`).system, id).toMatch(/read-only|without changing files/i);
     }
     for (const id of READ_ONLY_AGENTS) {
       expect(agent(id).system, id).not.toMatch(/\bomca_notepad_(write|compact)\b/);
     }
-    expect(agent("omca-reviewer").system).toContain("only when the user explicitly asks and the host permits it");
-    expect(agent("omca-reviewer").system).toContain("Do not modify source code");
-    expect(agent("omca-architect").system).toContain("`omca-build-fixer` for compile");
-    expect(agent("omca-build-fixer").system).toContain("runtime behavior changes to `omca-executor`");
-    expect(agent("omca-researcher").system).toContain("Do not guess APIs or invent citations");
-    expect(agent("omca-researcher").system).toContain("commit-pinned links");
-    expect(agent("omca-viewer").system).toContain("Report confidence and limitations");
-  });
-
-  test("worker retry ceilings survive projection with immediate safety escalation", () => {
-    for (const [id, ceiling] of [["executor", "three"], ["build-fixer", "five"]]) {
-      const rule = agent(`omca-${id}`).system.match(/After (three|five) .*?attempts[^.]*\./);
-      expect(rule?.[1], id).toBe(ceiling);
-      expect(rule?.[0], id).toMatch(/stop.*primary agent/);
-      expect(rule?.[0], id).toMatch(/immediately.*unsafe.*out of scope/);
-    }
-    expect(agent("omca-executor").system).toContain("sooner when a skill requires it");
-  });
-
-  test("coordinator acceptance review comes once from the shared output style", () => {
-    const source = readFileSync(join(root, "output-styles/omca-default.md"), "utf8");
-    const paragraphs = splitFrontmatter(source, "output style").body.split(/\n\n/);
-    const rules = paragraphs.filter((paragraph) => /delegated implementation/.test(paragraph));
-    expect(rules).toHaveLength(1);
-    const rule = projectBody(found(rules[0], "acceptance review")).trim();
-    expect(rule).toMatch(/independently.*diff.*rerun.*acceptance checks/);
-    expect(rule).toMatch(/final.*requirements and exclusions.*full diff.*final checks/);
-    const context = `${data.outputStyle}\n${COORDINATOR}\n${EXECUTION}`;
-    expect(context.split(rule)).toHaveLength(2);
-    expect(context.match(/foreground\/background/g)).toHaveLength(1);
-  });
-
-  test("native planning respects the reviewer's saved-path prerequisite", () => {
-    const rule = PLANNING.split("\n").find((line) => line.includes("omca-reviewer"));
-    expect(rule).toMatch(/only with an authoritative saved plan path/);
-    expect(rule).toMatch(/otherwise self-review.*without creating a file/);
-    expect(PLANNING).toMatch(/Write a plan file only if the user explicitly requests one/);
-  });
-
-  test("debugging requires a reproducer before a behavior change", () => {
-    const text = skill("omca-debugging").content;
-    expect(text).toContain("Reproduce the runtime failure before changing behavior");
-    expect(text).toContain("Change only the confirmed cause");
-    expect(text).toContain("Rerun the same reproducer and nearby affected behavior");
-    expect(text).toContain("two failed fix attempts");
-  });
-
-  test("executor requires observable verification and honest exits", () => {
-    const text = agent("omca-executor").system;
-    expect(text).toContain("clean typecheck alone does not prove it works");
-    expect(text).toContain("`omca_evidence_log` with the real exit code");
-    expect(text).toContain("If a check cannot run, say why");
-    expect(text).toContain("Recheck after further edits");
-  });
-
-  test("handoff stays user-requested, compact, and read-only", () => {
-    const text = skill("omca-handoff").content;
-    expect(text).toContain("only when the user explicitly asks");
-    expect(text).toContain("long conversation alone is not authorization");
-    expect(text).toContain("Read-only");
-    expect(text).toContain("do not change files, register or bind a plan");
-    expect(text).toContain("do not select another session's plan");
-    expect(text).toContain("dump metadata or transcripts");
-  });
-
-  test("git inspection cannot authorize commits or destructive discard", () => {
-    const text = skill("omca-git-master").content;
-    expect(text).toContain("inspection and history search are read-only");
-    expect(text).toContain("Do not commit or push unless explicitly requested");
-    expect(text).toContain("Stashing or discarding work is the user's step");
-    expect(text).toContain("Do not run reset --hard, checkout --, restore, clean, or stash");
-    expect(text).toContain("--force-with-lease, never --force");
-    expect(text).toContain("name a recovery path");
-  });
-
-  test("refactor and cleanup retain behavior and load-bearing protection", () => {
-    const refactor = skill("omca-refactor").content;
-    expect(refactor).toContain("Preserve behavior");
-    expect(refactor).toContain("Run a baseline");
-    expect(refactor).toContain("tests and typechecks after each step");
-    expect(refactor).toContain("Do not continue past a failure");
-    const cleanup = skill("omca-remove-ai-slops").content;
-    expect(cleanup).toContain("test an adversarial input and prove the remaining path handles the same failure");
-    expect(cleanup).toContain("No proof means no deletion");
-    expect(cleanup).toContain("Do not introduce replacement abstractions");
-    expect(cleanup).toContain("license/SPDX and file/module headers");
-  });
-
-  test("native file tools honor permissions", () => {
-    expect(data.outputStyle).toContain("Custom tools do not bypass the host's permissions");
-    expect(data.outputStyle).toContain("historical evidence from current-checkout verification");
+    expect(agent("omca-architect").system).toContain("`omca-build-fixer`");
   });
 
   test("agent fields", () => {

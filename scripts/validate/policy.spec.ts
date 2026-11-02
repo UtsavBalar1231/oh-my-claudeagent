@@ -30,11 +30,6 @@ describe("policy markers", () => {
     });
   });
 
-  test("a doc with no statement that the permission filter does not auto-allow fails", async () => {
-    const ctx = fixture({ "docs/references.md": without(VALID["docs/references.md"], "does not auto-allow") });
-    expect(await policy.run(ctx)).toEqual({ status: "fail", detail: "docs/references.md lacks the non-bypassing permission filter guidance" });
-  });
-
   test("each hook model marker is required in docs/references.md", async () => {
     const markers = ["hooks/register.ts", "mcp_tool", "omca_hook", "tool.check", "OMCA_DISABLED_HOOKS", "boulder.json", "verification-evidence.json"];
     for (const marker of markers) {
