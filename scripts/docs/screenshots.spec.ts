@@ -106,14 +106,14 @@ describe("CLIPS", () => {
     expect(marks(clip("clip-verify"))).toEqual(["cmd-typed", "tests-pass", "evidence-logged", "complete"]);
     expect(marks(clip("clip-tour"))).toEqual(["cmd-typed", "agents-tab", "plan-tab", "evidence-tab", "notepad-tab", "stats-typed", "stats-tab"]);
     expect(targets(clip("clip-verify"))).toEqual(["complete-chip", "verdict-line"]);
-    expect(targets(clip("clip-tour"))).toEqual(["band", "cost-row", "notepad-card", "stats-header"]);
+    expect(targets(clip("clip-tour"))).toEqual(["band", "cost-row", "notepad-section", "stats-header"]);
   });
 
   // Each row is a split screen: the transcript, the pane's edge at column 12, then the pane.
   test.each([
     ["clip-tour", "band", "██ 6/14 · next 7 Wire the panel ·  6 proven  ● 1 unproven ·  1 running     [-]│pane", { row: 0, col: 3, len: 67, rows: 1 }],
     ["clip-tour", "cost-row", "  ↯ 6/14\n  $0.04 · ⏱ 11s", { row: 1, col: 2, len: 7, rows: 1 }],
-    ["clip-tour", "notepad-card", "│╭── x ──╮\n│╭────╮ ╭────╮\n││ Learnings · 3 entries", { row: 1, col: 1, len: 6, rows: 1 }],
+    ["clip-tour", "notepad-section", "│f: Find\n│ Learnings · 3 entries  10-03 13:47  │", { row: 1, col: 2, len: 34, rows: 1 }],
     ["clip-tour", "stats-header", "abc│  agent   runs  median  tokens  est. cost  evidence  outcomes   │", { row: 0, col: 6, len: 59, rows: 1 }],
     ["clip-delegate", "lane-head", "x │             executor                 ◆ running     7s", { row: 0, col: 16, len: 41, rows: 1 }],
     ["clip-verify", "verdict-line", "x │  COMPLETE  matches the current plan · 10-04 13:35   │", { row: 0, col: 5, len: 48, rows: 1 }],

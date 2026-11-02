@@ -484,7 +484,7 @@ export const CLIPS: readonly Clip[] = [
       { key: "3", gap: 0 },
       { until: has("Final verification"), mark: "evidence-tab" },
       { key: "4", gap: 0 },
-      { until: has("Learnings · "), mark: "notepad-tab", targets: { "notepad-card": /╭─+╮(?=[^\n]*\n[^\n]*Learnings · \d+ entr)/ } },
+      { until: has("Learnings · "), mark: "notepad-tab", targets: { "notepad-section": /Learnings · \d+ entr[^\n│]*\d\d:\d\d/ } },
       { key: "Escape", gap: 0 },
       ...command("/omca stats", "stats-typed"),
       { until: has("delegations in"), mark: "stats-tab", hold: 1_200, targets: { "stats-header": /agent +runs +median +tokens[^\n│]*outcomes/ } },
