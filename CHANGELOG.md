@@ -16,9 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `OMCA_DISABLED_HOOKS=plan-receipts` turns them off. They need Claude Code 2.1.314 or later.
 - **Keyword triggers show in the prompt:** with `enableKeywordTriggers` on, a phrase that would
   trigger is underlined as you type, until its mode has fired once in the session.
-- **A warning that stays while the `omca` server is off:** a session whose server did not connect
-  keeps a status line under the prompt, beside the one-time transcript line, and clears it once
-  the server connects.
+- **A warning that stays while the `omca` server is off:** a session whose server did not connect,
+  or stopped partway through, keeps a status line under the prompt, beside the one-time transcript
+  line, and clears it on the first turn after `/mcp` reconnects the server.
 
 ### Changed
 

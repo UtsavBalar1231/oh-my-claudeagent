@@ -603,9 +603,10 @@ The [availability table](references.md#where-each-feature-works) lists each feat
 
 ## Troubleshooting
 
-**The `omca` tools are missing.** At session start the mod asks Claude Code whether the `omca`
-server connected, and when it did not, it writes one line in the transcript and keeps a warning
-under the prompt, which it asks about again at each turn and clears once the server connects.
+**The `omca` tools are missing.** At session start and at each turn the mod asks Claude Code
+whether the `omca` server is connected. When it is not, at the start or because it stopped partway
+through, the mod writes one line in the transcript and keeps a warning under the prompt, which it
+clears on the first turn after the server connects.
 Either bun is not on `PATH`: install bun 1.4.2 or later and restart Claude Code (for Desktop and
 VS Code, see above). Or the server failed: the line gives Claude Code's reason, and `/mcp` shows
 the server's state. A failed server is not started again on its own: choose Reconnect in `/mcp`,

@@ -82,9 +82,10 @@ or an undo. It notes a mode at `prompt.submit` as the detector announces it, onc
 stops marking it. `$.prompt.paint` rejects on an old client and leaves the draft as it stands.
 
 `server-check` also keeps a `$.ui.status` line while the `omca` server is not connected, which the
-engine draws under the prompt as `⚠ oh-my-claudeagent: ...`. Only while the line is up, each main
-`turn.start` asks the engine again, from a `$.clock.after` timer and one ask at a time, so a server
-that hangs while it connects holds up no turn.
+engine draws under the prompt as `⚠ oh-my-claudeagent: ...`. Each main `turn.start` asks the engine
+again, since a server can die after it connected and no event says so. It asks from a `$.clock.after`
+timer and one ask at a time, so a server that hangs while it connects holds up no turn. The answer
+is the session's state, and a failed server stays failed until `/mcp` reconnects it.
 
 `agents-tracker` also owns the agent page that `tabs/agent-page.ts` draws on the Agents tab: a
 Button keyed `open-<agent id>` on each lane opens it, and `b`, `c`, `r` and `v` go back, copy the
@@ -153,8 +154,8 @@ overflowing region, a row, a page (`bodyRows`) or an end (`contentRows`) at a ti
 - `UserPromptSubmit` and `UserPromptExpansion` route to the server's `keyword-detector` and
   `slash-mode-detector` handlers, and both to its `guidance` handler, which injects the
   guidance template, the session id and the bound plan's context on a session's first prompt.
-- The mod and the server each report when the other is missing. At `session.start` the mod's `server-check.ts`
-  asks the engine to connect the `omca` server and, when it is not connected, writes one line
+- The mod and the server each report when the other is missing. At `session.start` and each main `turn.start`
+  the mod's `server-check.ts` asks the engine to connect the `omca` server and, when it finds it not connected, writes one line
   to the transcript: that bun is not on PATH, or the engine's reason with a pointer to `/mcp`.
   On the launch session's first prompt, the server's `mod-notice` handler answers with a
   `systemMessage` when the mod has written no marker for the session. A session that `/clear`

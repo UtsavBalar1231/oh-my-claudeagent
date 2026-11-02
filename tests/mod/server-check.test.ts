@@ -70,13 +70,47 @@ test("a connect the engine refuses is logged to debug, says nothing on screen an
   expect(seen.world.files.has(MARKER)).toBe(true);
 });
 
-test("a connected server is looked up once, at session start, and not at each turn", async ($, on) => {
+test("a connected server is asked at each main turn, and nothing shows", async ($, on) => {
   const seen = engine(on, { isConnected: true, server: "plugin:oh-my-claudeagent:omca" }, "ok");
   await start($);
   await $.turn.start({ text: "go", turnId: "t-1" });
+  await seen.world.clock.settle();
   await $.turn.start({ text: "again", turnId: "t-2" });
-  expect(seen.connects).toEqual(["omca"]);
+  await seen.world.clock.settle();
+  expect(seen.connects).toEqual(["omca", "omca", "omca"]);
+  expect(seen.runs).toEqual([]);
+  expect(seen.world.said).toEqual([]);
   expect(seen.world.statuses).toEqual([undefined]);
+});
+
+test("a server lost mid-session pins the line at the next main turn, says why once, and clears after a reconnect", async ($, on) => {
+  const seen = engine(on, { isConnected: true, server: "plugin:oh-my-claudeagent:omca" }, "ok");
+  await start($);
+  seen.answer = refused("Connection closed");
+  await $.turn.start({ text: "go", turnId: "t-1" });
+  await seen.world.clock.settle();
+  expect(seen.world.said).toEqual([`the omca server is not connected (Connection closed), so ${OFF}. Run /mcp to see why.`]);
+  expect(seen.world.statuses).toEqual([undefined, "server not connected, stop gates are off. Run /mcp"]);
+
+  await $.turn.start({ text: "still off", turnId: "t-2" });
+  await seen.world.clock.settle();
+  expect(seen.world.said).toHaveLength(1);
+  expect(seen.world.statuses).toHaveLength(2);
+
+  seen.answer = { isConnected: true, server: "plugin:oh-my-claudeagent:omca" };
+  await $.turn.start({ text: "back", turnId: "t-3" });
+  await seen.world.clock.settle();
+  expect(seen.world.statuses).toEqual([undefined, "server not connected, stop gates are off. Run /mcp", undefined]);
+});
+
+test("a server lost mid-session with no bun left on PATH names bun", async ($, on) => {
+  const seen = engine(on, { isConnected: true, server: "plugin:oh-my-claudeagent:omca" }, "missing");
+  await start($);
+  seen.answer = refused("spawn bun ENOENT");
+  await $.turn.start({ text: "go", turnId: "t-1" });
+  await seen.world.clock.settle();
+  expect(seen.world.said).toEqual([NO_BUN]);
+  expect(seen.world.statuses).toEqual([undefined, "bun is not on PATH, so the server and stop gates are off"]);
 });
 
 test("a refused server pins a status line naming the fix, and says why in the transcript only once", async ($, on) => {
@@ -108,7 +142,8 @@ test("a pinned session asks again at each main turn, and clears the line once th
 
   await $.turn.start({ text: "and again", turnId: "t-3" });
   await seen.world.clock.settle();
-  expect(seen.connects).toEqual(["omca", "omca", "omca"]);
+  expect(seen.connects).toEqual(["omca", "omca", "omca", "omca"]);
+  expect(seen.world.statuses).toEqual(["server not connected, stop gates are off. Run /mcp", undefined]);
 });
 
 test("a subagent's turn does not ask again", async ($, on) => {
@@ -131,6 +166,27 @@ test("a server that hangs while connecting holds up no turn, and only one ask ru
   answer();
   await seen.world.clock.settle();
   expect(seen.connects).toEqual(["omca", "omca"]);
+});
+
+test("a turn that starts while the launch ask hangs adds no second ask, so the server's failure is said once", async ($, on) => {
+  const seen = engine(on, refused("timed out"), "ok");
+  let answer = () => {};
+  seen.hold = new Promise<void>((resolve) => (answer = resolve));
+  const starting = start($);
+  await seen.world.clock.advance(1);
+  await $.turn.start({ text: "go", turnId: "t-1" });
+  await seen.world.clock.advance(1);
+  answer();
+  await starting;
+  await seen.world.clock.settle();
+  expect(seen.connects).toEqual(["omca"]);
+  expect(seen.world.said).toHaveLength(1);
+  expect(seen.world.statuses).toEqual(["server not connected, stop gates are off. Run /mcp"]);
+
+  await $.turn.start({ text: "again", turnId: "t-2" });
+  await seen.world.clock.settle();
+  expect(seen.connects).toEqual(["omca", "omca"]);
+  expect(seen.world.said).toHaveLength(1);
 });
 
 test("an ask the engine refuses logs why, keeps the line and asks again next turn", async ($, on) => {
