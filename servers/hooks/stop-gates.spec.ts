@@ -17,6 +17,7 @@ const UNFINISHED = "TODO: imple" + "ment";
 const CLAIM = "All done, implemented and fixed.";
 
 const UNCHECKED_PLAN = "# My Plan\n\n- [x] 1. First task\n- [ ] 2. Second task not done\n";
+const CLOSED_PLAN = "# My Plan\n\n- [x] 1. First task\n- [~] 2. Second task\n- [~] 3. Third task\n";
 const COMPLETE_PLAN = "# My Plan\n\n## TODOs\n\n- [x] 1. First task\n- [x] 2. Second task\n- [x] 3. Third task\n";
 const NO_BOXES_PLAN = "# Context Document\n\nThis is a reference doc with no tasks.\n";
 const MALFORMED_PLAN = "# My Plan\n\n- [ ] Task without a number\n";
@@ -27,9 +28,9 @@ const FINISHED_SUBAGENT = [{ ...RUNNING_SUBAGENT[0], status: "completed" }];
 const feedback = (additionalContext: string): Output => ({ hookSpecificOutput: { hookEventName: "Stop", additionalContext } });
 
 const CONTINUE_TEXT =
-  "[PLAN CONTINUATION] The bound plan 'test-plan' still has 1 unchecked task (next: Second task not done). Continue with the next task. " +
-  "If its work is already done and reviewed, flip its checkbox. If it cannot proceed without the user, record why with notepad_write and " +
-  "ask the user; a turn that asks the user is not blocked.";
+  "[PLAN CONTINUATION] The bound plan 'test-plan' still has 1 open task (next: Second task not done). Continue with the next task. " +
+  "If its work is already done and reviewed, flip its checkbox. If it cannot proceed, close it as blocked (`- [~] N.` with a `- Blocked:` line), " +
+  "or record why with notepad_write and ask the user; a turn that asks the user is not blocked.";
 const CONTINUE: Output = feedback(CONTINUE_TEXT);
 
 const corruptRegistry = (root: string): Output =>
@@ -48,6 +49,15 @@ const unverified = (plan: string): Output =>
       'evidence_log(evidence_type="final_verification", command="<what the review covered>", exit_code=<0 for COMPLETE, 1 for INCOMPLETE>, ' +
       `output_snippet="<verdict>", plan_sha256="${sha256(plan)}"). An INCOMPLETE verdict means fixing the gap and reviewing again. ` +
       "Set OMCA_DISABLED_HOOKS=final-verification to bypass.",
+  );
+
+const closedUnverified = (plan: string, blocked: string): Output =>
+  feedback(
+    `[FINAL VERIFICATION] Plan '${plan}' has no open task but is not complete, because these tasks are blocked: ${blocked}. No final_verification evidence matches its current contents. ` +
+      "Record the verdict of the plan's completeness review, running the review first if it has not run: " +
+      'evidence_log(evidence_type="final_verification", command="<what the review covered>", exit_code=<0 when the tasks marked done pass review, 1 when one fails a requirement>, ' +
+      `output_snippet="<verdict>", plan_sha256="${sha256(plan)}"). An exit_code=0 verdict's output_snippet must name every blocked task and its gap. ` +
+      "An exit_code=1 verdict means fixing that requirement and reviewing again. Set OMCA_DISABLED_HOOKS=final-verification to bypass.",
   );
 
 const corruptLedger = (root: string): Output =>
@@ -174,6 +184,18 @@ describe("plan continuation", () => {
     const state = findSession(run.sessionId);
     expect(state?.planBackoff).toEqual({ plan: "test-plan", backoff: { consecutiveBlocks: 1, lastBlockAt: NOW_S, lastUnchecked: 1, sameCountRun: 1, isStagnated: false } });
     expect([...(state?.stopBlocks ?? [])]).toEqual([["plan-continuation", 1]]);
+  });
+
+  test("plan continuation: a plan with only done and blocked tasks stays silent", async () => {
+    const run = session();
+    bind(run, CLOSED_PLAN);
+    expect(await run.stop()).toEqual({});
+  });
+
+  test("plan continuation: an open task beside a blocked one is the count and the next task", async () => {
+    const run = session();
+    bind(run, "# My Plan\n\n- [~] 1. First task\n- [ ] 2. Second task not done\n");
+    expect(await run.stop()).toEqual(CONTINUE);
   });
 
   test("plan continuation: a fenced example task is not quoted as the next task", async () => {
@@ -531,6 +553,38 @@ describe("final verification", () => {
     const plan = bind(run, COMPLETE_PLAN, { boundAt: 1 });
     expect(await run.stop()).toEqual(unverified(plan));
     expect([...(findSession(run.sessionId)?.stopBlocks ?? [])]).toEqual([["final-verification", 1]]);
+  });
+
+  test("final verification: a plan with no open task and blocked tasks blocks Stop and names them", async () => {
+    const run = session();
+    const plan = bind(run, CLOSED_PLAN);
+    expect(await run.stop()).toEqual(closedUnverified(plan, "2, 3"));
+  });
+
+  test("final verification: a plan with only blocked tasks blocks Stop", async () => {
+    const run = session();
+    const plan = bind(run, "- [~] 4. Only task\n");
+    expect(await run.stop()).toEqual(closedUnverified(plan, "4"));
+  });
+
+  test("final verification: an open task beside a blocked one passes through", async () => {
+    const run = session();
+    bind(run, "- [~] 1. First task\n- [ ] 2. Second task\n");
+    expect(await run.stop()).toEqual({});
+  });
+
+  test("final verification: a matching exit-0 verdict quiets a plan with blocked tasks", async () => {
+    const run = session();
+    const plan = bind(run, CLOSED_PLAN);
+    writeLedger(run.root, [verdict({ plan_sha256: sha256(plan) })]);
+    expect(await run.stop()).toEqual({});
+  });
+
+  test("final verification: a verdict for other plan bytes leaves a plan with blocked tasks held", async () => {
+    const run = session();
+    const plan = bind(run, CLOSED_PLAN);
+    writeLedger(run.root, [verdict({ plan_sha256: "0".repeat(64) })]);
+    expect(await run.stop()).toEqual(closedUnverified(plan, "2, 3"));
   });
 
   test("final verification: registered complete plan bound to another session allows Stop", async () => {

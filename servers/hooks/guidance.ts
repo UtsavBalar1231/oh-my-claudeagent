@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { nextTaskLabel } from "../../src/core/checkboxes.ts";
+import { blockedNumbers, nextTaskLabel, planTasks } from "../../src/core/checkboxes.ts";
 import { pluginRoot } from "../plugin-root.ts";
 import type { Handler } from "./registry.ts";
 import type { Session } from "./session-state.ts";
@@ -23,10 +23,15 @@ function boundPlanOf(root: string, sessionId: string): BoundPlan | undefined {
   return undefined;
 }
 
+function noneOpen(content: string): string {
+  const blocked = blockedNumbers(planTasks(content));
+  return blocked.length === 0 ? "None open: every numbered task is checked." : `None open: every numbered task is checked or blocked (blocked: ${blocked.join(", ")}).`;
+}
+
 const planContext = ({ name, path, content }: BoundPlan): string =>
   [
     `[ACTIVE PLAN] ${name}: ${path}`,
-    `[NEXT TASK] ${nextTaskLabel(content) ?? "None open: every numbered task is checked."}`,
+    `[NEXT TASK] ${nextTaskLabel(content) ?? noneOpen(content)}`,
     `[NOTEPAD] Record discoveries, decisions and blockers with notepad_write('${name}', section, content); the sections are learnings, issues, decisions and problems.`,
   ].join("\n");
 

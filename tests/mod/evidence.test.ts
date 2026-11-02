@@ -973,3 +973,13 @@ test("by default the rows and the checklist draw Nerd Font outcome glyphs and ea
   expect([...drawn.matchAll(/[\u{e000}-\u{f8ff}](?=\S)/gu)].map((match) => match[0])).toEqual([]);
   await ui.unmount();
 });
+
+test("a passing verdict over a plan with blocked tasks reads as closed, never complete", async ($, on) => {
+  const text = "# Sample\n\n## TODOs\n\n- [x] 1. One\n- [~] 2. Two\n  - Blocked: needs a credential\n";
+  const sha = sha256Hex(new TextEncoder().encode(text));
+  const entries = [evidence("final_verification", "completeness review: closed with blocked tasks", 0, local(2, 11, 45), "orchestrator", "2 blocked: needs a credential", sha)];
+  world(on, { [PLAN_PATH]: text, [BOULDER]: BOUND, [LEDGER]: JSON.stringify({ entries }) });
+  const ui = await openEvidence($, DOCK_120);
+  expect((await body(ui, DOCK_120))[2]).toBe("│  CLOSED  not complete, 1 blocked · 10-02 11:45");
+  await ui.unmount();
+});

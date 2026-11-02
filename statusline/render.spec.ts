@@ -285,7 +285,7 @@ describe("plan segment", () => {
 
   test("an open task gives progress and its label", () => {
     bind(THREE_OF_TEN);
-    expect(plan()).toEqual({ done: 3, total: 10, label: "Pending 4" });
+    expect(plan()).toEqual({ done: 3, blocked: 0, total: 10, label: "Pending 4" });
   });
 
   test("a label past 80 code points is capped", () => {
@@ -303,14 +303,35 @@ describe("plan segment", () => {
     expect(rendered(NERD)[0]).toContain(`${G}\uf0ae 3/10${R} ${D}→ Pending 4${R}`);
   });
 
+  test("a blocked task is counted apart and skipped for the label", () => {
+    bind("- [x] 1. Done\n- [~] 2. Stuck\n- [ ] 3. Open\n");
+    expect(plan()).toEqual({ done: 1, blocked: 1, total: 3, label: "Open" });
+  });
+
+  test("the session row draws the blocked count after the tally", () => {
+    bind("- [x] 1. Done\n- [~] 2. Stuck\n- [ ] 3. Open\n");
+    expect(rendered(ASCII)[0]).toBe([`${C}> m${R}`, `${G}T: 1/3${R}${S}${Y}1 blocked${R} ${D}-> Open${R}`].join(S));
+  });
+
+  test("the compact line draws the blocked count after the tally", () => {
+    bind("- [x] 1. Done\n- [~] 2. Stuck\n- [ ] 3. Open\n");
+    expect(rendered({ OMCA_GLYPHS: "unicode", COLUMNS: "50" })[0]).toBe([`${C}> m${R}`, `${G}T: 1/3${R}${S}${Y}1 blocked${R}`].join(S));
+  });
+
+  test("a plan with no open task and a blocked one stays on the status line with no next task", () => {
+    bind("- [x] 1. Done\n- [~] 2. Stuck\n");
+    expect(plan()).toEqual({ done: 1, blocked: 1, total: 2, label: null });
+    expect(rendered(ASCII)[0]).toBe([`${C}> m${R}`, `${G}T: 1/2${R}${S}${Y}1 blocked${R}`].join(S));
+  });
+
   test("a plan with nothing done counts zero", () => {
     bind("- [ ] 1. First\n- [ ] 2. Second\n");
-    expect(plan()).toEqual({ done: 0, total: 2, label: "First" });
+    expect(plan()).toEqual({ done: 0, blocked: 0, total: 2, label: "First" });
   });
 
   test("a task without a label gives only the count", () => {
     bind("- [x] 1. Done\n- [ ] 2.\n");
-    expect(plan()).toEqual({ done: 1, total: 2, label: null });
+    expect(plan()).toEqual({ done: 1, blocked: 0, total: 2, label: null });
     expect(rendered(ASCII)[0]).toBe([`${C}> m${R}`, `${G}T: 1/2${R}`].join(S));
   });
 
@@ -400,7 +421,7 @@ describe("plan segment", () => {
       registry.plans["plan-b"] = { active_plan: join(dir, "plan-b.md") };
       registry.bindings["sess-bound"] = { plan_name: "plan-b", bound_at: "2026-03-01T00:00:00Z" };
       writeBoulder(registry);
-      expect(plan("sess-bound")).toEqual({ done: 3, total: 10, label: "Pending 4" });
+      expect(plan("sess-bound")).toEqual({ done: 3, blocked: 0, total: 10, label: "Pending 4" });
     });
 
     test("an unbound session among several plans gives nothing", () => {

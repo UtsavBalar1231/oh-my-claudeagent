@@ -164,7 +164,7 @@ overflowing region, a row, a page (`bodyRows`) or an end (`contentRows`) at a ti
 - `SessionStart` for `clear` or `compact` routes to the server's `session-start` handler,
   which re-injects that context after a compaction and hands it back to the next prompt
   after `/clear`. The mod's `session.compact` feature (`compact.ts`) tells the summarizer to
-  keep the bound plan and its open tasks. It does not run for a user-installed plugin where an
+  keep the bound plan with its open and blocked tasks. It does not run for a user-installed plugin where an
   organization manages Claude Code, so the server handler's re-injection is the only cover there.
 - `SubagentStart` routes to the server's `subagent-context` handler.
 - `Stop` routes to the server's `stop-gates` handler, which runs plan continuation, final

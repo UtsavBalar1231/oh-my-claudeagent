@@ -3,6 +3,7 @@ import type { Info, ToolContext } from "@opencode/plugin/promise/tool";
 import { createHash } from "node:crypto";
 import { appendFileSync, lstatSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
+import { taskCounts } from "../src/core/checkboxes.ts";
 import { EVIDENCE_TYPES } from "../src/core/evidence.ts";
 import { NOTEPAD_SECTIONS, toPlanName } from "../src/core/notepad.ts";
 import { BOULDER, LEDGER } from "../src/core/omca-paths.ts";
@@ -284,8 +285,8 @@ export async function registerTools(ctx: Plugin.Context, changed: (sessionID: st
         const plan = await authorizedPlan(scope, context);
         if (plan === null) return { content: JSON.stringify({ session_id: context.sessionID, plan: null }, null, 2) };
         const { tasks } = plan;
-        const completed = tasks.filter((task) => task.checked).length;
-        return { content: JSON.stringify({ plan_name: plan.name, plan_path: plan.path, plan_sha256: plan.sha256, total: tasks.length, completed, remaining: tasks.length - completed, next_task_label: tasks.find((task) => !task.checked)?.label ?? null }, null, 2) };
+        const counts = taskCounts(tasks);
+        return { content: JSON.stringify({ plan_name: plan.name, plan_path: plan.path, plan_sha256: plan.sha256, total: counts.total, completed: counts.done, blocked: counts.blocked, remaining: counts.open, next_task_label: tasks.find((task) => task.state === "open")?.label ?? null }, null, 2) };
       },
     });
   }

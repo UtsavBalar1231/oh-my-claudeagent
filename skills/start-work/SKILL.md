@@ -49,10 +49,10 @@ OMCA tracks several plans at once, and each session is bound to at most one of t
 Plan selection in this step is what binds this session.
 
 1. When the guidance OMCA added to this session carries an `[ACTIVE PLAN] <name>: <path>`
-   line, this session is bound to that plan. If the file has unchecked boxes, resume
+   line, this session is bound to that plan. If the file has an open `- [ ]` task, resume
    it directly (skip steps 2-3); `boulder_progress(plan_name="<name>")` gives the counts.
 
-2. Otherwise, or when that plan is fully checked, build the selection list from two
+2. Otherwise, or when that plan has no open task left, build the selection list from two
    sources:
    - The plan `boulder_progress()` returns, labeled `[active]`. With no binding it
      returns the only registered plan or the most recently started one, which may be
@@ -99,13 +99,16 @@ Once the plan's Status line reads FINAL, re-run:
 A refused plan is also excluded from the selection list, so a single draft never
 auto-selects. If every candidate is a draft, say so rather than picking one.
 
-- **This session already resolves to a bound plan with unchecked boxes**: append the
+- **This session already resolves to a bound plan with an open task**: append the
   session (re-run `boulder_write`, which is idempotent) and continue work.
-- **No bound plan, or the bound plan is complete**: list available plans (per above,
+- **No bound plan, or the bound plan has no open task**: list available plans (per above,
   completed plans excluded).
   - One plan found: auto-select it.
   - Several plans: present the list and ask the user to choose. Selecting a plan calls
     `boulder_write`, which registers the plan and binds this session to it.
+- **The selected plan has no open task, only `- [~]` tasks left**: flip back to `- [ ]` each
+  task whose gap is now resolved, and continue. If none is, report the plan as closed with
+  its blocked tasks and stop.
 
 ### Argument handling
 
@@ -181,22 +184,22 @@ Reading plan and beginning execution...
    paths do not overlap and every task in their `Depends:` is checked; in a plan without
    `[P]` markers, apply the same two tests to decide.
 
-## 5-Section Prompt Structure
+## Delegation prompt
 
-Every delegation prompt includes all five sections.
+Every delegation prompt carries these five sections.
 
 ```markdown
 ## 1. TASK
 [Quote the task's checkbox line AND every sub-bullet beneath it, VERBATIM.
 The checkbox line alone is a title, not a task.]
 
-## 2. EXPECTED OUTCOME
-- [ ] Files created/modified: [exact paths, from the task's `File:` sub-bullet]
-- [ ] Functionality: [exact behavior]
-- [ ] Verification: `[command]` passes, taken from the task's `Done when:` sub-bullet
+## 2. DONE WHEN
+- [ ] Paths touched: [from the task's `File:` sub-bullet]
+- [ ] Behavior: [what the code does afterwards]
+- [ ] Proof: `[command]` passes, taken from the task's `Done when:` sub-bullet
 
-## 3. REQUIRED TOOLS
-- [tool]: [what to search/check]
+## 3. TOOLS
+- [tool]: [what it is for here]
 
 ## 4. SCOPE
 - [Every requirement the task states: the pattern to follow at reference file:lines,
@@ -236,9 +239,9 @@ Each sub-bullet then feeds a specific section, and the mapping is not a judgment
 
 | Sub-bullet    | Feeds                                                            |
 |---------------|------------------------------------------------------------------|
-| `Done when:`  | §2 EXPECTED OUTCOME, as the verification line                     |
+| `Done when:`  | §2 DONE WHEN, as the proof line                                   |
 | `Must NOT:`   | §4 SCOPE, restated verbatim                                       |
-| `File:`       | §2's "Files created/modified" and §5 CONTEXT                      |
+| `File:`       | §2's "Paths touched" and §5 CONTEXT                               |
 | `Depends:`    | §5 CONTEXT, under Dependencies                                    |
 | `Effort:`     | The `Agent` call's `effort` input                                 |
 
@@ -353,7 +356,7 @@ actually does:
 
 ```
 [ ] Does it work as expected, not just "should work"?
-[ ] Does it follow the existing codebase pattern (naming, error handling, layer boundaries)?
+[ ] Does it match how this codebase already works (naming, error handling, layer boundaries)?
 [ ] Did the expected result actually come out (not a plausible-sounding substitute)?
 [ ] Were the SCOPE requirements and exclusions from the delegation prompt honored?
 [ ] Read the executor's `SLOP PASS:` cut list and confirm nothing load-bearing was cut.
@@ -378,9 +381,8 @@ slop. If the cut list names one and you cannot point at the test that would fail
 it, treat the cut as a regression and require it back before flipping the checkbox.
 `no cuts` still gets a diff read: an absent cut list is not an absent change.
 
-If you cannot explain what the changed code does, you have not reviewed it:
-go back and read it. Never trust a subagent's self-report as a substitute for
-reading the diff yourself.
+A review means you can say what each changed line does; until then, keep reading.
+Never trust a subagent's self-report as a substitute for reading the diff yourself.
 
 If any QA scenario spawned a resource (process, port, container, temp dir,
 browser session), confirm its teardown receipt before treating the task as
@@ -393,7 +395,7 @@ and a resumed session all read progress from these boxes.
 
 ## Completeness Check
 
-After flipping the LAST `- [ ]` → `- [x]`:
+Once no task is open, because the last `- [ ]` became `- [x]` or `- [~]`:
 
 **Run the plan's `## Verification` commands**, the project's own full check, and log
 each result via `evidence_log`. When the plan lists none, run the project's own build,
@@ -401,16 +403,17 @@ lint, and test commands.
 
 Then run a single completeness review yourself: read the plan end to end, read the
 plan's full diff, and check that each requirement was implemented and each `Must NOT`
-was honored. The verdict is COMPLETE or INCOMPLETE with specifics. You reviewed every
-task's diff in 2.3, so a fresh reviewer mostly re-derives your findings; hand the review
-to `executor` only when the full diff no longer fits in your remaining context:
+was honored. The verdict is COMPLETE or INCOMPLETE. You reviewed every task's diff in
+2.3, so a fresh reviewer mostly re-derives your findings; hand the review to the read-only
+`architect` only when the full diff no longer fits in your remaining context:
 
 ```text
 Agent(
-  subagent_type="oh-my-claudeagent:executor",
+  subagent_type="oh-my-claudeagent:architect",
+  effort="high",
   prompt="[five-section completeness review prompt: read plan end-to-end, read diffs,
 check each requirement was implemented, check each constraint was honored.
-Output: COMPLETE or INCOMPLETE with specifics.]"
+Output: COMPLETE or INCOMPLETE, each blocker citing the requirement it fails.]"
 )
 ```
 
@@ -437,20 +440,26 @@ evidence_log(
 )
 ```
 
-A verdict of "COMPLETE, but..." or "looks good aside from..." counts as
-INCOMPLETE: a qualified approval is a rejection. Fix the qualified issue and
-re-verify; there is no partial-credit verdict.
+A blocker cites the plan requirement or `Must NOT` that the evidence fails. A concern
+that cites neither is a note: it goes in the final report and leaves the verdict
+COMPLETE.
 
-On INCOMPLETE: fix the specific gap, re-run the completeness review, log a fresh
-`final_verification` entry. Repeat until COMPLETE. This loop is bounded by the
-fix-and-rerun cycle itself: it terminates when the gap is actually closed, not
-by a retry counter.
+On INCOMPLETE: fix the cited gap, review what the fix changed, and log a fresh
+`final_verification` entry. Re-review at most twice. When the same requirement fails
+again after that, stop fixing: close its task as blocked (see Blocked tasks) with the
+requirement, the evidence and what was tried.
 
-OMCA enforces this gate: it keeps the session from ending while the plan is fully
-checked and no `final_verification` entry with `exit_code=0` matches it. A logged
-verdict opens the gate until the plan file changes.
+When the plan closes with blocked tasks, the review still runs over everything that was
+done. It cannot call the plan COMPLETE. Log the result with `command="completeness review:
+closed with blocked tasks"`, `exit_code=0`, and an `output_snippet` that names every
+blocked task and its gap.
 
-Do not report completion until `final_verification` evidence is logged.
+OMCA enforces this gate: it keeps the session from ending while no task is open and no
+`final_verification` entry with `exit_code=0` matches the plan's current hash. That hash
+covers the plan file only, so a code edit after the verdict leaves the gate open and the
+verdict out of date. Review and log again after any such edit.
+
+Do not report the plan finished until `final_verification` evidence is logged.
 
 ## Evidence logging mandate
 
@@ -504,18 +513,22 @@ Evidence type table:
 
 Session end is blocked until a `final_verification` entry with `exit_code=0` matches the plan file's current hash.
 
-## Auto-continue policy
+## Between tasks
 
-Do not ask "should I continue" between plan steps. After verification passes,
-immediately delegate the next task.
+Once a task verifies, delegate the next one in the same breath, without checking in.
 
 After each checkbox flip, write the user a short note: which task finished, what
 verified it, and what runs next. Claude Code collapses thinking by default, so
 between-tool notes the model writes as thinking stay hidden, and this note is the only
 progress a user sees during a long run.
 
-**Pause only when**: plan needs clarification, blocked by external dependency,
-critical failure.
+These endings stop work you still owe, so do not end a turn on one: a summary that
+announces the next step, an offer to continue, a list of decisions that block nothing,
+or a report because a milestone landed. Make the reversible call, note it, and keep going.
+
+**Pause only when**: the plan needs clarification that blocks every remaining task, or
+every remaining task needs something deliberately protected from you (a permission denial,
+a user's refusal). Say what is protected and what would unblock it; do not route around it.
 
 At each phase boundary (or, in unphased plans, roughly every few completed
 tasks), review the plan's notepad `issues` section via `notepad_read` (load it if needed: `ToolSearch({query: "select:mcp__plugin_oh-my-claudeagent_omca__notepad_read", max_results: 1})`) and
@@ -529,15 +542,35 @@ the plan's checkboxes, not the notepad.
 | Condition    | Signal                                                | Action                                             |
 |--------------|-------------------------------------------------------|-----------------------------------------------------|
 | **CONTINUE** | Task passes verification AND subsequent tasks unblocked | Proceed immediately                              |
-| **ESCALATE** | 2+ tasks in same plan area fail verification          | Ask user whether to run analyzer re-analysis          |
-| **PAUSE**    | 2 consecutive independent task failures               | Document failures, pause, ask user for guidance    |
+| **BLOCK**    | A task meets a condition under Blocked tasks          | Close it as `[~]`, carry on with independent tasks |
+| **ESCALATE** | Several tasks blocked for one root cause              | The plan is aimed wrong: stop and report that cause |
 | **ABORT**    | 3+ consecutive waves with zero net progress           | Stop all work, document state, present to user     |
 
 ### Failure handling
 
-Max 3 retries per task. When a task is still blocked after 3, record it with `notepad_write(plan_name, "issues", ...)`
-and continue to independent tasks. When 2+ tasks in the same area fail, ask the user
-whether to run analyzer re-analysis.
+Before each retry, classify the failure and reduce it to a signature.
+
+- **Class.** A product failure means the code under change is wrong. A harness failure means the environment is: a tool, a network call, a missing credential, a full disk, a test runner that crashed before it ran anything. A harness failure says nothing about the task's code, so do not rewrite working code to answer it.
+- **Signature.** The check that failed and its error text, minus whatever differs from run to run: line numbers, timestamps, ports, temp paths, ids. Two attempts with one signature mean the approach is not moving.
+
+### Blocked tasks
+
+Close a task as blocked when any of these holds:
+
+- Its failure signature repeats on the next attempt, and a different approach is not apparent.
+- A third attempt fails, whatever the signatures.
+- It needs something this run cannot get: a credential, an external system, a choice that belongs to the user.
+- A permission check denied what it needs, or the user declined it. Do this at once, with no retry.
+
+To close it, edit the box from `- [ ] N.` to `- [~] N.` and add a sub-bullet stating the gap in one line:
+
+```
+- [~] 7. Imperative task title
+  - File: `exact/path.ts`
+  - Blocked: `bun test src/orders` fails with the same parse error after two approaches (product)
+```
+
+Record what was tried with `notepad_write(plan_name, "issues", ...)`. A blocked task is closed but never done, and it never satisfies a `Depends:`. Close each task that depends on it the same way, with `Blocked: needs task 7`, then continue with the independent tasks. An unattended run therefore reaches the end of the plan and reports what it could not do, rather than stalling on the first gap. The final report names every blocked task, its gap and what would unblock it. Flipping `[~]` back to `[ ]` reopens a task.
 
 When relaunching a task after a failed executor attempt, the fresh delegation
 prompt must carry forward what was already tried and why it failed: the exact
@@ -549,7 +582,7 @@ When a relaunched task fails again with the same error, call the `advisor` tool 
 the next relaunch, when you have it: it has read both delegations and their reports and
 can say whether the task itself is aimed at the wrong place.
 
-A task never moves past unverified into "done." A verification failure is never
+A task never moves past unverified into `[x]`. A verification failure is never
 dismissed as a false positive without evidence proving the failure itself was
 spurious (e.g. a flaky-test rerun that then passes, logged). "That's probably
 just flaky" is not evidence.
@@ -568,7 +601,7 @@ just flaky" is not evidence.
 
 - `boulder_write` before delegating; tracks execution metadata
 - Read the full plan before delegating
-- All five sections in every delegation prompt
+- Every delegation prompt carries all five sections
 - `evidence_log` after every verification command
 - `evidence_read` before final report to summarize all results
 - Mark plan checkboxes immediately after verification; do not batch

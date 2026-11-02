@@ -198,6 +198,17 @@ test("the turn that ends a plan adds its outcome, and a final verification logge
   expect(w.toasts).toEqual([]);
 });
 
+test("a task finished beside a blocked one places its row and no plan outcome", async ($, on) => {
+  const w = setup(on, 0, 2);
+  write(w, PLAN, "- [ ] 1. a\n- [~] 2. b\n");
+  await start($);
+  write(w, PLAN, "- [x] 1. a\n- [~] 2. b\n");
+  await mainTurn($);
+  expect(w.placed).toHaveLength(1);
+  expect(await rowsOf($, w.placed[0] ?? "")).toEqual(["✓ Task 1 a"]);
+  expect(w.toasts).toEqual([]);
+});
+
 for (const [name, answer] of [
   ["rejects, as on a client with no placed rows", { rejects: "ui.place is not available" }],
   ["answers that no row stands", { isPlaced: false, reason: "past the cap" }],

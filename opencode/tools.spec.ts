@@ -193,6 +193,14 @@ test("read-only tools do not initialize missing state and progress never inherit
   expect(JSON.parse(String((await f.call("boulder_progress")).content))).toMatchObject({ total: 2, completed: 1, remaining: 1, next_task_label: "next" });
 });
 
+test("omca_boulder_progress counts a blocked task apart and skips it for the next task", async () => {
+  const f = await fake();
+  const plan = join(f.a, "plan.md");
+  writeFileSync(plan, "Status: FINAL\n\n- [x] 1. done\n- [~] 2. stuck\n- [ ] 3. next\n");
+  await bindPlan(f.a, "ses_a", plan);
+  expect(JSON.parse(String((await f.call("boulder_progress")).content))).toMatchObject({ total: 3, completed: 1, blocked: 1, remaining: 1, next_task_label: "next" });
+});
+
 test("snapshot inspection passes the approved binding and cannot substitute a newly bound plan", async () => {
   const f = await fake();
   const approvedPlan = join(f.a, "approved.md");

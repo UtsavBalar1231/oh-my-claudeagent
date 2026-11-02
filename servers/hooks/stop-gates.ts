@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync, statSync } from "node:fs";
 import { open } from "node:fs/promises";
 import { join } from "node:path";
-import { allTasksDone, type PlanTask, planTasks } from "../../src/core/checkboxes.ts";
+import { allTasksClosed, blockedNumbers, type PlanTask, planTasks, taskCounts } from "../../src/core/checkboxes.ts";
 import { addedLines, type Candidate, hasCompletionClaim, hasStubMarker, isStubFinding } from "../../src/core/drift.ts";
 import { entriesOf, readLedger } from "../../src/core/evidence.ts";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
@@ -197,7 +197,7 @@ const planContinuation: Gate = async (turn) => {
     return `[PLAN CONTINUATION] ${registryPath(root)} ${problem}, so this session's plan state cannot be resolved and plan-scoped enforcement is off. Repair or delete the file, then stop again. Set OMCA_DISABLED_HOOKS=plan-continuation to bypass.`;
   }
   const plan = turn.plan();
-  const open = plan === undefined ? [] : plan.tasks.filter((task) => !task.checked);
+  const open = plan === undefined ? [] : plan.tasks.filter((task) => task.state === "open");
   const unchecked = open.length;
   if (plan === undefined || unchecked === 0) {
     settlePlan(session);
@@ -219,7 +219,7 @@ const planContinuation: Gate = async (turn) => {
   session.planBackoff = { plan: plan.name, backoff: step.state };
   if (!step.isBlocking || !spend(session, "plan-continuation")) return undefined;
   const next = open[0]?.label ?? "";
-  return `[PLAN CONTINUATION] The bound plan '${plan.name}' still has ${unchecked} unchecked ${unchecked === 1 ? "task" : "tasks"} (next: ${next}). Continue with the next task. If its work is already done and reviewed, flip its checkbox. If it cannot proceed without the user, record why with notepad_write and ask the user; a turn that asks the user is not blocked.`;
+  return `[PLAN CONTINUATION] The bound plan '${plan.name}' still has ${unchecked} open ${unchecked === 1 ? "task" : "tasks"} (next: ${next}). Continue with the next task. If its work is already done and reviewed, flip its checkbox. If it cannot proceed, close it as blocked (\`- [~] N.\` with a \`- Blocked:\` line), or record why with notepad_write and ask the user; a turn that asks the user is not blocked.`;
 };
 
 const finalVerification: Gate = async (turn) => {
@@ -230,7 +230,7 @@ const finalVerification: Gate = async (turn) => {
     return undefined;
   }
   const plan = turn.plan();
-  if (plan === undefined || !allTasksDone({ done: plan.tasks.filter((task) => task.checked).length, total: plan.tasks.length })) return undefined;
+  if (plan === undefined || !allTasksClosed(taskCounts(plan.tasks))) return undefined;
   const ledger = readLedgerFile(ledgerPath(root));
   if (ledger.kind === "corrupt") {
     return spend(session, "final-verification") ? `[FINAL VERIFICATION] Evidence file corrupt. Repair ${ledgerPath(root)} before stopping.` : undefined;
@@ -244,7 +244,13 @@ const finalVerification: Gate = async (turn) => {
     return undefined;
   }
   if (!spend(session, "final-verification")) return undefined;
-  return `[FINAL VERIFICATION] Every task in plan '${plan.path}' is checked, but no final_verification evidence matches its current contents. Record the verdict of the plan's completeness review, running the review first if it has not run: evidence_log(evidence_type="final_verification", command="<what the review covered>", exit_code=<0 for COMPLETE, 1 for INCOMPLETE>, output_snippet="<verdict>", plan_sha256="${sha256}"). An INCOMPLETE verdict means fixing the gap and reviewing again. Set OMCA_DISABLED_HOOKS=final-verification to bypass.`;
+  const record = (exitCodes: string, after: string): string =>
+    `Record the verdict of the plan's completeness review, running the review first if it has not run: evidence_log(evidence_type="final_verification", command="<what the review covered>", exit_code=<${exitCodes}>, output_snippet="<verdict>", plan_sha256="${sha256}"). ${after} Set OMCA_DISABLED_HOOKS=final-verification to bypass.`;
+  const blocked = blockedNumbers(plan.tasks);
+  if (blocked.length === 0) {
+    return `[FINAL VERIFICATION] Every task in plan '${plan.path}' is checked, but no final_verification evidence matches its current contents. ${record("0 for COMPLETE, 1 for INCOMPLETE", "An INCOMPLETE verdict means fixing the gap and reviewing again.")}`;
+  }
+  return `[FINAL VERIFICATION] Plan '${plan.path}' has no open task but is not complete, because these tasks are blocked: ${blocked.join(", ")}. No final_verification evidence matches its current contents. ${record("0 when the tasks marked done pass review, 1 when one fails a requirement", "An exit_code=0 verdict's output_snippet must name every blocked task and its gap. An exit_code=1 verdict means fixing that requirement and reviewing again.")}`;
 };
 
 async function git(root: string, args: readonly string[]): Promise<{ code: number; stdout: string }> {

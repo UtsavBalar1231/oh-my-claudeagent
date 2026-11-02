@@ -66,7 +66,7 @@ const ASCII_INDENT = "  |  ";
 export function receiptRow(receipt: ShellReceipt, g: Glyphs, columns: number): Piece[] {
   const indent = g.tier === "ascii" ? ASCII_INDENT : INDENT;
   const mark =
-    receipt.state === "pass" ? { glyph: g.check, color: TONE_KEYS.ok } : receipt.state === "fail" ? { glyph: g.cross, color: TONE_KEYS.fail } : { glyph: g.blocked, color: TONE_KEYS.warn };
+    receipt.state === "pass" ? { glyph: g.check, color: TONE_KEYS.ok } : receipt.state === "fail" ? { glyph: g.cross, color: TONE_KEYS.fail } : { glyph: g.waiting, color: TONE_KEYS.warn };
   const dot: Piece = { text: ` ${g.dot} `, color: TONE_KEYS.muted };
   const facts: Piece[] = [
     ...(receipt.state === "stopped" ? [{ text: "stopped", color: TONE_KEYS.warn }] : []),

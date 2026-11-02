@@ -26,7 +26,8 @@ const UNICODE_SET = {
   vrule: "│",
   ellipsis: "…",
   progress: "◐",
-  blocked: "⊘",
+  waiting: "⊘",
+  blocked: "⊗",
   agent: "◆",
   mask: "‹masked›",
 } as const;
@@ -49,7 +50,8 @@ const NERD: Glyphs = {
   pending: "\u{f10c}",
   running: "\u{f111}",
   progress: "\u{f042}",
-  blocked: "\u{f056}",
+  waiting: "\u{f056}",
+  blocked: "\u{f05e}",
   agent: "\u{f007}",
 };
 
@@ -69,7 +71,8 @@ const ASCII: Glyphs = {
   vrule: "|",
   ellipsis: "...",
   progress: "~",
-  blocked: "/",
+  waiting: "/",
+  blocked: "%",
   agent: "@",
   mask: "<masked>",
 };

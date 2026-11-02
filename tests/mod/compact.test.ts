@@ -54,6 +54,20 @@ test("ten open tasks are listed and the rest are counted", async ($, on) => {
   expect(lines.slice(2)).toEqual([...Array.from({ length: 10 }, (_, i) => `- ${i + 1}. Port module ${i + 1}`), "- and 2 more in the plan file"]);
 });
 
+test("blocked tasks stay visible apart from the open ones", async ($, on) => {
+  const seen = engine(on, { [BOULDER]: registry(SESSION), [PLAN]: "- [x] 1. Parse\n- [~] 2. Print\n- [ ] 3. Ship\n" });
+  await $.session.compact(manual());
+  expect(seen.map((e) => e.instructions)).toEqual([
+    `Keep OMCA's active plan in the summary: widget (${PLAN}).\nOpen tasks:\n- 3. Ship\nBlocked tasks, not done and not to be run:\n- 2. Print`,
+  ]);
+});
+
+test("a plan with blocked tasks and none open does not say every task is checked", async ($, on) => {
+  const seen = engine(on, { [BOULDER]: registry(SESSION), [PLAN]: "- [x] 1. Parse\n- [~] 2. Print\n" });
+  await $.session.compact(manual());
+  expect(seen.map((e) => e.instructions)).toEqual([`Keep OMCA's active plan in the summary: widget (${PLAN}).\nBlocked tasks, not done and not to be run:\n- 2. Print`]);
+});
+
 test("a plan with every task checked says so", async ($, on) => {
   const seen = engine(on, { [BOULDER]: registry(SESSION), [PLAN]: tasks(3, 3) });
   await $.session.compact(manual());

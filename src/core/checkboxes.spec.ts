@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { allTasksDone, checkboxStates, clean, MAX_LABEL_LEN, nextTaskLabel, outsideFences, planIsComplete, planTasks } from "./checkboxes.ts";
+import { allTasksClosed, allTasksDone, blockedNumbers, checkboxStates, clean, MAX_LABEL_LEN, nextTaskLabel, outsideFences, planIsComplete, planTasks, taskCounts } from "./checkboxes.ts";
 import { parsePlan } from "./plan-reader.ts";
 
 describe("clean", () => {
@@ -27,9 +27,56 @@ describe("planTasks", () => {
   test("gives number, capped label, state and line of each numbered task outside fences, past a BOM", () => {
     const plan = `\uFEFF# Plan\n- [x] 1. Done\n\`\`\`\n- [ ] 9. Example\n\`\`\`\n- [ ] Unnumbered\n- [ ] 2. ${"x".repeat(100)}\n`;
     expect(planTasks(plan)).toEqual([
-      { number: 1, label: "Done", checked: true, line: 1 },
-      { number: 2, label: `${"x".repeat(79)}…`, checked: false, line: 6 },
+      { number: 1, label: "Done", state: "done", line: 1 },
+      { number: 2, label: `${"x".repeat(79)}…`, state: "open", line: 6 },
     ]);
+  });
+
+  test("reads a `[~]` box as a blocked task", () => {
+    expect(planTasks("- [~] 3. Stuck\n")).toEqual([{ number: 3, label: "Stuck", state: "blocked", line: 0 }]);
+  });
+
+  test("does not read an unnumbered `[~]` line as a task", () => {
+    expect(planTasks("- [~] Stuck\n")).toEqual([]);
+  });
+});
+
+describe("blocked tasks", () => {
+  const PLAN = "- [x] 1. Done\n- [~] 2. Stuck\n- [ ] 3. Open\n- [~] 4. Stuck too\n";
+  const CLOSED = "- [x] 1. Done\n- [~] 2. Stuck\n";
+
+  test("checkboxStates returns the literal box character", () => {
+    expect(checkboxStates(PLAN)).toEqual(["x", "~", " ", "~"]);
+  });
+
+  test("the next task skips a blocked one", () => {
+    expect(nextTaskLabel(PLAN)).toBe("Open");
+  });
+
+  test("a plan with only done and blocked tasks has no next task", () => {
+    expect(nextTaskLabel(CLOSED)).toBeNull();
+  });
+
+  test("taskCounts counts a blocked task as neither done nor open", () => {
+    expect(taskCounts(planTasks(PLAN))).toEqual({ done: 1, blocked: 2, open: 1, total: 4 });
+  });
+
+  test("blockedNumbers lists the blocked tasks in document order", () => {
+    expect(blockedNumbers(planTasks(PLAN))).toEqual([2, 4]);
+  });
+
+  test("a plan with a blocked task and no open task is not complete", () => {
+    expect(planIsComplete(CLOSED)).toBe(false);
+  });
+
+  test.each([
+    ["no tasks", { done: 0, blocked: 0, total: 0 }, false],
+    ["an open task beside a blocked one", { done: 1, blocked: 1, total: 3 }, false],
+    ["done and blocked tasks only", { done: 1, blocked: 1, total: 2 }, true],
+    ["blocked tasks only", { done: 0, blocked: 2, total: 2 }, true],
+    ["done tasks only", { done: 2, blocked: 0, total: 2 }, true],
+  ])("allTasksClosed with %s", (_title, counts, expected) => {
+    expect(allTasksClosed(counts)).toBe(expected);
   });
 });
 

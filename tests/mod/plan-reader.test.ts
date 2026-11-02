@@ -434,7 +434,7 @@ test("the board shows the plan's Status, progress, proof and next task, then eac
             "── Milestone 2: Board ── ████████ 0/3 ─────────────",
             "○ 3 Draw the board                                 ",
             "○ 4 Wire the hotkeys                               ",
-            "⊘ 5 Write the docs                     blocked by 3",
+            "⊘ 5 Write the docs                     waiting on 3",
             " ",
             "k: Run check  s: Start here  c: Copy  m: More",
           ]
@@ -444,12 +444,12 @@ test("the board shows the plan's Status, progress, proof and next task, then eac
             "── Milestone 2: Board ── ████████ 0/3 ─────────────",
             "○ 3 Draw the board",
             "○ 4 Wire the hotkeys",
-            "⊘ 5 Write the docs blocked by 3",
+            "⊘ 5 Write the docs waiting on 3",
             " ",
             "k: Run check  s: Start here  c: Copy  m: More",
           ];
     expect(rows(await ui.drawn()).slice(2)).toEqual([
-      "Ship the board█████████▋██████████████ 2/5 · ⊘ 1 blocked✓ 2 proven · ! 0 unproven · ✗ 0 failednext 3 Draw the board",
+      "Ship the board█████████▋██████████████ 2/5 · ⊘ 1 waiting✓ 2 proven · ! 0 unproven · ✗ 0 failednext 3 Draw the board",
       " ",
       "── Milestone 1: Core ── ████████ 2/2 ──────────────",
       ...tasks,
@@ -461,8 +461,8 @@ test("the board shows the plan's Status, progress, proof and next task, then eac
       { text: "Ship the board", color: "text", bold: true },
       { text: " 2/5", bold: true },
       { text: " · ", color: "inactive" },
-      { text: "⊘", color: "warning" },
-      { text: " 1 blocked" },
+      { text: "⊘", color: "inactive" },
+      { text: " 1 waiting" },
       { text: "✓", color: "success" },
       { text: " 2 proven" },
       { text: " · ", color: "inactive" },
@@ -497,10 +497,10 @@ test("each row carries its state as a glyph, a word and a color, and done rows a
   ]);
   expect(await row(4)).toEqual([{ text: "○ " }, { text: "4" }, { text: "Wire the hotkeys" }]);
   expect(await row(5)).toEqual([
-    { text: "⊘ ", color: "warning" },
+    { text: "⊘ ", color: "inactive" },
     { text: "5" },
     { text: "Write the docs" },
-    { text: "blocked by 3", color: "inactive" },
+    { text: "waiting on 3", color: "inactive" },
   ]);
 
   await $.ui.focus({ component: "Pane", requestId: "omca", element: "task-4", origin: { kind: "person" } });
@@ -512,32 +512,32 @@ test("each row carries its state as a glyph, a word and a color, and done rows a
 const BAR = /^[█▏▎▍▌▋▊▉]+$/;
 const WAITING_ONLY = BOARD.replace("  - Done when: the README shows the board.\n  - Depends: 3\n", "  - Done when: the README shows the board.\n");
 
-test("a task waiting only on the task before it draws open with no label, and a plan with no other blocked task draws no blocked count", async ($, on) => {
+test("a task waiting only on the task before it draws open with no label, and a plan with no other waiting task draws no waiting count", async ($, on) => {
   boardWorld(on, PASSING, {}, WAITING_ONLY);
   const ui = await mountBoard($, PAGE);
   expect((await ui.find({ key: "line-task-4" }))?.text).toBe("○ 4 Wire the hotkeys                               ");
   expect((await ui.find({ key: "line-task-5" }))?.text).toBe("○ 5 Write the docs                                 ");
-  expect(spans(await ui.find({ key: "plan-header" })).filter((span) => /blocked/.test(span.text))).toEqual([]);
+  expect(spans(await ui.find({ key: "plan-header" })).filter((span) => /waiting/.test(span.text))).toEqual([]);
 
   await ui.press({ key: "task-4" });
   const page = spreadRows(await ui.drawn());
   expect(page).toContain(" OPEN ");
   expect(page).toContain(" ○ 3 ");
-  expect(page.filter((row) => /BLOCKED|blocked by/.test(row))).toEqual([]);
+  expect(page.filter((row) => /WAITING|waiting on/.test(row))).toEqual([]);
   await ui.unmount();
 });
 
-test("a task that skips the task before it, or waits on it among others, keeps its blocked glyph and label, and the header counts it", async ($, on) => {
+test("a task that skips the task before it, or waits on it among others, keeps its waiting glyph and label, and the header counts it", async ($, on) => {
   boardWorld(on, PASSING, {}, WAITING_ONLY.replace("  - Done when: the README shows the board.\n", "  - Done when: the README shows the board.\n  - Depends: 3, 4\n"));
   const ui = await mountBoard($, PAGE);
   expect((await ui.find({ key: "line-task-4" }))?.text).toBe("○ 4 Wire the hotkeys                               ");
-  expect((await ui.find({ key: "line-task-5" }))?.text).toBe("⊘ 5 Write the docs                  blocked by 3, 4");
-  expect(spans(await ui.find({ key: "plan-header" })).filter((span) => /blocked/.test(span.text))).toEqual([{ text: " 1 blocked" }]);
+  expect((await ui.find({ key: "line-task-5" }))?.text).toBe("⊘ 5 Write the docs                  waiting on 3, 4");
+  expect(spans(await ui.find({ key: "plan-header" })).filter((span) => /waiting/.test(span.text))).toEqual([{ text: " 1 waiting" }]);
 
   await ui.press({ key: "task-5" });
   const page = spreadRows(await ui.drawn());
-  expect(page).toContain(" BLOCKED  by 3, 4");
-  expect(page).toContain(" ○ 3   ○ 4  blocked by 3, 4");
+  expect(page).toContain(" WAITING  on 3, 4");
+  expect(page).toContain(" ○ 3   ○ 4  waiting on 3, 4");
   await ui.unmount();
 });
 
@@ -607,7 +607,7 @@ test("a running agent whose prompt names a task marks that task in progress in t
     { text: "◐ ", color: "claude" },
     { text: "◆ executor", color: "green_FOR_SUBAGENTS_ONLY" },
   ]);
-  expect((await ui.find({ key: "line-task-5" }))?.text).toBe("⊘ 5 Write the docs                     blocked by 3");
+  expect((await ui.find({ key: "line-task-5" }))?.text).toBe("⊘ 5 Write the docs                     waiting on 3");
   const header = spans(await ui.find({ key: "plan-header" }));
   expect(header.slice(-2)).toEqual([
     { text: "◆ executor", color: "green_FOR_SUBAGENTS_ONLY" },
@@ -929,12 +929,12 @@ test("Enter opens a task's page with its files and the runs that prove it; n, p 
   ]);
   expect(four).toContain(" OPEN ");
   expect(four).toContain(" ○ 3 ");
-  expect(four.filter((row) => /BLOCKED|blocked by|PROVEN/.test(row))).toEqual([]);
+  expect(four.filter((row) => /WAITING|waiting on|PROVEN/.test(row))).toEqual([]);
 
   await ui.press({ key: "n" });
   const five = spreadRows(await ui.drawn());
-  expect(five).toContain(" BLOCKED  by 3");
-  expect(five).toContain(" ○ 3  blocked by 3");
+  expect(five).toContain(" WAITING  on 3");
+  expect(five).toContain(" ○ 3  waiting on 3");
   expect(five.slice(five.indexOf("Evidence"))).toEqual(["Evidence", "  Lists no files, so no run can prove it."]);
   expect((await ui.find({ key: "n" }))?.props["dimColor"]).toBe(true);
   expect((await ui.find({ key: "k" }))?.props["dimColor"]).toBe(true);
@@ -1047,7 +1047,7 @@ test("o keeps open tasks, f opens the Find field, and a filter that matches noth
     "── Milestone 2: Board ── ████████ 0/3 ─────────────",
     "○ 3 Draw the board                                 ",
     "○ 4 Wire the hotkeys                               ",
-    "⊘ 5 Write the docs                     blocked by 3",
+    "⊘ 5 Write the docs                     waiting on 3",
   ]);
   await ui.press({ key: "o" });
   expect((await ui.find({ key: "o" }))?.props["dimColor"]).toBe(true);
@@ -1074,7 +1074,7 @@ test("OMCA_GLYPHS=ascii draws the board, its chips and bars from the ASCII set",
   await $.agent.spawn(SPAWN);
   const ui = await $.ui.mount(pane("terminal", PAGE));
   expect(rows(await ui.drawn()).slice(2)).toEqual([
-    "Ship the board[#########====.........] 2/5 | / 1 blocked+ 2 proven | ! 0 unproven | x 0 failednext 3 Draw the board@ executor on 3",
+    "Ship the board[#########====.........] 2/5 | / 1 waiting+ 2 proven | ! 0 unproven | x 0 failednext 3 Draw the board@ executor on 3",
     " ",
     "-- Milestone 1: Core -- [######] 2/2 --------------",
     "+ 1 Parse the plan                         + proven",
@@ -1082,7 +1082,7 @@ test("OMCA_GLYPHS=ascii draws the board, its chips and bars from the ASCII set",
     "-- Milestone 2: Board -- [......] 0/3 -------------",
     "~ 3 Draw the board                       @ executor",
     "o 4 Wire the hotkeys                               ",
-    "/ 5 Write the docs                     blocked by 3",
+    "/ 5 Write the docs                     waiting on 3",
     " ",
     "k: Run check  s: Start here  c: Copy  m: More",
   ]);
@@ -1354,7 +1354,7 @@ test("the split list takes the width its longest title asks for, at least 56 cel
   expect(listWidth).toBeGreaterThanOrEqual(56);
   expect(drawnNode(tree, "line-task-5")?.props?.["width"]).toBe(listWidth - 1);
   const blocked = (await ui.find({ key: "line-task-5" }))?.text ?? "";
-  expect(blocked).toContain("blocked by 3");
+  expect(blocked).toContain("waiting on 3");
   expect(blocked).toContain("Write the docs");
   await ui.unmount();
 });
@@ -1526,4 +1526,61 @@ test("/omca plan <name> loads a plan from .omca/plans, and /omca plan <registry 
     expect(await ui.find({ type: "Text", text: `1/2 tasks done · ${shown}` }), args).toBeDefined();
     await ui.unmount();
   }
+});
+
+const HALTED_PATH = `${ROOT}/plans/halted.md`;
+const HALTED = [
+  "# Halted",
+  "",
+  "## TODOs",
+  "- [x] 1. Parse the plan",
+  "- [~] 2. Reach staging",
+  "  - Blocked: no staging access",
+  "- [ ] 3. Deploy it",
+  "  - Depends: 2",
+  "",
+].join("\n");
+const HALTED_REGISTRY = JSON.stringify({ plans: { halted: { active_plan: HALTED_PATH } }, bindings: { [SESSION]: { plan_name: "halted" } } });
+
+test("the contents view and the task page mark a blocked task with its `[~]` box", async ($, on) => {
+  world(on, { [BOULDER]: HALTED_REGISTRY, [HALTED_PATH]: HALTED });
+  await $.command.run(run("plan"));
+  const ui = await $.ui.mount(pane("terminal"));
+  await ui.press({ key: "m" });
+  await ui.press({ key: "t" });
+  const labels = await Promise.all([1, 2, 3].map(async (n) => (await ui.find({ key: `row-${n}` }))?.props["label"]));
+  expect(labels).toEqual(["    [x] 1. Parse the plan", "    [~] 2. Reach staging", "    [ ] 3. Deploy it"]);
+  await ui.press({ key: "row-2" });
+  expect(await ui.find({ type: "Text", text: "[~] 2. Reach staging" })).toBeDefined();
+  await ui.unmount();
+});
+
+test("a blocked task's board row draws its own glyph in the warning key, with its word", async ($, on) => {
+  world(on, { [BOULDER]: HALTED_REGISTRY, [HALTED_PATH]: HALTED });
+  await $.command.run(run("plan"));
+  const ui = await $.ui.mount(pane("terminal"));
+  const row = await ui.find({ key: "line-task-2" });
+  expect(row?.text).toStartWith("⊗ 2 Reach staging");
+  expect(row?.text).toEndWith("blocked");
+  expect(spans(row).filter((span) => span.text === "⊗ ")).toEqual([{ text: "⊗ ", color: "warning" }]);
+  await ui.unmount();
+});
+
+test("a task whose only dependency is the blocked task before it reads as blocked by it, not waiting in line", async ($, on) => {
+  world(on, { [BOULDER]: HALTED_REGISTRY, [HALTED_PATH]: HALTED });
+  await $.command.run(run("plan"));
+  const ui = await $.ui.mount(pane("terminal"));
+  expect((await ui.find({ key: "line-task-3" }))?.text).toEndWith("waiting on 2");
+  await ui.unmount();
+});
+
+test("the header of a plan with no open task and a blocked one neither says every task is done nor draws the ok tone", async ($, on) => {
+  world(on, { [BOULDER]: HALTED_REGISTRY, [HALTED_PATH]: "# Halted\n\n## TODOs\n- [x] 1. Parse the plan\n- [~] 2. Reach staging\n" });
+  await $.command.run(run("plan"));
+  const ui = await $.ui.mount(pane("terminal"));
+  const header = await ui.find({ key: "plan-header" });
+  expect(header?.text).not.toContain("every task is done");
+  expect(header?.text).toContain("no task is open and 1 blocked");
+  expect(header?.props["borderColor"]).toBe("warning");
+  await ui.unmount();
 });

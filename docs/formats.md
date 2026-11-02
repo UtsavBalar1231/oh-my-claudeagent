@@ -30,9 +30,10 @@ A task is one line that matches this shape, with no indentation:
 ```text
 - [ ] 12. Text of the task
 - [x] 12. Text of the task
+- [~] 12. Text of the task
 ```
 
-The box holds a space or a lowercase `x`. The number is one or more digits followed by a dot, and the text follows. A `- [ ]` line without a number, or a line with `[X]`, is not a task. When a plan file is written or edited, OMCA warns about each unchecked `- [ ]` line that has no number. Task numbers are not checked for order or uniqueness.
+The box holds a space (open), a lowercase `x` (done) or a `~` (blocked). The number is one or more digits followed by a dot, and the text follows. A `- [ ]` or `- [~]` line without a number, or a line with `[X]`, is not a task. When a plan file is written or edited, OMCA warns about each `- [ ]` or `- [~]` line that has no number. Task numbers are not checked for order or uniqueness.
 
 Before OMCA looks for tasks, it cleans the text: CRLF and lone CR become LF, and control characters, zero-width and bidirectional marks and the byte order mark are dropped. A task line inside a fenced code block is not a task. A line that starts, after any whitespace, with three backticks or three tildes opens or closes a fence, so a plan can show an example task safely.
 
@@ -40,11 +41,25 @@ Before OMCA looks for tasks, it cleans the text: CRLF and lone CR become LF, and
 
 A task's details are sub-bullets indented two spaces under it, each of the form `- Name: text` with a capital letter starting the name. The plan board reads three names into structured fields: `File` or `Files` (the paths in the first code span of each comma-separated item), `Depends` or `Depends on` (task numbers) and `Done when` (code spans holding a command with an argument). It shows any other name, such as `Must NOT` or `Effort`, as plain text. No sub-bullet affects completion.
 
+A blocked task states its gap in an ordinary sub-bullet, `- Blocked: <one line>`, which shows as plain text like any other name.
+
 ### Next task, progress and completion
 
-The next-task label is the text of the first unchecked task, trimmed and cut to 80 code points. It is `null` when every task is checked. A longer text keeps its first 79 code points, trailing whitespace trimmed, followed by `…`. The count is in code points, so an emoji is never split.
+The next-task label is the text of the first open task, trimmed and cut to 80 code points. It is `null` when no task is open. A longer text keeps its first 79 code points, trailing whitespace trimmed, followed by `…`. The count is in code points, so an emoji is never split.
 
-A plan is complete when it has at least one task and every task is checked. A plan with no numbered tasks is never complete.
+A blocked task is closed for what runs next and is never counted as done:
+
+| Question | open `[ ]` | done `[x]` | blocked `[~]` |
+| --- | --- | --- | --- |
+| The plan-continuation gate counts it as remaining | yes | no | no |
+| Candidate for next task | yes | no | no |
+| Counted in `completed` | no | yes | no |
+| Counted in `remaining` | yes | no | no |
+| Satisfies another task's `Depends` | no | yes | no |
+
+A plan is complete when it has at least one task and every task is done. One blocked task means not complete, and a plan with no numbered tasks is never complete.
+
+A plan is closed when it has at least one task and no open task. The plan-continuation gate stays silent for a closed plan and the final-verification gate fires. When blocked tasks exist, its message names their numbers, and an `exit_code` 0 verdict's `output_snippet` must name every blocked task and its gap. A closed plan with blocked tasks stays registered, and changing a `[~]` back to `[ ]` reopens that task. A task whose `Depends` names a blocked task stays open and cannot run until the dependency is done.
 
 ### The plan hash
 
@@ -76,6 +91,7 @@ For this text, ending in one newline, `boulder_progress` reports:
 {
   "total": 2,
   "completed": 1,
+  "blocked": 0,
   "remaining": 1,
   "is_complete": false,
   "plan_path": "/home/user/.claude/plans/checkout-redesign.md",
@@ -123,7 +139,7 @@ When the server starts, it checks the live ledger. If the file is over 1 MiB or 
 
 ### What the gates accept
 
-- **Stop gate.** A session bound to a plan cannot stop, once every task is checked, until the ledger holds a `final_verification` entry with `exit_code` 0 whose `plan_sha256` is empty or equals the plan file's current hash. An entry without a hash matches any plan. The gate treats a missing ledger as no evidence, and a ledger that the reader refuses, or that has no `entries` list, as corrupt. Both hold the stop with a message, within the gate's block budget.
+- **Stop gate.** A session bound to a plan cannot stop, once no task is open, until the ledger holds a `final_verification` entry with `exit_code` 0 whose `plan_sha256` is empty or equals the plan file's current hash. An entry without a hash matches any plan. The gate treats a missing ledger as no evidence, and a ledger that the reader refuses, or that has no `entries` list, as corrupt. Both hold the stop with a message, within the gate's block budget.
 - **TaskCompleted.** When the session ran a verification command within the last hour, the ledger must have been modified at or after the time that command finished, give or take 2 seconds, and must hold at least one well-formed entry. A malformed entry beside a good one does not block.
 
 ### Example

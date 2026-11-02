@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { handle } from "./plan-format-warn.ts";
 
 const NOW = 1_786_000_000_000;
-const FIX = "Fix: a - [ ] line not matching '- [ ] N.' will not be counted; use the numbered form.";
+const FIX = "Fix: a - [ ] or - [~] line not matching '- [ ] N.' or '- [~] N.' will not be counted; use the numbered form.";
 const roots: string[] = [];
 
 afterEach(() => {
@@ -108,4 +108,11 @@ test("plan-format-warn: OMCA_DISABLED_HOOKS kill switch suppresses output", asyn
   expect(await warn(root, path)).toBeUndefined();
   process.env.OMCA_DISABLED_HOOKS = "context-injector";
   expect(await warn(root, path)).toStartWith("[PLAN-FORMAT-WARN] ");
+});
+
+test("plan-format-warn: an unnumbered `[~]` line warns like an unnumbered `[ ]` line", async () => {
+  const { root, path } = file("plans/blocked.md", "- [~] 1. Numbered\n- [~] stuck with no number\n");
+  expect(await warn(root, path)).toBe(
+    [`[PLAN-FORMAT-WARN] ${path} has 1 checkbox line(s) that will not be counted as numbered tasks:`, "2:- [~] stuck with no number", FIX].join("\n"),
+  );
 });

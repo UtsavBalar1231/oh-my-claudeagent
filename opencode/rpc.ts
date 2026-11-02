@@ -36,10 +36,10 @@ export const Omca = Rpc.define({
                       properties: {
                         number: { type: "integer" },
                         label: { type: "string" },
-                        checked: { type: "boolean" },
+                        state: { type: "string", enum: ["open", "done", "blocked"] },
                         dependencies: { type: "array", items: { type: "integer" } },
                       },
-                      required: ["number", "label", "checked", "dependencies"],
+                      required: ["number", "label", "state", "dependencies"],
                       additionalProperties: false,
                     },
                   },

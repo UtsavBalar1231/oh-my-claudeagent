@@ -105,6 +105,19 @@ test("a plan going from 13/14 to 14/14 places one receipt and raises one notific
   expect(notified).toEqual([{ text: "Plan complete: widget 14/14", title: "OMCA" }]);
 });
 
+test("a plan closing with a blocked task notifies that it closed, not that it is complete", async ($, on) => {
+  const notified: unknown[] = [];
+  on("ui.notify", (_$, e) => (notified.push(e), { value: { isSent: true, channel: "kitty" } }));
+  const w = setup(on, { [BOULDER]: registry, [PLAN]: "- [x] 1. a\n- [ ] 2. b\n" });
+  await start($);
+  await mainTurn($);
+
+  write(w, PLAN, "- [x] 1. a\n- [~] 2. b\n");
+  await mainTurn($);
+  await mainTurn($);
+  expect(notified).toEqual([{ text: "Plan closed: widget 1/2, 1 blocked", title: "OMCA" }]);
+});
+
 test("an engine that raises no notification still places the plan's receipt and logs why", async ($, on) => {
   on("ui.notify", () => {
     throw new Error("no notification channel");

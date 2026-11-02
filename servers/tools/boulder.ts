@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { asRegistry, type PlanEntry, readRegistryDocument, type Registry, type RegistryDocument, resolveBoundPlan, unbindSessions, upsertPlanSession } from "../../src/core/boulder.ts";
-import { allTasksDone, planIsComplete, planTasks } from "../../src/core/checkboxes.ts";
+import { allTasksDone, planIsComplete, planTasks, taskCounts } from "../../src/core/checkboxes.ts";
 import { toPlanName } from "../../src/core/notepad.ts";
 import { STATE_VERSION } from "../../src/core/state-version.ts";
 import { latestSessionId } from "../hooks/session-state.ts";
@@ -179,16 +179,17 @@ function boulderProgress(args: Record<string, unknown>): string {
   }
   const content = bytes.toString("utf8");
   const tasks = planTasks(content);
-  const completed = tasks.filter((task) => task.checked).length;
+  const counts = taskCounts(tasks);
   return JSON.stringify(
     {
-      total: tasks.length,
-      completed,
-      remaining: tasks.length - completed,
-      is_complete: allTasksDone({ done: completed, total: tasks.length }),
+      total: counts.total,
+      completed: counts.done,
+      blocked: counts.blocked,
+      remaining: counts.open,
+      is_complete: allTasksDone(counts),
       plan_path: planPath,
       plan_sha256: createHash("sha256").update(bytes).digest("hex"),
-      next_task_label: tasks.find((task) => !task.checked)?.label ?? null,
+      next_task_label: tasks.find((task) => task.state === "open")?.label ?? null,
     },
     null,
     2,
@@ -199,7 +200,7 @@ export const tools: Tool[] = [
   {
     name: "boulder_write",
     description:
-      "Register a work plan in the project's plan registry (.omca/state/boulder.json) and bind this session to it. Upserts plans[plan_name], keeping its started_at and adding session_id to its session_ids, then prunes bindings older than 7 days and unbound, finished plans of that age. Binding turns on plan enforcement for this session: while numbered tasks (`- [ ] N.`) remain unchecked, the Stop hook blocks the stop with a nudge to continue, and once all are checked it blocks until a final_verification evidence entry matches the plan. Call it once before executing a plan; calling it again is safe. Refuses a plan_name the notepad tools reject, and a registry file that is not JSON, not an object, or has a version other than 1, leaving that file untouched. Returns a confirmation with the plan name and session count.",
+      "Register a work plan in the project's plan registry (.omca/state/boulder.json) and bind this session to it. Upserts plans[plan_name], keeping its started_at and adding session_id to its session_ids, then prunes bindings older than 7 days and unbound, finished plans of that age. Binding turns on plan enforcement for this session: while numbered tasks (`- [ ] N.`) remain open, the Stop hook blocks the stop with a nudge to continue, and once none is open (each `- [x] N.` or blocked `- [~] N.`) it blocks until a final_verification evidence entry matches the plan. Call it once before executing a plan; calling it again is safe. Refuses a plan_name the notepad tools reject, and a registry file that is not JSON, not an object, or has a version other than 1, leaving that file untouched. Returns a confirmation with the plan name and session count.",
     inputSchema: {
       type: "object",
       properties: {
@@ -228,7 +229,7 @@ export const tools: Tool[] = [
   {
     name: "boulder_progress",
     description:
-      "A plan's progress over its numbered checkboxes (`- [ ] N.`): total, completed, remaining, the next task, and the plan_sha256 a final_verification entry takes. Without plan_path or plan_name it reads this session's bound plan, else the only or newest registered plan, which may belong to another session; pass plan_name when several exist.",
+      "A plan's progress over its numbered checkboxes (`- [ ] N.`, done `[x]`, blocked `[~]`): total, completed, blocked, remaining (open tasks), the next task, and the plan_sha256 a final_verification entry takes. Without plan_path or plan_name it reads this session's bound plan, else the only or newest registered plan, which may belong to another session; pass plan_name when several exist.",
     inputSchema: {
       type: "object",
       properties: {

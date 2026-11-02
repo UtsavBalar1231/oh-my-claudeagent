@@ -7,6 +7,7 @@ const PLAN = {
   name: "widget-rewrite",
   path: "/work/plans/widget-rewrite.md",
   done: 12,
+  blocked: 0,
   total: 46,
   next: { n: 13, title: "Port module 13" },
 };
@@ -38,7 +39,7 @@ describe("planTally", () => {
       "- [x] 3. Later done task",
       "- [ ] not numbered",
     ].join("\n");
-    expect(planTally(text)).toEqual({ done: 2, total: 3, next: { n: 2, title: "Port the ledger" } });
+    expect(planTally(text)).toEqual({ done: 2, blocked: 0, total: 3, next: { n: 2, title: "Port the ledger" } });
   });
 
   test("the next task's title is capped at 80 code points", () => {
@@ -46,8 +47,8 @@ describe("planTally", () => {
   });
 
   test("a finished plan or one with no tasks has no next task", () => {
-    expect(planTally("- [x] 1. a\n- [x] 2. b")).toEqual({ done: 2, total: 2, next: null });
-    expect(planTally("# Empty")).toEqual({ done: 0, total: 0, next: null });
+    expect(planTally("- [x] 1. a\n- [x] 2. b")).toEqual({ done: 2, blocked: 0, total: 2, next: null });
+    expect(planTally("# Empty")).toEqual({ done: 0, blocked: 0, total: 0, next: null });
   });
 });
 
@@ -217,5 +218,34 @@ describe("bandView", () => {
         expect(buttonCells + Math.max(0, buttons.length - 1) * BUTTON_GAP, `buttons at ${columns}`).toBeLessThanOrEqual(width);
       }
     }
+  });
+});
+
+describe("blocked tasks", () => {
+  const text = (view: ReturnType<typeof bandView>): string => (view?.status ?? []).map((span) => span.text).join("");
+  const blocked = { ...PLAN, done: 3, blocked: 1, total: 5, next: { n: 5, title: "Ship" } };
+
+  test("planTally counts a blocked task apart and skips it for the next task", () => {
+    expect(planTally("- [x] 1. a\n- [~] 2. b\n- [ ] 3. c\n")).toEqual({ done: 1, blocked: 1, total: 3, next: { n: 3, title: "c" } });
+  });
+
+  test("planTally gives no next task when only done and blocked tasks remain", () => {
+    expect(planTally("- [x] 1. a\n- [~] 2. b\n")).toEqual({ done: 1, blocked: 1, total: 2, next: null });
+  });
+
+  test("the band follows the tally with the blocked count", () => {
+    expect(text(bandView(band({ plan: blocked }), [], 120, "ascii"))).toBe("[#%.] 3/5 - 1 blocked - next 5 Ship");
+  });
+
+  test("the blocked count draws in the warning tone", () => {
+    expect(bandView(band({ plan: blocked }), [], 120, "ascii")?.status.find((span) => span.text === "1 blocked")?.tone).toBe("warn");
+  });
+
+  test("a plan with no blocked task draws no blocked count", () => {
+    expect(text(bandView(band({ plan: { ...blocked, blocked: 0 } }), [], 120, "ascii"))).toBe("[##.] 3/5 - next 5 Ship");
+  });
+
+  test("the blocked count stays while the next task gives way as the band narrows", () => {
+    expect(text(bandView(band({ plan: blocked }), [], 28, "ascii"))).toBe("[#%.] 3/5 - 1 blocked");
   });
 });
