@@ -58,6 +58,7 @@ const PLANNER_PROTOCOL =
 const COMMON =
   "\n[OUTPUT MANDATE] Your final response is the deliverable; intermediate tool results are not forwarded. Return findings, evidence and remaining limits, keeping any markers your agent requires." +
   "\n[FILE TOOLS] Read files with the Read tool, not cat, head, tail, or sed -n in Bash: Read numbers the lines and pages a large file with offset and limit." +
+  "\n[REFUSALS] When a permission check denies a call or the user declines it, that decides the outcome the call was after. Do not get there through another tool, command, path or host. Report what stays undone and carry on with the rest. Retry only when the denial's own message says to wait and try again." +
   "\n[OMCA TOOLS] `evidence_log`, `boulder_progress` and `notepad_write` are always available. Load any other omca tool with ToolSearch first, by its full name: `select:mcp__plugin_oh-my-claudeagent_omca__ast_search`. A guessed prefix finds nothing.";
 const EDITING_GUIDANCE =
   "\n[EDITS] Change an existing file with Edit, which touches only the lines that need it, rather than rewriting it with Write or a shell heredoc. Read the file before you Edit it, so old_string matches its current content." +
