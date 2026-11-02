@@ -15,8 +15,9 @@ const scratchDir = (): string => {
   return dir;
 };
 
+// A commit otherwise starts background maintenance, whose lock file comes and goes in the object store.
 function git(cwd: string, ...args: string[]): string {
-  const run = Bun.spawnSync(["git", "-c", "user.email=spec@example.invalid", "-c", "user.name=spec", "-c", "core.autocrlf=false", ...args], { cwd });
+  const run = Bun.spawnSync(["git", "-c", "user.email=spec@example.invalid", "-c", "user.name=spec", "-c", "core.autocrlf=false", "-c", "maintenance.auto=false", "-c", "gc.auto=0", ...args], { cwd });
   if (run.exitCode !== 0) throw new Error(`git ${args.join(" ")}: ${run.stderr.toString()}`);
   return run.stdout.toString().trim();
 }
