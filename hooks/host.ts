@@ -1,5 +1,6 @@
 import type { EngineInterface, FsBytes, PluginState, SessionMessage, Settings, SettingsReadArgs, StateRead, StateSetOptions, StateSetResult } from "claude-code";
 import { parseRegistry, resolveBoundPlan } from "../src/core/boulder.ts";
+import { readLedger } from "../src/core/evidence.ts";
 import { BOULDER, LEDGER } from "../src/core/omca-paths.ts";
 import { configDir, type Env as PathEnv, homeDir, inferPlatform, isAbsolutePath, joinPath, type Platform, samePath } from "../src/core/path.ts";
 import { parseRuns, provingRuns, type Run, type Verdict, verdictFrom } from "../src/core/proof.ts";
@@ -65,6 +66,8 @@ export type Host = {
     notify: Engine["ui"]["notify"];
     blit: Engine["ui"]["blit"];
     view: Engine["ui"]["view"];
+    place: Engine["ui"]["place"];
+    status: Engine["ui"]["status"];
   };
   session: {
     id: Engine["session"]["id"];
@@ -83,7 +86,7 @@ export type Host = {
     after: Engine["clock"]["after"];
     every: Engine["clock"]["every"];
   };
-  prompt: { fill: Engine["prompt"]["fill"]; submit: Engine["prompt"]["submit"] };
+  prompt: { fill: Engine["prompt"]["fill"]; submit: Engine["prompt"]["submit"]; read: Engine["prompt"]["read"]; paint: Engine["prompt"]["paint"] };
   state: { [K in keyof State]: AtomHost<K> };
 };
 
@@ -182,6 +185,14 @@ export async function boundPlanOf(host: Host): Promise<{ name: string; path: str
 export async function ledgerWrittenAt(host: Host, root: string): Promise<number> {
   const path = `${root}/${LEDGER}`;
   return (await host.fs.exists(path)) ? Math.floor((await host.fs.stat(path)).mtimeMs / 1000) : 0;
+}
+
+/** The ledger as the shared reader takes it, undefined while there is none; throws when the reader refuses it. */
+export async function ledgerDocument(host: Host, path: string): Promise<unknown> {
+  if (!(await host.fs.exists(path))) return undefined;
+  const read = readLedger(await host.fs.read(path));
+  if (read.kind === "refused") throw new Error(read.reason);
+  return read.document;
 }
 
 /** `mtimeMs:size`, or `absent` when the file cannot be stated. */

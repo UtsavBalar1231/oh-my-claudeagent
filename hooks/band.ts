@@ -1,7 +1,7 @@
 import type { RenderElement } from "claude-code";
 import { type Band, bandView, BUTTON_GAP, planTally, type Proof, type Span, type Tone } from "../src/core/band-model.ts";
 import { allTasksDone } from "../src/core/checkboxes.ts";
-import { ledgerCoversSlot, readLedger } from "../src/core/evidence.ts";
+import { ledgerCoversSlot } from "../src/core/evidence.ts";
 import { hasPassingFinalVerification, type NextAction, nextActions } from "../src/core/next-actions.ts";
 import { BOULDER, exitCodeOf, LEDGER, statusPath, verificationOf } from "../src/core/omca-paths.ts";
 import { boardOf, parsePlan } from "../src/core/plan-reader.ts";
@@ -10,7 +10,7 @@ import { sha256Hex } from "../src/core/sha256.ts";
 import { fitEnd, type GlyphTier, glyphs, oneLine } from "../src/core/ui-kit.ts";
 import { TONE_KEYS } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
-import { boundPlanOf, bytesOf, fillPrompt, type Host, ledgerWrittenAt, proofFacts, reason, sessionOf, stampOf, verdictFor } from "./host.ts";
+import { boundPlanOf, bytesOf, fillPrompt, type Host, ledgerDocument, ledgerWrittenAt, proofFacts, reason, sessionOf, stampOf, verdictFor } from "./host.ts";
 import { isRemote, type Kit, kitOf, Run, type TextStyle } from "./ui.ts";
 
 type Snapshot = { band: Band; hasFinalVerification: boolean; exitCode: number | null; planPath: string | undefined };
@@ -36,13 +36,6 @@ const isShownHotkey = (text: string): boolean => {
 
 async function readJson(host: Host, path: string): Promise<unknown> {
   return (await host.fs.exists(path)) ? JSON.parse(await host.fs.read(path)) : undefined;
-}
-
-async function ledgerDocument(host: Host, path: string): Promise<unknown> {
-  if (!(await host.fs.exists(path))) return undefined;
-  const read = readLedger(await host.fs.read(path));
-  if (read.kind === "refused") throw new Error(read.reason);
-  return read.document;
 }
 
 async function readSnapshot(host: Host, within: object): Promise<Snapshot> {
@@ -133,11 +126,10 @@ async function toastChanges(host: Host, { band, exitCode }: Snapshot): Promise<v
   toastedVerificationAt = Math.max(toastedVerificationAt, verifiedAt);
   const isDone = plan !== null && plan.total > 0 && plan.done === plan.total;
   if (!isBaseline && plan !== null && isDone && toastedPlan?.path === plan.path && !toastedPlan.isDone) {
-    const text = `Plan complete: ${plan.name} ${plan.done}/${plan.total}`;
-    host.ui.toast(text, { timeoutMs: TOAST_MS });
-    // A plan run is the long unattended case, so its end also reaches the person's own notifications.
+    // A plan run is the long unattended case, so its end reaches the person's own notifications.
+    // The transcript's receipt row says the same in the session, with a toast where no row stands.
     try {
-      await host.ui.notify(text, { title: "OMCA" });
+      await host.ui.notify(`Plan complete: ${plan.name} ${plan.done}/${plan.total}`, { title: "OMCA" });
     } catch (error) {
       host.log(`band: notifying failed: ${reason(error)}`);
     }

@@ -141,6 +141,14 @@ declare module "claude-code" {
         receipt: { command: string; at: number; isLogged: boolean } | null;
         waiting: readonly string[];
       }[];
+      receipts: readonly {
+        id: string;
+        plan: string;
+        path: string;
+        total: number;
+        tasks: readonly { n: number; title: string; proof: "proven" | "unproven" | "failed" | null; command: string | null }[];
+        complete: { proven: number; unproven: number; failed: number; isVerified: boolean } | null;
+      }[];
       doctor: {
         isRunning: boolean;
         checks: readonly {

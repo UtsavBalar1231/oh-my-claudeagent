@@ -8,19 +8,20 @@ const NO_BUN =
   `bun is not on PATH, so the omca server did not start and ${OFF}. Install bun 1.4.2 or later and restart Claude Code. ` +
   "In Claude Desktop or VS Code, put bun's folder (usually ~/.bun/bin) on the PATH the app starts with.";
 
-type Seen = { connects: string[]; runs: string[][]; world: World };
+type Seen = { connects: string[]; runs: string[][]; world: World; answer: McpConnectResult | { deny: string }; hold: Promise<void> | undefined };
 
 function engine(on: On, connect: McpConnectResult | { deny: string }, bun: "ok" | "missing" | "failing"): Seen {
   const w = world(on);
-  const seen: Seen = { connects: [], runs: [], world: w };
+  const seen: Seen = { connects: [], runs: [], world: w, answer: connect, hold: undefined };
   on("session.start", (_$, e) => ({ cwd: e.cwd }));
   on("turn.start", (_$, e) => ({ turnId: e.turnId }));
   on("session.usage", () => ({ value: { startedAt: 0, context: { window: 200_000 }, rateLimits: [] } }));
   on("command.register", (_$, e) => ({ value: { command: e.name } }));
   on("fs.write", (_$, e) => (write(w, e.path, e.text), { value: undefined }));
-  on("mcp.connect", (_$, e) => {
+  on("mcp.connect", async (_$, e) => {
     seen.connects.push(e.server);
-    return "deny" in connect ? { deny: connect.deny } : { value: connect };
+    await seen.hold;
+    return "deny" in seen.answer ? { deny: seen.answer.deny } : { value: seen.answer };
   });
   on("process.run", (_$, e) => {
     seen.runs.push([...e.argv]);
@@ -69,11 +70,135 @@ test("a connect the engine refuses is logged to debug, says nothing on screen an
   expect(seen.world.files.has(MARKER)).toBe(true);
 });
 
-test("the server is looked up once, at session start, and not at each turn", async ($, on) => {
-  const seen = engine(on, refused("spawn bun ENOENT"), "missing");
+test("a connected server is asked at each main turn, and nothing shows", async ($, on) => {
+  const seen = engine(on, { isConnected: true, server: "plugin:oh-my-claudeagent:omca" }, "ok");
   await start($);
   await $.turn.start({ text: "go", turnId: "t-1" });
+  await seen.world.clock.settle();
   await $.turn.start({ text: "again", turnId: "t-2" });
-  expect(seen.connects).toEqual(["omca"]);
+  await seen.world.clock.settle();
+  expect(seen.connects).toEqual(["omca", "omca", "omca"]);
+  expect(seen.runs).toEqual([]);
+  expect(seen.world.said).toEqual([]);
+  expect(seen.world.statuses).toEqual([undefined]);
+});
+
+test("a server lost mid-session pins the line at the next main turn, says why once, and clears after a reconnect", async ($, on) => {
+  const seen = engine(on, { isConnected: true, server: "plugin:oh-my-claudeagent:omca" }, "ok");
+  await start($);
+  seen.answer = refused("Connection closed");
+  await $.turn.start({ text: "go", turnId: "t-1" });
+  await seen.world.clock.settle();
+  expect(seen.world.said).toEqual([`the omca server is not connected (Connection closed), so ${OFF}. Run /mcp to see why.`]);
+  expect(seen.world.statuses).toEqual([undefined, "server not connected, stop gates are off. Run /mcp"]);
+
+  await $.turn.start({ text: "still off", turnId: "t-2" });
+  await seen.world.clock.settle();
+  expect(seen.world.said).toHaveLength(1);
+  expect(seen.world.statuses).toHaveLength(2);
+
+  seen.answer = { isConnected: true, server: "plugin:oh-my-claudeagent:omca" };
+  await $.turn.start({ text: "back", turnId: "t-3" });
+  await seen.world.clock.settle();
+  expect(seen.world.statuses).toEqual([undefined, "server not connected, stop gates are off. Run /mcp", undefined]);
+});
+
+test("a server lost mid-session with no bun left on PATH names bun", async ($, on) => {
+  const seen = engine(on, { isConnected: true, server: "plugin:oh-my-claudeagent:omca" }, "missing");
+  await start($);
+  seen.answer = refused("spawn bun ENOENT");
+  await $.turn.start({ text: "go", turnId: "t-1" });
+  await seen.world.clock.settle();
   expect(seen.world.said).toEqual([NO_BUN]);
+  expect(seen.world.statuses).toEqual([undefined, "bun is not on PATH, so the server and stop gates are off"]);
+});
+
+test("a refused server pins a status line naming the fix, and says why in the transcript only once", async ($, on) => {
+  const seen = engine(on, refused("exit 1"), "ok");
+  await start($);
+  await $.turn.start({ text: "go", turnId: "t-1" });
+  expect(seen.world.statuses).toEqual(["server not connected, stop gates are off. Run /mcp"]);
+  expect(seen.world.said).toEqual([`the omca server is not connected (exit 1), so ${OFF}. Run /mcp to see why.`]);
+});
+
+test("with no bun on PATH the status line names bun", async ($, on) => {
+  const seen = engine(on, refused("spawn bun ENOENT"), "missing");
+  await start($);
+  expect(seen.world.statuses).toEqual(["bun is not on PATH, so the server and stop gates are off"]);
+});
+
+test("a pinned session asks again at each main turn, and clears the line once the server connects", async ($, on) => {
+  const seen = engine(on, refused("exit 1"), "ok");
+  await start($);
+  await $.turn.start({ text: "go", turnId: "t-1" });
+  await seen.world.clock.settle();
+  expect(seen.connects).toEqual(["omca", "omca"]);
+  expect(seen.world.statuses).toHaveLength(1);
+
+  seen.answer = { isConnected: true, server: "plugin:oh-my-claudeagent:omca" };
+  await $.turn.start({ text: "again", turnId: "t-2" });
+  await seen.world.clock.settle();
+  expect(seen.world.statuses).toEqual(["server not connected, stop gates are off. Run /mcp", undefined]);
+
+  await $.turn.start({ text: "and again", turnId: "t-3" });
+  await seen.world.clock.settle();
+  expect(seen.connects).toEqual(["omca", "omca", "omca", "omca"]);
+  expect(seen.world.statuses).toEqual(["server not connected, stop gates are off. Run /mcp", undefined]);
+});
+
+test("a subagent's turn does not ask again", async ($, on) => {
+  const seen = engine(on, refused("exit 1"), "ok");
+  await start($);
+  await $.turn.start({ text: "go", turnId: "t-1", agentId: "a-1" });
+  await seen.world.clock.settle();
+  expect(seen.connects).toEqual(["omca"]);
+});
+
+test("a server that hangs while connecting holds up no turn, and only one ask runs at a time", async ($, on) => {
+  const seen = engine(on, refused("exit 1"), "ok");
+  await start($);
+  let answer = () => {};
+  seen.hold = new Promise<void>((resolve) => (answer = resolve));
+  await $.turn.start({ text: "go", turnId: "t-1" });
+  await seen.world.clock.advance(1);
+  await $.turn.start({ text: "again", turnId: "t-2" });
+  await seen.world.clock.advance(1);
+  answer();
+  await seen.world.clock.settle();
+  expect(seen.connects).toEqual(["omca", "omca"]);
+});
+
+test("a turn that starts while the launch ask hangs adds no second ask, so the server's failure is said once", async ($, on) => {
+  const seen = engine(on, refused("timed out"), "ok");
+  let answer = () => {};
+  seen.hold = new Promise<void>((resolve) => (answer = resolve));
+  const starting = start($);
+  await seen.world.clock.advance(1);
+  await $.turn.start({ text: "go", turnId: "t-1" });
+  await seen.world.clock.advance(1);
+  answer();
+  await starting;
+  await seen.world.clock.settle();
+  expect(seen.connects).toEqual(["omca"]);
+  expect(seen.world.said).toHaveLength(1);
+  expect(seen.world.statuses).toEqual(["server not connected, stop gates are off. Run /mcp"]);
+
+  await $.turn.start({ text: "again", turnId: "t-2" });
+  await seen.world.clock.settle();
+  expect(seen.connects).toEqual(["omca", "omca"]);
+  expect(seen.world.said).toHaveLength(1);
+});
+
+test("an ask the engine refuses logs why, keeps the line and asks again next turn", async ($, on) => {
+  const seen = engine(on, refused("exit 1"), "ok");
+  await start($);
+  seen.answer = { deny: "connect unavailable" };
+  await $.turn.start({ text: "go", turnId: "t-1" });
+  await seen.world.clock.settle();
+  expect(seen.world.logs.some((line) => line.startsWith("server-check: asking again failed:"))).toBe(true);
+  expect(seen.world.statuses).toHaveLength(1);
+
+  await $.turn.start({ text: "again", turnId: "t-2" });
+  await seen.world.clock.settle();
+  expect(seen.connects).toEqual(["omca", "omca", "omca"]);
 });

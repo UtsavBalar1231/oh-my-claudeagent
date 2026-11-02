@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { KEYWORD_MODES, matchKeywordModes, SLASH_MODES } from "./keywords.ts";
+import { isSlashCommand, KEYWORD_MODES, keywordSpans, matchKeywordModes, SLASH_MODES } from "./keywords.ts";
 
 const modesOf = (prompt: string): string[] => matchKeywordModes(prompt).map(({ name }) => name);
 
@@ -118,5 +118,56 @@ describe("slash modes", () => {
 
   test("the slash and keyword modes share the handoff name that suppresses a repeat", () => {
     expect(KEYWORD_MODES.some(({ name }) => name === SLASH_MODES.get("oh-my-claudeagent:handoff")?.name)).toBe(true);
+  });
+});
+
+describe("keywordSpans", () => {
+  const spans = (prompt: string) => keywordSpans(prompt).map(({ name, start, end }) => [name, prompt.slice(start, end)]);
+
+  test("names each phrase by its place in the prompt, in the order typed, in the case typed", () => {
+    expect(spans("please Create Plan, then FIX\n  build and create plan")).toEqual([
+      ["plan", "Create Plan"],
+      ["build-fixer", "FIX\n  build"],
+      ["plan", "create plan"],
+    ]);
+  });
+
+  test("an offset still lands on the phrase past non-ASCII text, quoted spans and a paste", () => {
+    const paste = '<pasted_content id="1">\ncreate plan\n</pasted_content id="1">';
+    expect(spans(`İstanbul 日本語 "quoted" \`code\`\n${paste}\nfix build`)).toEqual([["build-fixer", "fix build"]]);
+  });
+
+  test.each([
+    "the phrase create plan",
+    'say "create plan" to it',
+    "`fix build` is a phrase",
+    "<task-notification>create plan</task-notification>",
+    '<pasted_content id="1">\nfix build\n</pasted_content id="1">',
+    "fix the build",
+  ])("what the detector does not fire on marks nothing: %p", (prompt) => {
+    expect(matchKeywordModes(prompt)).toEqual([]);
+    expect(keywordSpans(prompt)).toEqual([]);
+  });
+
+  test.each([
+    "handoff please",
+    "my context is getting long",
+    "setup omca on this machine",
+    "run analyzer on the draft",
+    "do some pre-plan work",
+    "create plan for the auth rewrite",
+    "build broken again",
+  ])("what the detector fires on marks that mode: %p", (prompt) => {
+    expect(keywordSpans(prompt).map(({ name }) => name)).toEqual(matchKeywordModes(prompt).map(({ name }) => name));
+    expect(keywordSpans(prompt).length).toBeGreaterThan(0);
+  });
+});
+
+describe("isSlashCommand", () => {
+  test("is a leading command word and nothing else", () => {
+    expect(isSlashCommand("/oh-my-claudeagent:plan create plan")).toBe(true);
+    expect(isSlashCommand("  /omca")).toBe(true);
+    expect(isSlashCommand("create plan in /tmp")).toBe(false);
+    expect(isSlashCommand("/tmp/x is a path")).toBe(false);
   });
 });

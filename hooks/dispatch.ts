@@ -24,6 +24,7 @@ type Sites = {
   "ui.render UserMessage": [RenderInput<"UserMessage">, RenderElement];
   "ui.render ToolUse": [RenderInput<"ToolUse">, RenderElement];
   "ui.render ToolGroup": [RenderInput<"ToolGroup">, RenderElement];
+  "ui.render Placed": [RenderInput<"Placed">, RenderElement];
   "session.compact": [Args<"session.compact">, EventResult<"session.compact">];
 };
 

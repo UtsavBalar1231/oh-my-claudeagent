@@ -232,6 +232,21 @@ the work happens:
   OMCA says so in the transcript when tmux holds them back. A group of more than three pictures
   previews three and names the rest, and the pictures in one group share 2 MiB: past that, and in
   tmux and iTerm2, a picture drawn from its file keeps the name row alone.
+- **A plan task's receipt.** When a main turn finishes tasks of the bound plan, a row under its
+  turn line names each one with its [proof](#proof): `✓ Task 7 Wire the panel · proven by just
+  test`, `! Task 8 Move the rates · unproven`, or `✗ Task 9 Add the form · failed bun test`. The
+  turn that ends the plan adds `Plan checkout complete · 14/14 · ✓ 12 proven ! 2 unproven · final
+  verification not logged`, dropping the counts first where the row runs short. A row stays where
+  it landed and settles as evidence comes in: a run logged in a later turn turns `unproven` to
+  `proven` or `failed` in place, and a final verification logged later turns the last row to `final
+  verification passed`. A row that says `proven` keeps saying it when later work edits the same
+  files; the band and the Plan tab show the live verdict. Tasks already done when the session
+  started or the plan was bound place no row. The row is for you: Claude never reads it, it is not
+  in the transcript file, and `--resume` does not bring it back. Outside fullscreen, a compaction
+  ends it. Claude Code holds 500 rows per plugin in a conversation until `/clear`; past that a task
+  places no row, and a plan's end is a toast.
+  `OMCA_DISABLED_HOOKS=plan-receipts` turns the rows off. Claude Code 2.1.314 or later draws them;
+  on an older one a plan's end is a toast instead.
 
 Running agents are listed by Claude Code itself, under the prompt. A session without a terminal
 gets the turn's figures as one text row beneath the answer instead.
@@ -545,7 +560,8 @@ in `.omca/rules/` replaces a shipped rule, and an empty one turns it off. OMCA k
 Desktop and VS Code start `.mcp.json` with the GUI's `PATH`, which can lack `~/.bun/bin`. When
 it does, the `omca` server never starts, and the MCP tools, the injected guidance and the stop
 gates are off. At session start OMCA writes a line in the transcript that bun is not on `PATH`,
-and the Doctor page reports bun as missing. Make bun reachable from the app's `PATH`, for example
+keeps a warning under the prompt while the server is off, and the Doctor page reports bun as
+missing. Make bun reachable from the app's `PATH`, for example
 by linking it into a directory the app searches, and restart the app.
 
 The Code tab in Desktop runs its own bundled copy of Claude Code. OMCA's mod
@@ -578,7 +594,9 @@ On Desktop the mod draws differently:
   before typing.
 - Copy can report that the surface has no clipboard, and the spinner keeps Desktop's own text.
 - The transcript keeps Desktop's own rows: Desktop draws its own turn footer, so the turn's
-  figures and receipt arrive as a text row beneath the answer.
+  figures and receipt arrive as a text row beneath the answer. A plan task's receipt is OMCA's own
+  row, so it needs no Desktop row to redraw, but it has not been checked on Desktop; a bundled copy
+  older than 2.1.314 shows a toast at the plan's end instead.
 
 The VS Code chat panel runs OMCA's hooks but draws none of its interface: no band, no pane and
 no guard dialog ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)).
@@ -586,13 +604,15 @@ The [availability table](references.md#where-each-feature-works) lists each feat
 
 ## Troubleshooting
 
-**The `omca` tools are missing.** At session start the mod asks Claude Code whether the `omca`
-server connected, and when it did not, it writes one line in the transcript. Either bun is not on
-`PATH`: install bun 1.4.2 or later and restart Claude Code (for Desktop and VS Code, see above).
-Or the server failed: the line gives Claude Code's reason, and `/mcp` shows the server's state.
-A failed server is not started again on its own: choose Reconnect in `/mcp`, and in `claude -p`
-runs Claude Code skips it for 15 minutes after a failed start. A server listed there as pending
-approval needs your approval.
+**The `omca` tools are missing.** At session start and at each turn the mod asks Claude Code
+whether the `omca` server is connected. When it is not, at the start or because it stopped partway
+through, the mod writes one line in the transcript and keeps a warning under the prompt, which it
+clears on the first turn after the server connects.
+Either bun is not on `PATH`: install bun 1.4.2 or later and restart Claude Code (for Desktop and
+VS Code, see above). Or the server failed: the line gives Claude Code's reason, and `/mcp` shows
+the server's state. A failed server is not started again on its own: choose Reconnect in `/mcp`,
+and in `claude -p` runs Claude Code skips it for 15 minutes after a failed start. A server listed
+there as pending approval needs your approval.
 
 **`evidence_log` fails partway through a plan.** The server was reconnecting or reloading. Call
 the tool again; do not skip the evidence.

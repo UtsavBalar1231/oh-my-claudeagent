@@ -27,10 +27,28 @@ describe("SHOTS", () => {
     expect(still("plan")?.ready(board)).toBe(false);
   });
 
-  test("the mascots scene is ready only once all three lanes show their agent running", () => {
-    const lanes = ["executor              ◆ running     8s", "explorer              ◆ running     4s", "architect             ◆ running     1s"];
+  test("the hero scene is ready only with task 7's detail beside the list, which a dock draws from 207 columns", () => {
+    const board = "◆ executor on 7\n✓ 6 proven · ! 1 unproven\n◐ 7 Wire the order summary panel  ! unproven\nk: Run check  s: Start here  c: Copy  m: More";
+    expect(still("hero")?.ready(`${board}\n7. Wire the order summary panel`)).toBe(true);
+    expect(still("hero")?.ready(board)).toBe(false);
+    expect(still("hero")?.cols).toBeGreaterThanOrEqual(207);
+  });
+
+  test("the mascots scene is ready only once all three lanes show their agent running with its tokens", () => {
+    const lanes = [
+      "executor              ◆ running     8s\nsonnet-5-5 · high · 8.3k tokens",
+      "explorer              ◆ running     4s\nsonnet-5-5 · high · 7.2k tokens",
+      "architect             ◆ running     1s\nfable-5-1 · xhigh · 10.6k tokens",
+    ];
     expect(still("mascots")?.ready(lanes.join("\n"))).toBe(true);
     expect(still("mascots")?.ready(lanes.slice(0, 2).join("\n"))).toBe(false);
+    expect(still("mascots")?.ready([...lanes.slice(0, 2), "architect             ◆ running     1s\nfable-5-1"].join("\n"))).toBe(false);
+  });
+
+  test("the statusline scene is ready only once both agents' rows show their context share", () => {
+    const rows = ["executor · Sonnet 5.5 · running · high · 1% ctx · Check the types", "executor · Sonnet 5.5 · running · high · 1% ctx · Check the lint rules"];
+    expect(still("statusline")?.ready(rows.join("\n"))).toBe(true);
+    expect(still("statusline")?.ready(rows.map((row) => row.replace(" · 1% ctx", "")).join("\n"))).toBe(false);
   });
 
   test("only the pane scenes crop to the pane", () => {
@@ -65,7 +83,7 @@ describe("CLIPS", () => {
       "clip-tour",
     ]);
     const pairs = ["clip-plain-stop", "clip-plain-reset", "clip-refusal", "clip-guard"];
-    for (const shot of CLIPS) expect([shot.name, shot.cols, shot.rows, shot.font]).toEqual(pairs.includes(shot.name) ? [shot.name, 96, 34, 35] : [shot.name, 200, 50, undefined]);
+    for (const shot of CLIPS) expect([shot.name, shot.cols, shot.rows, shot.font]).toEqual(pairs.includes(shot.name) ? [shot.name, 96, 34, 35] : [shot.name, 214, 50, undefined]);
   });
 
   test("each clip marks the events and names the targets its beat needs", () => {
@@ -88,14 +106,14 @@ describe("CLIPS", () => {
     expect(marks(clip("clip-verify"))).toEqual(["cmd-typed", "tests-pass", "evidence-logged", "complete"]);
     expect(marks(clip("clip-tour"))).toEqual(["cmd-typed", "agents-tab", "plan-tab", "evidence-tab", "notepad-tab", "stats-typed", "stats-tab"]);
     expect(targets(clip("clip-verify"))).toEqual(["complete-chip", "verdict-line"]);
-    expect(targets(clip("clip-tour"))).toEqual(["band", "cost-row", "notepad-card", "stats-header"]);
+    expect(targets(clip("clip-tour"))).toEqual(["band", "cost-row", "notepad-section", "stats-header"]);
   });
 
   // Each row is a split screen: the transcript, the pane's edge at column 12, then the pane.
   test.each([
     ["clip-tour", "band", "██ 6/14 · next 7 Wire the panel ·  6 proven  ● 1 unproven ·  1 running     [-]│pane", { row: 0, col: 3, len: 67, rows: 1 }],
     ["clip-tour", "cost-row", "  ↯ 6/14\n  $0.04 · ⏱ 11s", { row: 1, col: 2, len: 7, rows: 1 }],
-    ["clip-tour", "notepad-card", "│╭── x ──╮\n│╭────╮ ╭────╮\n││ Learnings · 3 entries", { row: 1, col: 1, len: 6, rows: 1 }],
+    ["clip-tour", "notepad-section", "│f: Find\n│ Learnings · 3 entries  10-03 13:47  │", { row: 1, col: 2, len: 34, rows: 1 }],
     ["clip-tour", "stats-header", "abc│  agent   runs  median  tokens  est. cost  evidence  outcomes   │", { row: 0, col: 6, len: 59, rows: 1 }],
     ["clip-delegate", "lane-head", "x │             executor                 ◆ running     7s", { row: 0, col: 16, len: 41, rows: 1 }],
     ["clip-verify", "verdict-line", "x │  COMPLETE  matches the current plan · 10-04 13:35   │", { row: 0, col: 5, len: 48, rows: 1 }],

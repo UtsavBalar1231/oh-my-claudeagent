@@ -1,0 +1,6 @@
+{
+  "command": "Finish task 2",
+  "keys": ["Finish task 3", "Enter"],
+  "mockScript": "receipts",
+  "fixture": "receipts"
+}

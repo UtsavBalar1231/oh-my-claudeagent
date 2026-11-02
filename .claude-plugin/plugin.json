@@ -30,7 +30,7 @@
       "title": "Enable keyword triggers",
       "type": "boolean",
       "default": false,
-      "description": "Adds a one-line hint naming the slash command when a prompt contains a trigger phrase such as \"create plan\".",
+      "description": "Adds a one-line hint naming the slash command when a prompt contains a trigger phrase such as \"create plan\", and underlines the phrase as you type it.",
       "sensitive": false
     },
     "statuslineMode": {

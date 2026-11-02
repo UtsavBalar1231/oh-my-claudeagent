@@ -1,0 +1,12 @@
+{
+  "plans": {
+    "checkout": {
+      "active_plan": "{{cwd}}/plans/checkout.md",
+      "started_at": "2026-10-02T09:00:00Z",
+      "session_ids": ["00000000-0000-4000-8000-000000000001"]
+    }
+  },
+  "bindings": {
+    "00000000-0000-4000-8000-000000000001": { "plan_name": "checkout", "bound_at": 1790931600 }
+  }
+}

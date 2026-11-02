@@ -1,0 +1,18 @@
+{
+  "main": [
+    {
+      "content": [
+        { "type": "tool_use", "name": "Bash", "input": { "command": "sed -i 's/^- \\[ \\] 2\\./- [x] 2./' plans/checkout.md", "description": "Check off task 2" } },
+        {
+          "type": "tool_use",
+          "name": "mcp__plugin_oh-my-claudeagent_omca__evidence_log",
+          "input": { "evidence_type": "test", "command": "just test", "exit_code": 0, "output_snippet": "12 passed" }
+        }
+      ]
+    },
+    { "content": [{ "type": "text", "text": "Task 2 is done and its test run is logged." }] },
+    { "content": [{ "type": "tool_use", "name": "Bash", "input": { "command": "sed -i 's/^- \\[ \\] 3\\./- [x] 3./' plans/checkout.md", "description": "Check off task 3" } }] },
+    { "content": [{ "type": "text", "text": "Task 3 is done." }] }
+  ],
+  "subagent": []
+}

@@ -1,5 +1,5 @@
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
-import { matchKeywordModes } from "../../src/core/keywords.ts";
+import { isSlashCommand, matchKeywordModes } from "../../src/core/keywords.ts";
 import { isRecord } from "../../src/core/tool-input.ts";
 import type { Handler } from "./registry.ts";
 import { announceOnce } from "./session-state.ts";
@@ -11,11 +11,9 @@ function keywordTriggersEnabled(root: string, sessionId: unknown): boolean {
   return isRecord(options) && options.enableKeywordTriggers === true;
 }
 
-const SLASH_COMMAND = /^\s*\/[\w:.-]+(?:\s|$)/;
-
 export const handle: Handler = (payload, { root, session }) => {
   if (isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "keyword-detector")) return;
-  if (payload.agent_id || typeof payload.prompt !== "string" || SLASH_COMMAND.test(payload.prompt)) return;
+  if (payload.agent_id || typeof payload.prompt !== "string" || isSlashCommand(payload.prompt)) return;
   if (!keywordTriggersEnabled(root, payload.session_id)) return;
   const banners = matchKeywordModes(payload.prompt)
     .filter(({ name }) => announceOnce(session, name))

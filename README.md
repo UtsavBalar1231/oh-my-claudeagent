@@ -66,7 +66,8 @@ OMCA shows its work in Claude Code's own transcript. The line that closes each t
 tokens, its cost and a receipt for the verification it ran. An agent starts and finishes in its
 own color, the finish with its duration, tool calls, tokens and the first line of its reply. A
 test, build or lint run gets its result under the shell commands that ran it, and a screenshot
-Claude reads shows as a picture where the terminal draws them.
+Claude reads shows as a picture where the terminal draws them. A plan task gets its own row when a
+turn finishes it, with the proof behind it, and that row settles as evidence lands.
 
 <img src=".github/assets/transcript.png" width="900" alt="A Claude Code turn on the checkout project: under Ran 1 shell command, a receipt reads just test, 42 passed. Two background agents start, and each reports as it finishes: the explorer on Map the validation messages and the architect on Review the checkout flow, each with its duration, tool calls and tokens flush right and the first line of its reply beneath. The dim line that closes each turn names the agents still running, then the turn's tokens and cost.">
 
@@ -95,7 +96,7 @@ earlier ones shrink to a line, and in a short pane each lane keeps to two rows.
 When the pane has room, each lane gets four rows of its own. The agent page opens a subagent's brief, tool calls, reply and cost, and toasts report
 failed verifications and a completed plan.
 
-<img src=".github/assets/mascots.png" width="680" alt="The Agents tab with three agents running at once, each lane led by its pixel mascot: a green executor in a yellow hard hat with a hammer, a blue explorer in a safari hat with a spyglass, and a purple architect with a lit bulb beside its head. Beside each mascot, four rows give the agent's name with its running time, its task, its running Bash sleep with one call, and its model, effort and tokens, with a blank row between agents.">
+<img src=".github/assets/mascots.png" width="680" alt="The Agents tab with three agents running at once, each lane led by its pixel mascot: a green executor in a yellow hard hat with a hammer, a blue explorer in a safari hat with a spyglass, and a purple architect with a lit bulb beside its head. Beside each mascot, four rows give the agent's name with its running time, its task, its running Bash command with one call, and its model, effort and tokens, with a blank row between agents.">
 
 The guard holds a destructive shell command for your review and shows what it would touch.
 
@@ -105,7 +106,7 @@ The guard holds a destructive shell command for your review and shows what it wo
 change how OMCA runs. A check with a known fix offers a key that fills the prompt with it, and
 the passing checks fold into one line that `o` opens.
 
-<img src=".github/assets/doctor.png" width="680" alt="The Doctor page, named after the four tabs in the tab bar, counts 1 warning, 1 info row and 11 passing checks. The warning says maxEffortLevel high holds the architect below the xhigh it declares, the info row offers a: Use /advisor fable, and one line beside o: Show passing folds the passing checks, naming OMCA, Claude Code, bun, the omca server, ast-grep, the options, the agent models and the mod policy before it is cut.">
+<img src=".github/assets/doctor.png" width="680" alt="The Doctor page, named after the four tabs in the tab bar, counts 1 warning, 1 info row and 11 passing checks. The warning says maxEffortLevel high holds the architect below the xhigh it declares, the info row offers a: Use /advisor fable, and one line beside o: Show passing folds the passing checks, naming OMCA, Claude Code, bun, the omca server, ast-grep and the options before it is cut.">
 
 The status line shows the session (model, agent and the plan's next task), the workspace
 (context window and git state) and usage (duration, usage limits, and cost for accounts billed

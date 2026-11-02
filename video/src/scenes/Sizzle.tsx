@@ -59,7 +59,7 @@ const proven = target(F4, "proven-chip");
 const discard = target(F5, "discard-lines");
 const claimLine = target(F1, "claim-line");
 const stopLine = target(F1, "stop-line");
-const notepadCard = target(F8, "notepad-card");
+const notepadSection = target(F8, "notepad-section");
 const statsHeader = target(F8, "stats-header");
 const band = target(F8, "band");
 const costRow = target(F8, "cost-row");
@@ -96,7 +96,7 @@ const CUTS: readonly Cut[] = [
   },
   { id: "S7 theme wipe", clip: F4, seconds: 0.6, framing: PANE(F4), at: mark(F4, "board") + 30, rate: 1, wipeTo: F7 },
   // The tabs have painted at their marks, so the previous tab never shows.
-  { id: "S8 notepad", clip: F8, seconds: 0.5, framing: { top: notepadCard.row, left: PANE_COL, cols: notepadCard.col + notepadCard.len - PANE_COL }, at: mark(F8, "notepad-tab"), rate: 2, lead: 0 },
+  { id: "S8 notepad", clip: F8, seconds: 0.5, framing: { top: notepadSection.row, left: PANE_COL, cols: notepadSection.col + notepadSection.len + 2 - PANE_COL }, at: mark(F8, "notepad-tab"), rate: 2, lead: 0 },
   { id: "S9 stats", clip: F8, seconds: 0.5, framing: PANE(F8, statsHeader.row - 3), at: mark(F8, "stats-tab"), rate: 2, lead: 0 },
   // The band down to the row above the cost row, while /omca is typed in the prompt.
   { id: "S10 band", clip: F8, seconds: 0.5, framing: { top: band.row, left: 0, cols: TRANSCRIPT_COLS, rows: costRow.row - band.row }, at: mark(F8, "cmd-typed"), rate: 2, lead: 15 },
