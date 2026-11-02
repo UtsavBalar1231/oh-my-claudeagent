@@ -1,11 +1,11 @@
 ---
 name: remove-ai-slops
-description: "Use to strip AI slop from changed files (double guards, dead fallbacks, narrating comments, premature abstraction) while keeping load-bearing validation and error handling. Triggers: 'remove ai slop', 'de-slop'."
+description: "Use to strip AI slop from changed files (double guards, dead fallbacks, narrating comments, premature abstraction) while keeping load-bearing validation and error handling. Triggers: 'remove ai slop', 'de-slop', 'clean up tests'."
 ---
 
 # Remove AI slop
 
-Clean only the requested files or reviewed diff. Read each candidate before cutting redundant guards, dead fallbacks, narrating comments, or unused abstractions. Do not introduce replacement abstractions, change public signatures or algorithms, or weaken test assertions. Use `references/categories.md` for examples and borderline cases.
+Clean only the requested files or reviewed diff. Read each candidate before cutting redundant guards, dead fallbacks, narrating comments, or unused abstractions. Do not introduce replacement abstractions, change public signatures or algorithms, or weaken test assertions. Use `references/categories.md` for examples and borderline cases. On a direct request to clean up tests, follow `references/tests.md`; otherwise list suspect tests in your report and leave them in place.
 
 Preserve load-bearing validation, error/data-loss handling, security controls, and comments that explain contracts or non-obvious constraints. Keep license/SPDX and file/module headers, API docs, `// SAFETY:` rationale, locking/concurrency and `Context:` contracts, invariants and constant derivations, error/panic semantics, units and boundary conditions, deprecation notices, bug-linked workarounds, and project-mandated comments.
 
