@@ -80,10 +80,17 @@ describe.skipIf(!opencodeBin || !tmux || process.platform === "win32")("native O
       throw error
     }
     terminal("send-keys", "-t", "omca", "-l", "/omca")
-    terminal("send-keys", "-t", "omca", "Enter")
-    await until("slash completion selected", 5_000, async () => capture().includes("/omca"), capture)
-    terminal("send-keys", "-t", "omca", "Enter")
-    await until("OMCA panel displayed", 20_000, async () => capture().includes("OMCA / Overview"), capture)
+    await until("slash completion listed", 10_000, async () => capture().includes("Open OMCA overview"), capture)
+    // One Enter picks the completion and the next submits it, and a key can land while the popup redraws.
+    let lastEnter = 0
+    await until("OMCA panel displayed", 20_000, async () => {
+      if (capture().includes("OMCA / Overview")) return true
+      if (Date.now() - lastEnter >= 1_000) {
+        terminal("send-keys", "-t", "omca", "Enter")
+        lastEnter = Date.now()
+      }
+      return false
+    }, capture)
     expect(capture()).toContain("Current plan")
     expect(capture()).toContain("First task")
     expect(capture()).not.toContain("SHA256")
