@@ -73,6 +73,7 @@ declare module "claude-code" {
           snippet: string;
           verifiedBy: string | null;
           planSha: string;
+          tree: string;
         }[];
         plan: { name: string; sha: string; blocked: number } | { name: string; error: string } | null;
         error: string | null;

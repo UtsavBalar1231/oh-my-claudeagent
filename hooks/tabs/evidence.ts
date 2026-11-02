@@ -10,6 +10,7 @@ import {
   rerunPrompt,
   shownIndices,
   TYPE_WORDS,
+  treeMovedSince,
   verdictOf,
 } from "../../src/core/evidence.ts";
 import { planTasks, taskCounts } from "../../src/core/checkboxes.ts";
@@ -224,6 +225,9 @@ function verdictLine(view: View, ledger: Ledger): { tone: ChipTone; title: strin
   const verdict = verdictOf(ledger.entries, plan.sha);
   switch (verdict.kind) {
     case "complete":
+      if (treeMovedSince(ledger.entries, verdict.entry)) {
+        return { tone: "warn", title, groups: [mark("STALE", "warn", "code changed since it passed"), at(verdict.entry.at)], when: at(verdict.entry.at) };
+      }
       return plan.blocked > 0
         ? { tone: "warn", title, groups: [mark("CLOSED", "warn", `not complete, ${plan.blocked} blocked`), at(verdict.entry.at)], when: at(verdict.entry.at) }
         : { tone: "ok", title, groups: [mark("COMPLETE", "ok", "matches the current plan"), at(verdict.entry.at)], when: at(verdict.entry.at) };

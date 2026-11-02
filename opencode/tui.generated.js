@@ -72,9 +72,10 @@ var Omca = Rpc.define({
                     at: { type: "number" },
                     snippet: { type: "string" },
                     verifiedBy: { type: ["string", "null"] },
-                    planSha: { type: "string" }
+                    planSha: { type: "string" },
+                    tree: { type: "string" }
                   },
-                  required: ["type", "command", "exitCode", "at", "snippet", "verifiedBy", "planSha"],
+                  required: ["type", "command", "exitCode", "at", "snippet", "verifiedBy", "planSha", "tree"],
                   additionalProperties: false
                 }
               }

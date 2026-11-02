@@ -4,12 +4,13 @@ import { open } from "node:fs/promises";
 import { join } from "node:path";
 import { allTasksClosed, blockedNumbers, type PlanTask, planTasks, taskCounts } from "../../src/core/checkboxes.ts";
 import { addedLines, type Candidate, hasCompletionClaim, hasStubMarker, isStubFinding } from "../../src/core/drift.ts";
-import { entriesOf, readLedger } from "../../src/core/evidence.ts";
+import { entriesOf, evidenceOf, readLedger, verdictOf } from "../../src/core/evidence.ts";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
 import { hasPassingFinalVerification } from "../../src/core/next-actions.ts";
 import { FRESH_BACKOFF, spendBlock, type StopGate, stepBackoff } from "../../src/core/stop-ledger.ts";
 import { field, isRecord, text } from "../../src/core/tool-input.ts";
 import { errorCode, isMissing } from "../io.ts";
+import { workingTreeStamp } from "../tree-stamp.ts";
 import type { Context, Handler, Payload } from "./registry.ts";
 import type { Session } from "./session-state.ts";
 import { ledgerMtimeSeconds, ledgerPath, readBoundPlan, readRegistry, type RegistryRead, registryPath, seconds } from "./status-file.ts";
@@ -301,6 +302,19 @@ const driftGuard: Gate = async (turn) => {
   return `[DRIFT GUARD] Completion claimed but stub markers remain on added/untracked lines:\n${listed}\nResolve the stubs before claiming done, or stop claiming completion. Set OMCA_DISABLED_HOOKS=drift-guard to bypass.`;
 };
 
+// Display only: the gate reads the plan's hash, so a verdict the code has moved past still opens it.
+async function staleVerdictNote(turn: Turn): Promise<string | undefined> {
+  const plan = turn.plan();
+  if (plan === undefined) return undefined;
+  const ledger = readLedgerFile(ledgerPath(turn.context.root));
+  if (ledger.kind !== "ok") return undefined;
+  const verdict = verdictOf(evidenceOf(ledger.document), createHash("sha256").update(plan.bytes).digest("hex"));
+  if (verdict.kind !== "complete" || verdict.entry.tree === "" || !hasCompletionClaim(await assistantText(turn))) return undefined;
+  const current = await workingTreeStamp(turn.context.root);
+  if (current === null || current === verdict.entry.tree) return undefined;
+  return `OMCA: the final verification of plan '${plan.name}' ran before the latest code changes, so it no longer describes this checkout.`;
+}
+
 const GATES: readonly (readonly [StopGate, Gate])[] = [
   ["plan-continuation", planContinuation],
   ["final-verification", finalVerification],
@@ -331,5 +345,12 @@ export const handle: Handler = async (payload, context) => {
       console.error(`omca: the ${name} Stop gate failed:`, error);
     }
   }
-  return undefined;
+  if (isHookDisabled(disabled, "final-verification")) return undefined;
+  try {
+    const note = await staleVerdictNote(turn);
+    return note === undefined ? undefined : { systemMessage: note };
+  } catch (error) {
+    console.error("omca: the stale verdict check failed:", error);
+    return undefined;
+  }
 };

@@ -124,6 +124,7 @@ The writer keeps any other top-level key it finds and writes `version` first.
 | `timestamp` | string | always | UTC at seconds precision, for example `2026-10-02T12:05:00Z` |
 | `verified_by` | string | only when not empty | The agent or person that verified, cut to 200 characters |
 | `plan_sha256` | string | only when not empty | The plan hash, 64 lowercase hex characters |
+| `tree` | string | when git can produce it | The tree hash of the working directory as `git add -A` would record it, computed by the server with a scratch index. Claude Code's `.claude/worktrees` directory does not count. It is absent outside a git repository, or when git is missing, fails, or a git call takes over 3 seconds. A caller cannot supply it |
 
 Lengths are counted in characters, not bytes. `evidence_log` rejects an unknown `type`, a non-integer `exit_code` and a `plan_sha256` that is not 64 lowercase hex characters or empty.
 
@@ -140,6 +141,7 @@ When the server starts, it checks the live ledger. If the file is over 1 MiB or 
 ### What the gates accept
 
 - **Stop gate.** A session bound to a plan cannot stop, once no task is open, until the ledger holds a `final_verification` entry with `exit_code` 0 whose `plan_sha256` is empty or equals the plan file's current hash. An entry without a hash matches any plan. The gate treats a missing ledger as no evidence, and a ledger that the reader refuses, or that has no `entries` list, as corrupt. Both hold the stop with a message, within the gate's block budget.
+- **Later code changes.** No gate reads `tree`. The Evidence tab shows a passing verdict as stale once a later entry carries a different `tree`, OpenCode's panel does the same, and at Stop a completion claim over a verdict whose `tree` differs from the working directory shows the user a message.
 - **TaskCompleted.** When the session ran a verification command within the last hour, the ledger must have been modified at or after the time that command finished, give or take 2 seconds, and must hold at least one well-formed entry. A malformed entry beside a good one does not block.
 
 ### Example

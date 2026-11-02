@@ -421,7 +421,7 @@ keeps the glyph. The task's detail shows the state as a chip.
 
 The Evidence tab opens on a verdict for the bound plan: **COMPLETE** when a passing final
 verification matches the plan file as it is now, **CLOSED** when it matches but tasks remain
-blocked, **STALE** when the plan changed after it passed,
+blocked, **STALE** when the plan changed after it passed or a later run saw different code,
 and **MISSING** when none passed. Under it a checklist says whether the newest build, test, lint
 and manual run each passed.
 

@@ -6,6 +6,7 @@ import { latestSessionId, touchSession } from "../hooks/session-state.ts";
 import { ledgerPath, writeStatus } from "../hooks/status-file.ts";
 import { ensureStateDir, readOrNull, withLock, writeFileAtomic } from "../io.ts";
 import type { Tool } from "../omca.ts";
+import { workingTreeStamp } from "../tree-stamp.ts";
 import { argReader, isoTimestamp, rootOf, stringArg, WORKING_DIRECTORY } from "./args.ts";
 
 export const SNIPPET_MAX_CHARS = 2000;
@@ -30,6 +31,7 @@ export type EvidenceEntry = {
   timestamp: string;
   verified_by?: string;
   plan_sha256?: string;
+  tree?: string;
   record_id?: string;
   [key: string]: unknown;
 };
@@ -90,6 +92,7 @@ async function evidenceLog(args: Record<string, unknown>): Promise<string> {
   const planSha256 = arg("plan_sha256", "");
   if (planSha256 !== "" && !SHA256_HEX.test(planSha256)) throw new Error("evidence_log: plan_sha256 must be 64 lowercase hex digits or empty");
   const root = rootOf(arg("working_directory", ""));
+  const tree = await workingTreeStamp(root);
 
   const entry = {
     type: type as EvidenceType,
@@ -99,6 +102,7 @@ async function evidenceLog(args: Record<string, unknown>): Promise<string> {
     timestamp: isoTimestamp(),
     ...(verifiedBy && { verified_by: capped(verifiedBy, VERIFIED_BY_MAX_CHARS) }),
     ...(planSha256 && { plan_sha256: planSha256 }),
+    ...(tree !== null && { tree }),
   };
   ensureStateDir(root);
   const total = await appendEvidence(root, entry);

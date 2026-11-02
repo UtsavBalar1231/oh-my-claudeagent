@@ -13,6 +13,7 @@ import type { Tool } from "../servers/omca.ts";
 import type { ToolContext as SharedContext } from "../servers/progress.ts";
 import { argReader, isoTimestamp } from "../servers/tools/args.ts";
 import { tools as astTools } from "../servers/tools/ast.ts";
+import { workingTreeStamp } from "../servers/tree-stamp.ts";
 import { appendEvidence, COMMAND_MAX_CHARS, SNIPPET_MAX_CHARS, tools as evidenceTools, VERIFIED_BY_MAX_CHARS } from "../servers/tools/evidence.ts";
 import { tools as filesystemTools } from "../servers/tools/filesystem.ts";
 import { appendNotepad, compactNotepad, formatNotepadList, type NotepadListing, tools as notepadTools } from "../servers/tools/notepad.ts";
@@ -96,9 +97,10 @@ async function evidenceLog(args: Record<string, unknown>, scope: RequestScope, c
   const initializeState = await scope.authorizeStateWrite();
   await scope.current();
   const recordID = createHash("sha256").update(JSON.stringify([context.sessionID, context.messageID, context.id])).digest("hex");
+  const tree = await workingTreeStamp(scope.root);
   const total = await appendEvidence(scope.root, {
     type, command, exit_code: exitCode, output_snippet: output, timestamp: isoTimestamp(),
-    ...(verifiedBy && { verified_by: verifiedBy }), ...(planSha && { plan_sha256: planSha }),
+    ...(verifiedBy && { verified_by: verifiedBy }), ...(planSha && { plan_sha256: planSha }), ...(tree !== null && { tree }),
     origin: "attested", record_id: recordID,
     provenance: { adapter: "opencode", session_id: context.sessionID, message_id: context.messageID, call_id: context.id },
   }, async () => {

@@ -7,6 +7,7 @@ import type { StopGate } from "../../src/core/stop-ledger.ts";
 import { dispatch, type Output, payloadOf } from "./registry.ts";
 import { findSession, touchSession } from "./session-state.ts";
 import * as statusFile from "./status-file.ts";
+import { workingTreeStamp } from "../tree-stamp.ts";
 
 const NOW = 1_786_000_000_000;
 const NOW_S = NOW / 1000;
@@ -1074,6 +1075,49 @@ describe("drift-guard", () => {
     const run = seeded("spec.js", "a\nb\nc\nd\ne\nf\n");
     write(run.root, "spec.js", "a\nb\nit.only('x')\nf\n");
     expect(await claim(run)).toEqual(drift("spec.js:3  it.only('x')"));
+  });
+});
+
+describe("a verdict the code has moved past", () => {
+  async function verified(tree: (root: string) => Promise<string | null>): Promise<Stop> {
+    const run = session(repository());
+    write(run.root, ".omca/.gitignore", "*\n");
+    write(run.root, "a.txt", "one\n");
+    commitAll(run.root);
+    bind(run, COMPLETE_PLAN);
+    writeLedger(run.root, [verdict({ tree: await tree(run.root) })]);
+    return run;
+  }
+  const NOTE = { systemMessage: "OMCA: the final verification of plan 'test-plan' ran before the latest code changes, so it no longer describes this checkout." };
+
+  test("a completion claim after a later edit tells the user and does not hold the stop", async () => {
+    const run = await verified(workingTreeStamp);
+    write(run.root, "a.txt", "two\n");
+    expect(await run.stop({ last_assistant_message: CLAIM })).toEqual(NOTE);
+  });
+
+  test("a completion claim with no later edit says nothing", async () => {
+    const run = await verified(workingTreeStamp);
+    expect(await run.stop({ last_assistant_message: CLAIM })).toEqual({});
+  });
+
+  test("a reply that claims nothing says nothing, whatever changed", async () => {
+    const run = await verified(workingTreeStamp);
+    write(run.root, "a.txt", "two\n");
+    expect(await run.stop({ last_assistant_message: "Looking at the next file." })).toEqual({});
+  });
+
+  test("a verdict with no stamp says nothing", async () => {
+    const run = await verified(async () => "");
+    write(run.root, "a.txt", "two\n");
+    expect(await run.stop({ last_assistant_message: CLAIM })).toEqual({});
+  });
+
+  test("turning off the final-verification gate turns off the note", async () => {
+    const run = await verified(workingTreeStamp);
+    write(run.root, "a.txt", "two\n");
+    process.env.OMCA_DISABLED_HOOKS = "final-verification";
+    expect(await run.stop({ last_assistant_message: CLAIM })).toEqual({});
   });
 });
 

@@ -14,6 +14,7 @@ import {
   readLedger,
   rerunPrompt,
   shownIndices,
+  treeMovedSince,
   verdictOf,
 } from "./evidence.ts";
 import { sha256Hex } from "./sha256.ts";
@@ -117,6 +118,7 @@ const run = (overrides: Partial<Evidence>): Evidence => ({
   snippet: "",
   verifiedBy: "executor",
   planSha: "",
+  tree: "",
   ...overrides,
 });
 
@@ -141,8 +143,9 @@ describe("parseLedger", () => {
         snippet: "10 passed",
         verifiedBy: "oh-my-claudeagent:executor",
         planSha: "",
+        tree: "",
       },
-      { type: "final_verification", command: "just ci", exitCode: 1, at: at("2026-10-02T12:08:00Z"), snippet: "", verifiedBy: null, planSha: "ab" },
+      { type: "final_verification", command: "just ci", exitCode: 1, at: at("2026-10-02T12:08:00Z"), snippet: "", verifiedBy: null, planSha: "ab", tree: "" },
     ]);
   });
 
@@ -331,4 +334,28 @@ test("a plan with a BOM, CRLF line endings and an invalid UTF-8 byte has one dig
 test("an ASCII plan with LF endings and no BOM keeps its digest", () => {
   const plan = "# Plan\n\n- [ ] 1. Task\n";
   expect(sha256Hex(bytesOf(plan))).toBe("a892183894168d775be2863f3e50fff56d2bb24729d5c20bb8e00f99a5cbfdac");
+});
+
+describe("treeMovedSince", () => {
+  const stamped = (tree: string) => run({ tree });
+
+  test("a later entry on another tree means the code moved", () => {
+    const verdict = stamped("a");
+    expect(treeMovedSince([verdict, stamped("b")], verdict)).toBe(true);
+  });
+
+  test("a later entry on the same tree means it did not", () => {
+    const verdict = stamped("a");
+    expect(treeMovedSince([stamped("z"), verdict, stamped("a")], verdict)).toBe(false);
+  });
+
+  test("an unstamped later entry says nothing", () => {
+    const verdict = stamped("a");
+    expect(treeMovedSince([verdict, stamped("")], verdict)).toBe(false);
+  });
+
+  test("an unstamped entry never reads as moved", () => {
+    const verdict = stamped("");
+    expect(treeMovedSince([verdict, stamped("b")], verdict)).toBe(false);
+  });
 });

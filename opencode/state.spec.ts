@@ -487,6 +487,15 @@ describe("evidence and notepads", () => {
     expect(readSnapshot(checkout, "ses_one").evidence.verdict).toBe("stale");
   });
 
+  test("a later entry on a different tree makes a passing verdict stale; one on the same tree does not", async () => {
+    await bindPlan(checkout, "ses_one", plan());
+    const hash = readSnapshot(checkout, "ses_one").plan?.sha256 ?? "";
+    ledger([evidence(hash, { tree: "a" }), evidence("", { type: "test", tree: "b" })]);
+    expect(readSnapshot(checkout, "ses_one").evidence.verdict).toBe("stale");
+    ledger([evidence(hash, { tree: "a" }), evidence("", { type: "test", tree: "a" })]);
+    expect(readSnapshot(checkout, "ses_one").evidence.verdict).toBe("historical");
+  });
+
   test("newer applicable failures invalidate success; unrelated hash failures do not", async () => {
     await bindPlan(checkout, "ses_one", plan());
     const hash = readSnapshot(checkout, "ses_one").plan?.sha256 ?? "";
