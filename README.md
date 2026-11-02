@@ -137,7 +137,7 @@ project files stay on that server. OMCA adds no telemetry or external service.
 
 **Settings hooks.** `hooks/hooks.json` registers `SessionStart` (only after `/clear` and
 compaction), `UserPromptSubmit`, `UserPromptExpansion`, `SubagentStart`, `PreToolUse` (only
-Write and Edit), `PermissionDenied`, `PostToolUse`, `PostToolUseFailure`, `Stop` and
+Write and Edit), `PostToolUse`, `PostToolUseFailure`, `Stop` and
 `TaskCompleted`. Each is an `mcp_tool` hook that calls `omca_hook` on the local server. They run
 in every session because the gates and the guidance need each turn's events: a plan-write guard
 and comment gate on writes, the verification recorder and rule injection after tool calls,

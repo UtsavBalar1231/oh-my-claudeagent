@@ -5,8 +5,8 @@
 ## Hook events
 
 Registered here: `SessionStart`, `UserPromptSubmit`, `UserPromptExpansion`,
-`SubagentStart`, `PreToolUse`, `PermissionDenied`, `PostToolUse`,
-`PostToolUseFailure`, `Stop`, `TaskCompleted`.
+`SubagentStart`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `Stop`,
+`TaskCompleted`.
 
 Regenerate that list with `jq -r '.hooks | keys[]' hooks/hooks.json`. Every other platform
 event is unregistered on purpose; `docs/references.md` carries the per-event reason.
@@ -166,9 +166,7 @@ overflowing region, a row, a page (`bodyRows`) or an end (`contentRows`) at a ti
   after `/clear`. The mod's `session.compact` feature (`compact.ts`) tells the summarizer to
   keep the bound plan and its open tasks. It does not run for a user-installed plugin where an
   organization manages Claude Code, so the server handler's re-injection is the only cover there.
-- `SubagentStart` routes to the server's `subagent-context` handler, and `PermissionDenied`
-  to its `permission-coach` handler, which answers an auto-mode classifier denial of a Bash
-  call with `retry: true`.
+- `SubagentStart` routes to the server's `subagent-context` handler.
 - `Stop` routes to the server's `stop-gates` handler, which runs plan continuation, final
   verification, and the drift guard in that order and answers with the first block.
   `OMCA_DISABLED_HOOKS=stop-gates` turns off all three; `plan-continuation`,
