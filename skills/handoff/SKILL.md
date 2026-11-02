@@ -25,7 +25,7 @@ allowed-tools:
 
 # Handoff
 
-Run only when the user explicitly asks for a handoff. A long conversation alone is not authorization. Read-only: do not change files, register or bind a plan, delegate, or create a session.
+Run this on a direct request for a handoff. A long conversation alone is not authorization. Read-only: do not change files, register or bind a plan, delegate, or create a session.
 
 Write compact, self-contained continuation context: the goal and exact constraints, verified progress, relevant changed files, decisions, blockers, and the next action. Quote requests and explicit constraints accurately; do not invent requirements. Inspect only the status, diff, plan, or notepad details needed to make those statements accurate. Use `boulder_progress` only for this session's explicitly bound plan; do not select another session's plan. Read relevant notepad sections with `notepad_read` when needed.
 

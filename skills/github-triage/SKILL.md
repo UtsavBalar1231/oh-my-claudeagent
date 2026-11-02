@@ -7,480 +7,98 @@ effort: medium
 disallowed-tools: [Edit]
 ---
 
-# GitHub triage: issue and PR processor
+# GitHub triage
 
-## Tool restrictions
+Go through a repository's open issues and pull requests and tell the maintainer what each one needs. The maintainer makes every decision, so a triage run changes nothing on GitHub or in the repository. The only files it writes are reports under `.omca/scratch/github-triage-{datetime}/` in the project root.
 
-Read-only GitHub and repository analysis. Do not modify repo files or GitHub state. Local report writes are allowed only under `.omca/scratch/github-triage-{datetime}/` in the project root. MCP tools: `notepad_write`, `evidence_log`, `ast_search`.
+## Read-only commands
 
-Fetch open issue/PR metadata, classify each, spawn 1 background executor per item. Each subagent fetches full details for its item and writes a report under `.omca/scratch/github-triage-{datetime}/` in the project root. Never take destructive action.
+Use `gh issue list`, `gh issue view`, `gh pr list`, `gh pr view`, `gh repo view` and `gh api --method GET`. Any command that merges, closes, edits, comments on, labels or reviews an item is out, as is `gh api` with a method that writes. Workers do not run `git checkout` or `git fetch`.
 
-## Zero-action policy
+## Citations
 
-This skill reads and reports; a human maintainer decides what happens to every item, and a mutation made during triage takes that decision away. Run only these read-only commands:
+A claim about code cites a GitHub permalink pinned to a commit SHA: `https://github.com/{REPO}/blob/{SHA}/path/to/file.py#L42`. A link through a branch name does not count, since the line it points at moves. A claim with no such link is marked UNVERIFIED.
 
-- `gh issue list`, `gh issue view`
-- `gh pr list`, `gh pr view`
-- `gh api --method GET repos/{REPO}/pulls/{number}/files`
-- `gh repo view`
+## 1. Choose the output directory
 
-Never run a `gh` command that merges, closes, edits, comments on, labels, or reviews an item (`gh pr merge`, `gh pr close`, `gh issue close`, `gh issue edit`, `gh pr edit`, `gh pr review`), and never call `gh api` with `POST`, `PUT`, `PATCH`, or `DELETE`.
+Set `{OUTDIR}` to the absolute path `<project root>/.omca/scratch/github-triage-<datetime>`, with `<datetime>` as `YYYYMMDD-HHMMSS`. When the session gives only the date, add a short word of your own so two runs in one day stay apart. The Write tool creates the directory with the first report, and OMCA's server keeps `.omca/` out of commits. Tell the user the path now.
 
-## Evidence rule (mandatory)
+## 2. Fetch metadata
 
-Every factual claim MUST cite a GitHub permalink containing a commit SHA. Branch permalinks (`blob/main`, `blob/master`, branch names) are forbidden.
-
-Format:
-```
-CLAIM: "The handler for X is in Y"
-EVIDENCE: https://github.com/{REPO}/blob/{COMMIT_SHA}/path/to/file.py#L42
-```
-
-Without a commit-SHA permalink, do not make the claim. Write "UNVERIFIED" instead.
-
-Applies to: bug root cause (file + line), "feature exists" (cite where), "fix correct" (cite what), any code reference.
-
-## Architecture
-
-```
-1 issue or PR  =  1 Agent(subagent_type="oh-my-claudeagent:executor")
-```
-
-| Rule | Value |
-|------|-------|
-| Agent type for ALL items | `oh-my-claudeagent:executor` |
-| Execution mode | Background by default, with the result in a `<task-notification>`; a subagent the platform runs in the foreground returns its result directly. Accept either |
-| Parallelism | Bounded batches, max 5 concurrent agents |
-| Total items per run | No platform cap. Bound the run yourself and record the overflow (see below) |
-| Result storage | `issue-{number}.md` or `pr-{number}.md` under `.omca/scratch/github-triage-{datetime}/` in the project root |
-| Final collection | Orchestrator reads all reports and writes `SUMMARY.md` |
-
----
-
-## Phase 1: setup output directory
-
-Set `{OUTDIR}` to the absolute path `<project root>/.omca/scratch/github-triage-<datetime>`, where `<datetime>` is the current date and time as `YYYYMMDD-HHMMSS`. When the session context gives only the date, append a short word of your own so two runs on one day get different directories. OMCA's server writes `.omca/.gitignore` when it starts, so reports stay out of commits.
-
-Run no shell command to create the directory: the Write tool creates it when the first report is written. Tell the user the path now: `Reports will be written to: {OUTDIR}`.
-
----
-
-## Phase 2: fetch open item metadata only
-
-When no repo argument was given, run `gh repo view --json nameWithOwner -q .nameWithOwner` and use the `owner/name` it prints as `{REPO}` from here on.
+With no repo argument, `gh repo view --json nameWithOwner -q .nameWithOwner` gives `{REPO}`. Honor `--issues-only` and `--prs-only`.
 
 ```bash
-# Issues: all open metadata only. Do not request body/comments here; control characters can break batching.
-gh issue list --repo {REPO} --state open --limit 500 --json number,title,state,createdAt,updatedAt,labels,author
-
-# PRs: all open metadata only. Subagents fetch body/comments/reviews/files per item.
-gh pr list --repo {REPO} --state open --limit 500 --json number,title,state,createdAt,updatedAt,labels,author,headRefName,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup
+gh issue list --repo {REPO} --json number,title,labels,author,createdAt,updatedAt,state --state open --limit 500
+gh pr list --repo {REPO} --json number,title,labels,author,createdAt,updatedAt,state,baseRefName,headRefName,isDraft,mergeable,reviewDecision,statusCheckRollup --state open --limit 500
 ```
 
-If either returns exactly 500 results, paginate using `--search "created:<LAST_CREATED_AT"` until exhausted.
+Leave bodies and comments for the workers, because control characters in them can break a large listing. A listing of exactly 500 means there may be more: continue with `--search "created:<LAST_CREATED_AT"` until one comes back short.
 
----
+## 3. Classify from metadata
 
-## Phase 3: classify each item
-
-For each item, determine its type from metadata only: title, labels, author, and PR state fields. Do not fetch body/comments during classification.
-
-### Issues
-
-Title prefixes and labels are strong signals. A `?` in a title is weak, because bug reports are often phrased as questions: an item that reports broken or unexpected behavior is `ISSUE_BUG` however it is phrased.
+Use the title, labels, author and PR fields, without opening the item.
 
 | Type | Signals |
-|------|-----------|
-| `ISSUE_BUG` | Title contains `[Bug]` or `Bug:`, labels indicate bug, or the title describes broken or unexpected behavior |
-| `ISSUE_FEATURE` | Title contains `[Feature]`, `[RFE]`, `[Enhancement]`, `Feature Request`, `Proposal`, or labels indicate enhancement |
-| `ISSUE_QUESTION` | Title contains `[Question]` or `[Discussion]`, or labels indicate question/discussion, and no defect is reported |
-| `ISSUE_OTHER` | Anything else |
+|---|---|
+| `ISSUE_BUG` | A bug label or `[Bug]` or `Bug:` in the title, or a title describing broken behavior, even one phrased as a question |
+| `ISSUE_FEATURE` | An enhancement label, or `[Feature]`, `[RFE]`, `[Enhancement]`, `Feature Request` or `Proposal` in the title |
+| `ISSUE_QUESTION` | A question or discussion label, or `[Question]` or `[Discussion]` in the title, with no defect reported |
+| `ISSUE_OTHER` | None of those |
+| `PR_BUGFIX` | A title starting with `fix`, a branch containing `fix/` or `bugfix/`, or a `bug` label |
+| `PR_OTHER` | Any other pull request |
 
-### PRs
+## 4. Bound the run
 
-| Type | Detection |
-|------|-----------|
-| `PR_BUGFIX` | Title starts with `fix`, `fix:`, `fix(`, branch contains `fix/` or `bugfix/`, or labels include `bug` |
-| `PR_OTHER` | Everything else (feat, refactor, docs, chore, etc.) |
+The session has no limit on total subagents, and batches of five stay under the concurrent one (`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS`, 20 by default). What limits a run is time and this conversation's context, since each finished worker's result lands here. Choose how many items to take from the user's stated scope, or else from the size of the list against the context you have left.
 
----
+When the list is longer than that, take the most recently updated items and write the rest to `{OUTDIR}/SKIPPED.md`, one line each with number, type, title and `updatedAt`. State both counts in `SUMMARY.md` and in your final message. A partial run is fine as long as it says it is partial.
 
-## Phase 4: spawn 1 background agent per item
+## 5. Run one worker per item
 
-### Run-size bound (decide before spawning anything)
+Spawn `oh-my-claudeagent:executor` for each item, up to five in a message. Each result arrives in a task notification, usually in a later turn, or directly if the platform ran that worker in the foreground. Start the next batch, read reports or write the summary only once the current batch has reported. While a batch runs, do work that does not overlap it; with none left, end the turn once. Never send repeated holding messages, and never respawn an item because its result is still on the way.
 
-No platform ceiling limits how many subagents a session spawns in total. The only
-spawn limit that applies here is the concurrent one: the Agent tool refuses a spawn
-with `Concurrent subagent limit reached` once the session's running count reaches
-`CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` (default 20), and it starts succeeding again
-as soon as running agents finish. Batches of 5 stay under that and under the
-tool-call concurrency default of 10, so a batched run never trips it. A session
-running with ultracode on is exempt from the concurrent limit entirely.
-
-What actually bounds a run is wall-clock time and the orchestrator's own context:
-every finished agent's result lands inline in this conversation. So the total is a
-judgment call, not a constant. Pick a bound for the run, from the user's stated scope
-if they gave one, otherwise from how large the classified list is against how much
-room is left in the conversation. Then, if the classified list is longer than the
-bound:
-
-1. Sort by `updatedAt` descending and take the first N. Recently-touched items are
-   the ones a triage pass is for.
-2. Write the dropped items to `{OUTDIR}/SKIPPED.md`, one line per item: number,
-   type, title, `updatedAt`. Never truncate silently.
-3. State the count in `SUMMARY.md` and in your final message: how many items were
-   triaged, how many were skipped, and that `SKIPPED.md` lists them.
-
-A run that reports 120 of 340 items with the skipped list on disk is correct. A run
-that reports those 120 as if they were all of them is a wrong answer.
-
-For EVERY item that survives the bound, spawn one executor agent:
+Fill in this brief for each worker:
 
 ```text
-Agent(
-    subagent_type="oh-my-claudeagent:executor",
-    prompt=SUBAGENT_PROMPT_FOR_TYPE
-)
+Triage {issue or PR} #{number} of {REPO}: "{title}" by {author}.
+{For a PR: {headRefName} into {baseRefName}, draft {isDraft}, mergeable {mergeable}, review {reviewDecision}, checks {summary of statusCheckRollup}.}
+
+This is read-only. Run only gh view commands and `gh api --method GET`, plus local search and Read. No git checkout or git fetch. Change nothing on GitHub or in the repository, and write nothing except your report.
+
+Get the details first.
+Issue: gh issue view {number} --repo {REPO} --json body,comments
+PR: gh pr view {number} --repo {REPO} --json body,files,reviews,comments,statusCheckRollup,reviewDecision
+    and gh api --method GET repos/{REPO}/pulls/{number}/files
+
+Search code with ast_search for syntax (a signature, a call site, an import) and rg for literal text, then Read what you find. Cite each claim about code with a permalink pinned to a commit SHA, or mark it UNVERIFIED.
+
+{The "Find out" cell for this type}
+
+Write {OUTDIR}/{issue or pr}-{number}.md:
+# {Issue or PR} #{number}: {title}
+**Type:** {type}
+{The "Headline" cell for this type}
+{The "Sections" cell for this type, each as a ## heading}
+## Next step
+What a maintainer should do. Draft any reply for them to post; never post it yourself.
 ```
 
-Launch agents in batches of up to 5 concurrent. Wait for batch to complete before launching next batch.
-
-**Background Agent Barrier**: Each result arrives as a task notification, often in a later turn than the spawn. Launch the next batch, read reports, or write the summary only after every agent in the current batch has reported. While a batch runs, do work that does not overlap it, such as preparing the next batch's prompts; when none is left, end the turn once. Do not send a holding message on consecutive turns for the same batch, and do not re-spawn an item because its result has not arrived yet.
-
----
-
-## Subagent prompt templates
-
-### SUBAGENT_ISSUE_QUESTION
-
-```
-You are analyzing GitHub issue #{number} for repository {REPO}.
-
-ZERO-ACTION POLICY: Do NOT run any mutation commands (no gh issue close/edit/comment, no gh pr merge/edit/review, no gh api POST/PUT/PATCH/DELETE). REPORT ONLY.
-
-ITEM:
-- Issue #{number}: {title}
-- Author: {author}
-- Initial data is metadata-only; fetch full issue details yourself with read-only `gh issue view {number} --repo {REPO} --json body,comments`.
-
-YOUR JOB:
-1. Fetch and read the issue body/comments. Understand what the user is asking.
-2. Search the codebase to find the answer: `ast_search` for a syntactic target (a signature, a call site, an import), `rg` for literal text, then Read what you find.
-3. Find specific file paths and code that address the question.
-
-EVIDENCE RULE: Every factual code claim must cite a GitHub permalink with commit SHA. If you cannot cite evidence, mark the claim UNVERIFIED.
-
-Write your report to: {OUTDIR}/issue-{number}.md
-
-Report format:
-# Issue #{number}: {title}
-**Type:** ISSUE_QUESTION
-**Status:** ANSWERED | PARTIAL | UNANSWERABLE
-
-## Analysis
-[Your findings with evidence]
-
-## Evidence
-[File paths and code references for each claim]
-EVIDENCE: <commit-SHA GitHub permalink> - [description]
-
-## Recommended Response
-[Draft response text for a maintainer to post - do NOT post it yourself]
-
-## Action Required
-[What a human maintainer should do]
-```
-
----
-
-### SUBAGENT_ISSUE_BUG
-
-```
-You are analyzing GitHub issue #{number} for repository {REPO}.
-
-ZERO-ACTION POLICY: Do NOT run any mutation commands (no gh issue close/edit/comment, no gh pr merge/edit/review, no gh api POST/PUT/PATCH/DELETE). REPORT ONLY.
-
-ITEM:
-- Issue #{number}: {title}
-- Author: {author}
-- Initial data is metadata-only; fetch full issue details yourself with read-only `gh issue view {number} --repo {REPO} --json body,comments`.
-
-YOUR JOB:
-1. Fetch and read the issue body/comments. Identify expected vs actual behavior and reproduction steps.
-2. Search the codebase for the relevant code path.
-3. Determine: confirmed bug, not a bug (behavior is correct), or unclear.
-
-EVIDENCE RULE: For CONFIRMED_BUG, cite commit-SHA permalinks for exact code lines. No citation = UNVERIFIED. For NOT_A_BUG, cite commit-SHA permalinks proving correct behavior.
-
-Write your report to: {OUTDIR}/issue-{number}.md
-
-Report format:
-# Issue #{number}: {title}
-**Type:** ISSUE_BUG
-**Verdict:** CONFIRMED_BUG | NOT_A_BUG | NEEDS_INVESTIGATION
-
-## Root Cause (if CONFIRMED_BUG)
-EVIDENCE: <commit-SHA GitHub permalink> - [what goes wrong and why]
-
-## Proof of Correct Behavior (if NOT_A_BUG)
-EVIDENCE: <commit-SHA GitHub permalink> - [code that shows intended behavior]
-
-## Fix Approach (if CONFIRMED_BUG)
-[Specific change needed - file, line, what to change]
-
-## Severity
-[LOW | MEDIUM | HIGH | CRITICAL] - [justification]
-
-## Action Required
-[What a human maintainer should do next]
-```
-
----
-
-### SUBAGENT_ISSUE_FEATURE
-
-```
-You are analyzing GitHub issue #{number} for repository {REPO}.
-
-ZERO-ACTION POLICY: Do NOT run any mutation commands, including gh api POST/PUT/PATCH/DELETE. REPORT ONLY.
-
-ITEM:
-- Issue #{number}: {title}
-- Author: {author}
-- Initial data is metadata-only; fetch full issue details yourself with read-only `gh issue view {number} --repo {REPO} --json body,comments`.
-
-YOUR JOB:
-1. Fetch and read the issue body/comments.
-2. Search the codebase to check if this feature already exists (partially or fully).
-3. Assess implementation feasibility.
-
-EVIDENCE RULE: If you claim the feature exists, cite commit-SHA permalinks for the exact file and function.
-
-Write your report to: {OUTDIR}/issue-{number}.md
-
-Report format:
-# Issue #{number}: {title}
-**Type:** ISSUE_FEATURE
-**Already Exists:** YES_FULLY | YES_PARTIALLY | NO
-
-## Existence Evidence (if exists)
-EVIDENCE: <commit-SHA GitHub permalink> - [how the feature is implemented]
-
-## Feasibility
-[EASY | MODERATE | HARD | ARCHITECTURAL_CHANGE]
-
-## Relevant Files for Implementation
-[Files that would need changes]
-
-## Action Required
-[What a human maintainer should do]
-```
-
----
-
-### SUBAGENT_ISSUE_OTHER
-
-```
-You are analyzing GitHub issue #{number} for repository {REPO}.
-
-ZERO-ACTION POLICY: Do NOT run any mutation commands, including gh api POST/PUT/PATCH/DELETE. REPORT ONLY.
-
-ITEM:
-- Issue #{number}: {title}
-- Author: {author}
-- Initial data is metadata-only; fetch full issue details yourself with read-only `gh issue view {number} --repo {REPO} --json body,comments`.
-
-YOUR JOB:
-1. Fetch and read the issue body/comments. Understand what the reporter is describing.
-2. Search the codebase with `ast_search` or `rg`, then Read, to gather relevant context.
-3. Determine the best classification and whether it needs maintainer attention.
-
-EVIDENCE RULE: Every factual code claim must cite a GitHub permalink with commit SHA. If you cannot cite evidence, mark the claim UNVERIFIED.
-
-Write your report to: {OUTDIR}/issue-{number}.md
-
-Report format:
-# Issue #{number}: {title}
-**Type:** ISSUE_OTHER
-**Best Classification:** QUESTION | BUG | FEATURE | DISCUSSION | META | STALE
-**Needs Attention:** YES | NO
-**Summary:** [1-2 sentence summary]
-
-## Analysis
-[Your findings with evidence]
-
-## Evidence
-[File paths and code references for each claim]
-EVIDENCE: <commit-SHA GitHub permalink> - [description]
-
-**Suggested Label:** [if any]
-**Action Required:** [what a maintainer should do]
-```
-
----
-
-### SUBAGENT_PR_BUGFIX
-
-```
-You are analyzing GitHub PR #{number} for repository {REPO}.
-
-ZERO-ACTION POLICY: Do NOT run any mutation commands (no gh pr merge/close/edit, no gh pr review --approve, no gh api POST/PUT/PATCH/DELETE). REPORT ONLY. Read-only analysis via gh CLI and GET API only.
-
-ITEM:
-- PR #{number}: {title}
-- Author: {author}
-- Base: {baseRefName} <- Head: {headRefName}
-- Draft: {isDraft}
-- Mergeable: {mergeable}
-- Review Decision: {reviewDecision}
-- CI Status: {statusCheckRollup_summary}
-
-YOUR JOB (READ-ONLY: no git checkout, no git fetch):
-1. Fetch PR details: gh pr view {number} --repo {REPO} --json body,files,reviews,comments,statusCheckRollup,reviewDecision
-2. Read changed files via: gh api --method GET repos/{REPO}/pulls/{number}/files
-3. Search codebase to understand what the PR is fixing.
-4. Assess merge safety against ALL six conditions.
-
-MERGE CONDITIONS (report on each):
-  a. CI status: ALL passing
-  b. Review decision: APPROVED
-  c. Fix is clearly correct, addressing an obvious, unambiguous bug
-  d. No risky side effects (no architectural changes, no breaking changes)
-  e. Not a draft PR
-  f. Mergeable state is clean (no conflicts)
-
-EVIDENCE RULE: For "fix is correct" assessment, cite original bug code and fix code with commit-SHA permalinks.
-
-Write your report to: {OUTDIR}/pr-{number}.md
-
-Report format:
-# PR #{number}: {title}
-**Type:** PR_BUGFIX
-**Merge Safe:** YES (all 6 conditions met) | NO (list failing conditions)
-
-## Fix Analysis
-EVIDENCE: Original bug at <commit-SHA GitHub permalink>
-EVIDENCE: Fix applied at <commit-SHA GitHub permalink> in PR diff
-
-## Merge Condition Checklist
-- [ ] CI: PASS | FAIL | PENDING
-- [ ] Review: APPROVED | CHANGES_REQUESTED | PENDING | NONE
-- [ ] Fix correctness: VERIFIED | UNVERIFIED
-- [ ] Side effects: NONE | [describe]
-- [ ] Draft: NO (good) | YES (blocks merge)
-- [ ] Conflicts: NONE | [describe]
-
-## Risk Assessment
-[What could go wrong if merged]
-
-## Action Required
-[What a human maintainer should do - be specific]
-```
-
----
-
-### SUBAGENT_PR_OTHER
-
-```
-You are analyzing GitHub PR #{number} for repository {REPO}.
-
-ZERO-ACTION POLICY: Do NOT run any mutation commands, including gh api POST/PUT/PATCH/DELETE. READ-ONLY analysis only. No git checkout.
-
-ITEM:
-- PR #{number}: {title}
-- Author: {author}
-- Base: {baseRefName} <- Head: {headRefName}
-- Draft: {isDraft}
-- Mergeable: {mergeable}
-- Review Decision: {reviewDecision}
-- CI Status: {statusCheckRollup_summary}
-
-YOUR JOB:
-1. Fetch PR details: gh pr view {number} --repo {REPO} --json body,files,reviews,comments,statusCheckRollup
-2. Read changed files via: gh api --method GET repos/{REPO}/pulls/{number}/files
-3. Assess the PR.
-
-Write your report to: {OUTDIR}/pr-{number}.md
-
-Report format:
-# PR #{number}: {title}
-**Type:** PR_OTHER
-**Subtype:** FEATURE | REFACTOR | DOCS | CHORE | TEST | OTHER
-**Summary:** [what this PR does in 2-3 sentences]
-
-## Status
-- CI: PASS | FAIL | PENDING
-- Review: APPROVED | CHANGES_REQUESTED | PENDING | NONE
-- Conflicts: NONE | [describe]
-- Draft: YES | NO
-
-## Risk Level
-[LOW | MEDIUM | HIGH] - [justification]
-
-## Alignment
-[Does this fit the project direction? YES | NO | UNCLEAR - cite evidence]
-
-## Action Required
-[NEEDS_REVIEW | REQUEST_CHANGES | WAIT_FOR_CI | CLOSE | other - with reason]
-```
-
----
-
-## Phase 5: collect results and write summary
-
-After all background agents complete, read every per-item report from `{OUTDIR}/`
-(`SKIPPED.md` is not a report; carry its count into the summary instead):
-
-```bash
-ls {OUTDIR}/issue-*.md {OUTDIR}/pr-*.md
-```
-
-Produce a final summary at `{OUTDIR}/SUMMARY.md`:
-
-```markdown
-# GitHub Triage Report: {REPO}
-
-**Date:** {datetime}
-**Output directory:** {OUTDIR}
-**Items Processed:** {total}
-
-## Issues ({issue_count})
-| # | Title | Type | Verdict | Action Required |
-|---|-------|------|---------|----------------|
-| ... | ... | ... | ... | ... |
-
-## Pull Requests ({pr_count})
-| # | Title | Type | Merge Safe | Action Required |
-|---|-------|------|------------|----------------|
-| ... | ... | ... | ... | ... |
-
-## Items Requiring Immediate Attention
-[List each item where Action Required is non-trivial, with 1-line summary]
-
-## Statistics
-- Bugs confirmed: {bugs_confirmed}
-- Questions answerable: {questions_answerable}
-- PRs merge-safe: {prs_merge_safe}
-- Needs human decision: {needs_human}
-
-## Report Files
-All individual reports in: {OUTDIR}/
-```
-
-Tell the user the output directory path when complete.
-
----
-
-## Quick start
-
-When invoked:
-
-1. Choose the output directory: `.omca/scratch/github-triage-{datetime}/` under the project root, created by the first Write
-2. Fetch open issue + PR metadata via gh CLI (paginate if 500 reached; no body/comments initially)
-3. Classify each item (ISSUE_QUESTION, ISSUE_BUG, ISSUE_FEATURE, ISSUE_OTHER, PR_BUGFIX, PR_OTHER)
-4. Decide the run-size bound; log any overflow to `{OUTDIR}/SKIPPED.md`
-5. For EACH surviving item: `Agent(subagent_type="oh-my-claudeagent:executor", prompt=...)`
-6. Launch agents in bounded batches of up to 5 concurrent executors
-7. Collect reports from output directory once agents complete
-8. Write `{OUTDIR}/SUMMARY.md` with aggregated findings
-9. Report the output directory path to the user
+| Type | Find out | Headline | Sections |
+|---|---|---|---|
+| `ISSUE_QUESTION` | What is being asked, and the answer from the code | **Status:** ANSWERED, PARTIAL or UNANSWERABLE | Findings, with citations. Draft reply |
+| `ISSUE_BUG` | Expected and actual behavior, the steps to reproduce, and the code path. Decide whether the defect is real | **Verdict:** CONFIRMED_BUG, NOT_A_BUG or NEEDS_INVESTIGATION | Cause, or proof that the behavior is correct, cited to exact lines. For a real bug, the change needed. Severity with the reason |
+| `ISSUE_FEATURE` | Whether it already exists in whole or in part, and how much work it would be | **Already exists:** FULLY, PARTLY or NO | Where it exists, cited to file and function. Effort: small, medium, large or redesign. Files a change would touch |
+| `ISSUE_OTHER` | What it is really about, and whether a maintainer needs to look | **Best fit:** question, bug, feature, discussion, meta or stale. **Needs attention:** yes or no | Findings, with citations. Suggested label |
+| `PR_BUGFIX` | What it fixes, and whether it is safe to merge. It is safe only if checks all pass, the review is approved, the fix is plainly right for a plain bug, nothing breaks or shifts architecture, it is not a draft, and it has no conflicts | **Merge safe:** YES, or NO with the conditions it fails | Each condition with its state. The bug and the fix, both cited. What could go wrong after merging |
+| `PR_OTHER` | What it does, and how it fits the project | **Subtype:** feature, refactor, docs, chore, test or other. **Risk:** low, medium or high, with the reason | Summary in two or three sentences. Checks, review, conflicts and draft state. Whether it fits the project's direction, with evidence |
+
+## 6. Summarize
+
+Read every `issue-*.md` and `pr-*.md` report in `{OUTDIR}`, then write `{OUTDIR}/SUMMARY.md` with:
+
+- the repository, the date, the directory, and how many items were triaged and skipped
+- a table of issues (number, title, type, verdict, next step) and a table of pull requests (number, title, type, merge safe, next step)
+- the items a maintainer should look at first, one line each
+- counts of confirmed bugs, answerable questions, merge-safe pull requests and items waiting on a human decision
+
+Give the user the directory path when you finish.
