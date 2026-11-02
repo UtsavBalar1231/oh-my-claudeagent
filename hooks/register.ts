@@ -7,6 +7,7 @@ import { compact } from "./compact.ts";
 import { completion } from "./completion.ts";
 import { dispatch, dispatchStream, featuresFor } from "./dispatch.ts";
 import { footer } from "./footer.ts";
+import { keywordPaint } from "./keyword-paint.ts";
 import type { Host, Options } from "./host.ts";
 import { metrics } from "./metrics.ts";
 import { modMarker } from "./mod-marker.ts";
@@ -80,7 +81,12 @@ function bindHost($: EngineInterface, options: Options): Host {
       after: (ms, fn) => $.clock.after(ms, fn),
       every: (ms, fn) => $.clock.every(ms, fn),
     },
-    prompt: { fill: (args) => $.prompt.fill(args), submit: (args) => $.prompt.submit(args) },
+    prompt: {
+      fill: (args) => $.prompt.fill(args),
+      submit: (args) => $.prompt.submit(args),
+      read: () => $.prompt.read(),
+      paint: (args) => $.prompt.paint(args),
+    },
     state: {
       agents: {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "agents" }),
@@ -161,14 +167,14 @@ export const register: Register = (on, pluginOptions) => {
   const options = readOptions(pluginOptions);
   const bash = featuresFor("tool.check", { bashGuard });
   const toolCall = featuresFor("tool.call", { agentsTracker });
-  const sessionStart = featuresFor("session.start", { refusalRecovery, pane, modMarker, band, serverCheck });
-  const promptSubmit = featuresFor("prompt.submit", { refusalRecovery });
+  const sessionStart = featuresFor("session.start", { refusalRecovery, pane, modMarker, band, serverCheck, keywordPaint });
+  const promptSubmit = featuresFor("prompt.submit", { refusalRecovery, keywordPaint });
   const turnStart = featuresFor("turn.start", { refusalRecovery, footer, modMarker });
   const turnStep = featuresFor("turn.step", { metrics, agentsTracker });
   const turnComplete = featuresFor("turn.complete", { band, agentsTracker, agentRows, metrics, pane, footer, refusalRecovery });
   const agentSpawn = featuresFor("agent.spawn", { agentsTracker, metrics });
-  const promptEdit = featuresFor("prompt.edit", { band, refusalRecovery });
-  const promptChange = featuresFor("prompt.change", { band });
+  const promptEdit = featuresFor("prompt.edit", { band, refusalRecovery, keywordPaint });
+  const promptChange = featuresFor("prompt.change", { band, keywordPaint });
   const promptAutocomplete = featuresFor("prompt.autocomplete", { completion });
   const paneClose = featuresFor("ui.close", { pane });
   const paneFocus = featuresFor("ui.focus", { pane });

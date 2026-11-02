@@ -66,6 +66,8 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
         "mcp.connect",
         "process.run",
         "prompt.fill",
+        "prompt.paint",
+        "prompt.read",
         "prompt.submit",
         "session.cwd",
         "session.id",
