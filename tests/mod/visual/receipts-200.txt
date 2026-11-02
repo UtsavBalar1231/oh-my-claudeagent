@@ -1,0 +1,50 @@
+
+ ▐▛███▛█   Claude Code v2.1.316
+▝▜██████▀  Opus 5.5 · API Usage Billing
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd
+
+
+❯ Finish task 2
+
+  Called plugin:oh-my-claudeagent:omca, ran 1 shell command
+
+● Task 2 is done and its test run is logged.
+
+✻ Worked for 0s · done HH:MM · NN.Nk in NN out · $X.XX
+   Task 2 Wire the session store · proven by just test
+
+❯ Finish task 3
+
+  Ran 1 shell command
+
+● Task 3 is done.
+
+✻ Worked for 0s · done HH:MM · NN.Nk in NN out · $X.XX
+   Task 3 Send the receipt email · proven by just test
+   Plan checkout complete · 3/3 ·  3 proven · final verification not logged
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+█████ 3/3 ·  3 proven                                                                                                                                                                              [-]
+1: Run final verification
+                                                                                                                                                                                    ◐ medium · /effort
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── OMCA: checkout ─
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏸ manual mode on · ? for shortcuts · ← for agents
