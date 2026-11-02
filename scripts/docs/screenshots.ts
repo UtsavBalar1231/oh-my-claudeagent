@@ -495,7 +495,7 @@ export const SHOTS: readonly Still[] = [
   {
     name: "hero",
     format: "png",
-    cols: 200,
+    cols: 214,
     rows: 50,
     command: "Pick up the next task on the plan",
     keys: ["/omca plan", "Enter"],
@@ -618,8 +618,9 @@ export const SHOTS: readonly Still[] = [
     rows: 36,
     command: "Start the open checkout tasks",
     keys: ["/omca", "Enter"],
-    // Each subagent takes the next scripted turn, and the mock holds its last reply back, so all
-    // three stay running while the pane draws their lanes, each led by its mini.
+    // Each subagent takes the next scripted turn, and the mock holds its second reply back, so all
+    // three stay running with a call and tokens to show while the pane draws their lanes, each led
+    // by its mini.
     script: {
       main: [
         { content: [text("Three agents can start now."), TASK_7] },
@@ -630,12 +631,17 @@ export const SHOTS: readonly Still[] = [
         { content: [text("The executor, the explorer and the architect are running.")] },
       ],
       subagent: [
+        { content: [bash("ls src/steps", "List the checkout steps")] },
         { content: [bash("ls", "Hold the executor open")], delayMs: 600_000 },
+        { content: [bash("ls src/forms", "List the forms")] },
         { content: [bash("ls", "Hold the explorer open")], delayMs: 600_000 },
+        { content: [bash("ls src/cart", "List the cart modules")] },
         { content: [bash("ls", "Hold the architect open")], delayMs: 600_000 },
       ],
     },
-    ready: (screen) => ["executor", "explorer", "architect"].every((name) => new RegExp(`${name} {2,}\\S+ running`).test(screen)),
+    ready: (screen) =>
+      ["executor", "explorer", "architect"].every((name) => new RegExp(`${name} {2,}\\S+ running`).test(screen)) &&
+      (screen.match(/\S+-\d+-\d+ · \w+ · [\d.]+k tokens/g) ?? []).length === 3,
     crop: "pane",
   },
   { name: "guard", format: "png", cols: 120, rows: 26, command: "Clean the build", keys: [], script: GUARD_SCRIPT, ready: guardReady },
@@ -671,13 +677,14 @@ export const SHOTS: readonly Still[] = [
         { content: [text("Both checks are running.")] },
       ],
       subagent: [
-        { content: [bash("sleep 25", "Run the type checker")] },
-        { content: [bash("sleep 25", "Run the linter")] },
-        { content: [text("The type check passed.")] },
-        { content: [text("The lint check passed.")] },
+        { content: [bash("ls", "Run the type checker")] },
+        { content: [bash("ls", "Run the linter")] },
+        { content: [bash("ls", "Run the type checker")], delayMs: 600_000 },
+        { content: [bash("ls", "Run the linter")], delayMs: 600_000 },
       ],
     },
-    ready: (screen) => screen.includes(" · Check the lint rules"),
+    // The context share needs a finished model call, so an agent's row waits on its first reply.
+    ready: (screen) => screen.includes(" · Check the lint rules") && (screen.match(/executor · .*\d+% ctx/g) ?? []).length === 2,
   },
   {
     name: "pane-tour",

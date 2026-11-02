@@ -27,10 +27,28 @@ describe("SHOTS", () => {
     expect(still("plan")?.ready(board)).toBe(false);
   });
 
-  test("the mascots scene is ready only once all three lanes show their agent running", () => {
-    const lanes = ["executor              ◆ running     8s", "explorer              ◆ running     4s", "architect             ◆ running     1s"];
+  test("the hero scene is ready only with task 7's detail beside the list, which a dock draws from 207 columns", () => {
+    const board = "◆ executor on 7\n✓ 6 proven · ! 1 unproven\n◐ 7 Wire the order summary panel  ! unproven\nk: Run check  s: Start here  c: Copy  m: More";
+    expect(still("hero")?.ready(`${board}\n7. Wire the order summary panel`)).toBe(true);
+    expect(still("hero")?.ready(board)).toBe(false);
+    expect(still("hero")?.cols).toBeGreaterThanOrEqual(207);
+  });
+
+  test("the mascots scene is ready only once all three lanes show their agent running with its tokens", () => {
+    const lanes = [
+      "executor              ◆ running     8s\nsonnet-5-5 · high · 8.3k tokens",
+      "explorer              ◆ running     4s\nsonnet-5-5 · high · 7.2k tokens",
+      "architect             ◆ running     1s\nfable-5-1 · xhigh · 10.6k tokens",
+    ];
     expect(still("mascots")?.ready(lanes.join("\n"))).toBe(true);
     expect(still("mascots")?.ready(lanes.slice(0, 2).join("\n"))).toBe(false);
+    expect(still("mascots")?.ready([...lanes.slice(0, 2), "architect             ◆ running     1s\nfable-5-1"].join("\n"))).toBe(false);
+  });
+
+  test("the statusline scene is ready only once both agents' rows show their context share", () => {
+    const rows = ["executor · Sonnet 5.5 · running · high · 1% ctx · Check the types", "executor · Sonnet 5.5 · running · high · 1% ctx · Check the lint rules"];
+    expect(still("statusline")?.ready(rows.join("\n"))).toBe(true);
+    expect(still("statusline")?.ready(rows.map((row) => row.replace(" · 1% ctx", "")).join("\n"))).toBe(false);
   });
 
   test("only the pane scenes crop to the pane", () => {
