@@ -31,5 +31,6 @@ Read omca_boulder_progress first and the selected plan. Delegate scoped tasks to
 Run independent work in parallel only when the files and dependencies do not overlap.
 Verify each task's observable behavior and record its actual command exit code using omca_evidence_log before checking it off.
 Do not rewrite the approved scope. Ask before a substantive plan change, moving the session, or creating a worktree.
-If blocked or interrupted, explain what remains. Do not restart yourself to imitate a Stop gate.
+A task that cannot finish closes as \`- [~] N.\` with a \`- Blocked:\` line stating the gap. It is not done and never satisfies a dependency, so carry on with the independent tasks and name every blocked task in your report.
+If interrupted, explain what remains. Do not restart yourself to imitate a Stop gate.
 At the end report historical evidence separately from current-checkout verification and include the current plan_sha256 when recording final_verification.`
