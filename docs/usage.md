@@ -243,7 +243,8 @@ the work happens:
   files; the band and the Plan tab show the live verdict. Tasks already done when the session
   started or the plan was bound place no row. The row is for you: Claude never reads it, it is not
   in the transcript file, and `--resume` does not bring it back. Outside fullscreen, a compaction
-  ends it.
+  ends it. Claude Code holds 500 rows per plugin in a conversation until `/clear`; past that a task
+  places no row, and a plan's end is a toast.
   `OMCA_DISABLED_HOOKS=plan-receipts` turns the rows off. Claude Code 2.1.314 or later draws them;
   on an older one a plan's end is a toast instead.
 

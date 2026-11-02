@@ -240,22 +240,38 @@ test("OMCA_DISABLED_HOOKS=plan-receipts places no row and keeps the toast off to
   expect(w.toasts).toEqual([]);
 });
 
-test("the atom keeps the newest rows up to its cap, so an old row is the first to go", async ($, on) => {
-  const w = setup(on, 0, 2);
-  let stored: unknown = Array.from({ length: 200 }, (_, i) => ({ id: `receipt-old-${i}`, plan: "other", path: "/other.md", total: 1, tasks: [], complete: null }));
+function seedReceipts(on: On, count: number): () => readonly { id: string }[] {
+  let stored: unknown = Array.from({ length: count }, (_, i) => ({ id: `receipt-old-${i}`, plan: "other", path: "/other.md", total: 1, tasks: [], complete: null }));
   on("state.get", async (_$, e, next) => (e.key === "receipts" ? { value: { value: stored, version: 1 } } : next(e)));
   on("state.set", async (_$, e, next) => {
     if (e.key !== "receipts") return next(e);
     stored = e.value;
     return { value: { isSet: true, version: 2 } };
   });
+  return () => stored as readonly { id: string }[];
+}
+
+test("every row that stands keeps its facts, however many there are", async ($, on) => {
+  const w = setup(on, 0, 2);
+  const kept = seedReceipts(on, 499);
   await start($);
   finish(w, 1, 2);
   await mainTurn($);
-  const kept = stored as readonly { id: string }[];
-  expect(kept).toHaveLength(200);
-  expect(kept[0]?.id).toBe("receipt-old-1");
-  expect(kept[199]?.id).toBe(w.placed[0]);
+  expect(kept()).toHaveLength(500);
+  expect(kept()[0]?.id).toBe("receipt-old-0");
+  expect(kept()[499]?.id).toBe(w.placed[0]);
+});
+
+test("a row past the engine's 500 keeps no facts, so the rows that stand keep theirs and still draw", async ($, on) => {
+  const w = setup(on, 0, 2);
+  w.placeAnswer = { isPlaced: false, reason: "a plugin holds at most 500 placed rows" };
+  const kept = seedReceipts(on, 500);
+  await start($);
+  finish(w, 1, 2);
+  await mainTurn($);
+  expect(w.placed).toHaveLength(1);
+  expect(kept().map(({ id }) => id)).toEqual(Array.from({ length: 500 }, (_, i) => `receipt-old-${i}`));
+  expect(w.toasts).toEqual([]);
 });
 
 test("a row OMCA did not place keeps what is beneath it", async ($, on) => {

@@ -4,7 +4,7 @@ import { hasPassingFinalVerification } from "../src/core/next-actions.ts";
 import { LEDGER } from "../src/core/omca-paths.ts";
 import { boardOf, type Card, parsePlan } from "../src/core/plan-reader.ts";
 import { proofSummary, shownProof } from "../src/core/proof.ts";
-import { isReceiptId, KEPT_RECEIPTS, type PlanComplete, type Receipt, receiptId, receiptRows, settled, type TaskReceipt, taskReceipt } from "../src/core/plan-receipts.ts";
+import { isReceiptId, type PlanComplete, type Receipt, receiptId, receiptRows, settled, type TaskReceipt, taskReceipt } from "../src/core/plan-receipts.ts";
 import { sha256Hex } from "../src/core/sha256.ts";
 import { glyphs } from "../src/core/ui-kit.ts";
 import type { Features } from "./dispatch.ts";
@@ -53,11 +53,13 @@ async function readingOf(host: Host, within: object): Promise<Reading | undefine
 
 function nextReceipts(receipts: readonly Receipt[], reading: Reading, added: Receipt | undefined): readonly Receipt[] {
   const current = receipts.map((receipt) => (receipt.path === reading.path ? settled(receipt, reading.tasks, reading.complete) : receipt));
-  return [...current, ...(added === undefined ? [] : [added])].slice(-KEPT_RECEIPTS);
+  return added === undefined ? current : [...current, added];
 }
 
 // A rejection is a client with no placed rows, and no `requestId` means the row does not stand at
-// all. A row with a `requestId` stands and draws when a surface attaches, so it needs no toast.
+// all: a plugin holds at most 500 in a conversation (probed on 2.1.316). A row with a `requestId`
+// stands and draws when a surface attaches, so it needs no toast. A row that does not stand keeps no
+// facts, so the atom holds only rows that stand and the engine's cap is the atom's.
 async function place(host: Host, receipt: Receipt): Promise<void> {
   let stands = false;
   try {
@@ -66,7 +68,9 @@ async function place(host: Host, receipt: Receipt): Promise<void> {
   } catch (error) {
     host.log(`plan-receipts: placing a row failed: ${reason(error)}`);
   }
-  if (!stands && receipt.complete !== null) host.ui.toast(`Plan complete: ${receipt.plan} ${receipt.total}/${receipt.total}`, { timeoutMs: TOAST_MS });
+  if (stands) return;
+  if (receipt.complete !== null) host.ui.toast(`Plan complete: ${receipt.plan} ${receipt.total}/${receipt.total}`, { timeoutMs: TOAST_MS });
+  await update(host.state.receipts, (value) => value?.filter(({ id }) => id !== receipt.id));
 }
 
 export const planReceipts: Features = {

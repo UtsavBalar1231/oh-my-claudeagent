@@ -16,8 +16,6 @@ export type Receipt = {
 };
 
 const RECEIPT_PREFIX = "receipt-";
-// A row whose facts leave the atom draws nothing, so the cap sits past any session's finished tasks.
-export const KEPT_RECEIPTS = 200;
 // More tasks than this finishing in one turn fold into a count, so a bulk edit of a plan stays a short row.
 const SHOWN_TASKS = 6;
 // A command this short stays whole; a longer one keeps at least `MIN_COMMAND` cells beside the title.
