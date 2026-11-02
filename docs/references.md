@@ -104,9 +104,11 @@ trigger.
 | `setup omca`, `omca setup` | omca-setup |
 | `handoff`, `context is getting long`, `start fresh session` | a suggestion to run `/oh-my-claudeagent:handoff` |
 
-A slash command activates its mode whether or not the option is on. A prompt that is a slash
-command raises no keyword suggestion, so only the slash command's own mode banner appears. The
-client raises `UserPromptSubmit` before `UserPromptExpansion` for such a prompt.
+While the option is on, a phrase that would trigger is underlined in the prompt as you type, until
+its mode has fired once in the session. A slash command activates its mode whether or not the
+option is on. A prompt that is a slash command raises no keyword suggestion, so only the slash
+command's own mode banner appears. The client raises `UserPromptSubmit` before
+`UserPromptExpansion` for such a prompt.
 
 ## MCP tools
 
@@ -147,13 +149,13 @@ server's `omca_hook` tool, which dispatches through `servers/hooks/registry.ts`.
 | Event | Feature |
 | --- | --- |
 | `tool.check` for Bash, PowerShell and Monitor | The destructive-command guard and its review dialog; a Monitor command is read as bash |
-| `session.start` | Registers `/omca`, writes the session's mod marker, draws the band's first state, and writes a transcript line when the `omca` server is not connected, naming a missing bun or the server's error |
-| `prompt.submit` | Tracks user-origin submissions and cancels a pending refusal recovery when new user input arrives |
-| `turn.start`, `turn.complete` | The turn's tokens, cost and verification receipt for its closing line, a finished agent's notice, the band and its buttons, the pane's refresh. A main turn you started in an interactive session that still ends in a `reasoning_extraction` refusal, after Claude Code's own retry, gets at most one follow-up prompt from OMCA; the refusal itself stands |
+| `session.start` | Registers `/omca`, writes the session's mod marker, draws the band's first state, and writes a transcript line when the `omca` server is not connected, naming a missing bun or the server's error, with a status line under the prompt until it connects |
+| `prompt.submit` | Tracks user-origin submissions and cancels a pending refusal recovery when new user input arrives; notes which keyword modes have fired so the prompt stops underlining them |
+| `turn.start`, `turn.complete` | The turn's tokens, cost and verification receipt for its closing line, a finished agent's notice, the band and its buttons, the pane's refresh, a plan task's receipt row. At a main turn's start, a session whose `omca` server is off asks about it again. A main turn you started in an interactive session that still ends in a `reasoning_extraction` refusal, after Claude Code's own retry, gets at most one follow-up prompt from OMCA; the refusal itself stands |
 | `agent.spawn`, `turn.step` | The Agents tab and delegation records |
 | `tool.call` | A subagent's tool calls, kept for its page on the Agents tab; only a subagent's call reaches the mod, and a main-loop call skips it |
 | `session.compact` | Asks the summarizer to keep the bound plan and its next ten open tasks. It does not run for a user-installed plugin where an organization manages Claude Code; the server's `SessionStart` `compact` handler re-injects the plan context there |
-| `ui.render`, `ui.focus`, `ui.scroll`, `ui.close`, `prompt.edit`, `prompt.change`, `command.run` | The turn line, an agent's launch and finish rows, and the receipts and picture previews under tool groups in the transcript, the band, the pane and the commands |
+| `ui.render`, `ui.focus`, `ui.scroll`, `ui.close`, `prompt.edit`, `prompt.change`, `command.run` | The turn line, an agent's launch and finish rows, the receipts and picture previews under tool groups and plan task receipts in the transcript, the band, the pane and the commands, and the underline on a keyword trigger in the prompt |
 
 An observed user submission cancels a follow-up before it is queued. If user input races a
 follow-up already queued, neither competing turn qualifies for another automatic recovery.
@@ -204,6 +206,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | --- | --- |
 | `bash-guard` | The guard's review and its refusals. The catastrophic-removal deny stays |
 | `refusal-recovery` | The follow-up prompt after a `reasoning_extraction` refusal |
+| `plan-receipts` | The plan task rows in the transcript |
 | `stop-gates` | Every stop gate |
 | `plan-continuation`, `final-verification`, `drift-guard` | One stop gate |
 | `task-completed` | The task completion check |
@@ -215,7 +218,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | `failure-recovery` | Advice after a failed tool call |
 | `subagent-context` | The context each subagent gets at start |
 | `permission-coach` | The retry after an auto-mode denial |
-| `keyword-detector`, `slash-mode-detector` | Mode detection from prompts and slash commands |
+| `keyword-detector`, `slash-mode-detector` | Mode detection from prompts and slash commands. `keyword-detector` also takes the underline off trigger phrases in the prompt |
 | `mod-notice` | The message that the mod is not running |
 | `session-start` | Context restore after compaction and `/clear` |
 | `compact` | The plan note in compaction instructions |
@@ -323,6 +326,7 @@ ledger, notepads and the registry, and links the JSON Schemas for the ledger and
 | Guard review dialog | Yes | As guard decisions | No: held commands are decided without you | No: decided as in `-p` | As the guard |
 | Band, pane, plan reader, doctor | Yes | As guard decisions, with [Desktop's differences](usage.md#desktop-and-vs-code) | No | No ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)) | As the guard |
 | Turn line, agent rows, receipts and image previews in the transcript | Yes, pictures where the terminal draws them (kitty, Ghostty, iTerm2 3.5 or later, and tmux 3.3 or later with passthrough on) | No: Desktop keeps its own rows, and the turn's figures and receipt arrive as a text row beneath the answer | No | No | As the guard |
+| Plan task receipts in the transcript | Yes, from Claude Code 2.1.314; before it, a toast at the plan's end | Not checked; a toast at the plan's end where the app's Claude Code is older than 2.1.314 | No | No | As the guard |
 | Status line | Yes | Not documented | No | Not documented | Unless `allowManagedHooksOnly` or `disableAllHooks` |
 
 Where the built-in `sec-default` guard loads (a machine whose managed settings set at least one

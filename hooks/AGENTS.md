@@ -18,7 +18,7 @@ event is unregistered on purpose; `docs/references.md` carries the per-event rea
 try/catch. `host.ts` defines the `Host` closures a feature receives in place of `$`, so a
 feature module takes `host` and never `$`. The features are `bash-guard`, `server-check`,
 `mod-marker`, `compact`, `agents-tracker`, `agent-rows`, `metrics`, `band`, `pane` with its `tabs/`,
-`footer`, `group-rows`, `spinner`, `completion`, `refusal-recovery` and `omca-router`. `doctor.ts` runs the Doctor page's checks and fixes for
+`footer`, `group-rows`, `plan-receipts`, `keyword-paint`, `spinner`, `completion`, `refusal-recovery` and `omca-router`. `doctor.ts` runs the Doctor page's checks and fixes for
 `tabs/doctor.ts`; it registers no event. Pure logic lives in `src/core/`.
 
 `spinner` rewrites only the `suffix` of the terminal's main-loop Spinner, to `… · task 7/14`, from
@@ -57,6 +57,34 @@ atoms written once per turn or per finished agent, since a row subscribes to eve
   draw bytes and not a file, and a refusal carrying `fix: "tmux-passthrough"` writes one transcript
   line naming tmux's `allow-passthrough` and `focus-events`.
   An expanded group is left as drawn.
+
+`plan-receipts` adds OMCA's own rows to the transcript with `$.ui.place`, which the engine draws
+through the `Placed` component on every surface. At each main `turn.complete` it compares the bound
+plan's done tasks with those of the last main turn, and the tasks that finished get one row with
+their verdicts from `proofFacts`, plus the plan's outcome when they end it. A row lands under the turn
+line, since the engine draws that line before `turn.complete` hooks run, and a subagent's turn
+places none because its row would land among the main turn's tool rows. The first read of a plan, at
+`session.start` or when it becomes bound, only records what is done, and so does the first main turn
+after a hot reload, which starts the module's memory over. The `receipts` atom holds the rows' facts,
+capped at 200; a drawing reads it. Each main turn moves a stored verdict only toward proof (`settled`):
+a run that lands late settles a row, while a later task's edit to a shared file, which makes the
+live verdict read unproven, leaves it alone, and the band and the Plan tab carry the live verdict.
+A turn that settles nothing writes nothing, because a write redraws every placed row. A rejected call
+(a client older than 2.1.314) or a result with no `requestId` means no row stands, and a plan's end
+then toasts; a result with a `requestId` stands for a surface yet to attach. The band keeps the
+plan's end notification.
+
+`keyword-paint` underlines what the server's `keyword-detector` would match in the draft, from the
+same `keywordSpans` reader in `src/core/keywords.ts`, only with `enableKeywordTriggers` on and that
+detector's switch off. A `prompt.edit` answer carries the runs as typing goes on, and `prompt.change`
+repaints with `$.prompt.read` and `$.prompt.paint` for a write no edit carries, as a recalled entry
+or an undo. It notes a mode at `prompt.submit` as the detector announces it, once a session, and
+stops marking it. `$.prompt.paint` rejects on an old client and leaves the draft as it stands.
+
+`server-check` also keeps a `$.ui.status` line while the `omca` server is not connected, which the
+engine draws under the prompt as `⚠ oh-my-claudeagent: ...`. Only while the line is up, each main
+`turn.start` asks the engine again, from a `$.clock.after` timer and one ask at a time, so a server
+that hangs while it connects holds up no turn.
 
 `agents-tracker` also owns the agent page that `tabs/agent-page.ts` draws on the Agents tab: a
 Button keyed `open-<agent id>` on each lane opens it, and `b`, `c`, `r` and `v` go back, copy the

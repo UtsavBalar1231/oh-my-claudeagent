@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Plan task receipts in the transcript:** when a main turn finishes tasks of the bound plan, a
+  row under its turn line names each one with its proof, such as `✓ Task 7 Wire the panel · proven
+  by just test`, and the turn that ends the plan adds the plan's outcome. A row keeps its place and
+  settles as evidence lands in later turns. Claude never reads these rows, and
+  `OMCA_DISABLED_HOOKS=plan-receipts` turns them off. They need Claude Code 2.1.314 or later.
+- **Keyword triggers show in the prompt:** with `enableKeywordTriggers` on, a phrase that would
+  trigger is underlined as you type, until its mode has fired once in the session.
+- **A warning that stays while the `omca` server is off:** a session whose server did not connect
+  keeps a status line under the prompt, beside the one-time transcript line, and clears it once
+  the server connects.
+
+### Changed
+
+- **The end of a plan:** the receipt row replaces the "Plan complete" toast. The toast remains where
+  no row can stand, as on Claude Code older than 2.1.314, and the desktop notification still fires.
+
 ## [3.4.0] - 2026-11-02
 
 ### Added
