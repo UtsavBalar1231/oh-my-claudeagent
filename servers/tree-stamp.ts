@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, statSync, utimesSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -28,7 +28,14 @@ async function stampWith(root: string, scratch: string): Promise<string | null> 
   if (index === undefined || objects === undefined) return null;
   mkdirSync(join(scratch, "objects"));
   const realIndex = resolve(root, index);
-  if (existsSync(realIndex)) copyFileSync(realIndex, join(scratch, "index"));
+  if (existsSync(realIndex)) {
+    const copy = join(scratch, "index");
+    copyFileSync(realIndex, copy);
+    // git trusts a file's stat data only when the index is older than the file, so a fresh copy
+    // would read a same-size edit from the second of the last index write as unchanged.
+    const { atime, mtime } = statSync(realIndex);
+    utimesSync(copy, atime, mtime);
+  }
   const env = {
     GIT_INDEX_FILE: join(scratch, "index"),
     GIT_OBJECT_DIRECTORY: join(scratch, "objects"),

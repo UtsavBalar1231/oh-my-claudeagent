@@ -1,5 +1,5 @@
 import { afterAll, afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { workingTreeStamp } from "./tree-stamp.ts";
@@ -47,6 +47,19 @@ describe("workingTreeStamp", () => {
     expect(await workingTreeStamp(dir)).not.toBe(clean);
     writeFileSync(join(dir, "a.txt"), "one\n");
     expect(await workingTreeStamp(dir)).toBe(clean);
+  });
+
+  test("a same-size edit that keeps the time of the last index write still changes the stamp", async () => {
+    const dir = repo();
+    git(dir, "config", "core.trustctime", "false");
+    const past = new Date(Date.now() - 100_000);
+    utimesSync(join(dir, "a.txt"), past, past);
+    git(dir, "add", "a.txt");
+    utimesSync(join(dir, ".git", "index"), past, past);
+    const clean = await workingTreeStamp(dir);
+    writeFileSync(join(dir, "a.txt"), "two\n");
+    utimesSync(join(dir, "a.txt"), past, past);
+    expect(await workingTreeStamp(dir)).not.toBe(clean);
   });
 
   test("an untracked file changes the stamp", async () => {
