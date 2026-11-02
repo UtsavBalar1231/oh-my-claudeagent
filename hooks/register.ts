@@ -63,6 +63,7 @@ function bindHost($: EngineInterface, options: Options): Host {
       notify: (text, notifyOptions) => $.ui.notify(text, notifyOptions),
       blit: (args) => $.ui.blit(args),
       view: (args) => $.ui.view(args),
+      status: (text) => $.ui.status(text),
     },
     session: {
       id: () => $.session.id(),
@@ -169,7 +170,7 @@ export const register: Register = (on, pluginOptions) => {
   const toolCall = featuresFor("tool.call", { agentsTracker });
   const sessionStart = featuresFor("session.start", { refusalRecovery, pane, modMarker, band, serverCheck, keywordPaint });
   const promptSubmit = featuresFor("prompt.submit", { refusalRecovery, keywordPaint });
-  const turnStart = featuresFor("turn.start", { refusalRecovery, footer, modMarker });
+  const turnStart = featuresFor("turn.start", { refusalRecovery, footer, modMarker, serverCheck });
   const turnStep = featuresFor("turn.step", { metrics, agentsTracker });
   const turnComplete = featuresFor("turn.complete", { band, agentsTracker, agentRows, metrics, pane, footer, refusalRecovery });
   const agentSpawn = featuresFor("agent.spawn", { agentsTracker, metrics });

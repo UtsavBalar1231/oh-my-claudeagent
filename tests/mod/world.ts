@@ -72,6 +72,8 @@ export type World = {
   /** The stable code a refused blit carries beside its `deny`, as `tmux-passthrough` for tmux holding pictures back. */
   blitFix: "tmux-passthrough" | undefined;
   blits: { requestId: string; key: string; cells: string | undefined; columns: number | undefined; rows: number | undefined }[];
+  /** What `$.ui.status` was called with, in order; undefined clears the line. */
+  statuses: (string | undefined)[];
   conversations: Map<string, SessionMessage[]>;
   opened: unknown[];
   /** Why `ui.open` leaves a pane unplaced; undefined places every pane. */
@@ -137,6 +139,7 @@ export function world(
     blitDeny: undefined,
     blitFix: undefined,
     blits: [],
+    statuses: [],
     conversations: new Map(),
     opened: [],
     unplaced: undefined,
@@ -217,6 +220,7 @@ export function world(
     const deny = typeof w.blitDeny === "function" ? w.blitDeny("source" in e ? e.source : undefined) : w.blitDeny;
     return { value: deny === undefined ? {} : { deny, ...(w.blitFix !== undefined && { fix: w.blitFix }) } };
   });
+  on("ui.status", (_$, e) => (w.statuses.push(e.text), { value: undefined }));
   on("session.messages", (_$, e) => {
     const found = e.agentId === undefined ? undefined : w.conversations.get(e.agentId);
     return { value: found ?? { deny: `no conversation for ${e.agentId ?? "main"}` } };
