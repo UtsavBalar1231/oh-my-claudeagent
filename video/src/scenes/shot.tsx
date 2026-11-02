@@ -17,13 +17,13 @@ export const cellBox = (clip: ClipManifest, cols: number, rows: number, scale = 
   return { x: STAGE.x + Math.round((STAGE.width - width) / 2), y: STAGE.y + Math.round((STAGE.height - height) / 2), width, height };
 };
 
-// For the 200x50 captures: the transcript window shows the capture's left margin and 95 columns,
-// the pane window starts where the OMCA pane's background does (column 109, measured at x = 1978
+// For the 214x50 captures: the transcript window shows the capture's left margin and 95 columns,
+// the pane window starts where the OMCA pane's background does (column 118, measured at x = 2140
 // in each pane clip). The pane window leaves out the grid's last column, which holds only the
-// pane's close mark, and is 18 rows high, so a push to 1.5 also lands on whole cells (60 x 12).
+// pane's close mark, and is 18 rows high, so a push to 1.5 also lands on whole rows.
 const WINDOW_ROWS = 19;
 export const TRANSCRIPT_COLS = 95;
-export const PANE_COL = 109;
+export const PANE_COL = 118;
 const PANE_ROWS = 18;
 export const paneCols = (clip: ClipManifest): number => clip.grid.cols - 1 - PANE_COL;
 
@@ -37,7 +37,7 @@ export const transcriptBox = (clip: ClipManifest): Rect => {
   return { ...box, x: STAGE.x + Math.round((STAGE.width - width) / 2), width };
 };
 
-/** The pane window for the 200x50 captures at 1.0. */
+/** The pane window for the 214x50 captures at 1.0. */
 export const paneBox = (clip: ClipManifest): Rect => cellBox(clip, paneCols(clip), PANE_ROWS);
 
 /**

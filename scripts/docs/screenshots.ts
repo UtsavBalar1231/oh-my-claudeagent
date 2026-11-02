@@ -38,8 +38,8 @@ const PADDING = 12;
 const DPI = 96;
 // kitty reads its padding in points.
 const PADDING_PX = Math.round((PADDING * DPI) / 72);
-const SCREEN = "3840x2160x24";
-// Dense enough that a 2x zoom of a 200-column clip inside a 1080p composition stays sharp: 16
+const SCREEN = "4096x2160x24";
+// Dense enough that a 2x zoom of a 214-column clip inside a 1080p composition stays sharp: 16
 // footage pixels a column.
 const CLIP_FONT_SIZE = 22;
 const CLIP_MIN_CELL_PX = 16;
@@ -140,8 +140,9 @@ const GUARD_SCRIPT: Script = {
 };
 const guardReady = (screen: string) => /^● Removing/m.test(screen) && screen.includes("OMCA held this command");
 
-// The board's split tier needs a docked pane body of 90 columns, which 200 columns leaves.
-const CLIP_COLS = 200;
+// A dock takes at most 45% of the terminal. At 214 columns its body holds the board's split tier and
+// a detail column that fits the task title on one line.
+const CLIP_COLS = 214;
 const CLIP_ROWS = 50;
 // The before-and-after pairs fit the whole terminal in the video window, so Claude Code wraps every
 // line inside the frame and none is cut. The larger font keeps a column dense, and the rows still

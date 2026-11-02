@@ -83,7 +83,7 @@ describe("CLIPS", () => {
       "clip-tour",
     ]);
     const pairs = ["clip-plain-stop", "clip-plain-reset", "clip-refusal", "clip-guard"];
-    for (const shot of CLIPS) expect([shot.name, shot.cols, shot.rows, shot.font]).toEqual(pairs.includes(shot.name) ? [shot.name, 96, 34, 35] : [shot.name, 200, 50, undefined]);
+    for (const shot of CLIPS) expect([shot.name, shot.cols, shot.rows, shot.font]).toEqual(pairs.includes(shot.name) ? [shot.name, 96, 34, 35] : [shot.name, 214, 50, undefined]);
   });
 
   test("each clip marks the events and names the targets its beat needs", () => {
