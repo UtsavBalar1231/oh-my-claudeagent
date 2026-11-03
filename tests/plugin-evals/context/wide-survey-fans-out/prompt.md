@@ -1,6 +1,6 @@
 ---
 description: A survey of three independent areas goes to parallel explorer agents, one per area.
-max_turns: 16
+max_turns: 30
 timeout_seconds: 600
 allowed_tools: [Agent, Read, Glob, Grep]
 ---
