@@ -201,7 +201,8 @@ The full lists are in the reference: [hooks](docs/references.md#hooks),
 ## Acknowledgments
 
 Based on [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) by
-[@code-yeongyu](https://github.com/code-yeongyu).
+[@code-yeongyu](https://github.com/code-yeongyu). Its notice is in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## License
 
