@@ -1,6 +1,6 @@
 ---
 name: git-master
-description: "MUST USE for ANY git operations. Atomic commits, rebase/squash, history search (blame, bisect, log -S). Triggers: 'commit', 'rebase', 'squash', 'who wrote', 'when was X added', 'find the commit that'."
+description: "Use for all git work: splitting changes into atomic commits, rebasing and squashing, and searching history with blame, bisect and log -S. Reach for it on 'commit', 'squash', 'rebase', 'find the commit that', 'when was X added' or 'who wrote'."
 model: opus
 argument-hint: "[commit | rebase | blame | bisect]"
 effort: medium

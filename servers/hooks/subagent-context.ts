@@ -1,5 +1,6 @@
 import { omcaAgentName } from "../../src/core/agent-type.ts";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
+import { REFUSAL_RULE } from "../../src/core/refusal.ts";
 import type { Handler } from "./registry.ts";
 import { readBoundPlan, registryPath } from "./status-file.ts";
 
@@ -59,6 +60,7 @@ export const handle: Handler = (payload, { root }) => {
     PLANNING.has(name) ? PLANNER : AUTONOMOUS,
     OUTPUT_MANDATE,
     FILE_TOOLS,
+    `[REFUSALS] ${REFUSAL_RULE}`,
     `[OMCA TOOLS] ${OMCA_TOOLS}`,
     ...planLines(root, payload.session_id, EDITING.has(name) || isOrchestrator),
     ...(EDITING.has(name) ? EDITING_GUIDANCE : []),

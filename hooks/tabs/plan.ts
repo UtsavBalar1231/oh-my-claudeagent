@@ -2,6 +2,7 @@ import type { RenderElement } from "claude-code";
 import { lookOf } from "../../src/core/agent-type.ts";
 import { parseRegistry } from "../../src/core/boulder.ts";
 import { type Drawn, drawnAt, type FocusList, focusMove, type ListSlice, placeWindow, windowOf } from "../../src/core/list-window.ts";
+import { TASK_BOX } from "../../src/core/checkboxes.ts";
 import { BOULDER } from "../../src/core/omca-paths.ts";
 import { type Platform, samePath, tildePath } from "../../src/core/path.ts";
 import {
@@ -53,7 +54,7 @@ type Agent = State["agents"][string];
 type Mode = "board" | "detail" | "contents" | "page" | "plans";
 type List = "board" | "contents" | "plans";
 type Key = readonly [hotkey: string, label: string, work: () => unknown, isOff?: boolean];
-type Status = "done" | "progress" | "blocked" | "open";
+type Status = "done" | "progress" | "blocked" | "waiting" | "open";
 type Item = { kind: "group"; group: number; done: number; total: number } | { kind: "task"; card: Card };
 type Ring = {
   focus: FocusList;
@@ -111,6 +112,7 @@ const STATUS: Readonly<Record<Status, { word: string; tone: ChipTone; color: The
   done: { word: "DONE", tone: "ok", color: TONE_KEYS.ok },
   progress: { word: "IN PROGRESS", tone: "active", color: TONE_KEYS.active },
   blocked: { word: "BLOCKED", tone: "warn", color: TONE_KEYS.warn },
+  waiting: { word: "WAITING", tone: "muted", color: TONE_KEYS.muted },
   open: { word: "OPEN", tone: "muted", color: undefined },
 };
 
@@ -149,7 +151,7 @@ let boundTo: string | undefined;
 // lands one element off once the field goes; it is sent from the first drawing without it.
 let isFieldClosing = false;
 
-const markOf = ({ task: mark }: Page) => (mark === undefined ? "" : mark.done ? "[x] " : "[ ] ");
+const markOf = ({ task: mark }: Page) => (mark === undefined ? "" : `[${TASK_BOX[mark.state]}] `);
 
 const isLoaded = (plan: State["plan"] | undefined): plan is Loaded => plan !== undefined && "pages" in plan;
 
@@ -227,7 +229,7 @@ function keptCursor(plan: Pick<Loaded, "pages">, index: number): number {
   return listed.find((at) => at >= index) ?? listed.at(-1) ?? 0;
 }
 
-const startTask = (board: Board): number => (board.cards.find((card) => !card.done) ?? board.cards.at(-1))?.n ?? 0;
+const startTask = (board: Board): number => (board.cards.find((card) => card.state === "open") ?? board.cards.at(-1))?.n ?? 0;
 
 const refocus = (host: Host, key: string): void => focusIn(host, key, "plan");
 
@@ -366,7 +368,7 @@ function toBoard(host: Host): void {
 
 const verdictOf = (card: Card): Verdict | undefined => verdictFor(facts, card.files);
 
-const cardProof = (card: Card): Proof | undefined => shownProof(card.done, verdictOf(card)?.proof);
+const cardProof = (card: Card): Proof | undefined => shownProof(card.state === "done", verdictOf(card)?.proof);
 
 function runningOf(agents: readonly Agent[]): Map<number, Agent[]> {
   const running = new Map<number, Agent[]>();
@@ -377,23 +379,24 @@ function runningOf(agents: readonly Agent[]): Map<number, Agent[]> {
 }
 
 function statusOf(ctx: Pick<Ctx, "board" | "byN" | "running">, card: Card): Status {
-  if (card.done) return "done";
+  if (card.state === "done") return "done";
+  if (card.state === "blocked") return "blocked";
   if (ctx.running.has(card.n)) return "progress";
-  return blockersOf(ctx, card).length > 0 ? "blocked" : "open";
+  return blockersOf(ctx, card).length > 0 ? "waiting" : "open";
 }
 
-// A task whose only unfinished dependency is the task just before it is waiting in line, not blocked.
+// A task whose only unfinished dependency is the open task just before it is simply next in line, so it draws as open.
 function blockersOf(ctx: Pick<Ctx, "board" | "byN">, card: Card): number[] {
-  const waiting = card.depends.filter((n) => ctx.byN.get(n)?.done !== true);
-  const before = ctx.board.cards[ctx.board.cards.findIndex((each) => each.n === card.n) - 1]?.n;
-  return waiting.length === 1 && waiting[0] === before ? [] : waiting;
+  const waiting = card.depends.filter((n) => ctx.byN.get(n)?.state !== "done");
+  const before = ctx.board.cards[ctx.board.cards.findIndex((each) => each.n === card.n) - 1];
+  return waiting.length === 1 && waiting[0] === before?.n && before?.state === "open" ? [] : waiting;
 }
 
 const glyphOf = (view: View, status: Status) =>
-  ({ done: view.g.check, progress: view.g.progress, blocked: view.g.blocked, open: view.g.pending })[status];
+  ({ done: view.g.check, progress: view.g.progress, blocked: view.g.blocked, waiting: view.g.waiting, open: view.g.pending })[status];
 
 function isShown(card: Card): boolean {
-  if (filter.isOpenOnly && card.done) return false;
+  if (filter.isOpenOnly && card.state !== "open") return false;
   if (filter.isFailingOnly && verdictOf(card)?.proof !== "failed") return false;
   const wanted = filter.text.trim().toLowerCase();
   return wanted === "" || `${card.n} ${card.title} ${card.files.join(" ")}`.toLowerCase().includes(wanted);
@@ -406,7 +409,7 @@ function itemsOf(board: Board, lean = isLean): Item[] {
     const cards = board.cards.filter((card) => card.group === index);
     const shown = cards.filter(isShown);
     if (shown.length === 0) return [];
-    const done = cards.filter((card) => card.done).length;
+    const done = cards.filter((card) => card.state === "done").length;
     const tasks = shown.map((card) => ({ kind: "task" as const, card }));
     return lean ? tasks : [{ kind: "group" as const, group: index, done, total: group.tasks.length }, ...tasks];
   });
@@ -701,7 +704,7 @@ function agentPieces(view: View, agents: readonly Agent[]): Piece[] {
 function tally(ctx: Ctx) {
   const statuses = ctx.board.cards.map((card) => statusOf(ctx, card));
   const count = (status: Status) => statuses.filter((each) => each === status).length;
-  return { done: count("done"), active: count("progress"), blocked: count("blocked"), todo: count("open") };
+  return { done: count("done"), active: count("progress"), blocked: count("blocked"), waiting: count("waiting"), todo: count("open") };
 }
 
 function statusChip(view: View, board: Board): Piece[] {
@@ -715,14 +718,15 @@ const headOf = (view: View): Head => (view.isInline || view.rows < SHORT_ROWS ? 
 function header(view: View, ctx: Ctx, head: Head): RenderElement[] {
   const { board, plan } = ctx;
   const parts = tally(ctx);
-  // Blocked tasks draw as todo, so a plan that is mostly waiting does not read as a wall of warning color.
-  const filled = { done: parts.done, active: parts.active, todo: parts.todo + parts.blocked };
+  // A task waiting on another draws as todo, so a plan that is mostly waiting does not read as a wall of warning color.
+  const filled = { done: parts.done, active: parts.active, blocked: parts.blocked, todo: parts.todo + parts.waiting };
   const count = `${parts.done}/${board.cards.length}`;
   const ellipsis = view.g.ellipsis;
   const lead = statusChip(view, board);
   if (head !== "card") {
     const runningCount = ctx.agents.filter((agent) => agent.endedAt === null).length;
-    const counts: Piece[] = [{ text: " " }, ...bar(filled, COMPACT_BAR, view.isAscii), { text: ` ${count} `, bold: true }];
+    const blocked: Piece[] = parts.blocked === 0 ? [] : [{ text: `${view.g.blocked} ${parts.blocked} `, color: TONE_KEYS.warn }];
+    const counts: Piece[] = [{ text: " " }, ...bar(filled, COMPACT_BAR, view.isAscii), { text: ` ${count} `, bold: true }, ...blocked];
     const running: Piece[] = runningCount === 0 ? [] : [{ text: `  ${view.g.agent} `, color: TONE_KEYS.active }, { text: `${runningCount} running` }];
     const tails = [[...counts, ...proofPieces(view, ctx, true), ...running], [...counts, ...running], counts];
     if (head === "lines") {
@@ -737,18 +741,19 @@ function header(view: View, ctx: Ctx, head: Head): RenderElement[] {
     return [Line(view.kit, fitPieces([...lead, { text: fitEnd(plan.title, room, ellipsis), bold: true }, ...tail], view.width, ellipsis))];
   }
   const inner = Math.max(1, view.width - 4);
-  const next = board.cards.find((card) => !card.done);
+  const next = board.cards.find((card) => card.state === "open");
   const running = agentPieces(view, ctx.agents);
-  const blocked: Piece[] =
-    parts.blocked === 0
-      ? []
-      : [{ text: dotOf(view), color: TONE_KEYS.muted }, { text: view.g.blocked, color: TONE_KEYS.warn }, { text: ` ${parts.blocked} blocked` }];
+  const countOf = (glyph: string, color: ThemeKey, n: number, word: string): Piece[] =>
+    n === 0 ? [] : [{ text: dotOf(view), color: TONE_KEYS.muted }, { text: glyph, color }, { text: ` ${n} ${word}` }];
+  const blocked: Piece[] = [...countOf(view.g.blocked, TONE_KEYS.warn, parts.blocked, "blocked"), ...countOf(view.g.waiting, TONE_KEYS.muted, parts.waiting, "waiting")];
   const barWidth = Math.max(4, Math.min(HEADER_BAR, inner - piecesWidth(lead) - displayWidth(` ${count}`) - piecesWidth(blocked)));
   const lines: Piece[][] = [
     [...lead, ...bar(filled, barWidth, view.isAscii), { text: ` ${count}`, bold: true }, ...blocked],
     proofPieces(view, ctx, false),
     next === undefined
-      ? [{ text: `${view.g.check} every task is done`, color: TONE_KEYS.ok }]
+      ? parts.blocked > 0
+        ? [{ text: `${view.g.blocked} no task is open and ${parts.blocked} blocked`, color: TONE_KEYS.warn }]
+        : [{ text: `${view.g.check} every task is done`, color: TONE_KEYS.ok }]
       : [
           { text: "next ", color: TONE_KEYS.muted },
           { text: `${next.n} `, bold: true, color: TONE_KEYS.active },
@@ -760,7 +765,7 @@ function header(view: View, ctx: Ctx, head: Head): RenderElement[] {
     CardBox(view.kit, {
       key: "plan-header",
       title: fitEnd(plan.title, inner, ellipsis),
-      tone: next === undefined ? "ok" : "plan",
+      tone: next !== undefined ? "plan" : parts.blocked > 0 ? "warn" : "ok",
       isAscii: view.isAscii,
       width: view.width,
       children: lines.map((pieces) => Line(view.kit, fitPieces(pieces, inner, ellipsis))),
@@ -779,10 +784,11 @@ function rightPieces(view: View, ctx: Ctx, card: Card, isShort: boolean): Piece[
     const glyph = agentGlyph(agent.type, view.g);
     pieces.push({ text: " " }, { text: isShort ? glyph : `${glyph} ${shortType(agent.type)}`, color: agentKey(lookOf(agent)) });
   }
+  if (card.state === "blocked" && !isShort) pieces.push({ text: " " }, { text: "blocked", color: TONE_KEYS.warn });
   const waiting = blockersOf(ctx, card);
-  if (!card.done && waiting.length > 0 && !ctx.running.has(card.n)) {
-    if (isShort) pieces.push({ text: " " }, { text: view.g.blocked, color: TONE_KEYS.warn }, { text: ` ${waiting.join(",")}` });
-    else pieces.push({ text: " " }, { text: `blocked by ${waiting.join(", ")}`, color: TONE_KEYS.muted });
+  if (card.state === "open" && waiting.length > 0 && !ctx.running.has(card.n)) {
+    if (isShort) pieces.push({ text: " " }, { text: view.g.waiting, color: TONE_KEYS.muted }, { text: ` ${waiting.join(",")}` });
+    else pieces.push({ text: " " }, { text: `waiting on ${waiting.join(", ")}`, color: TONE_KEYS.muted });
   }
   const proof = cardProof(card);
   if (proof !== undefined) {
@@ -806,7 +812,8 @@ function taskRow(
 ): RenderElement {
   const { Box, Button, Text } = view.kit;
   const status = statusOf(ctx, card);
-  const isNext = card.n === ctx.board.cards.find((each) => !each.done)?.n;
+  const isNext = card.n === ctx.board.cards.find((each) => each.state === "open")?.n;
+  const isDone = card.state === "done";
   const fixed = 2 + numWidth + 1;
   // Chips read as words while the title keeps its room, the whole title in a split list; glyphs otherwise.
   const words = rightPieces(view, ctx, card, false);
@@ -832,14 +839,14 @@ function taskRow(
     ...(isCurrent ? { backgroundColor: TONE_KEYS.focus } : {}),
     children: [
       paint({ text: `${glyphOf(view, status)} `, ...(color === undefined ? {} : { color }) }),
-      paint({ text: padStart(String(card.n), numWidth), ...(card.done ? { dimColor: true } : isNext ? { color: ON_SURFACE, bold: true } : {}) }),
+      paint({ text: padStart(String(card.n), numWidth), ...(isDone ? { dimColor: true } : isNext ? { color: ON_SURFACE, bold: true } : {}) }),
       paint({ text: " " }),
       Button({
         key: `${TASK}${card.n}`,
         label: titleText,
         plain: true,
         hover: { color: ON_SURFACE },
-        ...(card.done ? { dimColor: true } : {}),
+        ...(isDone ? { dimColor: true } : {}),
         ...(isCurrent ? { autoFocus: true } : {}),
         onPress: view.press(onPress),
       }),
@@ -925,7 +932,7 @@ function selectTask(host: Host, n: number): void {
 function taskKeys(host: Host, view: View, plan: Loaded, card: Card | undefined): Key[] {
   return [
     ["k", "Run check", () => runCheck(host, view, card), card === undefined || card.checks.length === 0],
-    ["s", "Start here", () => startHere(host, view, plan, card), card === undefined || card.done],
+    ["s", "Start here", () => startHere(host, view, plan, card), card === undefined || card.state !== "open"],
     ["c", "Copy", () => copyTask(host, view, plan, card), card === undefined],
   ];
 }
@@ -1097,11 +1104,11 @@ function detail(view: View, ctx: Ctx, card: Card, width: number): Unit[] {
   const { Text } = view.kit;
   const status = statusOf(ctx, card);
   const verdict = verdictOf(card);
-  const waiting = card.done ? [] : blockersOf(ctx, card);
+  const waiting = card.state === "open" ? blockersOf(ctx, card) : [];
   const proof = cardProof(card);
   const chips: Piece[] = [
     chip(STATUS[status].word, STATUS[status].tone, view.isAscii),
-    ...(status === "blocked" ? [{ text: " " }, { text: `by ${waiting.join(", ")}`, color: TONE_KEYS.warn }] : []),
+    ...(status === "waiting" ? [{ text: " " }, { text: `on ${waiting.join(", ")}`, color: TONE_KEYS.muted }] : []),
     ...(proof === undefined ? [] : [{ text: " " }, chip(PROOF[proof].word, PROOF[proof].tone, view.isAscii)]),
     ...(ctx.running.get(card.n) ?? []).flatMap((agent) => [{ text: " " }, { text: `${agentGlyph(agent.type, view.g)} ${shortType(agent.type)}`, color: agentKey(lookOf(agent)) }]),
   ];
@@ -1133,7 +1140,7 @@ function detail(view: View, ctx: Ctx, card: Card, width: number): Unit[] {
       : [
           gap,
           one(label(view, "Depends")),
-          ...lines([...deps, ...(waiting.length === 0 ? [] : [{ text: ` blocked by ${waiting.join(", ")}`, color: TONE_KEYS.warn }])]),
+          ...lines([...deps, ...(waiting.length === 0 ? [] : [{ text: ` waiting on ${waiting.join(", ")}`, color: TONE_KEYS.muted }])]),
         ]),
     ...(card.files.length === 0 ? [] : [gap, one(label(view, "Files")), ...filesLines(view, card, verdict, width)]),
     gap,
@@ -1448,7 +1455,7 @@ function contentsView(host: Host, view: View, plan: Loaded): RenderElement[] {
         key: `${ROW}${index}`,
         label,
         plain: true,
-        ...(section.task?.done === true ? { dimColor: true } : {}),
+        ...(section.task?.state === "done" ? { dimColor: true } : {}),
         ...(isCurrent ? { autoFocus: true } : {}),
         onPress: view.press(() => {
           mode = "page";
@@ -1460,7 +1467,7 @@ function contentsView(host: Host, view: View, plan: Loaded): RenderElement[] {
     );
   });
   pin(host, view, "contents", { left: 0, top: layout.isFull ? 3 : 1, width: view.width, height: rows.length + 2 });
-  const progress = `${plan.done}/${plan.total} tasks done`;
+  const progress = `${plan.done}/${plan.total} tasks done${plan.blocked === 0 ? "" : `, ${plan.blocked} blocked`}`;
   const lead = `${progress} ${view.g.dot} `;
   const hidden = plan.pages.length - list.total;
   const below = list.total - end;

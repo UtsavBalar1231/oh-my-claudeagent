@@ -51,7 +51,7 @@ panel opened with `/omca`. Build and Plan remain available. See
    verification after each one, and checks the plan's boxes as tasks finish.
 3. Open `/omca` to watch the agents, the plan, the evidence and the notepad while it runs.
 
-When the session tries to stop with tasks unchecked, or with every task checked and no final
+When the session tries to stop with tasks open, or with none open and no final
 verification logged, OMCA sends it back to work with the reason.
 
 ## Try it
@@ -66,7 +66,8 @@ OMCA shows its work in Claude Code's own transcript. The line that closes each t
 tokens, its cost and a receipt for the verification it ran. An agent starts and finishes in its
 own color, the finish with its duration, tool calls, tokens and the first line of its reply. A
 test, build or lint run gets its result under the shell commands that ran it, and a screenshot
-Claude reads shows as a picture where the terminal draws them.
+Claude reads shows as a picture where the terminal draws them. A plan task gets its own row when a
+turn finishes it, with the proof behind it, and that row settles as evidence lands.
 
 <img src=".github/assets/transcript.png" width="900" alt="A Claude Code turn on the checkout project: under Ran 1 shell command, a receipt reads just test, 42 passed. Two background agents start, and each reports as it finishes: the explorer on Map the validation messages and the architect on Review the checkout flow, each with its duration, tool calls and tokens flush right and the first line of its reply beneath. The dim line that closes each turn names the agents still running, then the turn's tokens and cost.">
 
@@ -79,7 +80,7 @@ buttons fill the prompt with the next step.
 `/omca plan` opens the plan board: the tasks grouped by milestone, each with its state, its proof
 and the agent working on it. A wide pane shows the focused task's detail beside the list.
 
-<img src=".github/assets/plan.png" width="680" alt="The Plan tab of the OMCA pane shows the checkout-redesign board at 6 of 14 tasks, with 6 proven and 4 blocked. Tasks 1 to 6 are done and proven, the executor is on task 7, tasks 8, 9 and 11 are open, and tasks 10, 12, 13 and 14 name the tasks that block them. Beside the list, task 6, Build the payment step, shows its steps, its done-when command, its dependencies, its file changed 3h ago and the passing runs since then. The keys for the focused task and the board fill one row under the list.">
+<img src=".github/assets/plan.png" width="680" alt="The Plan tab of the OMCA pane shows the checkout-redesign board at 6 of 14 tasks, with 6 proven and 4 waiting. Tasks 1 to 6 are done and proven, the executor is on task 7, tasks 8, 9 and 11 are open, and tasks 10, 12, 13 and 14 name the tasks they wait on. Beside the list, task 6, Build the payment step, shows its steps, its done-when command, its dependencies, its file changed 3h ago and the passing runs since then. The keys for the focused task and the board fill one row under the list.">
 
 The Evidence tab is the proof ledger: a verdict on the plan's final verification, then every
 logged run grouped by day.
@@ -95,7 +96,7 @@ earlier ones shrink to a line, and in a short pane each lane keeps to two rows.
 When the pane has room, each lane gets four rows of its own. The agent page opens a subagent's brief, tool calls, reply and cost, and toasts report
 failed verifications and a completed plan.
 
-<img src=".github/assets/mascots.png" width="680" alt="The Agents tab with three agents running at once, each lane led by its pixel mascot: a green executor in a yellow hard hat with a hammer, a blue explorer in a safari hat with a spyglass, and a purple architect with a lit bulb beside its head. Beside each mascot, four rows give the agent's name with its running time, its task, its running Bash sleep with one call, and its model, effort and tokens, with a blank row between agents.">
+<img src=".github/assets/mascots.png" width="680" alt="The Agents tab with three agents running at once, each lane led by its pixel mascot: a green executor in a yellow hard hat with a hammer, a blue explorer in a safari hat with a spyglass, and a purple architect with a lit bulb beside its head. Beside each mascot, four rows give the agent's name with its running time, its task, its running Bash command with one call, and its model, effort and tokens, with a blank row between agents.">
 
 The guard holds a destructive shell command for your review and shows what it would touch.
 
@@ -105,7 +106,7 @@ The guard holds a destructive shell command for your review and shows what it wo
 change how OMCA runs. A check with a known fix offers a key that fills the prompt with it, and
 the passing checks fold into one line that `o` opens.
 
-<img src=".github/assets/doctor.png" width="680" alt="The Doctor page, named after the four tabs in the tab bar, counts 1 warning, 1 info row and 11 passing checks. The warning says maxEffortLevel high holds the architect below the xhigh it declares, the info row offers a: Use /advisor fable, and one line beside o: Show passing folds the passing checks, naming OMCA, Claude Code, bun, the omca server, ast-grep, the options, the agent models and the mod policy before it is cut.">
+<img src=".github/assets/doctor.png" width="680" alt="The Doctor page, named after the four tabs in the tab bar, counts 1 warning, 1 info row and 11 passing checks. The warning says maxEffortLevel high holds the architect below the xhigh it declares, the info row offers a: Use /advisor fable, and one line beside o: Show passing folds the passing checks, naming OMCA, Claude Code, bun, the omca server, ast-grep and the options before it is cut.">
 
 The status line shows the session (model, agent and the plan's next task), the workspace
 (context window and git state) and usage (duration, usage limits, and cost for accounts billed
@@ -136,7 +137,7 @@ project files stay on that server. OMCA adds no telemetry or external service.
 
 **Settings hooks.** `hooks/hooks.json` registers `SessionStart` (only after `/clear` and
 compaction), `UserPromptSubmit`, `UserPromptExpansion`, `SubagentStart`, `PreToolUse` (only
-Write and Edit), `PermissionDenied`, `PostToolUse`, `PostToolUseFailure`, `Stop` and
+Write and Edit), `PostToolUse`, `PostToolUseFailure`, `Stop` and
 `TaskCompleted`. Each is an `mcp_tool` hook that calls `omca_hook` on the local server. They run
 in every session because the gates and the guidance need each turn's events: a plan-write guard
 and comment gate on writes, the verification recorder and rule injection after tool calls,
@@ -200,7 +201,8 @@ The full lists are in the reference: [hooks](docs/references.md#hooks),
 ## Acknowledgments
 
 Based on [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) by
-[@code-yeongyu](https://github.com/code-yeongyu).
+[@code-yeongyu](https://github.com/code-yeongyu). Its notice is in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## License
 

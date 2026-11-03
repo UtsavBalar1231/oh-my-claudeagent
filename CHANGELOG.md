@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.0] - 2026-11-03
+
+### Added
+
+- **Plan task receipts in the transcript:** when a main turn finishes tasks of the bound plan, a
+  row under its turn line names each one with its proof, such as `✓ Task 7 Wire the panel · proven
+  by just test`, and the turn that ends the plan adds the plan's outcome. A row keeps its place and
+  settles as evidence lands in later turns. Claude never reads these rows, and
+  `OMCA_DISABLED_HOOKS=plan-receipts` turns them off. They need Claude Code 2.1.314 or later.
+- **Keyword triggers show in the prompt:** with `enableKeywordTriggers` on, a phrase that would
+  trigger is underlined as you type, until its mode has fired once in the session.
+- **A warning that stays while the `omca` server is off:** a session whose server did not connect,
+  or stopped partway through, keeps a status line under the prompt, beside the one-time transcript
+  line, and clears it on the first turn after `/mcp` reconnects the server.
+- **Blocked tasks:** a plan task that cannot finish without something the run lacks closes as
+  `- [~] N.`, with a `- Blocked:` sub-bullet stating the gap. It never counts as done and never
+  satisfies a `Depends:`, but it stops holding the session, so an unattended run finishes the
+  independent tasks and reports what it could not do. `/oh-my-claudeagent:start-work` closes a task
+  this way on a repeated failure signature, a third failed attempt, something the run cannot get,
+  or a denied permission. Changing `[~]` back to `[ ]` reopens it.
+- **Evidence notices later code changes:** `evidence_log` stamps each entry with the tree hash of
+  the working directory, using a scratch index and object directory so your staging area and object
+  store stay untouched. A passing verdict reads as stale in the Evidence tab and OpenCode's panel
+  once a later entry saw different code, and a completion claim at Stop over a verdict the code has
+  moved past shows you a message. No gate blocks on it yet.
+- **Test cleanup and flaky triage:** `remove-ai-slops` gains a reference for removing tests that
+  cannot fail, proven by breaking the code they claim to protect, and `debugging` gains a table
+  that reads a flaky test's failure pattern.
+- **Third-party notice:** `THIRD-PARTY-NOTICES.md` ships with the plugin and carries the MIT notice
+  for the project OMCA is based on.
+
+### Changed
+
+- **The end of a plan:** the receipt row replaces the "Plan complete" toast. The toast remains where
+  no row can stand, as on Claude Code older than 2.1.314, and the desktop notification still fires.
+- **A denial settles the outcome:** the output style and every subagent's start context say that a
+  permission denial or a user's refusal decides what the call was after, so it is not reached by
+  another tool, command, path or host. Retrying is left to denials whose own message asks for it.
+- **Tests when they earn it:** the planner defaults to new tests only where the project already
+  tests that behavior and a future break could land unseen, and writes tests first only on request.
+  Scenarios scale with risk, a prose deliverable is proven by reading it, and each `Must have` names
+  the tasks that deliver it.
+- **A bounded completeness check:** a blocker in `start-work`'s review must cite a plan requirement
+  or a `Must NOT`. Other concerns are notes that leave the verdict standing, and a requirement that
+  keeps failing after two re-reviews closes as blocked. An oversized review goes to the read-only
+  architect.
+- **Rewritten prompts:** `github-triage`, `init-deep`, the planner and parts of the orchestrator,
+  `start-work`, `git-master` and others are newly written. The planner's routes are now CLEAR, VAGUE
+  and UNSURE, and delegation sections read TASK, DONE WHEN, TOOLS, SCOPE and CONTEXT.
+- **"Waiting" and "blocked" on the Plan tab:** a task held up by another task's box now reads
+  WAITING, so BLOCKED means only a task whose own box is `[~]`.
+
+### Removed
+
+- **The `PermissionDenied` retry coach:** Claude Code ignores `retry` on a denial with no classifier
+  verdict and already tells the model what to do there, so the handler could only invite a retry of
+  a call the classifier judged unsafe.
+
 ## [3.4.0] - 2026-11-02
 
 ### Added
@@ -3196,6 +3254,7 @@ for multi-agent orchestration.
 - Shellcheck fixes applied across all hook scripts
 - Ruff fixes applied to Python MCP servers
 
+[3.5.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.4.0...v3.5.0
 [3.4.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.3.2...v3.4.0
 [3.3.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.3.1...v3.3.2
 [3.3.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.3.0...v3.3.1

@@ -30,6 +30,8 @@ export type Evidence = {
   snippet: string;
   verifiedBy: string | null;
   planSha: string;
+  /** The working tree the server stamped when the entry was logged; empty when it could not. */
+  tree: string;
 };
 
 const isType = (value: unknown): value is EvidenceType => EVIDENCE_TYPES.some((type) => type === value);
@@ -42,7 +44,7 @@ export function entriesOf(data: unknown): unknown[] | undefined {
 
 function toEvidence(raw: unknown): Evidence[] {
   if (!isRecord(raw)) return [];
-  const { type, command, exit_code: exitCode, timestamp, output_snippet: snippet, verified_by: verifiedBy, plan_sha256: planSha } = raw;
+  const { type, command, exit_code: exitCode, timestamp, output_snippet: snippet, verified_by: verifiedBy, plan_sha256: planSha, tree } = raw;
   const at = typeof timestamp === "string" ? Date.parse(timestamp) : Number.NaN;
   if (!isType(type) || typeof command !== "string" || typeof exitCode !== "number" || Number.isNaN(at)) return [];
   return [
@@ -54,6 +56,7 @@ function toEvidence(raw: unknown): Evidence[] {
       snippet: typeof snippet === "string" ? snippet : "",
       verifiedBy: typeof verifiedBy === "string" && verifiedBy !== "" ? verifiedBy : null,
       planSha: typeof planSha === "string" ? planSha : "",
+      tree: typeof tree === "string" ? tree : "",
     },
   ];
 }
@@ -100,6 +103,12 @@ export function verdictOf(entries: readonly Evidence[], planSha: string): Verdic
   const stale = finals.find((entry) => entry.exitCode === 0);
   if (stale !== undefined) return { kind: "stale", entry: stale };
   return { kind: "missing", failed: finals[0] ?? null };
+}
+
+/** Whether a later entry saw a different working tree, so the code moved after this entry ran. */
+export function treeMovedSince(entries: readonly Evidence[], entry: Evidence): boolean {
+  if (entry.tree === "") return false;
+  return entries.slice(entries.lastIndexOf(entry) + 1).some((later) => later.tree !== "" && later.tree !== entry.tree);
 }
 
 export type Latest = { type: EvidenceType; isPassing: boolean };

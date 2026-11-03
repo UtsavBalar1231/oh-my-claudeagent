@@ -93,24 +93,6 @@
         ]
       }
     ],
-    "PermissionDenied": [
-      {
-        "hooks": [
-          {
-            "type": "mcp_tool",
-            "server": "plugin:oh-my-claudeagent:omca",
-            "tool": "omca_hook",
-            "timeout": 10,
-            "input": {
-              "event": "PermissionDenied",
-              "session_id": "${session_id}",
-              "tool_name": "${tool_name}",
-              "reason": "${reason}"
-            }
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
         "matcher": "Read|Write|Edit|Agent|SubagentHandback|Bash|PowerShell",

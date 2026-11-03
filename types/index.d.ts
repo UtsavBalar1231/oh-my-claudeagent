@@ -37,6 +37,7 @@ declare module "claude-code" {
           name: string;
           path: string;
           done: number;
+          blocked: number;
           total: number;
           next: { n: number; title: string } | null;
         } | null;
@@ -72,8 +73,9 @@ declare module "claude-code" {
           snippet: string;
           verifiedBy: string | null;
           planSha: string;
+          tree: string;
         }[];
-        plan: { name: string; sha: string } | { name: string; error: string } | null;
+        plan: { name: string; sha: string; blocked: number } | { name: string; error: string } | null;
         error: string | null;
         readAt: number;
       };
@@ -85,9 +87,10 @@ declare module "claude-code" {
               title: string;
               level: number;
               body: string;
-              task?: { n: number; done: boolean };
+              task?: { n: number; state: "open" | "done" | "blocked" };
             }[];
             done: number;
+            blocked: number;
             total: number;
             readAt: number;
           }
@@ -140,6 +143,14 @@ declare module "claude-code" {
         costUsd: number | null;
         receipt: { command: string; at: number; isLogged: boolean } | null;
         waiting: readonly string[];
+      }[];
+      receipts: readonly {
+        id: string;
+        plan: string;
+        path: string;
+        total: number;
+        tasks: readonly { n: number; title: string; proof: "proven" | "unproven" | "failed" | null; command: string | null }[];
+        complete: { proven: number; unproven: number; failed: number; isVerified: boolean } | null;
       }[];
       doctor: {
         isRunning: boolean;

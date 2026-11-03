@@ -48,8 +48,15 @@ export function outsideFences(text: string): string {
     .join("\n");
 }
 
-/** One numbered task line (`- [ ] 1. text`, `- [x] 12. text`): the definition every plan reader shares. */
-export const TASK_LINE = /^- \[([ x])\] (\d+)\.\s*(.*)$/;
+/** One numbered task line (`- [ ] 1. text`, `- [x] 12. text`, `- [~] 3. text`): the definition every plan reader shares. */
+export const TASK_LINE = /^- \[([ x~])\] (\d+)\.\s*(.*)$/;
+
+export type TaskState = "open" | "done" | "blocked";
+
+/** The character a task's box holds in each state. */
+export const TASK_BOX: Readonly<Record<TaskState, string>> = { open: " ", done: "x", blocked: "~" };
+
+export const taskState = (box: string | undefined): TaskState => (box === "x" ? "done" : box === "~" ? "blocked" : "open");
 
 // Keeps the label a short resume hint rather than a restatement of the task.
 export const MAX_LABEL_LEN = 80;
@@ -61,26 +68,37 @@ function capLabel(text: string): string {
   return `${chars.slice(0, MAX_LABEL_LEN - 1).join("").trimEnd()}…`;
 }
 
-export type PlanTask = { number: number; label: string; checked: boolean; line: number };
+export type PlanTask = { number: number; label: string; state: TaskState; line: number };
 
 /** The numbered tasks outside code fences in document order; `line` indexes the cleaned text. */
 export function planTasks(content: string): PlanTask[] {
   return outsideFences(content).split("\n").flatMap((text, line) => {
     const task = TASK_LINE.exec(text);
-    return task === null ? [] : [{ number: Number(task[2]), label: capLabel(task[3] ?? ""), checked: task[1] === "x", line }];
+    return task === null ? [] : [{ number: Number(task[2]), label: capLabel(task[3] ?? ""), state: taskState(task[1]), line }];
   });
 }
 
-/** The state (`"x"` or `" "`) of each numbered checkbox outside code fences, in document order. */
-export const checkboxStates = (content: string): string[] => planTasks(content).map((task) => (task.checked ? "x" : " "));
+/** The box character (`"x"`, `" "` or `"~"`) of each numbered checkbox outside code fences, in document order. */
+export const checkboxStates = (content: string): string[] => planTasks(content).map((task) => TASK_BOX[task.state]);
 
-export const nextTaskLabel = (content: string): string | null => planTasks(content).find((task) => !task.checked)?.label ?? null;
+export const nextTaskLabel = (content: string): string | null => planTasks(content).find((task) => task.state === "open")?.label ?? null;
+
+export type TaskCounts = { done: number; blocked: number; open: number; total: number };
+
+export function taskCounts(tasks: readonly { state: TaskState }[]): TaskCounts {
+  const count = (state: TaskState) => tasks.filter((task) => task.state === state).length;
+  return { done: count("done"), blocked: count("blocked"), open: count("open"), total: tasks.length };
+}
+
+export const blockedNumbers = (tasks: readonly PlanTask[]): number[] => tasks.flatMap((task) => (task.state === "blocked" ? [task.number] : []));
 
 /** The one completeness rule, by counts: at least one task and every task done. */
 export const allTasksDone = ({ done, total }: { done: number; total: number }): boolean => total > 0 && done === total;
 
+/** At least one task and none open: nothing runs next, though a blocked task keeps the plan from being complete. */
+export const allTasksClosed = ({ done, blocked, total }: { done: number; blocked: number; total: number }): boolean => total > 0 && done + blocked === total;
+
 /** The same rule read from the plan's text: a plan with no numbered checkboxes is never complete. */
 export function planIsComplete(content: string): boolean {
-  const tasks = planTasks(content);
-  return allTasksDone({ done: tasks.filter((task) => task.checked).length, total: tasks.length });
+  return allTasksDone(taskCounts(planTasks(content)));
 }

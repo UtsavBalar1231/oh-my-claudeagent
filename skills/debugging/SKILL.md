@@ -13,7 +13,7 @@ Rerun the same reproducer and nearby affected behavior. Add a regression test wh
 
 After two failed fix attempts, stop repeating edits and return the evidence and attempt history to the primary agent; recommend `oh-my-claudeagent:architect` for deeper diagnosis. Build, type, dependency, and toolchain failures belong to `oh-my-claudeagent:build-fixer`.
 
-For deeper diagnostic techniques, read `references/methodology.md` or `references/diagnostics.md` as needed.
+For deeper diagnostic techniques, read `references/methodology.md` or `references/diagnostics.md` as needed; the latter holds a table for flaky tests.
 
 ## Claude Code
 

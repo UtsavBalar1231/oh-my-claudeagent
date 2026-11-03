@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseRegistry, resolveBoundPlan } from "../src/core/boulder.ts";
-import { planTasks } from "../src/core/checkboxes.ts";
+import { planTasks, taskCounts } from "../src/core/checkboxes.ts";
 import { baseName, inferPlatform } from "../src/core/path.ts";
 import { AGENT_ICONS, cells, displayWidth, fitEnd, formatDuration, formatTokens, type GlyphTier, glyphTier } from "../src/core/ui-kit.ts";
 import type { GitInfo } from "./git.ts";
@@ -387,6 +387,7 @@ export function composePr(data: Payload, tier: GlyphTier): string {
 
 export interface PlanProgress {
   done: number;
+  blocked: number;
   total: number;
   label: string | null;
 }
@@ -398,16 +399,20 @@ export function readPlan(projectDir: string, sessionId: string): PlanProgress | 
     if (!planPath) return null;
     const plan = readFileSync(planPath, "utf8");
     const tasks = planTasks(plan);
-    const done = tasks.filter((task) => task.checked).length;
-    if (tasks.length === 0 || done === tasks.length) return null;
-    return { done, total: tasks.length, label: tasks.find((task) => !task.checked)?.label || null };
+    const { done, blocked, total } = taskCounts(tasks);
+    if (total === 0 || done === total) return null;
+    return { done, blocked, total, label: tasks.find((task) => task.state === "open")?.label || null };
   } catch {
     return null;
   }
 }
 
-function planSegment({ done, total, label }: PlanProgress, { g }: Ctx): Segment {
-  const count = `${GREEN}${g.tasks} ${done}/${total}${RST}`;
+const planCount = ({ done, blocked, total }: PlanProgress, g: Ctx["g"]): string =>
+  `${GREEN}${g.tasks} ${done}/${total}${RST}${blocked === 0 ? "" : `${separator(g.dot)}${YELLOW}${blocked} blocked${RST}`}`;
+
+function planSegment(plan: PlanProgress, { g }: Ctx): Segment {
+  const { label } = plan;
+  const count = planCount(plan, g);
   if (label === null) return block(count);
   const head = `${count} ${DIM}${g.arrow} `;
   const headWidth = textWidth(head);
@@ -620,7 +625,7 @@ function compactSegments(c: Ctx): Segment[] {
   const branch = branchOf(c);
   return present([
     block(`${CYAN}${c.g.model} ${modelName(c)}${RST}`),
-    plan ? block(`${GREEN}${c.g.tasks} ${plan.done}/${plan.total}${RST}`) : null,
+    plan ? block(planCount(plan, c.g)) : null,
     percentSegment(data, c.tier === "nerd"),
     branch ? block(`${c.g.branch} ${branch}`) : null,
   ]);

@@ -8,30 +8,30 @@ effort: medium
 
 # /init-deep
 
-Generate hierarchical AGENTS.md files. Root + complexity-scored subdirectories.
+Writes an AGENTS.md at the repository root and in each subdirectory that needs its own.
 
 ## Usage
 
 ```
-/init-deep                      # Update mode: modify existing + create new where warranted
-/init-deep --create-new         # Read existing → remove all → regenerate from scratch
+/init-deep                      # Refresh the files that exist and add any that are now needed
+/init-deep --create-new         # Read the existing files, delete them, then write new ones
 ```
 
 ## Workflow
 
-1. **Discovery + Analysis** (concurrent): explorer agents, bash structure, codemap, existing AGENTS.md
-2. **Score & Decide**: AGENTS.md locations from merged findings
-3. **Generate**: root first, subdirs in parallel
-4. **Review**: deduplicate, trim, validate
+1. **Survey** the repository: explorer agents, the shell pass below, symbols, existing AGENTS.md files
+2. **Choose** which directories get a file
+3. **Write** the root file first, then the subdirectories in parallel
+4. **Trim** repetition and anything generic
 
-## Phase 1: discovery + analysis (concurrent)
+## Phase 1: survey the repository
 
 ### Background explorer agents
 
-Each explorer agent re-reads the repository from scratch and hands back a report you then read, so delegate only the tracks the Bash pass below cannot answer in a few reads: none for a small repository, and at most five in total for a large one. Launch the ones you choose in a single message so they run concurrently, and brief each with its directory scope and what to report. Candidate tracks:
+Each explorer agent re-reads the repository from scratch and hands back a report you then read, so delegate only the tracks the Bash pass below cannot answer in a few reads: none for a small repository, and at most five in total for a large one. Launch the ones you choose together in one message, and brief each with its directory scope and what to report. Candidate tracks:
 
 - Entry points and non-standard organization
-- Config files (.eslintrc, pyproject.toml, .editorconfig) and the project-specific rules they encode
+- Config files (linters, formatters, `pyproject.toml`) and the project-specific rules they encode
 - Comments that mark forbidden or deprecated patterns (`DO NOT`, `NEVER`, `DEPRECATED`), with the reason each gives
 - Build and CI (.github/workflows, Makefile) where it departs from the defaults
 - Test configuration and layout
@@ -40,19 +40,24 @@ Each explorer agent re-reads the repository from scratch and hands back a report
 
 Merge the explorer findings only after every agent has reported. Until then, carry on with the main-session analysis below, which does not overlap theirs; when it is done and agents are still running, end the turn once instead of answering each notification with a holding message.
 
-### Main session (concurrent with agents)
+### Main session, alongside the agents
 
-#### 1. Bash structural analysis
+#### 1. Shell pass
+
+Tracked files already leave out dependencies and build output. Outside a git repository, get the same answers with `Glob`.
+
 ```bash
-find . -type d -not -path '*/\.*' -not -path '*/node_modules/*' -not -path '*/venv/*' -not -path '*/dist/*' -not -path '*/build/*' | awk -F/ '{print NF-1}' | sort -n | uniq -c
-find . -type f -not -path '*/\.*' -not -path '*/node_modules/*' | sed 's|/[^/]*$||' | sort | uniq -c | sort -rn | head -30
-find . -type f \( -name "*.py" -o -name "*.ts" -o -name "*.tsx" -o -name "*.js" -o -name "*.go" -o -name "*.rs" \) -not -path '*/node_modules/*' | sed 's|/[^/]*$||' | sort | uniq -c | sort -rn | head -20
-find . -type f \( -name "AGENTS.md" -o -name "CLAUDE.md" \) -not -path '*/node_modules/*' 2>/dev/null
+git ls-files | awk -F/ '{print NF-1}' | sort -n | uniq -c
+git ls-files | grep / | sed 's|/[^/]*$||' | sort | uniq -c | sort -rn | head -30
+git ls-files | sed -n 's/.*\.\([^./]*\)$/\1/p' | sort | uniq -c | sort -rn | head -10
+git ls-files | grep -E '(^|/)(AGENTS|CLAUDE)\.md$'
 ```
+
+These print how deep the tree goes, its busiest directories, its file types and the instruction files it holds.
 
 #### 2. Read existing AGENTS.md
 
-Extract key insights, conventions, anti-patterns. `--create-new`: read first (preserve context) → delete → regenerate.
+Note what they record: conventions, prohibitions and the reasons given. With `--create-new`, read them before deleting so that knowledge carries over.
 
 #### 3. LSP codemap (if available)
 
@@ -78,19 +83,19 @@ Leave a directory to its parent file when the parent already covers it. Every ex
 # Project knowledge base
 
 ## Overview
-{1-2 sentences: what + core stack}
+{What this is and what it is built with, in a sentence or two}
 
 ## Structure
 {Tree with non-obvious purposes only}
 
-## Where to look
-| Task | Location | Notes |
+## Finding your way
+| To change | Look in | Why it is not obvious |
 
-## Conventions
-{ONLY deviations from standard}
+## House rules
+{Only where this project departs from the norm for its stack}
 
-## Anti-patterns in this project
-{Explicitly forbidden here}
+## Do not
+{What is forbidden here, each with its reason}
 
 ## Commands
 {dev/test/build}
@@ -108,7 +113,4 @@ Remove generic advice and anything a parent file already says. Keep the reason a
 
 ## Anti-patterns
 
-- Ignoring existing files: ALWAYS read first, even with --create-new
-- Over-documenting: not every dir needs AGENTS.md
-- Redundancy: a child never repeats its parent
-- Generic content: remove anything that applies to ALL projects
+Skip no existing file: `--create-new` reads them too. Most directories need no file of their own. A child file never repeats its parent, and a line that would hold for any project gets cut.

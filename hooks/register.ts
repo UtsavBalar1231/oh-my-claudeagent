@@ -7,12 +7,14 @@ import { compact } from "./compact.ts";
 import { completion } from "./completion.ts";
 import { dispatch, dispatchStream, featuresFor } from "./dispatch.ts";
 import { footer } from "./footer.ts";
+import { keywordPaint } from "./keyword-paint.ts";
 import type { Host, Options } from "./host.ts";
 import { metrics } from "./metrics.ts";
 import { modMarker } from "./mod-marker.ts";
 import { router } from "./omca-router.ts";
 import { refusalRecovery } from "./refusal-recovery.ts";
 import { pane } from "./pane.ts";
+import { planReceipts } from "./plan-receipts.ts";
 import { groupRows } from "./group-rows.ts";
 import { serverCheck } from "./server-check.ts";
 import { spinner } from "./spinner.ts";
@@ -62,6 +64,8 @@ function bindHost($: EngineInterface, options: Options): Host {
       notify: (text, notifyOptions) => $.ui.notify(text, notifyOptions),
       blit: (args) => $.ui.blit(args),
       view: (args) => $.ui.view(args),
+      place: (args) => $.ui.place(args),
+      status: (text) => $.ui.status(text),
     },
     session: {
       id: () => $.session.id(),
@@ -80,7 +84,12 @@ function bindHost($: EngineInterface, options: Options): Host {
       after: (ms, fn) => $.clock.after(ms, fn),
       every: (ms, fn) => $.clock.every(ms, fn),
     },
-    prompt: { fill: (args) => $.prompt.fill(args), submit: (args) => $.prompt.submit(args) },
+    prompt: {
+      fill: (args) => $.prompt.fill(args),
+      submit: (args) => $.prompt.submit(args),
+      read: () => $.prompt.read(),
+      paint: (args) => $.prompt.paint(args),
+    },
     state: {
       agents: {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "agents" }),
@@ -128,6 +137,10 @@ function bindHost($: EngineInterface, options: Options): Host {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "turns" }),
         set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "turns" }, value, setOptions),
       },
+      receipts: {
+        get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "receipts" }),
+        set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "receipts" }, value, setOptions),
+      },
       doctor: {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "doctor" }),
         set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "doctor" }, value, setOptions),
@@ -161,14 +174,14 @@ export const register: Register = (on, pluginOptions) => {
   const options = readOptions(pluginOptions);
   const bash = featuresFor("tool.check", { bashGuard });
   const toolCall = featuresFor("tool.call", { agentsTracker });
-  const sessionStart = featuresFor("session.start", { refusalRecovery, pane, modMarker, band, serverCheck });
-  const promptSubmit = featuresFor("prompt.submit", { refusalRecovery });
-  const turnStart = featuresFor("turn.start", { refusalRecovery, footer, modMarker });
+  const sessionStart = featuresFor("session.start", { refusalRecovery, pane, modMarker, band, planReceipts, serverCheck, keywordPaint });
+  const promptSubmit = featuresFor("prompt.submit", { refusalRecovery, keywordPaint });
+  const turnStart = featuresFor("turn.start", { refusalRecovery, footer, modMarker, serverCheck });
   const turnStep = featuresFor("turn.step", { metrics, agentsTracker });
-  const turnComplete = featuresFor("turn.complete", { band, agentsTracker, agentRows, metrics, pane, footer, refusalRecovery });
+  const turnComplete = featuresFor("turn.complete", { band, agentsTracker, agentRows, metrics, pane, footer, planReceipts, refusalRecovery });
   const agentSpawn = featuresFor("agent.spawn", { agentsTracker, metrics });
-  const promptEdit = featuresFor("prompt.edit", { band, refusalRecovery });
-  const promptChange = featuresFor("prompt.change", { band });
+  const promptEdit = featuresFor("prompt.edit", { band, refusalRecovery, keywordPaint });
+  const promptChange = featuresFor("prompt.change", { band, keywordPaint });
   const promptAutocomplete = featuresFor("prompt.autocomplete", { completion });
   const paneClose = featuresFor("ui.close", { pane });
   const paneFocus = featuresFor("ui.focus", { pane });
@@ -181,6 +194,7 @@ export const register: Register = (on, pluginOptions) => {
   const noticeRender = featuresFor("ui.render UserMessage", { agentRows });
   const launchRender = featuresFor("ui.render ToolUse", { agentRows });
   const groupRender = featuresFor("ui.render ToolGroup", { groupRows });
+  const placedRender = featuresFor("ui.render Placed", { planReceipts });
   const sessionCompact = featuresFor("session.compact", { compact });
 
   on("tool.check", { tool: /^(?:Bash|PowerShell|Monitor)$/ }, ($, e, next) =>
@@ -226,6 +240,9 @@ export const register: Register = (on, pluginOptions) => {
   );
   on("ui.render", { component: "ToolGroup" }, ($, e, next) =>
     dispatch(bindHost($, options), "ui.render ToolGroup", groupRender, e, next),
+  );
+  on("ui.render", { component: "Placed", props: { plugin: "oh-my-claudeagent" } }, ($, e, next) =>
+    dispatch(bindHost($, options), "ui.render Placed", placedRender, e, next),
   );
   on("session.compact", ($, e, next) => dispatch(bindHost($, options), "session.compact", sessionCompact, e, next)).catch((_$, e, next) => next(e));
 };
