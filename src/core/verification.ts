@@ -30,6 +30,18 @@ export function isVerificationCommand(command: string): boolean {
   return RUNNER.test(blankQuotedSpans(command));
 }
 
+// The block at task completion quotes the command twice, so a heredoc recorded whole costs the
+// model thousands of tokens on every block, and the band and its prompt button quote it too.
+const QUOTED_COMMAND_CHARS = 200;
+
+/** The line of a command that ran the check, cut to a length the surfaces can quote back. */
+export function quotableCommand(command: string): string {
+  const lines = command.split(/\r?\n/);
+  const line = (lines.find(isVerificationCommand) ?? lines[0] ?? "").trim();
+  const quoted = line.slice(0, QUOTED_COMMAND_CHARS);
+  return quoted === command.trim() ? quoted : `${quoted}…`;
+}
+
 /**
  * A recent unsatisfied slot, one with no evidence logged after it, outranks a newer
  * verification: overwriting it would let a logged lint run shadow an earlier unlogged failing

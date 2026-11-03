@@ -41,15 +41,18 @@ async function stampWith(root: string, scratch: string): Promise<string | null> 
     GIT_OBJECT_DIRECTORY: join(scratch, "objects"),
     GIT_ALTERNATE_OBJECT_DIRECTORIES: resolve(root, objects),
   };
-  if ((await git(root, ["add", "-A", "--", ":/", NOT_THE_PROJECT], env)) === null) return null;
-  return git(root, ["write-tree"], env);
+  // git-lfs keeps a copy of every version it cleans, and one the timeout kills leaves its partial
+  // file. write-tree needs this too, because writing an index cleans a racily clean entry again.
+  const lfs = ["-c", `lfs.storage=${join(scratch, "lfs")}`];
+  if ((await git(root, [...lfs, "add", "-A", "--", ":/", NOT_THE_PROJECT], env)) === null) return null;
+  return git(root, [...lfs, "write-tree"], env);
 }
 
 /**
  * The tree hash of `root` as `git add -A` would record it, so uncommitted and untracked work counts
- * and ignored files do not. A scratch index and object directory leave the user's staging area and
- * object store untouched. Null outside a repository, or when git is missing, fails or runs out of
- * time, because evidence must log whether or not a stamp can be made.
+ * and ignored files do not. A scratch index, object directory and LFS storage leave the user's
+ * staging area and both object stores untouched. Null outside a repository, or when git is missing,
+ * fails or runs out of time, because evidence must log whether or not a stamp can be made.
  */
 export async function workingTreeStamp(root: string): Promise<string | null> {
   try {

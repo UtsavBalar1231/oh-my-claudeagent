@@ -6,6 +6,7 @@ import {
   exitCodeOf,
   isVerificationCommand,
   keepsSlot,
+  quotableCommand,
   unloggedReason,
 } from "./verification.ts";
 
@@ -151,6 +152,26 @@ describe("exitCodeOf", () => {
       null,
       null,
     ]);
+  });
+});
+
+describe("quotableCommand", () => {
+  test("a short one-line command stays whole, without its outer whitespace", () => {
+    expect(quotableCommand("just test")).toBe("just test");
+    expect(quotableCommand("  cd app && just test 2>&1\n")).toBe("cd app && just test 2>&1");
+  });
+
+  test("a command over several lines quotes the line that ran the check", () => {
+    expect(quotableCommand("cd app &&\n  just test --seed 4\necho done")).toBe("just test --seed 4…");
+  });
+
+  test("a command with no such line of its own quotes its first line", () => {
+    expect(quotableCommand("echo a; python3 - <<'PY'\nprint(1); just = 2\nPY")).toBe("echo a; python3 - <<'PY'…");
+  });
+
+  test("a line past the limit is cut at 200 characters", () => {
+    expect(quotableCommand(`just test ${"x".repeat(500)}`)).toBe(`just test ${"x".repeat(190)}…`);
+    expect(quotableCommand(`just test ${"x".repeat(190)}`)).toBe(`just test ${"x".repeat(190)}`);
   });
 });
 
