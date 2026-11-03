@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.1] - 2026-11-03
+
+### Fixed
+
+- **Long commands in the task-completed block:** the block quoted a recorded verification command
+  whole, twice, so a long heredoc cost thousands of tokens each time it fired. The block, the band
+  and the band's prompt button now quote the line that ran the check, cut at 200 characters.
+- **The evidence stamp in Git LFS repositories:** stamping a repository with a dirty LFS file kept a
+  full copy of that version in `.git/lfs/objects`, and a stamp the 3 s limit stopped left a partial
+  file in `.git/lfs/tmp`, about 2.7 GiB each time for a 3 GiB asset. Both now stay in the stamp's
+  scratch directory, which is removed afterwards. To reclaim what 3.5.0 wrote, run `git lfs prune`
+  for the copies and delete the partial files in `.git/lfs/tmp` by hand, since prune leaves those.
+
 ## [3.5.0] - 2026-11-03
 
 ### Added
@@ -3254,6 +3267,7 @@ for multi-agent orchestration.
 - Shellcheck fixes applied across all hook scripts
 - Ruff fixes applied to Python MCP servers
 
+[3.5.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.5.0...v3.5.1
 [3.5.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.4.0...v3.5.0
 [3.4.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.3.2...v3.4.0
 [3.3.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.3.1...v3.3.2
