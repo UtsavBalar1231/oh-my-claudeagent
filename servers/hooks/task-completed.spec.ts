@@ -126,6 +126,20 @@ describe("a verification with no evidence after it blocks", () => {
     expect(await complete(root, sessionId, NOW, { task_description: "status report only" })).toEqual(BLOCK);
   });
 
+  test("a long heredoc is quoted by its first line, not whole", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    const command = `just test; python3 - <<'PY'\n${"x = 1\n".repeat(2000)}PY`;
+    await dispatch({ event: "PostToolUse", session_id: sessionId, tool_name: "Bash", tool_input: { command } }, root, NOW);
+    expect(await complete(root, sessionId)).toEqual({
+      decision: "block",
+      reason:
+        "You ran `just test; python3 - <<'PY'…` at 07:06 but logged no evidence after it. Log the real result with " +
+        'evidence_log, including a non-zero exit_code if it failed. Example: evidence_log(evidence_type="test", ' +
+        "command=\"just test; python3 - <<'PY'…\", exit_code=0, output_snippet=\"10 passed\")",
+    });
+  });
+
   test("true positive: a recorded verification with no evidence after it blocks", async () => {
     const root = project();
     const sessionId = crypto.randomUUID();
