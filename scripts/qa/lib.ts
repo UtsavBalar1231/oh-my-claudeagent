@@ -231,6 +231,8 @@ export const CANARY = "stale-build-cache";
 
 const HOOK_CALL = /Hooks: mcp_tool calling plugin:oh-my-claudeagent:omca\/omca_hook/g;
 const DENY_REASON = "Destructive rm -rf blocked";
+// The client names every module in the tool.check chain: "plugin a" alone, "plugins a, b" with others.
+const PLUGIN_DENY = /-> deny by plugins? (?:[\w.-]+, )*oh-my-claudeagent(?:, [\w.-]+)*: /;
 
 export const call = (name: string, input: Record<string, unknown>): Turn => ({ content: [{ type: "tool_use", name, input }] });
 export const say = (text: string): Turn => ({ content: [{ type: "text", text }] });
@@ -240,12 +242,12 @@ export const hookCalls = (debug: string): number => debug.match(HOOK_CALL)?.leng
 
 /** The debug-file lines in which the mod's tool.check guard denied a recursive removal through `tool`. */
 export function guardDenies(debug: string, tool: "Bash" | "PowerShell"): string[] {
-  const deny = new RegExp(`tool\\.check ${tool} [^ ]+: .* -> deny by plugin oh-my-claudeagent: ${DENY_REASON}`);
+  const deny = new RegExp(`tool\\.check ${tool} [^ ]+: .* ${PLUGIN_DENY.source}${DENY_REASON}`);
   return debug.split(/\r?\n/).filter((line) => deny.test(line));
 }
 
 /** Every debug-file line in which the plugin denied a call, whatever the tool or reason. */
-export const pluginDenies = (debug: string): string[] => debug.split(/\r?\n/).filter((line) => line.includes("-> deny by plugin oh-my-claudeagent"));
+export const pluginDenies = (debug: string): string[] => debug.split(/\r?\n/).filter((line) => PLUGIN_DENY.test(line));
 
 export type TraceEntry = { event: string; tool_name?: string; agent_type?: string; output: "deny" | "block" | "continue" | "context" | "empty" };
 
