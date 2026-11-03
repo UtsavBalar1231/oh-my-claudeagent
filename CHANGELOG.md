@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.5.0] - 2026-11-03
+
 ### Added
 
 - **Plan task receipts in the transcript:** when a main turn finishes tasks of the bound plan, a
@@ -19,7 +21,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **A warning that stays while the `omca` server is off:** a session whose server did not connect,
   or stopped partway through, keeps a status line under the prompt, beside the one-time transcript
   line, and clears it on the first turn after `/mcp` reconnects the server.
-
 - **Blocked tasks:** a plan task that cannot finish without something the run lacks closes as
   `- [~] N.`, with a `- Blocked:` sub-bullet stating the gap. It never counts as done and never
   satisfies a `Depends:`, but it stops holding the session, so an unattended run finishes the
@@ -34,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Test cleanup and flaky triage:** `remove-ai-slops` gains a reference for removing tests that
   cannot fail, proven by breaking the code they claim to protect, and `debugging` gains a table
   that reads a flaky test's failure pattern.
+- **Third-party notice:** `THIRD-PARTY-NOTICES.md` ships with the plugin and carries the MIT notice
+  for the project OMCA is based on.
 
 ### Changed
 
@@ -3251,6 +3254,7 @@ for multi-agent orchestration.
 - Shellcheck fixes applied across all hook scripts
 - Ruff fixes applied to Python MCP servers
 
+[3.5.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.4.0...v3.5.0
 [3.4.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.3.2...v3.4.0
 [3.3.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.3.1...v3.3.2
 [3.3.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.3.0...v3.3.1
