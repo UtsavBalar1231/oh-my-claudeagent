@@ -124,7 +124,7 @@ The writer keeps any other top-level key it finds and writes `version` first.
 | `timestamp` | string | always | UTC at seconds precision, for example `2026-10-02T12:05:00Z` |
 | `verified_by` | string | only when not empty | The agent or person that verified, cut to 200 characters |
 | `plan_sha256` | string | only when not empty | The plan hash, 64 lowercase hex characters |
-| `tree` | string | when git can produce it | The tree hash of the working directory as `git add -A` would record it, computed by the server with a scratch index. Claude Code's `.claude/worktrees` directory does not count. It is absent outside a git repository, or when git is missing, fails, or a git call takes over 3 seconds. A caller cannot supply it |
+| `tree` | string | when git can produce it | The tree hash of the working directory as `git add -A` would record it, computed by the server with a scratch index, object directory and git-lfs storage. Claude Code's `.claude/worktrees` directory does not count. It is absent outside a git repository, or when git is missing, fails, or a git call takes over 3 seconds. A caller cannot supply it |
 
 Lengths are counted in characters, not bytes. `evidence_log` rejects an unknown `type`, a non-integer `exit_code` and a `plan_sha256` that is not 64 lowercase hex characters or empty.
 
