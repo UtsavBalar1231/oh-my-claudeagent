@@ -379,6 +379,13 @@ describe("write-path GC", () => {
     expect(reg.plans).toHaveProperty("native");
   });
 
+  test("gc keeps an old unbound plan with no open task and a blocked one", () => {
+    const root = project();
+    const reg: Registry = { plans: { closed: { active_plan: planFile(root, "closed.md", "- [x] 1. a\n- [~] 2. b\n"), started_at: LONG_AGO } }, bindings: {} };
+    pruneStale(reg, nowSeconds());
+    expect(Object.keys(reg.plans)).toEqual(["closed"]);
+  });
+
   test("a started_at that is not a full UTC timestamp counts as long ago", () => {
     const root = project();
     const done = planFile(root, "done.md", COMPLETE);
@@ -403,6 +410,13 @@ describe("start-time GC", () => {
     const reg: Registry = { plans: { done: entry(planFile(root, "d.md", COMPLETE)) }, bindings: { "sess-1": { plan_name: "done", bound_at: 1 } } };
     expect(pruneUnbound(reg)).toEqual({ pruned_plans: [], pruned_bindings: [] });
     expect(Object.keys(reg.plans)).toEqual(["done"]);
+  });
+
+  test("keeps an unbound plan with no open task and a blocked one", () => {
+    const root = project();
+    const reg: Registry = { plans: { closed: entry(planFile(root, "c.md", "- [x] 1. a\n- [~] 2. b\n")) }, bindings: {} };
+    expect(pruneUnbound(reg)).toEqual({ pruned_plans: [], pruned_bindings: [] });
+    expect(Object.keys(reg.plans)).toEqual(["closed"]);
   });
 
   test("keeps unbound incomplete plan", () => {
@@ -475,6 +489,7 @@ describe("boulder_progress", () => {
       {
         total,
         completed,
+        blocked: 0,
         remaining: total - completed,
         is_complete: total > 0 && completed === total,
         plan_path: planPath,
@@ -490,6 +505,18 @@ describe("boulder_progress", () => {
     const plan = planFile(root, "plan.md", "# My Plan\n\n- [x] 1. Task one done\n- [ ] 2. Task two pending\n- [ ] 3. Task three pending\n");
     await write(root, "progress-plan", "sess-001", plan);
     expect(await progress(root, { session_id: "sess-001" })).toBe(result(plan, 3, 1, "Task two pending"));
+  });
+
+  test("boulder_progress counts a blocked task apart and leaves the plan incomplete", async () => {
+    const root = project();
+    const plan = planFile(root, "plan.md", "- [x] 1. Done\n- [~] 2. Stuck\n- [ ] 3. Open\n");
+    expect(JSON.parse(await progress(root, { plan_path: plan }))).toMatchObject({ total: 3, completed: 1, blocked: 1, remaining: 1, is_complete: false, next_task_label: "Open" });
+  });
+
+  test("boulder_progress on a plan with only done and blocked tasks is not complete and has no next task", async () => {
+    const root = project();
+    const plan = planFile(root, "plan.md", "- [x] 1. Done\n- [~] 2. Stuck\n");
+    expect(JSON.parse(await progress(root, { plan_path: plan }))).toMatchObject({ total: 2, completed: 1, blocked: 1, remaining: 0, is_complete: false, next_task_label: null });
   });
 
   test("boulder_progress returns the SHA-256 of the plan file's bytes", async () => {

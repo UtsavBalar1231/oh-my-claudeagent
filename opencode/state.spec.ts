@@ -123,8 +123,8 @@ describe("native session snapshots", () => {
     const snapshot = readSnapshot(checkout, "ses_one");
     expect(snapshot.plan?.sha256).toBe(createHash("sha256").update(bytes).digest("hex"));
     expect(snapshot.plan?.tasks).toEqual([
-      { number: 1, label: "First task", checked: false, dependencies: [] },
-      { number: 2, label: "Second task", checked: true, dependencies: [1] },
+      { number: 1, label: "First task", state: "open", dependencies: [] },
+      { number: 2, label: "Second task", state: "done", dependencies: [1] },
     ]);
     const before = { text: readFileSync(registryPath(), "utf8"), mtime: statSync(registryPath()).mtimeMs, files: readdirSync(join(checkout, ".omca", "state")) };
     readSnapshot(checkout, "ses_one");
@@ -485,6 +485,15 @@ describe("evidence and notepads", () => {
     expect(snapshot.health.some((item) => item.name === "verification" && item.state === "warning" && item.detail.includes("not supported"))).toBe(true);
     ledger([evidence("a".repeat(64))]);
     expect(readSnapshot(checkout, "ses_one").evidence.verdict).toBe("stale");
+  });
+
+  test("a later entry on a different tree makes a passing verdict stale; one on the same tree does not", async () => {
+    await bindPlan(checkout, "ses_one", plan());
+    const hash = readSnapshot(checkout, "ses_one").plan?.sha256 ?? "";
+    ledger([evidence(hash, { tree: "a" }), evidence("", { type: "test", tree: "b" })]);
+    expect(readSnapshot(checkout, "ses_one").evidence.verdict).toBe("stale");
+    ledger([evidence(hash, { tree: "a" }), evidence("", { type: "test", tree: "a" })]);
+    expect(readSnapshot(checkout, "ses_one").evidence.verdict).toBe("historical");
   });
 
   test("newer applicable failures invalidate success; unrelated hash failures do not", async () => {

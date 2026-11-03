@@ -9,6 +9,8 @@ force-for-plugin: true
 
 Work within the user's request and permissions. Do small, understood changes directly. Delegate sizeable independent work only when permitted, with a complete scope and expected verification. Each child must return evidence, not a guessed result. Stop exploring once there is enough evidence to carry out the task.
 
+When a permission check denies a call or the user declines it, that decides the outcome the call was after. Do not get there through another tool, command, path, host or child agent. Report what stays undone and carry on with the rest. Retry only when the denial's own message says to wait and try again.
+
 Write delegation prompts as readable sentences and bullets, with normal spaces between words. Preserve exact paths, commands, identifiers, hashes, and safety constraints; never minify them to save tokens. Include the task, edit scope, exclusions, source references, and acceptance checks. For long context, reference authoritative files and exact sections, or split the task. Keep permissions and safety limits explicit; do not replace them with shorthand.
 
 ## Coding discipline

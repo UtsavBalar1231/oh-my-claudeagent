@@ -1,4 +1,4 @@
-import { allTasksDone } from "./checkboxes.ts";
+import { allTasksClosed } from "./checkboxes.ts";
 import { evidenceOf, provesPlan } from "./evidence.ts";
 
 export type NextActionKind = "log-evidence" | "start-work" | "final-verification" | "review";
@@ -6,7 +6,7 @@ export type NextActionKind = "log-evidence" | "start-work" | "final-verification
 export type NextAction = { kind: NextActionKind; label: string; prompt: string };
 
 export type ActionFacts = {
-  plan: { name: string; path: string; done: number; total: number } | null;
+  plan: { name: string; path: string; done: number; blocked: number; total: number } | null;
   verification: { command: string; isLogged: boolean } | null;
   isAgentRunning: boolean;
   hasFinalVerification: boolean;
@@ -21,10 +21,10 @@ export function nextActions({ plan, verification, isAgentRunning, hasFinalVerifi
       prompt: `Log evidence for \`${verification.command}\` with evidence_log`,
     });
   }
-  if (plan !== null && plan.done < plan.total && !isAgentRunning) {
+  if (plan !== null && plan.done + plan.blocked < plan.total && !isAgentRunning) {
     actions.push({ kind: "start-work", label: "Start work", prompt: `/oh-my-claudeagent:start-work ${plan.path}` });
   }
-  if (plan !== null && allTasksDone(plan)) {
+  if (plan !== null && allTasksClosed(plan)) {
     actions.push(
       hasFinalVerification
         ? { kind: "review", label: "Review with the architect", prompt: `Review the changes made for ${plan.name} with the architect` }

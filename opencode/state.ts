@@ -3,8 +3,8 @@ import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, realpat
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { readRegistryDocument, resolveBoundPlan, type Registry, type RegistryDocument, unbindSessions, upsertPlanSession } from "../src/core/boulder.ts";
-import { outsideFences, planTasks } from "../src/core/checkboxes.ts";
-import { entriesOf, readLedger, type Evidence } from "../src/core/evidence.ts";
+import { outsideFences, planTasks, type TaskState } from "../src/core/checkboxes.ts";
+import { entriesOf, readLedger, treeMovedSince, type Evidence } from "../src/core/evidence.ts";
 import { NOTEPAD_SECTIONS, parseEntries, toPlanName } from "../src/core/notepad.ts";
 import { BOULDER, LEDGER } from "../src/core/omca-paths.ts";
 import { boardOf, parsePlan } from "../src/core/plan-reader.ts";
@@ -22,10 +22,10 @@ export interface Snapshot {
     path: string;
     sha256: string;
     status: string;
-    tasks: Array<{ number: number; label: string; checked: boolean; dependencies: number[] }>;
+    tasks: Array<{ number: number; label: string; state: TaskState; dependencies: number[] }>;
   };
   evidence: {
-    entries: Array<{ type: string; command: string; exitCode: number; at: number; snippet: string; verifiedBy: string | null; planSha: string }>;
+    entries: Array<{ type: string; command: string; exitCode: number; at: number; snippet: string; verifiedBy: string | null; planSha: string; tree: string }>;
     verdict: "missing" | "historical" | "stale" | "verified";
   };
   notepads: Array<{ section: string; content: string }>;
@@ -215,7 +215,7 @@ function evidenceVerdict(entries: Evidence[], plan: Snapshot["plan"]): Snapshot[
   const finals = entries.filter((entry) => entry.type === "final_verification" && entry.planSha !== "");
   const latest = finals.findLast((entry) => entry.planSha === plan.sha256);
   if (latest === undefined) return finals.length === 0 ? "missing" : "stale";
-  if (latest.exitCode !== 0) return "stale";
+  if (latest.exitCode !== 0 || treeMovedSince(entries, latest)) return "stale";
   const lastFinal = entries.lastIndexOf(latest);
   if (entries.slice(lastFinal + 1).some((entry) => entry.exitCode !== 0 && (entry.planSha === "" || entry.planSha === plan.sha256))) return "stale";
   return "historical";

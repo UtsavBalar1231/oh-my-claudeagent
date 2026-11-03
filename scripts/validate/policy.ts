@@ -9,7 +9,6 @@ const POSTURE_MARKERS: readonly Marker[] = [
   { text: "allowManagedPermissionRulesOnly", label: "managed settings boundary" },
   { text: "sandbox.failIfUnavailable", label: "sandbox fail-closed" },
 ];
-const NON_BYPASSING = /does not auto-allow|never auto-allow|no auto-allow/i;
 
 const HOOK_MODEL_DOC = "docs/references.md";
 const HOOK_MODEL_MARKERS: readonly Marker[] = [
@@ -30,11 +29,7 @@ function missing(ctx: Context, doc: string, markers: readonly Marker[]): string[
 
 function policyMarkers(ctx: Context): Outcome {
   const problems = [
-    ...POSTURE_DOCS.flatMap((doc) => {
-      const absent = missing(ctx, doc, POSTURE_MARKERS);
-      const lacksFilterGuidance = existsSync(join(ctx.root, doc)) && !NON_BYPASSING.test(readText(ctx.root, doc));
-      return lacksFilterGuidance ? [...absent, `${doc} lacks the non-bypassing permission filter guidance`] : absent;
-    }),
+    ...POSTURE_DOCS.flatMap((doc) => missing(ctx, doc, POSTURE_MARKERS)),
     ...missing(ctx, HOOK_MODEL_DOC, HOOK_MODEL_MARKERS),
   ];
   return verdict(problems, `${POSTURE_DOCS.join(" and ")} carry the posture markers, ${HOOK_MODEL_DOC} the hook model markers`);

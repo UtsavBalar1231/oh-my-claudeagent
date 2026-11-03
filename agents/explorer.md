@@ -1,6 +1,6 @@
 ---
 name: explorer
-description: Codebase search specialist for finding files, patterns, and implementations. Use when asking "Where is X?", "Which file has Y?", or "Find the code that does Z". Fire multiple in parallel for broad searches.
+description: Searches this codebase for files, patterns and implementations. Use for questions like "Where is X?", "What file holds Y?" or "What implements Z?". For a broad search, run several in parallel, one per area.
 model: sonnet
 effort: high
 omitClaudeMd: true

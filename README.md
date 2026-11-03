@@ -51,7 +51,7 @@ panel opened with `/omca`. Build and Plan remain available. See
    verification after each one, and checks the plan's boxes as tasks finish.
 3. Open `/omca` to watch the agents, the plan, the evidence and the notepad while it runs.
 
-When the session tries to stop with tasks unchecked, or with every task checked and no final
+When the session tries to stop with tasks open, or with none open and no final
 verification logged, OMCA sends it back to work with the reason.
 
 ## Try it
@@ -80,7 +80,7 @@ buttons fill the prompt with the next step.
 `/omca plan` opens the plan board: the tasks grouped by milestone, each with its state, its proof
 and the agent working on it. A wide pane shows the focused task's detail beside the list.
 
-<img src=".github/assets/plan.png" width="680" alt="The Plan tab of the OMCA pane shows the checkout-redesign board at 6 of 14 tasks, with 6 proven and 4 blocked. Tasks 1 to 6 are done and proven, the executor is on task 7, tasks 8, 9 and 11 are open, and tasks 10, 12, 13 and 14 name the tasks that block them. Beside the list, task 6, Build the payment step, shows its steps, its done-when command, its dependencies, its file changed 3h ago and the passing runs since then. The keys for the focused task and the board fill one row under the list.">
+<img src=".github/assets/plan.png" width="680" alt="The Plan tab of the OMCA pane shows the checkout-redesign board at 6 of 14 tasks, with 6 proven and 4 waiting. Tasks 1 to 6 are done and proven, the executor is on task 7, tasks 8, 9 and 11 are open, and tasks 10, 12, 13 and 14 name the tasks they wait on. Beside the list, task 6, Build the payment step, shows its steps, its done-when command, its dependencies, its file changed 3h ago and the passing runs since then. The keys for the focused task and the board fill one row under the list.">
 
 The Evidence tab is the proof ledger: a verdict on the plan's final verification, then every
 logged run grouped by day.
@@ -137,7 +137,7 @@ project files stay on that server. OMCA adds no telemetry or external service.
 
 **Settings hooks.** `hooks/hooks.json` registers `SessionStart` (only after `/clear` and
 compaction), `UserPromptSubmit`, `UserPromptExpansion`, `SubagentStart`, `PreToolUse` (only
-Write and Edit), `PermissionDenied`, `PostToolUse`, `PostToolUseFailure`, `Stop` and
+Write and Edit), `PostToolUse`, `PostToolUseFailure`, `Stop` and
 `TaskCompleted`. Each is an `mcp_tool` hook that calls `omca_hook` on the local server. They run
 in every session because the gates and the guidance need each turn's events: a plan-write guard
 and comment gate on writes, the verification recorder and rule injection after tool calls,
@@ -201,7 +201,8 @@ The full lists are in the reference: [hooks](docs/references.md#hooks),
 ## Acknowledgments
 
 Based on [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent) by
-[@code-yeongyu](https://github.com/code-yeongyu).
+[@code-yeongyu](https://github.com/code-yeongyu). Its notice is in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ## License
 

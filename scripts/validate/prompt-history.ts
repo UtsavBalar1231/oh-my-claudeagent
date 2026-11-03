@@ -62,12 +62,6 @@ export const ALLOWED: readonly Allowed[] = [
     reason: "the instruction not to add compatibility code the task does not require",
   },
   {
-    file: "agents/orchestrator.md",
-    phrase: "legacy",
-    line: "Legacy/Chaotic",
-    reason: "a class of the user's codebase that the orchestrator assesses",
-  },
-  {
     file: "rules/comments-go.md",
     phrase: "deprecated",
     line: "`Deprecated:` paragraphs",

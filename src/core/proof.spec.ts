@@ -12,6 +12,7 @@ const run = (type: Run["type"], exitCode: number, at: number, command = `just ${
   snippet: "",
   verifiedBy: null,
   planSha: "",
+  tree: "",
 });
 
 describe("parseRuns", () => {
@@ -27,8 +28,8 @@ describe("parseRuns", () => {
       ],
     });
     expect(parseRuns(text)).toEqual([
-      { type: "build", command: "bun run build", exitCode: 0, at: T, snippet: "", verifiedBy: null, planSha: "" },
-      { type: "test", command: "just test", exitCode: 1, at: T + 10 * MIN, snippet: "2 fail", verifiedBy: "executor", planSha: "" },
+      { type: "build", command: "bun run build", exitCode: 0, at: T, snippet: "", verifiedBy: null, planSha: "", tree: "" },
+      { type: "test", command: "just test", exitCode: 1, at: T + 10 * MIN, snippet: "2 fail", verifiedBy: "executor", planSha: "", tree: "" },
     ]);
   });
 

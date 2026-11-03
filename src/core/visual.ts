@@ -217,7 +217,7 @@ const SEGMENTS = [
   { part: "done", tone: "ok", ascii: "#" },
   { part: "active", tone: "active", ascii: "=" },
   { part: "failed", tone: "fail", ascii: "x" },
-  { part: "blocked", tone: "warn", ascii: "/" },
+  { part: "blocked", tone: "warn", ascii: "%" },
   { part: "todo", tone: "track", ascii: "." },
 ] as const;
 

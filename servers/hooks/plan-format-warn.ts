@@ -7,6 +7,7 @@ import type { Handler } from "./registry.ts";
 
 // Keeps the warning short on a plan with many malformed boxes while still naming the usual single typo.
 const MAX_NAMED_LINES = 5;
+const OPEN_OR_BLOCKED_BOX = /^- \[[ ~]\] /;
 
 export const handle: Handler = (payload) => {
   if ((payload.tool_name !== "Write" && payload.tool_name !== "Edit") || isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "plan-format-warn")) return;
@@ -16,13 +17,13 @@ export const handle: Handler = (payload) => {
   const numbered = new Set(planTasks(content).map((task) => task.line));
   const malformed = outsideFences(content)
     .split("\n")
-    .flatMap((line, index) => (line.startsWith("- [ ] ") && !numbered.has(index) ? [`${index + 1}:${line}`] : []));
+    .flatMap((line, index) => (OPEN_OR_BLOCKED_BOX.test(line) && !numbered.has(index) ? [`${index + 1}:${line}`] : []));
   if (malformed.length === 0) return;
   const lines = [
     `[PLAN-FORMAT-WARN] ${filePath} has ${malformed.length} checkbox line(s) that will not be counted as numbered tasks:`,
     ...malformed.slice(0, MAX_NAMED_LINES),
     ...(malformed.length > MAX_NAMED_LINES ? [`...and ${malformed.length - MAX_NAMED_LINES} more`] : []),
-    "Fix: a - [ ] line not matching '- [ ] N.' will not be counted; use the numbered form.",
+    "Fix: a - [ ] or - [~] line not matching '- [ ] N.' or '- [~] N.' will not be counted; use the numbered form.",
   ];
   return { hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: lines.join("\n") } };
 };

@@ -256,11 +256,11 @@ test("the board groups tasks by the heading above them and reads each task's fie
     { title: "TODOs", tasks: [1] },
     { title: "Milestone 1: Core", tasks: [2, 3] },
   ]);
-  expect(board.cards.map(({ n, done, title, group, page, files, depends, checks }) => ({ n, done, title, group, page, files, depends, checks }))).toEqual([
-    { n: 1, done: true, title: "Set up", group: 0, page: 2, files: [], depends: [], checks: [] },
+  expect(board.cards.map(({ n, state, title, group, page, files, depends, checks }) => ({ n, state, title, group, page, files, depends, checks }))).toEqual([
+    { n: 1, state: "done", title: "Set up", group: 0, page: 2, files: [], depends: [], checks: [] },
     {
       n: 2,
-      done: true,
+      state: "done",
       title: "[P] Build the core",
       group: 1,
       page: 4,
@@ -270,7 +270,7 @@ test("the board groups tasks by the heading above them and reads each task's fie
     },
     {
       n: 3,
-      done: false,
+      state: "open",
       title: "Wire the band",
       group: 1,
       page: 5,
@@ -324,4 +324,30 @@ test("taskReference reads the task a delegation names on its first line, then in
 test("taskMarkdown writes the task back as the plan spells it", () => {
   const card = boardOf(parsePlan(BOARD)).cards[2];
   expect(card === undefined ? "" : taskMarkdown(card, "- File: a.ts\n\n- Do: b")).toBe("- [ ] 3. Wire the band\n  - File: a.ts\n\n  - Do: b");
+});
+
+test("parsePlan counts a `[~]` task apart from done and carries its state to the page and the card", () => {
+  const plan = parsePlan("# P\n\n## TODOs\n- [x] 1. a\n- [~] 2. b\n  - Blocked: no staging access\n- [ ] 3. c\n");
+  expect([plan.done, plan.blocked, plan.total]).toEqual([1, 1, 3]);
+  expect(plan.pages.flatMap((page) => (page.task === undefined ? [] : [page.task]))).toEqual([
+    { n: 1, state: "done" },
+    { n: 2, state: "blocked" },
+    { n: 3, state: "open" },
+  ]);
+  expect(boardOf(plan).cards.map((card) => card.state)).toEqual(["done", "blocked", "open"]);
+});
+
+test("a `Blocked` sub-bullet stays a plain field", () => {
+  const card = boardOf(parsePlan("# P\n\n- [~] 2. b\n  - Blocked: no staging access\n")).cards[0];
+  expect(card?.fields).toEqual([{ name: "Blocked", text: "no staging access" }]);
+});
+
+test("firstOpenTask passes over a blocked task", () => {
+  const plan = parsePlan("# P\n\n- [~] 1. a\n- [ ] 2. b\n");
+  expect(plan.pages[firstOpenTask(plan)]?.task).toEqual({ n: 2, state: "open" });
+});
+
+test("taskMarkdown keeps a blocked task's box", () => {
+  const card = boardOf(parsePlan("# P\n\n- [~] 2. b\n")).cards[0];
+  expect(card === undefined ? "" : taskMarkdown(card, "")).toBe("- [~] 2. b");
 });

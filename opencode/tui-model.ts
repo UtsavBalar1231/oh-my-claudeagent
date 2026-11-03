@@ -1,9 +1,34 @@
+import { type TaskState, taskCounts } from "../src/core/checkboxes.ts";
+
 export const tabs = ["Overview", "Plan", "Agents", "Evidence", "Notepad", "Doctor"] as const;
 export type Tab = typeof tabs[number];
 
 export function commandTab(input = ""): Tab | undefined {
   const name = input.trim().replace(/^\/omca(?:\s+|$)/i, "").toLowerCase();
   return name === "" ? "Overview" : tabs.find((tab) => tab.toLowerCase() === name);
+}
+
+type PlanRow = { number: number; state: TaskState; dependencies: readonly number[] };
+
+/** A task's dependencies that are not done. A blocked dependency stays here, so its dependents never run. */
+export const waitingOn = (task: PlanRow, tasks: readonly PlanRow[]): number[] =>
+  task.dependencies.filter((number) => tasks.find((item) => item.number === number)?.state !== "done");
+
+export const nextRunnable = <T extends PlanRow>(tasks: readonly T[]): T | undefined =>
+  tasks.find((task) => task.state === "open" && waitingOn(task, tasks).length === 0);
+
+/** What the Overview says when no task can run next. */
+export function noRunnableNote(tasks: readonly PlanRow[]): string {
+  const { blocked, open } = taskCounts(tasks);
+  if (open > 0) return "No task can run: every open task waits on a blocked task.";
+  if (blocked > 0) return `No task is open and ${blocked} blocked, so this plan is not complete. Changing [~] back to [ ] reopens a task.`;
+  return "All task boxes are checked. Review acceptance criteria and verification before finishing.";
+}
+
+// The native footer gives its status 20 cells at 80 columns, and a longer one is cut off.
+export function footerStatus(tasks: readonly PlanRow[]): string {
+  const { done, blocked, total } = taskCounts(tasks);
+  return `OMCA: ${done}/${total}${blocked === 0 ? "" : ` ⊗${blocked}`}`;
 }
 
 export function plain(value: string): string {

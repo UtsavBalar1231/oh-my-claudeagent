@@ -48,6 +48,10 @@
             "description": "SHA-256 of the plan file's bytes, as 64 lowercase hex characters. Absent when logged empty.",
             "type": "string",
             "pattern": "^[0-9a-f]{64}$"
+          },
+          "tree": {
+            "description": "Tree hash of the working directory when the entry was logged, written by the server. Absent outside a git repository or when git could not produce it.",
+            "type": "string"
           }
         },
         "required": ["type", "command", "exit_code", "output_snippet", "timestamp"],

@@ -1,6 +1,6 @@
 import type { RenderElement } from "claude-code";
 import { type Band, bandView, BUTTON_GAP, planTally, type Proof, type Span, type Tone } from "../src/core/band-model.ts";
-import { allTasksDone } from "../src/core/checkboxes.ts";
+import { allTasksClosed, allTasksDone } from "../src/core/checkboxes.ts";
 import { ledgerCoversSlot } from "../src/core/evidence.ts";
 import { hasPassingFinalVerification, type NextAction, nextActions } from "../src/core/next-actions.ts";
 import { BOULDER, exitCodeOf, LEDGER, statusPath, verificationOf } from "../src/core/omca-paths.ts";
@@ -19,7 +19,7 @@ let glyphTier: GlyphTier = "nerd";
 let shownActions = 0;
 let isAgentInView = false;
 let toastedVerificationAt = 0;
-let toastedPlan: { path: string; isDone: boolean } | undefined;
+let toastedPlan: { path: string; isClosed: boolean } | undefined;
 let isBaselined = false;
 let planPath: string | undefined;
 let readStamps: string | undefined;
@@ -72,7 +72,7 @@ async function readSnapshot(host: Host, within: object): Promise<Snapshot> {
   const hasFinalVerification =
     plan !== null &&
     planBytes !== null &&
-    allTasksDone(plan) &&
+    allTasksClosed(plan) &&
     (await attempt(LEDGER, async () =>
       hasPassingFinalVerification(await ledgerDocument(host, ledgerPath), sha256Hex(planBytes)),
     )) === true;
@@ -89,7 +89,7 @@ async function proofOfPlan(host: Host, planPath: string, planText: string, withi
   const { cards } = boardOf(parsePlan(planText));
   const facts = await proofFacts(host, cards.flatMap((card) => card.files), planPath, within);
   if (facts.ledgerError !== null) throw new Error(facts.ledgerError);
-  const counts = proofSummary(cards.map((card) => shownProof(card.done, verdictFor(facts, card.files)?.proof)));
+  const counts = proofSummary(cards.map((card) => shownProof(card.state === "done", verdictFor(facts, card.files)?.proof)));
   return counts.proven + counts.unproven + counts.failed === 0 ? null : counts;
 }
 
@@ -124,17 +124,18 @@ async function toastChanges(host: Host, { band, exitCode }: Snapshot): Promise<v
     });
   }
   toastedVerificationAt = Math.max(toastedVerificationAt, verifiedAt);
-  const isDone = plan !== null && plan.total > 0 && plan.done === plan.total;
-  if (!isBaseline && plan !== null && isDone && toastedPlan?.path === plan.path && !toastedPlan.isDone) {
+  const isClosed = plan !== null && allTasksClosed(plan);
+  if (!isBaseline && plan !== null && isClosed && toastedPlan?.path === plan.path && !toastedPlan.isClosed) {
     // A plan run is the long unattended case, so its end reaches the person's own notifications.
     // The transcript's receipt row says the same in the session, with a toast where no row stands.
     try {
-      await host.ui.notify(`Plan complete: ${plan.name} ${plan.done}/${plan.total}`, { title: "OMCA" });
+      const outcome = allTasksDone(plan) ? `Plan complete: ${plan.name} ${plan.done}/${plan.total}` : `Plan closed: ${plan.name} ${plan.done}/${plan.total}, ${plan.blocked} blocked`;
+      await host.ui.notify(outcome, { title: "OMCA" });
     } catch (error) {
       host.log(`band: notifying failed: ${reason(error)}`);
     }
   }
-  toastedPlan = plan === null ? undefined : { path: plan.path, isDone };
+  toastedPlan = plan === null ? undefined : { path: plan.path, isClosed };
 }
 
 async function actionsFor(host: Host, { band, hasFinalVerification }: Snapshot): Promise<NextAction[]> {

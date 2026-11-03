@@ -57,11 +57,11 @@ test("on desktop the task page names the tasks a blocked task waits on beside it
   const ui = await $.ui.mount(docked("desktop", 56));
 
   await ui.press({ key: "task-5" });
-  expect(spreadRows(await ui.drawn())).toContain(" BLOCKED  by 3, 4");
+  expect(spreadRows(await ui.drawn())).toContain(" WAITING  on 3, 4");
   await ui.press({ key: "b" });
   await ui.press({ key: "task-3" });
   expect(spreadRows(await ui.drawn())).toContain(" OPEN ");
-  expect(spreadRows(await ui.drawn()).filter((row) => /BLOCKED|blocked by/.test(row))).toEqual([]);
+  expect(spreadRows(await ui.drawn()).filter((row) => /WAITING|waiting on/.test(row))).toEqual([]);
   await ui.press({ key: "b" });
   await ui.press({ key: "task-2" });
   expect(spreadRows(await ui.drawn())).toContain(" OPEN ");

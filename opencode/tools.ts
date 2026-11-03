@@ -3,6 +3,7 @@ import type { Info, ToolContext } from "@opencode/plugin/promise/tool";
 import { createHash } from "node:crypto";
 import { appendFileSync, lstatSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
+import { taskCounts } from "../src/core/checkboxes.ts";
 import { EVIDENCE_TYPES } from "../src/core/evidence.ts";
 import { NOTEPAD_SECTIONS, toPlanName } from "../src/core/notepad.ts";
 import { BOULDER, LEDGER } from "../src/core/omca-paths.ts";
@@ -12,6 +13,7 @@ import type { Tool } from "../servers/omca.ts";
 import type { ToolContext as SharedContext } from "../servers/progress.ts";
 import { argReader, isoTimestamp } from "../servers/tools/args.ts";
 import { tools as astTools } from "../servers/tools/ast.ts";
+import { workingTreeStamp } from "../servers/tree-stamp.ts";
 import { appendEvidence, COMMAND_MAX_CHARS, SNIPPET_MAX_CHARS, tools as evidenceTools, VERIFIED_BY_MAX_CHARS } from "../servers/tools/evidence.ts";
 import { tools as filesystemTools } from "../servers/tools/filesystem.ts";
 import { appendNotepad, compactNotepad, formatNotepadList, type NotepadListing, tools as notepadTools } from "../servers/tools/notepad.ts";
@@ -95,9 +97,10 @@ async function evidenceLog(args: Record<string, unknown>, scope: RequestScope, c
   const initializeState = await scope.authorizeStateWrite();
   await scope.current();
   const recordID = createHash("sha256").update(JSON.stringify([context.sessionID, context.messageID, context.id])).digest("hex");
+  const tree = await workingTreeStamp(scope.root);
   const total = await appendEvidence(scope.root, {
     type, command, exit_code: exitCode, output_snippet: output, timestamp: isoTimestamp(),
-    ...(verifiedBy && { verified_by: verifiedBy }), ...(planSha && { plan_sha256: planSha }),
+    ...(verifiedBy && { verified_by: verifiedBy }), ...(planSha && { plan_sha256: planSha }), ...(tree !== null && { tree }),
     origin: "attested", record_id: recordID,
     provenance: { adapter: "opencode", session_id: context.sessionID, message_id: context.messageID, call_id: context.id },
   }, async () => {
@@ -284,8 +287,8 @@ export async function registerTools(ctx: Plugin.Context, changed: (sessionID: st
         const plan = await authorizedPlan(scope, context);
         if (plan === null) return { content: JSON.stringify({ session_id: context.sessionID, plan: null }, null, 2) };
         const { tasks } = plan;
-        const completed = tasks.filter((task) => task.checked).length;
-        return { content: JSON.stringify({ plan_name: plan.name, plan_path: plan.path, plan_sha256: plan.sha256, total: tasks.length, completed, remaining: tasks.length - completed, next_task_label: tasks.find((task) => !task.checked)?.label ?? null }, null, 2) };
+        const counts = taskCounts(tasks);
+        return { content: JSON.stringify({ plan_name: plan.name, plan_path: plan.path, plan_sha256: plan.sha256, total: counts.total, completed: counts.done, blocked: counts.blocked, remaining: counts.open, next_task_label: tasks.find((task) => task.state === "open")?.label ?? null }, null, 2) };
       },
     });
   }

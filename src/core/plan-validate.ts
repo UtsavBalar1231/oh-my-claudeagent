@@ -7,7 +7,7 @@ const PLAN_HEADING = /^## (?:TODOs|Work Objectives)/m;
 const AGENT_PLAN_NAME = /^[^/]+-agent-[^/]+\.md$/;
 
 /**
- * The deny reason for a Write or Edit that gives a plan file no numbered `- [ ] N.` or `- [x] N.` task, or
+ * The deny reason for a Write or Edit that gives a plan file no numbered `- [ ] N.`, `- [x] N.` or `- [~] N.` task, or
  * undefined. A Write is judged on its `content`, an Edit on its `new_string`.
  */
 export function planWriteDenial(tool: string, input: unknown): string | undefined {

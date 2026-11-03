@@ -134,6 +134,9 @@ function startServer(project: string, env: Record<string, string>) {
   };
 }
 
+// git's fixed hash for a tree with no files, which a fresh repository stamps as.
+const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
 describe("evidence_log", () => {
   test("evidence_log creates file: one entry, exact text and ledger", async () => {
     const root = project();
@@ -144,7 +147,7 @@ describe("evidence_log", () => {
     expect(timestamp).toMatch(ISO_SECONDS);
     expect(timestamp >= before && timestamp <= after).toBe(true);
     expect(read(ledgerFile(root))).toBe(
-      json({ version: 1, entries: [{ type: "test", command: "just test", exit_code: 0, output_snippet: "5 passed", timestamp }] }),
+      json({ version: 1, entries: [{ type: "test", command: "just test", exit_code: 0, output_snippet: "5 passed", timestamp, tree: EMPTY_TREE }] }),
     );
   });
 
@@ -184,14 +187,41 @@ describe("evidence_log", () => {
     await log(root, { verified_by: "" });
     const [given, empty] = entries(root);
     expect(given.verified_by).toBe("executor");
-    expect(Object.keys(empty)).toEqual(["type", "command", "exit_code", "output_snippet", "timestamp"]);
+    expect(Object.keys(empty)).toEqual(["type", "command", "exit_code", "output_snippet", "timestamp", "tree"]);
+  });
+
+  test("evidence_log stamps the working tree itself and ignores a stamp in its arguments", async () => {
+    const root = project();
+    writeFileSync(join(root, "a.txt"), "one\n");
+    await log(root, { tree: "supplied-by-the-model" });
+    writeFileSync(join(root, "a.txt"), "two\n");
+    await log(root);
+    const [first, second] = entries(root);
+    expect(first.tree).toMatch(/^[0-9a-f]{40}$/);
+    expect(second.tree).toMatch(/^[0-9a-f]{40}$/);
+    expect(second.tree).not.toBe(first.tree);
+  });
+
+  test("evidence_log stores the entry without a stamp when git is missing", async () => {
+    const root = project();
+    const { PATH, Path } = process.env;
+    process.env.PATH = join(root, "no-such-dir");
+    process.env.Path = process.env.PATH;
+    try {
+      expect(await log(root)).toBe("Evidence recorded: test (exit 0), 1 total entries");
+    } finally {
+      process.env.PATH = PATH;
+      if (Path === undefined) delete process.env.Path;
+      else process.env.Path = Path;
+    }
+    expect(Object.keys(entries(root)[0])).toEqual(["type", "command", "exit_code", "output_snippet", "timestamp"]);
   });
 
   test("evidence_log with plan_sha256 stores it after verified_by", async () => {
     const root = project();
     await log(root, { evidence_type: "final_verification", verified_by: "orchestrator", plan_sha256: PLAN_SHA });
     const [stored] = entries(root);
-    expect(Object.keys(stored)).toEqual(["type", "command", "exit_code", "output_snippet", "timestamp", "verified_by", "plan_sha256"]);
+    expect(Object.keys(stored)).toEqual(["type", "command", "exit_code", "output_snippet", "timestamp", "verified_by", "plan_sha256", "tree"]);
     expect(stored.plan_sha256).toBe(PLAN_SHA);
   });
 

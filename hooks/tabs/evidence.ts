@@ -10,8 +10,10 @@ import {
   rerunPrompt,
   shownIndices,
   TYPE_WORDS,
+  treeMovedSince,
   verdictOf,
 } from "../../src/core/evidence.ts";
+import { planTasks, taskCounts } from "../../src/core/checkboxes.ts";
 import { BOULDER, LEDGER } from "../../src/core/omca-paths.ts";
 import { sha256Hex } from "../../src/core/sha256.ts";
 import { agentGlyph, clockOf, COLUMN_GAP, dayOf, displayWidth, fitEnd, fitMiddle, oneLine, padEnd, shortType, wrapText } from "../../src/core/ui-kit.ts";
@@ -91,7 +93,8 @@ async function boundPlan(host: Host, root: string): Promise<{ stamp: string; bou
 async function planOf(host: Host, bound: Bound): Promise<Ledger["plan"]> {
   if (bound === null || "error" in bound) return bound;
   try {
-    return { name: bound.name, sha: sha256Hex(await bytesOf(host, bound.path)) };
+    const bytes = await bytesOf(host, bound.path);
+    return { name: bound.name, sha: sha256Hex(bytes), blocked: taskCounts(planTasks(new TextDecoder().decode(bytes))).blocked };
   } catch (error) {
     return { name: bound.name, error: `Could not read the plan file: ${reason(error)}` };
   }
@@ -222,7 +225,12 @@ function verdictLine(view: View, ledger: Ledger): { tone: ChipTone; title: strin
   const verdict = verdictOf(ledger.entries, plan.sha);
   switch (verdict.kind) {
     case "complete":
-      return { tone: "ok", title, groups: [mark("COMPLETE", "ok", "matches the current plan"), at(verdict.entry.at)], when: at(verdict.entry.at) };
+      if (treeMovedSince(ledger.entries, verdict.entry)) {
+        return { tone: "warn", title, groups: [mark("STALE", "warn", "code changed since it passed"), at(verdict.entry.at)], when: at(verdict.entry.at) };
+      }
+      return plan.blocked > 0
+        ? { tone: "warn", title, groups: [mark("CLOSED", "warn", `not complete, ${plan.blocked} blocked`), at(verdict.entry.at)], when: at(verdict.entry.at) }
+        : { tone: "ok", title, groups: [mark("COMPLETE", "ok", "matches the current plan"), at(verdict.entry.at)], when: at(verdict.entry.at) };
     case "stale":
       return { tone: "warn", title, groups: [mark("STALE", "warn", "plan edited since it passed"), at(verdict.entry.at)], when: at(verdict.entry.at) };
     case "missing":

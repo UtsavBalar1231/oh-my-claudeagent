@@ -108,8 +108,8 @@ describe("evidence ledger schema", () => {
     expectMatches(LEDGER, [ledger], { optional: ["version"] });
     const entries = ledger["entries"] as Json[];
     expect(entries).toHaveLength(2);
-    expectMatches(LEDGER.properties?.["entries"]?.items ?? {}, entries);
-    expect(entries.map((entry) => Object.keys(entry).length)).toEqual([5, 7]);
+    expectMatches(LEDGER.properties?.["entries"]?.items ?? {}, entries, { optional: ["tree"] });
+    expect(entries.map((entry) => Object.keys(entry).length)).toEqual([6, 8]);
   });
 
   test("holds the writer's version and entry types", () => {

@@ -43,7 +43,7 @@ describe.skipIf(!opencodeBin || !tmux || process.platform === "win32")("native O
     if (!created.body?.data?.id) throw new Error(created.text)
     fixture.sessionID = created.body.data.id
     const plan = join(ws, "work.md")
-    writeFileSync(plan, "# Work\n\nStatus: FINAL\n\n- [ ] 1. First task\n- [ ] 2. Second task\n")
+    writeFileSync(plan, "# Work\n\nStatus: FINAL\n\n- [ ] 1. First task\n- [ ] 2. Second task\n- [~] 3. Stuck task\n")
     await bindPlan(ws, fixture.sessionID, plan)
     const seeded = await server.api("POST", `/api/session/${fixture.sessionID}/prompt`, ws, { text: "OMCA-TUI-FIXTURE: Reply briefly without tools." })
     if (seeded.status >= 400) throw new Error(seeded.text)
@@ -74,16 +74,23 @@ describe.skipIf(!opencodeBin || !tmux || process.platform === "win32")("native O
       return `Client: ${failures.join("\n") || "No plugin warning logged"}\nServer: ${serverFailures.join("\n") || "No plugin warning logged"}\n${capture()}`
     }
     try {
-      await until("installed package TUI footer loaded", 15_000, async () => capture().includes("OMCA: 0/2"), diagnostics)
+      await until("installed package TUI footer loaded", 15_000, async () => capture().includes("OMCA: 0/3 ⊗1"), diagnostics)
     } catch (error) {
       console.error(diagnostics())
       throw error
     }
     terminal("send-keys", "-t", "omca", "-l", "/omca")
-    terminal("send-keys", "-t", "omca", "Enter")
-    await until("slash completion selected", 5_000, async () => capture().includes("/omca"), capture)
-    terminal("send-keys", "-t", "omca", "Enter")
-    await until("OMCA panel displayed", 20_000, async () => capture().includes("OMCA / Overview"), capture)
+    await until("slash completion listed", 10_000, async () => capture().includes("Open OMCA overview"), capture)
+    // One Enter picks the completion and the next submits it, and a key can land while the popup redraws.
+    let lastEnter = 0
+    await until("OMCA panel displayed", 20_000, async () => {
+      if (capture().includes("OMCA / Overview")) return true
+      if (Date.now() - lastEnter >= 1_000) {
+        terminal("send-keys", "-t", "omca", "Enter")
+        lastEnter = Date.now()
+      }
+      return false
+    }, capture)
     expect(capture()).toContain("Current plan")
     expect(capture()).toContain("First task")
     expect(capture()).not.toContain("SHA256")
@@ -98,7 +105,7 @@ describe.skipIf(!opencodeBin || !tmux || process.platform === "win32")("native O
     await until("panel closed", 5_000, async () => !capture().includes("Read-only server health"), capture)
     const edited = await fixture.server.api("POST", `/api/session/${fixture.sessionID}/prompt`, fixture.ws, { text: "OMCA-SCENARIO:plan-checkbox" })
     expect(edited.status, edited.text).toBeLessThan(400)
-    await until("footer reflects the native edit with the panel closed", 10_000, async () => capture().includes("OMCA: 1/2"), capture)
+    await until("footer reflects the native edit with the panel closed", 10_000, async () => capture().includes("OMCA: 1/3 ⊗1"), capture)
     expect(fixture.server.log()).not.toContain("failed to load plugin")
   }, 90_000)
 })

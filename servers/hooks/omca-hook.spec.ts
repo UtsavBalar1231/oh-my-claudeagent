@@ -115,8 +115,8 @@ describe("omca_hook over stdio", () => {
       hookSpecificOutput: {
         hookEventName: "Stop",
         additionalContext:
-          "[PLAN CONTINUATION] The bound plan 'demo' still has 1 unchecked task (next: First task). Continue with the next task. " +
-          "If its work is already done and reviewed, flip its checkbox. If it cannot proceed without the user, record why with notepad_write and " +
+          "[PLAN CONTINUATION] The bound plan 'demo' still has 1 open task (next: First task). Continue with the next task. " +
+          "If its work is already done and reviewed, flip its checkbox. If it cannot proceed, close it as blocked (`- [~] N.` with a `- Blocked:` line), or record why with notepad_write and " +
           "ask the user; a turn that asks the user is not blocked.",
       },
     });

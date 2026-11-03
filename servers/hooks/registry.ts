@@ -6,7 +6,6 @@ import { handle as failureRecovery } from "./failure-recovery.ts";
 import { handle as guidance } from "./guidance.ts";
 import { handle as keywordDetector } from "./keyword-detector.ts";
 import { handle as modNotice } from "./mod-notice.ts";
-import { handle as permissionCoach } from "./permission-coach.ts";
 import { handle as planFormatWarn } from "./plan-format-warn.ts";
 import { handle as planWriteGuard } from "./plan-write-guard.ts";
 import { type Session, touchSession } from "./session-state.ts";
@@ -54,7 +53,6 @@ export const REGISTRY: Readonly<Record<string, readonly (readonly [string, Handl
     ["slash-mode-detector", slashModeDetector],
   ],
   SubagentStart: [["subagent-context", subagentContext]],
-  PermissionDenied: [["permission-coach", permissionCoach]],
   TaskCompleted: [["task-completed", taskCompleted]],
   Stop: [["stop-gates", stopGates]],
   SessionStart: [["session-start", sessionStart]],

@@ -29,6 +29,21 @@ Failures that vanish or change shape when you add logging, slow the system down,
 
 For any of these, the discriminating test is a controlled toggle of timing: force the interleaving you suspect (via a lock, a delay, or a smaller thread/worker count) and see whether the bug becomes reliable instead of intermittent. A hypothesis about ordering that only produces the bug 1% of the time under investigation and 100% of the time when you force the ordering is confirmed; one that stays equally rare either way is not.
 
+## Flaky tests
+
+Before theorizing, run the failing test alone in a loop, then the whole suite in a loop with the runner's random order on and its seed recorded. Then read the pattern:
+
+| What you see | What it points to | Next check |
+|---|---|---|
+| Fails alone too | The test or the code it covers: real clock, randomness, an unawaited promise | Freeze the clock and the seed, then look for the missing await |
+| Passes alone, fails in the suite, and one seed repeats it | State left behind by an earlier test | With that seed, cut the preceding tests in half until one remains |
+| A different test each run, and green on a quiet machine | Contention between tests or runs: a shared port, temp path, database or environment variable | Give each test its own and rerun with full parallelism |
+| Fails only under load or in CI | A timing assumption or a timeout set too tight | Slow the machine down; replace each sleep with a wait on the real condition |
+| Fails on one platform | Paths, case sensitivity, line endings, locale | Compare the values at the assertion on both |
+| Fails at a certain time or date | Time zone, month boundary, an expired fixture | Pin the date and step it across the boundary |
+
+A rerun that passes shows the failure is intermittent, and says nothing about whether it is harmless. Fix the cause. Retries added to the runner hide the next real failure the same way.
+
 ## Environment-difference checklists
 
 For "works locally, fails elsewhere" failures, the fastest path is a direct diff of everything that could differ between the two environments, rather than re-reading the code from scratch:

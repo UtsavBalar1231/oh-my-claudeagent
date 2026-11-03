@@ -4,7 +4,7 @@ import { Plugin } from "@opencode/plugin/tui";
 import type { JSX } from "@opentui/solid";
 import { Show, createEffect, createSignal, onCleanup } from "solid-js";
 import { Omca, type Snapshot } from "./rpc.ts";
-import { commandTab, snapshotReader, targetKey, type ReadState, type Tab, type Target } from "./tui-model.ts";
+import { commandTab, footerStatus, snapshotReader, targetKey, type ReadState, type Tab, type Target } from "./tui-model.ts";
 import { OmcaPanel } from "./tui-panel.tsx";
 
 export default Plugin.define({
@@ -105,7 +105,7 @@ export default Plugin.define({
         if (current.phase === "error") return "OMCA: offline";
         const value = current.value;
         if (!value?.plan) return "OMCA";
-        return `OMCA: ${value.plan.tasks.filter((task) => task.checked).length}/${value.plan.tasks.length}`;
+        return footerStatus(value.plan.tasks);
       };
       return <text fg={ctx.theme.text.muted} wrapMode="none">{status()}</text>;
     }

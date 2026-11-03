@@ -145,6 +145,9 @@ project, and `~/.claude/plans` otherwise. Ask for a project-local plan and it la
 `.omca/plans` under the project instead. To make that the default, set
 `plansDirectory: ".omca/plans"`. `.omca/` is gitignored, so those plans stay out of commits.
 Each task is a numbered checkbox, `- [ ] 1. ...`; progress tracking counts only numbered boxes.
+A finished task reads `- [x] 1. ...`, and a task that cannot be finished reads `- [~] 1. ...` with
+a `- Blocked: <one line>` sub-bullet. A blocked task is closed for what runs next and never counts
+as done.
 
 To research before planning, ask `/oh-my-claudeagent:plan` to help you understand or research
 the problem. Planner interviews you and returns its findings with no plan file.
@@ -160,16 +163,17 @@ where the plan allows it), records a verification for each task, and checks its 
 task is done. Add `--worktree <path>` to have every task work in an existing git worktree.
 
 To resume after an interruption, run `/oh-my-claudeagent:start-work` again. It continues from the
-first unchecked task. `/loop` cannot run `start-work` for you, because only you can start it.
+first open task. `/loop` cannot run `start-work` for you, because only you can start it.
 
 ### What keeps a session honest
 
 After any build, test, lint or typecheck command, the agent logs the result with
 `evidence_log`. These checks run when a session tries to stop:
 
-- **Plan continuation**: the bound plan still has unchecked tasks.
-- **Final verification**: every task is checked, but no `final_verification` entry with exit
-  code 0 matches the plan's current content.
+- **Plan continuation**: the bound plan still has open tasks.
+- **Final verification**: no task is open, but no `final_verification` entry with exit code 0
+  matches the plan's current content. With blocked tasks the message names them, and an exit 0
+  verdict must name each one and its gap.
 - **Drift guard**: the last reply claims the work is done while a changed line still holds a
   stub marker.
 
@@ -357,8 +361,9 @@ the plans directory, `.omca/plans` under the project and every registered plan w
 exists, and a name resolves against both directories and the registry. A plan with
 numbered tasks opens on its board: a header with a DRAFT chip while the plan is a draft, a
 progress bar, the proof counts, the next task and the running agents, then the tasks grouped by
-milestone. Each task row shows whether it is done, in progress, open or blocked, its proof mark,
-the agent working on it, and the tasks that block it. A task whose only unfinished dependency is
+milestone. Each task row shows whether it is done, in progress, open, waiting on another task or
+blocked (its box reads `[~]`), its proof mark,
+the agent working on it, and the tasks it waits on. A task whose only unfinished dependency is
 the task just before it is next in line, so it reads as open. A plan without numbered tasks opens
 on its sections.
 
@@ -415,7 +420,8 @@ keeps the glyph. The task's detail shows the state as a chip.
 ### The proof ledger
 
 The Evidence tab opens on a verdict for the bound plan: **COMPLETE** when a passing final
-verification matches the plan file as it is now, **STALE** when the plan changed after it passed,
+verification matches the plan file as it is now, **CLOSED** when it matches but tasks remain
+blocked, **STALE** when the plan changed after it passed or a later run saw different code,
 and **MISSING** when none passed. Under it a checklist says whether the newest build, test, lint
 and manual run each passed.
 

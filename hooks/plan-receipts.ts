@@ -28,7 +28,7 @@ async function isOff(host: Host): Promise<boolean> {
   return isHookDisabled(await host.env.OMCA_DISABLED_HOOKS(), "plan-receipts");
 }
 
-const doneOf = (cards: readonly Card[]): ReadonlySet<number> => new Set(cards.filter((card) => card.done).map((card) => card.n));
+const doneOf = (cards: readonly Card[]): ReadonlySet<number> => new Set(cards.filter((card) => card.state === "done").map((card) => card.n));
 
 async function readPlan(host: Host): Promise<{ name: string; path: string; bytes: Uint8Array; cards: readonly Card[] } | undefined> {
   const bound = await boundPlanOf(host);
@@ -46,7 +46,7 @@ async function readingOf(host: Host, within: object): Promise<Reading | undefine
   const tasks = new Map(cards.map((card, index) => [card.n, taskReceipt(card, verdicts[index])]));
   const isComplete = allTasksDone({ done: doneOf(cards).size, total: cards.length });
   if (!isComplete) return { name, path, cards, tasks, complete: null };
-  const counts = proofSummary(cards.map((card, index) => shownProof(card.done, verdicts[index]?.proof)));
+  const counts = proofSummary(cards.map((card, index) => shownProof(card.state === "done", verdicts[index]?.proof)));
   const ledger = await ledgerDocument(host, `${await host.session.root()}/${LEDGER}`);
   return { name, path, cards, tasks, complete: { ...counts, isVerified: hasPassingFinalVerification(ledger, sha256Hex(bytes)) } };
 }
@@ -91,7 +91,7 @@ export const planReceipts: Features = {
       const done = doneOf(reading.cards);
       const before = seen?.path === reading.path ? seen.done : done;
       seen = { path: reading.path, done };
-      const finished = reading.cards.filter((card) => card.done && !before.has(card.n));
+      const finished = reading.cards.filter((card) => card.state === "done" && !before.has(card.n));
       const at = await host.clock.now();
       const added: Receipt | undefined =
         finished.length === 0

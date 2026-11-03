@@ -252,7 +252,7 @@ describe("glyphs", () => {
     for (const [name, glyph] of Object.entries(ascii)) {
       expect({ name, ascii: /^[\x20-\x7e]+$/.test(glyph) }).toEqual({ name, ascii: true });
     }
-    for (const name of ["pointer", "check", "cross", "warn", "info", "running", "pending", "up", "down", "dot", "rule", "vrule", "progress", "blocked", "agent"] as const) {
+    for (const name of ["pointer", "check", "cross", "warn", "info", "running", "pending", "up", "down", "dot", "rule", "vrule", "progress", "blocked", "waiting", "agent"] as const) {
       expect({ name, unicode: displayWidth(unicode[name]), ascii: ascii[name].length }).toEqual({ name, unicode: 1, ascii: 1 });
     }
     expect(fitEnd("hello world", 6, ascii.ellipsis)).toBe("hel...");
@@ -261,8 +261,8 @@ describe("glyphs", () => {
   test("the Nerd set overrides the status and agent glyphs with one-cell Nerd Font icons and keeps the rest", () => {
     const nerd = glyphs("nerd");
     const unicode = glyphs("unicode");
-    const icons = ["check", "cross", "warn", "info", "pending", "running", "progress", "blocked", "agent"] as const;
-    expect(icons.map((name) => nerd[name].codePointAt(0)?.toString(16))).toEqual(["f058", "f057", "f06a", "f05a", "f10c", "f111", "f042", "f056", "f007"]);
+    const icons = ["check", "cross", "warn", "info", "pending", "running", "progress", "waiting", "blocked", "agent"] as const;
+    expect(icons.map((name) => nerd[name].codePointAt(0)?.toString(16))).toEqual(["f058", "f057", "f06a", "f05a", "f10c", "f111", "f042", "f056", "f05e", "f007"]);
     for (const name of icons) expect(displayWidth(nerd[name])).toBe(1);
     for (const name of ["pointer", "up", "down", "dot", "rule", "vrule", "ellipsis", "mask"] as const) expect(nerd[name]).toBe(unicode[name]);
     expect([nerd.tier, unicode.tier, glyphs("ascii").tier]).toEqual(["nerd", "unicode", "ascii"]);

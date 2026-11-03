@@ -5,9 +5,10 @@ import type { PanelInput } from "@opencode/plugin/tui/context";
 import type { JSX } from "@opentui/solid";
 import { For, Show, createMemo, type Accessor } from "solid-js";
 import { parseEntries } from "../src/core/notepad.ts";
+import { taskCounts } from "../src/core/checkboxes.ts";
 import { fitEnd } from "../src/core/ui-kit.ts";
 import type { Snapshot } from "./rpc.ts";
-import { plain, tabs, type ReadState, type Tab } from "./tui-model.ts";
+import { nextRunnable, noRunnableNote, plain, tabs, waitingOn, type ReadState, type Tab } from "./tui-model.ts";
 
 type Plan = NonNullable<Snapshot["plan"]>;
 type Run = Snapshot["evidence"]["entries"][number];
@@ -39,9 +40,9 @@ export function OmcaPanel(props: Props): JSX.Element {
   const activeWorkers = () => workers().filter((session) => ctx.data.session.status(session.id) === "running").length;
   const runs = () => value()?.evidence.entries.toReversed() ?? [];
   const errors = () => value()?.health.filter((item) => item.state === "error") ?? [];
-  const completed = (plan: Plan) => plan.tasks.filter((task) => task.checked).length;
-  const waiting = (task: Plan["tasks"][number], plan: Plan) => task.dependencies.filter((number) => !plan.tasks.find((item) => item.number === number)?.checked);
-  const nextTask = (plan: Plan) => plan.tasks.find((task) => !task.checked && waiting(task, plan).length === 0) ?? plan.tasks.find((task) => !task.checked);
+  const waiting = (task: Plan["tasks"][number], plan: Plan) => waitingOn(task, plan.tasks);
+  const markColor = (task: Plan["tasks"][number]) => task.state === "done" ? theme().text.feedback.success.base : task.state === "blocked" ? theme().text.feedback.warning.base : theme().text.muted;
+  const mark = (task: Plan["tasks"][number], plan: Plan) => task.state === "done" ? "✓ " : task.state === "blocked" ? "⊗ " : waiting(task, plan).length ? "· " : "○ ";
 
   function navigate(sessionID: string) {
     if (ctx.ui.tabs.enabled()) ctx.ui.tabs.focus(sessionID);
@@ -111,13 +112,15 @@ export function OmcaPanel(props: Props): JSX.Element {
   }
 
   function Progress(progress: { plan: Plan }): JSX.Element {
-    const total = () => progress.plan.tasks.length;
-    const done = () => completed(progress.plan);
+    const counts = () => taskCounts(progress.plan.tasks);
+    const total = () => counts().total;
+    const done = () => counts().done;
     const cells = () => width() < 26 ? 0 : Math.min(32, width() - 22);
     const filled = () => total() === 0 ? 0 : Math.round(done() / total() * cells());
     return <text fg={theme().text.muted}>
       <span style={{ fg: theme().text.action.primary.base }}>{"━".repeat(filled())}</span>{"─".repeat(cells() - filled())}
       <span style={{ fg: theme().text.base }}>{`  ${done()}/${total()}`}</span>{" checked"}
+      <Show when={counts().blocked > 0}><span style={{ fg: theme().text.feedback.warning.base }}>{` · ${counts().blocked} blocked`}</span></Show>
     </text>;
   }
 
@@ -179,8 +182,8 @@ export function OmcaPanel(props: Props): JSX.Element {
             <Show when={data().plan} fallback={<Empty title="No plan bound" message="Use /omca-plan to plan work, then /omca-start-work with the saved plan when you are ready. Opening this panel never starts execution." />}>
               {(plan: Accessor<Plan>) => <Section title="Current plan">
                 <PlanSummary plan={plan()} />
-                <Show when={nextTask(plan())} fallback={<text fg={theme().text.muted}>All task boxes are checked. Review acceptance criteria and verification before finishing.</text>}>{(task: Accessor<Plan["tasks"][number]>) => <box flexDirection="column" gap={1} border={["left"]} borderColor={theme().border.base} paddingLeft={1} flexShrink={0}>
-                  <text fg={theme().text.muted}>{waiting(task(), plan()).length ? "Waiting on dependencies" : "Next task"}</text>
+                <Show when={nextRunnable(plan().tasks)} fallback={<text fg={theme().text.muted} wrapMode="word">{noRunnableNote(plan().tasks)}</text>}>{(task: Accessor<Plan["tasks"][number]>) => <box flexDirection="column" gap={1} border={["left"]} borderColor={theme().border.base} paddingLeft={1} flexShrink={0}>
+                  <text fg={theme().text.muted}>Next task</text>
                   <text fg={theme().text.base} wrapMode="word">{plain(`${task().number}. ${task().label}`)}</text>
                 </box>}</Show>
               </Section>}
@@ -196,10 +199,10 @@ export function OmcaPanel(props: Props): JSX.Element {
               <PlanSummary plan={plan()} />
               <Section title="Tasks">
                 <For each={plan().tasks}>{(task) => <box flexDirection="column" flexShrink={0}>
-                  <text fg={task.checked ? theme().text.muted : theme().text.base} wrapMode="word">
-                    <span style={{ fg: task.checked ? theme().text.feedback.success.base : theme().text.muted }}>{task.checked ? "✓ " : waiting(task, plan()).length ? "· " : "○ "}</span>{plain(`${task.number}. ${task.label}`)}
+                  <text fg={task.state === "done" ? theme().text.muted : theme().text.base} wrapMode="word">
+                    <span style={{ fg: markColor(task) }}>{mark(task, plan())}</span>{plain(`${task.number}. ${task.label}`)}
                   </text>
-                  <Show when={!task.checked && waiting(task, plan()).length > 0}><text fg={theme().text.muted}>{`  Waiting on ${waiting(task, plan()).join(", ")}`}</text></Show>
+                  <Show when={task.state === "open" && waiting(task, plan()).length > 0}><text fg={theme().text.muted}>{`  Waiting on ${waiting(task, plan()).join(", ")}`}</text></Show>
                 </box>}</For>
               </Section>
               <text fg={theme().text.muted}>Checkbox progress is not verified completion.</text>

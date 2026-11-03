@@ -8,7 +8,7 @@ const g = glyphs("unicode");
 const task = (n: number, overrides: Partial<TaskReceipt> = {}): TaskReceipt => ({ n, title: `Port module ${n}`, proof: "proven", command: "just test", ...overrides });
 const receipt = (overrides: Partial<Receipt> = {}): Receipt => ({ id: "receipt-1", plan: "widget", path: "/p", total: 14, tasks: [task(7)], complete: null, ...overrides });
 const text = (pieces: readonly { text: string }[]): string => pieces.map((piece) => piece.text).join("");
-const run = (exitCode: number, command = "just test") => ({ type: "test" as const, command, exitCode, at: 2, snippet: "", verifiedBy: null, planSha: "" });
+const run = (exitCode: number, command = "just test") => ({ type: "test" as const, command, exitCode, at: 2, snippet: "", verifiedBy: null, planSha: "", tree: "" });
 const verdict = (proof: Verdict["proof"], since: Verdict["since"] = []): Verdict => ({ proof, changedAt: 1, since, lastPass: undefined });
 
 describe("receipt ids", () => {

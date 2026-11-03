@@ -1,9 +1,9 @@
-import { clean, FENCE, TASK_LINE } from "./checkboxes.ts";
+import { clean, FENCE, TASK_BOX, TASK_LINE, type TaskState, taskState } from "./checkboxes.ts";
 import { baseName, configDir, type Env, expandTilde, homeDir, isAbsolutePath, isInside, joinPath, normalizePath, type Platform, samePath, toPosix } from "./path.ts";
 
-export type Task = { n: number; done: boolean };
+export type Task = { n: number; state: TaskState };
 export type Page = { title: string; level: number; body: string; task?: Task };
-export type Plan = { title: string; pages: Page[]; done: number; total: number };
+export type Plan = { title: string; pages: Page[]; done: number; blocked: number; total: number };
 export type PlanFile = { name: string; path: string; mtimeMs: number };
 
 // The Markdown element refuses text over 10,000 characters; the margin keeps a split line safe.
@@ -20,6 +20,7 @@ export function parsePlan(source: string): Plan {
   let current: Page = { title: "Overview", level: 2, body: "" };
   let inFence = false;
   let done = 0;
+  let blocked = 0;
   let total = 0;
 
   // Markdown draws a `- [ ] 3. text` line as a stray `-` and a nested list, so a task page
@@ -46,10 +47,11 @@ export function parsePlan(source: string): Plan {
     }
     const task = inFence ? null : TASK_LINE.exec(line);
     if (task) {
-      const isDone = task[1] === "x";
+      const state = taskState(task[1]);
       total += 1;
-      if (isDone) done += 1;
-      flush({ title: `${task[2]}. ${task[3] ?? ""}`, level: 4, body: "", task: { n: Number(task[2]), done: isDone } });
+      if (state === "done") done += 1;
+      if (state === "blocked") blocked += 1;
+      flush({ title: `${task[2]}. ${task[3] ?? ""}`, level: 4, body: "", task: { n: Number(task[2]), state } });
       continue;
     }
     buffer.push(line);
@@ -58,7 +60,7 @@ export function parsePlan(source: string): Plan {
 
   const [overview, ...rest] = pages;
   const kept = overview !== undefined && overview.body !== "" ? pages : rest;
-  return { title: title === "" ? "Plan" : title, pages: kept, done, total };
+  return { title: title === "" ? "Plan" : title, pages: kept, done, blocked, total };
 }
 
 export function isReadable(page: Page): boolean {
@@ -87,14 +89,14 @@ export function chunks(body: string, limit = MARKDOWN_CHUNK): string[] {
 }
 
 export function firstOpenTask(plan: { readonly pages: readonly Page[] }): number {
-  const open = plan.pages.findIndex((page) => page.task !== undefined && !page.task.done);
+  const open = plan.pages.findIndex((page) => page.task?.state === "open");
   return open >= 0 ? open : (readable(plan)[0] ?? 0);
 }
 
 export type Field = { name: string; text: string };
 export type Card = {
   n: number;
-  done: boolean;
+  state: TaskState;
   title: string;
   group: number;
   page: number;
@@ -190,7 +192,7 @@ export function boardOf(plan: { readonly pages: readonly Page[] }): Board {
     const fields = fieldsOf(section.body);
     cards.push({
       n: task.n,
-      done: task.done,
+      state: task.state,
       title: section.title.replace(/^\d+\.\s*/, ""),
       group: groups.length - 1,
       page,
@@ -214,7 +216,7 @@ export function taskReference(prompt: string, description = ""): number | undefi
 
 /** The task as the plan writes it, for the clipboard. */
 export function taskMarkdown(card: Card, body: string): string {
-  const head = `- [${card.done ? "x" : " "}] ${card.n}. ${card.title}`;
+  const head = `- [${TASK_BOX[card.state]}] ${card.n}. ${card.title}`;
   return body === "" ? head : `${head}\n${body.split("\n").map((line) => (line === "" ? "" : `  ${line}`)).join("\n")}`;
 }
 

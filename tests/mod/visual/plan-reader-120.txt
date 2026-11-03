@@ -3,7 +3,7 @@
 ▝▜██████▀  Opus 5.5 · API Usage Billing                           │──────────────────────────────────────────────────
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd              │╭────────────────────────────────────────────────╮
                                                                   ││ Rebuild the billing export on the shared ledg… │
-                                                                  ││ ██████████▋██▍██████████ 4/9 ·  1 blocked     │
+                                                                  ││ ██████████▋██▍██████████ 4/9 ·  1 waiting     │
 ❯ Start task 5 with the executor                                  ││  3 proven ·  1 unproven ·  0 failed         │
                                                                   ││ next 5 Reconcile totals against the invoice t… │
   Ran 1 shell command                                             ││  executor on 5                                │
@@ -19,7 +19,7 @@
                                                                   │── Milestone 2: Rollout ── ████████ 0/4 ──────────
                                                                   │ 6 Run the new export beside the old one for a w…
                                                                   │ 7 Document the export columns for finance
-                                                                  │ 8 Switch the nightly job to th…  blocked by 6, 7
+                                                                  │ 8 Switch the nightly job to th…  waiting on 6, 7
                                                                   │ 9 Announce the change to finance
                                                                   │
                                                                   │k: Run check  s: Start here  c: Copy  m: More

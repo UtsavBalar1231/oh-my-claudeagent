@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { commandTab, plain, snapshotReader, targetKey, type ReadState, type Target } from "./tui-model.ts";
+import { commandTab, footerStatus, nextRunnable, noRunnableNote, plain, snapshotReader, targetKey, waitingOn, type ReadState, type Target } from "./tui-model.ts";
 
 const target = (sessionID: string, directory = "/checkout"): Target => ({ sessionID, location: { directory } });
 const tick = async () => { await Promise.resolve(); await Promise.resolve(); };
@@ -22,6 +22,48 @@ test("/omca accepts only inspection tabs, with or without the slash prefix", () 
   expect(commandTab("notepad")).toBe("Notepad");
   expect(commandTab("start-work")).toBeUndefined();
   expect(commandTab("plan /other/file")).toBeUndefined();
+});
+
+describe("blocked tasks in the plan view", () => {
+  const row = (number: number, state: "open" | "done" | "blocked", dependencies: number[] = []) => ({ number, state, dependencies });
+
+  test("a blocked dependency keeps its dependent waiting", () => {
+    const tasks = [row(1, "blocked"), row(2, "open", [1])];
+    expect(waitingOn(row(2, "open", [1]), tasks)).toEqual([1]);
+  });
+
+  test("a done dependency leaves nothing to wait on", () => {
+    const tasks = [row(1, "done"), row(2, "open", [1])];
+    expect(waitingOn(row(2, "open", [1]), tasks)).toEqual([]);
+  });
+
+  test("the next task passes over a blocked task and its dependent", () => {
+    expect(nextRunnable([row(1, "blocked"), row(2, "open", [1]), row(3, "open")])?.number).toBe(3);
+  });
+
+  test("a chain of dependents of a blocked task has no next task", () => {
+    expect(nextRunnable([row(1, "blocked"), row(2, "open", [1]), row(3, "open", [2])])).toBeUndefined();
+  });
+
+  test("a plan with only dependents of a blocked task says none can run", () => {
+    expect(noRunnableNote([row(1, "blocked"), row(2, "open", [1])])).toBe("No task can run: every open task waits on a blocked task.");
+  });
+
+  test("a plan with no open task and a blocked one says it is not complete", () => {
+    expect(noRunnableNote([row(1, "done"), row(2, "blocked")])).toBe("No task is open and 1 blocked, so this plan is not complete. Changing [~] back to [ ] reopens a task.");
+  });
+
+  test("a plan with every task done keeps the checked note", () => {
+    expect(noRunnableNote([row(1, "done")])).toBe("All task boxes are checked. Review acceptance criteria and verification before finishing.");
+  });
+
+  test("the footer adds the blocked count", () => {
+    expect(footerStatus([row(1, "done"), row(2, "blocked"), row(3, "open")])).toBe("OMCA: 1/3 ⊗1");
+  });
+
+  test("the footer stays plain with none blocked", () => {
+    expect(footerStatus([row(1, "done"), row(2, "open")])).toBe("OMCA: 1/2");
+  });
 });
 
 test("server strings cannot inject terminal control bytes", () => {

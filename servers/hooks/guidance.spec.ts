@@ -150,6 +150,26 @@ describe("bound plan context", () => {
     );
   });
 
+  test("a plan with blocked tasks and none open names them and does not call every task checked", () => {
+    const root = project();
+    const id = crypto.randomUUID();
+    const plan = join(root, "hello-plan.md");
+    writeFileSync(plan, "- [x] 1. Say hello\n- [~] 2. Say goodbye\n- [~] 3. Wave\n");
+    bind(root, id, plan);
+    expect(run(prompt("UserPromptExpansion", id), root)).toEqual(
+      injected("UserPromptExpansion", id, planLines(plan, "None open: every numbered task is checked or blocked (blocked: 2, 3).")),
+    );
+  });
+
+  test("the next open task skips a blocked one", () => {
+    const root = project();
+    const id = crypto.randomUUID();
+    const plan = join(root, "hello-plan.md");
+    writeFileSync(plan, "- [~] 1. Say hello\n- [ ] 2. Say goodbye\n");
+    bind(root, id, plan);
+    expect(run(prompt("UserPromptExpansion", id), root)).toEqual(injected("UserPromptExpansion", id, planLines(plan, "Say goodbye")));
+  });
+
   test("an unparseable registry is logged and the template still goes out", () => {
     const root = project();
     const id = crypto.randomUUID();

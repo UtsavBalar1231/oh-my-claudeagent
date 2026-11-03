@@ -1,4 +1,4 @@
-import { planTasks } from "./checkboxes.ts";
+import { planTasks, taskCounts } from "./checkboxes.ts";
 import type { NextAction, NextActionKind } from "./next-actions.ts";
 import { arrange, displayWidth, fitEnd, type Glyphs, glyphs, type GlyphTier, oneLine, type Ranked, share, usableColumns } from "./ui-kit.ts";
 import { bar, piecesWidth, type ThemeKey } from "./visual.ts";
@@ -7,7 +7,7 @@ export type NextTask = { n: number; title: string };
 export type Proof = { proven: number; unproven: number; failed: number };
 
 export type Band = {
-  plan: { name: string; path: string; done: number; total: number; next: NextTask | null } | null;
+  plan: { name: string; path: string; done: number; blocked: number; total: number; next: NextTask | null } | null;
   verification: { command: string; at: number; isLogged: boolean } | null;
   proof?: Proof;
   error: string | null;
@@ -51,12 +51,14 @@ const FULL_TITLE_MIN = MIN_FLEXIBLE + 1;
 const PRIORITY = { progress: 1, unlogged: 2, next: 3, proof: 4, logged: 5 } as const;
 
 /** The numbered tasks' tally and the first open one, read the way every plan reader reads them. */
-export function planTally(text: string): { done: number; total: number; next: NextTask | null } {
+export function planTally(text: string): { done: number; blocked: number; total: number; next: NextTask | null } {
   const tasks = planTasks(text);
-  const open = tasks.find((task) => !task.checked);
+  const open = tasks.find((task) => task.state === "open");
+  const { done, blocked, total } = taskCounts(tasks);
   return {
-    done: tasks.filter((task) => task.checked).length,
-    total: tasks.length,
+    done,
+    blocked,
+    total,
     next: open === undefined ? null : { n: open.number, title: oneLine(open.label) },
   };
 }
@@ -92,8 +94,9 @@ function statusSegments(band: Band, words: Words, g: Glyphs, ascii: boolean, tit
   const { plan, verification, proof } = band;
   const segments: Segment[] = [];
   if (plan !== null) {
-    const cells = bar({ done: plan.done, todo: plan.total - plan.done }, BAR_CELLS, ascii).map((piece): Span => ({ ...piece, tone: "plain" }));
-    segments.push(segment(PRIORITY.progress, [...cells, { text: ` ${plan.done}/${plan.total}`, tone: "muted" }]));
+    const cells = bar({ done: plan.done, blocked: plan.blocked, todo: plan.total - plan.done - plan.blocked }, BAR_CELLS, ascii).map((piece): Span => ({ ...piece, tone: "plain" }));
+    const blocked: Part[] = plan.blocked === 0 ? [] : [{ text: ` ${g.dot} `, tone: "muted" }, { text: `${plan.blocked} blocked`, tone: "warn" }];
+    segments.push(segment(PRIORITY.progress, [...cells, { text: ` ${plan.done}/${plan.total}`, tone: "muted" }, ...blocked]));
     if (plan.next !== null) {
       segments.push(
         segment(PRIORITY.next, [

@@ -12,7 +12,7 @@ const SPAWN = {
   fork: false,
 } as const;
 
-const plan = (done: number, total: number) => ({ name: "p", path: "/p.md", done, total, next: null });
+const plan = (done: number, total: number, blocked = 0) => ({ name: "p", path: "/p.md", done, blocked, total, next: null });
 
 function world(on: On, bandPlan: ReturnType<typeof plan> | null): void {
   const atoms = new Map<string, { value: unknown; version: number }>([
@@ -61,6 +61,16 @@ test("the main spinner's suffix names the next task, and running agents add noth
 test("with no plan the engine's suffix stands, agents or not", async ($, on) => {
   world(on, null);
   await $.agent.spawn(spawn("1"));
+  expect(await drawn($, "terminal", "main")).toBe("Sauteing…");
+});
+
+test("a blocked task counts as passed in the suffix", async ($, on) => {
+  world(on, plan(6, 14, 2));
+  expect(await drawn($, "terminal", "main")).toBe("Sauteing… · task 9/14");
+});
+
+test("a plan with no open task and a blocked one leaves the suffix alone", async ($, on) => {
+  world(on, plan(13, 14, 1));
   expect(await drawn($, "terminal", "main")).toBe("Sauteing…");
 });
 

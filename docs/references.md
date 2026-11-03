@@ -177,7 +177,6 @@ rejects `model.fork`, `http.fetch` and `store.*`.
 | `PreToolUse` | `Write`, `Edit` | `plan-write-guard` (a plan file needs numbered checkboxes), `comment-gate` |
 | `PostToolUse` | `Read`, `Write`, `Edit`, `Agent`, `SubagentHandback`, `Bash`, `PowerShell` | `verification-recorder`, `context-injector`, `plan-format-warn`, `empty-task-response` |
 | `PostToolUseFailure` | any | `failure-recovery`: advice on a failed call, and a stuck-loop note from a tool's third failure in five minutes |
-| `PermissionDenied` | any | `permission-coach`: lets Bash retry after an auto-mode classifier denial |
 | `Stop` | any | `stop-gates`: plan continuation, final verification, drift guard, in that order |
 | `TaskCompleted` | any | `task-completed`: refuses to complete a task while a recent verification is unlogged |
 
@@ -189,6 +188,7 @@ Events OMCA leaves unregistered, and why:
 
 | Event | Why |
 | --- | --- |
+| `PermissionDenied` | Its only lever is telling the model it may retry. Claude Code ignores that on a denial with no classifier verdict and already says whether to retry, so a handler could only invite a retry of a call the classifier judged unsafe |
 | `PermissionRequest` | OMCA never allows, and this event also fires where a call that cannot prompt would be denied, so a handler could only turn a denial into a run. The guard's deny is on `tool.check` |
 | `PreCompact`, `PostCompact` | The mod's `session.compact` feature shapes the summary, and the `SessionStart` compact handler restores context where the model can still see it |
 | `SessionEnd` | Its 1.5 s budget can kill a write halfway. The server unbinds its sessions when it exits |
@@ -217,7 +217,6 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | `empty-task-response` | The note on an empty or transitional agent report; concise findings need no fixed headers |
 | `failure-recovery` | Advice after a failed tool call |
 | `subagent-context` | The context each subagent gets at start |
-| `permission-coach` | The retry after an auto-mode denial |
 | `keyword-detector`, `slash-mode-detector` | Mode detection from prompts and slash commands. `keyword-detector` also takes the underline off trigger phrases in the prompt |
 | `mod-notice` | The message that the mod is not running |
 | `session-start` | Context restore after compaction and `/clear` |

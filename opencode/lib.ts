@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { REFUSAL_RULE } from "../src/core/refusal.ts";
 
 const AGENT_STEMS = ["explorer", "architect", "researcher", "viewer", "analyzer", "reviewer", "build-fixer", "executor"];
 const SKILL_DIRS = ["debugging", "remove-ai-slops", "refactor", "git-master", "handoff"];
@@ -115,7 +116,7 @@ export function generate(root: string): Prompts {
         id,
         tier: str(data, "model", src.relPath),
         description,
-        system: text,
+        system: `${text}\n${REFUSAL_RULE}\n`,
         ...(color ? { color } : {}),
         deny,
       });

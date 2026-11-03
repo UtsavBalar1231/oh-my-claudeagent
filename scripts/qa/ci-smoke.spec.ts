@@ -5,6 +5,7 @@ import { guardDenies, hookCalls, pluginDenies } from "./lib.ts";
 const REASON = "Destructive rm -rf blocked: the target is the filesystem root, home, the working directory, or a directory directly under root or home. Name a deeper path explicitly.";
 const BASH_DENY = `2026-10-02T21:20:39.671Z [DEBUG] tool.check Bash toolu_mock_1: unevaluated -> deny by plugin oh-my-claudeagent: ${REASON}`;
 const POWERSHELL_DENY = `2026-10-02T21:20:39.700Z [DEBUG] tool.check PowerShell toolu_mock_2: unevaluated -> deny by plugin oh-my-claudeagent: ${REASON}`;
+const LISTED_DENY = `2026-11-03T09:13:07.569Z [DEBUG] tool.check Bash toolu_mock_1: unevaluated -> deny by plugins oh-my-claudeagent, cc-plugin-privacy: ${REASON}`;
 const HOOK_LINE = "2026-10-02T21:20:39.628Z [DEBUG] Hooks: mcp_tool calling plugin:oh-my-claudeagent:omca/omca_hook with 6 arg(s)";
 const NOISE = "2026-10-02T21:20:39.671Z [DEBUG] hooks module oh-my-claudeagent@inline tool.check settled in 1.2ms (worker hop, next() included)";
 
@@ -32,6 +33,11 @@ describe("guardDenies", () => {
     const other = BASH_DENY.replace("Destructive rm -rf blocked", "Destructive git command blocked");
     expect(guardDenies(other, "Bash")).toEqual([]);
   });
+
+  test("matches a deny line that lists other plugins beside this one", () => {
+    expect(guardDenies(LISTED_DENY, "Bash")).toEqual([LISTED_DENY]);
+    expect(guardDenies(LISTED_DENY.replace("plugins oh-my-claudeagent, cc-plugin-privacy", "plugins cc-plugin-privacy, oh-my-claudeagent"), "Bash")).toHaveLength(1);
+  });
 });
 
 describe("pluginDenies", () => {
@@ -39,6 +45,12 @@ describe("pluginDenies", () => {
     const other = BASH_DENY.replace("Destructive rm -rf blocked", "Destructive git command blocked");
     expect(pluginDenies([BASH_DENY, POWERSHELL_DENY, other, NOISE].join("\n"))).toHaveLength(3);
     expect(pluginDenies(NOISE)).toEqual([]);
+  });
+
+  test("counts a deny that lists other plugins and ignores one this plugin is not named in", () => {
+    expect(pluginDenies(LISTED_DENY)).toEqual([LISTED_DENY]);
+    expect(pluginDenies(LISTED_DENY.replace("oh-my-claudeagent, ", ""))).toEqual([]);
+    expect(pluginDenies(BASH_DENY.replace("oh-my-claudeagent", "oh-my-claudeagent-extra"))).toEqual([]);
   });
 });
 

@@ -15,7 +15,7 @@ Review the supplied work plan for safe execution within its chosen direction. Do
 
 Require one unambiguous plan path, not an inline summary. Re-read it on each review. Verify referenced files and relevant symbols; a file the plan intends to create need not exist. Walk through the riskiest tasks against the actual sources and identify their likely failure modes.
 
-Check purpose, scope, dependencies, unresolved product decisions, executable acceptance checks, failure behavior, security, and rollback for irreversible operations. Reject real execution blockers, not style preferences or a different architecture you prefer. Missing trust-boundary validation and unrequested scope are blockers. Accept gaps an implementer can safely resolve from cited sources or local conventions. Apply greater scrutiny to irreversible operations.
+Check purpose, scope, dependencies, unresolved product decisions, executable acceptance checks, failure behavior, security, and rollback for irreversible operations. Reject real execution blockers, not style preferences or a different architecture you prefer. Missing trust-boundary validation, unrequested scope, and a requirement no task's acceptance check proves are blockers. Accept gaps an implementer can safely resolve from cited sources or local conventions. Apply greater scrutiny to irreversible operations.
 
 ## Final verdict format
 

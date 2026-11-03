@@ -9,6 +9,10 @@ const denial = (path: string) =>
   `[PLAN-CHECKBOX-VERIFY] Plan file ${path} has no numbered task checkbox. Write each task as \`- [ ] 1. <task>\`; plan progress and the Stop hooks count only numbered checkboxes.`;
 
 describe("Write judges the content", () => {
+  test("a plan whose only numbered tasks are blocked still has tasks", () => {
+    expect(planWriteDenial("Write", { file_path: PLAN, content: "## TODOs\n\n- [~] 1. Stuck\n" })).toBeUndefined();
+  });
+
   test("a plan with a TODOs heading and numbered checkboxes is allowed", () => {
     const content = "# My Plan\n\n## TODOs\n\n- [ ] 1. Do the first thing\n- [ ] 2. Do the second thing\n";
     expect(planWriteDenial("Write", { file_path: PLAN, content })).toBeUndefined();
