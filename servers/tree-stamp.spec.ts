@@ -87,6 +87,22 @@ describe("workingTreeStamp", () => {
     expect(objectFiles(dir)).toEqual(objects);
   });
 
+  test.skipIf(Bun.which("git-lfs") === null)("a dirty LFS file stamps as a real add would and leaves the LFS store untouched", async () => {
+    const dir = repo();
+    git(dir, "lfs", "install", "--local");
+    git(dir, "lfs", "track", "*.bin");
+    writeFileSync(join(dir, "asset.bin"), "one\n");
+    git(dir, "add", "-A");
+    git(dir, "commit", "-qm", "asset");
+    const lfsStore = (): string[] => readdirSync(join(dir, ".git", "lfs"), { recursive: true, encoding: "utf8" }).toSorted();
+    const before = lfsStore();
+    writeFileSync(join(dir, "asset.bin"), "two\n");
+    const stamp = await workingTreeStamp(dir);
+    expect(lfsStore()).toEqual(before);
+    git(dir, "add", "-A");
+    expect(stamp).toBe(git(dir, "write-tree"));
+  });
+
   test("a linked worktree stamps its own files", async () => {
     const dir = repo();
     const linked = join(scratchDir(), "linked");
