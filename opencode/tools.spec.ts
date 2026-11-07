@@ -217,6 +217,20 @@ test("a task needs a run", async () => {
   expect(existsSync(join(f.a, ".omca"))).toBe(false);
 });
 
+test.each([["the string true", "true"], ["false", false], ["null", null]])("task_create refuses metadata.final set to %s and creates nothing", async (_name, final) => {
+  const f = await fake();
+  await expect(coordinate(f, "task_create", newTask("work", { final }))).rejects.toThrow("metadata.final must be the boolean true");
+  expect(existsSync(join(f.a, ".omca"))).toBe(false);
+});
+
+test.each([["a string", "oops"], ["an array", ["run"]], ["null", null]])("task_create and task_update refuse metadata that is %s", async (_name, metadata) => {
+  const f = await fake();
+  await expect(coordinate(f, "task_create", { subject: "x", description: "y", metadata })).rejects.toThrow("metadata must be an object");
+  await coordinate(f, "task_create", newTask("work"));
+  await expect(coordinate(f, "task_update", { taskId: "1", status: "completed", metadata })).rejects.toThrow("metadata must be an object");
+  expect(JSON.parse(readFileSync(taskFile(f.a, "1"), "utf8")).status).toBe("pending");
+});
+
 test("the final task refuses completion until a passing verdict names it, end to end through the tools", async () => {
   const f = await fake();
   await coordinate(f, "task_create", newTask("work"));

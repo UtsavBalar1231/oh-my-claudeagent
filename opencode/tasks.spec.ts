@@ -5,7 +5,8 @@ import { join } from "node:path";
 import { formatTasks, parseTask } from "../src/core/native-tasks.ts";
 import { LEDGER } from "../src/core/omca-paths.ts";
 import { readTaskFiles, TASK_FILE_BYTE_LIMIT, TASK_LIMIT, TASKS_DIR } from "./state.ts";
-import { createTask, updateTask, type TaskChange } from "./tasks.ts";
+import { withLock } from "../servers/io.ts";
+import { createTask, tasksLock, updateTask, type TaskChange } from "./tasks.ts";
 
 let root: string;
 const savedSwitch = process.env.OMCA_DISABLED_HOOKS;
@@ -50,6 +51,24 @@ describe("creating a task", () => {
     expect(list().map(({ subject }) => subject).sort()).toEqual(["a", "b", "c", "d"]);
   });
 
+  test.each([
+    ["a create", (gate: () => Promise<void>) => createTask(root, { subject: "x", description: "y", activeForm: "", metadata: { run: "work" } }, gate)],
+    ["an update", (gate: () => Promise<void>) => updateTask(root, { taskId: "1", status: "in_progress" }, gate)],
+  ])("%s waits for the lock before it checks or writes", async (_name, write) => {
+    await create();
+    let release!: () => void;
+    const held = withLock(tasksLock(root), () => new Promise<void>((resolve) => { release = resolve; }));
+    let reached = false;
+    const pending = write(async () => { reached = true; });
+    await Bun.sleep(30);
+    expect(reached).toBe(false);
+    expect(list()).toHaveLength(1);
+    release();
+    await held;
+    await pending;
+    expect(reached).toBe(true);
+  });
+
   test("a task over the size limit is refused and leaves nothing behind", async () => {
     await expect(createTask(root, { subject: "big", description: "x".repeat(TASK_FILE_BYTE_LIMIT), activeForm: "", metadata: { run: "work" } }, ready)).rejects.toThrow(`${TASK_FILE_BYTE_LIMIT}-byte limit`);
     expect(list()).toEqual([]);
@@ -72,6 +91,18 @@ describe("creating a task", () => {
     expect(readFileSync(join(root, TASKS_DIR, ".highwatermark"), "utf8")).toBe("3");
     await update({ taskId: "3", status: "deleted" });
     expect((await create("after delete", { run: "next" })).id).toBe("4");
+  });
+
+  test.each([
+    ["is over the size limit", { description: "x".repeat(TASK_FILE_BYTE_LIMIT), metadata: { run: "next" } }, `${TASK_FILE_BYTE_LIMIT}-byte limit`],
+    ["would be hidden by metadata._internal", { description: "y", metadata: { run: "next", _internal: true } }, "no longer read as a task"],
+  ])("a create that %s leaves a finished run and the id counter as they were", async (_name, fields, message) => {
+    await create("old");
+    await update({ taskId: "1", status: "completed" });
+    await expect(createTask(root, { subject: "new", activeForm: "", ...fields }, ready)).rejects.toThrow(message);
+    expect(list().map(({ id }) => id)).toEqual(["1"]);
+    expect(readFileSync(join(root, TASKS_DIR, ".highwatermark"), "utf8")).toBe("1");
+    expect(readdirSync(join(root, TASKS_DIR)).sort()).toEqual([".highwatermark", "1.json"]);
   });
 
   test("a run with an open task is kept when another task joins", async () => {
@@ -181,6 +212,42 @@ describe("the final task", () => {
     expect(list().find(({ id }) => id === "2")?.isFinal).toBe(true);
   });
 
+  test.each([
+    ["marking it internal", { _internal: true }],
+    ["marking it internal with a truthy string", { _internal: "yes" }],
+  ])("%s would hide it from every reader, so nothing is written", async (_name, metadata) => {
+    await finalRun();
+    const before = stored("2");
+    await expect(update({ taskId: "2", metadata })).rejects.toThrow("no longer read as a task");
+    expect(stored("2")).toEqual(before);
+    expect(list().find(({ id }) => id === "2")?.isFinal).toBe(true);
+  });
+
+  test("an ordinary task cannot be hidden either", async () => {
+    await finalRun();
+    const before = stored("1");
+    await expect(update({ taskId: "1", metadata: { _internal: true } })).rejects.toThrow("no longer read as a task");
+    expect(stored("1")).toEqual(before);
+  });
+
+  test("cannot be moved out of its run", async () => {
+    await finalRun();
+    const before = stored("2");
+    await expect(update({ taskId: "2", metadata: { run: null } })).rejects.toThrow("it stays final");
+    await expect(update({ taskId: "2", metadata: { run: "elsewhere" } })).rejects.toThrow("it stays final");
+    expect(stored("2")).toEqual(before);
+  });
+
+  test("completing it checks the verdict whatever else the change carries", async () => {
+    await finalRun();
+    ledger({ task_id: "2", exit_code: 1 });
+    const before = stored("2");
+    await expect(update({ taskId: "2", status: "completed", metadata: { blocked: "gap" } })).rejects.toThrow("no passing final verification names it");
+    expect(stored("2")).toEqual(before);
+    ledger({ task_id: "2", exit_code: 1 }, { task_id: "2" });
+    expect(await update({ taskId: "2", status: "completed", metadata: { blocked: "gap" } })).toMatchObject({ status: "completed", blockedReason: "gap" });
+  });
+
   test("an unparsable ledger refuses rather than passes", async () => {
     await finalRun();
     mkdirSync(join(root, ".omca", "evidence"), { recursive: true });
@@ -198,6 +265,7 @@ describe("the final task", () => {
     await finalRun();
     process.env.OMCA_DISABLED_HOOKS = "final-verification";
     expect(await update({ taskId: "2", status: "completed" })).toMatchObject({ status: "completed" });
+    expect(await update({ taskId: "2", metadata: { final: null } })).toMatchObject({ isFinal: false });
   });
 });
 

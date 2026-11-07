@@ -81,7 +81,7 @@ function bestEffort(what: string, cleanup: () => void): void {
   }
 }
 
-const removeFile = (path: string): void => retryBusy(() => rmSync(path, { force: true }));
+export const removeFile = (path: string): void => retryBusy(() => rmSync(path, { force: true }));
 
 const NOT_A_REPOSITORY = /not a git repository/i;
 

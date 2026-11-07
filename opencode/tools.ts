@@ -309,8 +309,10 @@ export async function registerTools(ctx: Plugin.Context, changed: (sessionID: st
       options: { namespace: "omca", codemode: false },
       execute: async (input, context) => {
         const a = argReader(isRecord(input) ? input : {}, "omca_task_create");
-        const metadata = isRecord(input) && isRecord(input.metadata) ? input.metadata : {};
+        const metadata = isRecord(input) ? input.metadata : undefined;
+        if (!isRecord(metadata)) throw new Error("omca_task_create: metadata must be an object");
         if (typeof metadata.run !== "string" || metadata.run.trim() === "") throw new Error("omca_task_create: metadata.run must name the run");
+        if (Object.hasOwn(metadata, "final") && metadata.final !== true) throw new Error("omca_task_create: metadata.final must be the boolean true when present");
         const fields = { subject: a.string("subject"), description: a.string("description"), activeForm: a.string("activeForm", ""), metadata };
         const { scope, beforeWrite } = await writableScope(input, context, "task_create");
         const task = await createTask(scope.root, fields, beforeWrite);
@@ -340,6 +342,7 @@ export async function registerTools(ctx: Plugin.Context, changed: (sessionID: st
         const args = isRecord(input) ? input : {};
         const a = argReader(args, "omca_task_update");
         const taskId = a.string("taskId");
+        if (args.metadata !== undefined && !isRecord(args.metadata)) throw new Error("omca_task_update: metadata must be an object");
         const addBlocks = a.strings("addBlocks");
         const addBlockedBy = a.strings("addBlockedBy");
         const change = {
