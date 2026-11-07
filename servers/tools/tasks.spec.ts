@@ -16,7 +16,7 @@ beforeEach(() => {
   config = realpathSync(mkdtempSync(join(tmpdir(), "omca-task-config-")));
   expect(Bun.spawnSync(["git", "init", "-q", project], { env: process.env }).exitCode).toBe(0);
   process.env.CLAUDE_CONFIG_DIR = config;
-  delete process.env.CLAUDE_CODE_TASK_LIST_ID;
+  process.env.CLAUDE_CODE_TASK_LIST_ID = taskListIdFor(project);
   delete process.env.CLAUDE_CODE_SESSION_ID;
 });
 

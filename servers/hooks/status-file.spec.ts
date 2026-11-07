@@ -154,14 +154,26 @@ describe("the native task list", () => {
     return readTasks(root, sessionId).map(({ id }) => id);
   };
 
-  test("with no marker yet, as on the first prompt after /clear, it reads the list the mod is about to name", () => {
+  test("with no marker yet, at prompt time, as on the first prompt after /clear, it reads the list the mod is about to name", () => {
     const root = project();
     listFile(taskListIdFor(root), "1.json", stored("1"));
     delete process.env.CLAUDE_CODE_TASK_LIST_ID;
-    expect(readTasks(root, crypto.randomUUID()).map(({ id }) => id)).toEqual(["1"]);
+    const atPrompt = { atPrompt: true };
+    expect(readTasks(root, crypto.randomUUID(), atPrompt).map(({ id }) => id)).toEqual(["1"]);
     process.env.CLAUDE_CODE_TASK_LIST_ID = "named-at-launch";
     listFile("named-at-launch", "2.json", stored("2"));
-    expect(readTasks(root, crypto.randomUUID()).map(({ id }) => id)).toEqual(["2"]);
+    expect(readTasks(root, crypto.randomUUID(), atPrompt).map(({ id }) => id)).toEqual(["2"]);
+  });
+
+  test("with no marker on any other event, it reads the session's own list unless the environment names one", () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    listFile(taskListIdFor(root), "1.json", stored("1"));
+    listFile(sessionId, "2.json", stored("2"));
+    delete process.env.CLAUDE_CODE_TASK_LIST_ID;
+    expect(readTasks(root, sessionId).map(({ id }) => id)).toEqual(["2"]);
+    process.env.CLAUDE_CODE_TASK_LIST_ID = taskListIdFor(root);
+    expect(readTasks(root, sessionId).map(({ id }) => id)).toEqual(["1"]);
   });
 
   test("a missing directory is an empty list", () => {

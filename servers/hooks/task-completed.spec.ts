@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, spyOn, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { dispatch, type Output } from "./registry.ts";
@@ -369,6 +369,31 @@ describe("a run's final task", () => {
     const { root, sessionId } = listed();
     writeLedger(ledgerPath(root), "{not json", NOW_S);
     expect(await closing(root, sessionId)).toEqual(INVALID_BLOCK);
+  });
+
+  test("a ledger path that cannot be read blocks as invalid, never opens the gate", async () => {
+    const { root, sessionId } = listed();
+    mkdirSync(ledgerPath(root), { recursive: true });
+    expect(await closing(root, sessionId)).toEqual(INVALID_BLOCK);
+  });
+
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("a ledger with no read permission blocks as invalid", async () => {
+    const { root, sessionId } = listed();
+    withEntries(root, verdict());
+    chmodSync(ledgerPath(root), 0o000);
+    expect(await closing(root, sessionId)).toEqual(INVALID_BLOCK);
+  });
+
+  test("with no marker, the final task on the session's own list still blocks", async () => {
+    const listId = process.env.CLAUDE_CODE_TASK_LIST_ID;
+    delete process.env.CLAUDE_CODE_TASK_LIST_ID;
+    try {
+      const { sessionId } = listed();
+      const root = project();
+      expect(await closing(root, sessionId)).toEqual(FINAL_BLOCK);
+    } finally {
+      if (listId !== undefined) process.env.CLAUDE_CODE_TASK_LIST_ID = listId;
+    }
   });
 
   test("a malformed entry beside the verdict does not hide it", async () => {

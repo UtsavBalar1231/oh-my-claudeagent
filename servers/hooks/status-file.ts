@@ -66,15 +66,18 @@ export function latestMarker(root: string, sessionId: string, after = -Infinity)
 /** When the mod last marked the session, or undefined when it never has. */
 export const markerWrittenAt = (root: string, sessionId: string, after = -Infinity): number | undefined => writtenAtOf(latestMarker(root, sessionId, after));
 
-function taskListIdOf(root: string, sessionId: string): string {
+export type ReadOptions = { atPrompt?: boolean };
+
+function taskListIdOf(root: string, sessionId: string, atPrompt: boolean): string {
   let marker: Record<string, unknown> | undefined;
   try {
     marker = latestMarker(root, sessionId);
   } catch (error) {
     console.error(`omca: could not read the mod marker of session ${sessionId}:`, error);
   }
-  // No marker yet is a session's first prompt, as after `/clear`: the mod is about to name the list as it always does.
-  if (marker === undefined) return process.env.CLAUDE_CODE_TASK_LIST_ID || taskListIdFor(root);
+  // With no marker, a prompt is a session's first, as after `/clear`: the mod is about to name the list as it always does.
+  // On any later event the mod is not running, and the client keeps tasks under the session id.
+  if (marker === undefined) return process.env.CLAUDE_CODE_TASK_LIST_ID || (atPrompt ? taskListIdFor(root) : sessionId);
   const named = marker.task_list;
   return typeof named === "string" && named !== "" ? named : sessionId;
 }
@@ -83,10 +86,10 @@ function taskListIdOf(root: string, sessionId: string): string {
  * The session's native task list in id order, as `runState` needs it. The client deletes a finished
  * list on its own, so a missing directory is an empty list and a file gone or torn mid-read is skipped.
  */
-export function readTasks(root: string, sessionId: string): NativeTask[] {
+export function readTasks(root: string, sessionId: string, { atPrompt = false }: ReadOptions = {}): NativeTask[] {
   const config = configDir(process.env);
   if (config === undefined) return [];
-  const dir = taskListDir(toPlatform(process.platform), config, taskListIdOf(root, sessionId));
+  const dir = taskListDir(toPlatform(process.platform), config, taskListIdOf(root, sessionId, atPrompt));
   let names: string[];
   try {
     names = readdirSync(dir);
@@ -109,8 +112,8 @@ export function readTasks(root: string, sessionId: string): NativeTask[] {
 export type OpenRun = { name: string; open: readonly NativeTask[]; next: NativeTask };
 
 /** The session's run while it has tasks still to do. Every open task may wait on another, and `next` then names the first. */
-export function readOpenRun(root: string, sessionId: string): OpenRun | undefined {
-  const run = runState(readTasks(root, sessionId));
+export function readOpenRun(root: string, sessionId: string, options: ReadOptions = {}): OpenRun | undefined {
+  const run = runState(readTasks(root, sessionId, options));
   const next = run?.next ?? run?.open[0];
   return run === undefined || next === undefined ? undefined : { name: run.name, open: run.open, next };
 }

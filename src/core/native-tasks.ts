@@ -100,10 +100,16 @@ export const isOpen = (task: NativeTask): boolean => task.status !== "completed"
 export const openBlockers = (task: NativeTask, tasks: readonly NativeTask[]): string[] =>
   task.blockedBy.filter((id) => tasks.some((other) => other.id === id && isOpen(other)));
 
-/** The list a checkout's sessions share, so tasks outlive `/clear` and a new session. */
+const rootSpelling = (root: string): string => {
+  const slashed = root.replaceAll("\\", "/").replace(/^[a-z]:/, (drive) => drive.toUpperCase());
+  const trimmed = slashed.replace(/\/+$/, "");
+  return trimmed === "" ? "/" : /^[A-Z]:$/.test(trimmed) ? `${trimmed}/` : trimmed;
+};
+
+/** The list a checkout's sessions share, so tasks outlive `/clear` and a new session. Both spellings of a Windows root name one list. */
 export function taskListIdFor(root: string): string {
   const name = root.split(/[\\/]/).filter((part) => part !== "").at(-1) ?? "project";
-  return `omca-${name.replace(/[^a-zA-Z0-9_-]/g, "-")}-${sha256Hex(new TextEncoder().encode(root)).slice(0, 8)}`;
+  return `omca-${name.replace(/[^a-zA-Z0-9_-]/g, "-")}-${sha256Hex(new TextEncoder().encode(rootSpelling(root))).slice(0, 8)}`;
 }
 
 /** A run's tasks still to do, and the first of them nothing holds back. */

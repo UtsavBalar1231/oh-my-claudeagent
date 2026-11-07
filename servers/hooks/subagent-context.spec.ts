@@ -57,8 +57,8 @@ const COMMON =
   "\n[OMCA TOOLS] `evidence_log` and `notepad_write` are always available. Load any other omca tool with ToolSearch first, by its full name: `select:mcp__plugin_oh-my-claudeagent_omca__ast_search`. A guessed prefix finds nothing.";
 const EDITING_GUIDANCE =
   "\n[EDITS] Change an existing file with Edit, which touches only the lines that need it, rather than rewriting it with Write or a shell heredoc. Read the file before you Edit it, so old_string matches its current content." +
-  "\n[VERIFICATION] Record each build, test, or lint run with evidence_log, including its real exit code. Write .omca/evidence/verification-evidence.json only through that tool, never by hand or through a shell redirect: the TaskCompleted gate reads it as the audit trail." +
-  "\n[FINAL TASK] A run's final task completes only after a passing final_verification entry names it: evidence_log(..., task_id=<its id>).";
+  "\n[VERIFICATION] Record each build, test, or lint run with evidence_log, including its real exit code. Write .omca/evidence/verification-evidence.json only through that tool, never by hand or through a shell redirect: the TaskCompleted gate reads it as the audit trail.";
+const FINAL_TASK = "\n[FINAL TASK] A run's final task completes only after a passing final_verification entry names it: evidence_log(..., task_id=<its id>).";
 const ORCHESTRATING_GUIDANCE =
   "\n[ANTI-DUPLICATION] Do not duplicate an active delegate's search. Continue non-overlapping work, then independently check its delivered findings. A background launch acknowledgement is not a result; wait for the actual task notification. Do not poll the child's transcript or send holding messages." +
   "\n[TEAM CONTRACT] OMCA agents are thin wrappers over Claude-native subagents and agent teams. Use subagents when workers only need to report back. Use native agent teams when workers need the shared task list or direct teammate messaging.";
@@ -89,7 +89,12 @@ describe("the injected context, exactly", () => {
   });
 
   test("orchestrator gets the planner protocol, editing and orchestrating guidance, and no worker contract", async () => {
-    expect(await contextOf(omca("orchestrator"))).toBe(PLANNER_PROTOCOL + COMMON + EDITING_GUIDANCE + ORCHESTRATING_GUIDANCE);
+    expect(await contextOf(omca("orchestrator"))).toBe(PLANNER_PROTOCOL + COMMON + EDITING_GUIDANCE + FINAL_TASK + ORCHESTRATING_GUIDANCE);
+  });
+
+  test("only the orchestrator is told how to log the final verdict", async () => {
+    expect(await contextOf(omca("orchestrator"))).toContain("[FINAL TASK]");
+    for (const type of ["executor", "build-fixer", "planner", "explorer"]) expect(await contextOf(omca(type))).not.toContain("[FINAL TASK]");
   });
 
   test("planner gets only the orchestrating guidance", async () => {

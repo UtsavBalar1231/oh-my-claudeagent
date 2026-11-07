@@ -25,7 +25,7 @@ const contextFor = (sessionId: string, run: OpenRun | undefined): string =>
 
 /** The template, then the session's id and its open run when there is a session to name. */
 export function guidanceContext(root: string, sessionId: string | undefined): string {
-  return sessionId === undefined ? guidanceTemplate() : contextFor(sessionId, readOpenRun(root, sessionId));
+  return sessionId === undefined ? guidanceTemplate() : contextFor(sessionId, readOpenRun(root, sessionId, { atPrompt: true }));
 }
 
 // `claude --resume` keeps the session id but starts a new server, whose first hook call for the
@@ -45,7 +45,7 @@ export const handle: Handler = (payload, { root, now, session }) => {
   const isTitleDue = payload.event === "UserPromptSubmit" && !session.isTitleChecked;
   if (isTitleDue) session.isTitleChecked = true;
   const wantsTitle = isTitleDue && !payload.session_title;
-  const run = !isHeldBack || wantsTitle ? readOpenRun(root, session.id) : undefined;
+  const run = !isHeldBack || wantsTitle ? readOpenRun(root, session.id, { atPrompt: true }) : undefined;
   const context = isHeldBack ? undefined : contextFor(session.id, run);
   const title = wantsTitle && run !== undefined ? `OMCA: ${run.name}` : undefined;
   if (context === undefined && title === undefined) return;

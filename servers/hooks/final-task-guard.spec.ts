@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { dispatch } from "./registry.ts";
@@ -65,9 +65,36 @@ describe("the final task", () => {
     expect(isDenied(await update({ taskId: "2", status: "deleted" }))).toBe(true);
   });
 
-  test("final-verification in OMCA_DISABLED_HOOKS turns the guard off", async () => {
-    process.env.OMCA_DISABLED_HOOKS = "final-verification";
+  test.each(["final-verification", "final-task-guard"])("%s in OMCA_DISABLED_HOOKS turns the guard off", async (name) => {
+    process.env.OMCA_DISABLED_HOOKS = name;
     expect(isDenied(await update({ taskId: "2", status: "deleted" }))).toBe(false);
+  });
+
+  test("a numeric taskId names the task", async () => {
+    expect(isDenied(await update({ taskId: 2, status: "deleted" }))).toBe(true);
+    expect(isDenied(await update({ taskId: 1, status: "deleted" }))).toBe(false);
+  });
+
+  test("a ledger the reader refuses is reported as invalid, not as a missing verdict", async () => {
+    mkdirSync(join(root, ".omca", "evidence"), { recursive: true });
+    writeFileSync(ledgerPath(root), "{not json");
+    const output = JSON.stringify(await update({ taskId: "2", status: "deleted" }));
+    expect(output).toContain('"permissionDecision":"deny"');
+    expect(output).toContain("invalid schema");
+    expect(output).not.toContain("no final verification names it");
+  });
+
+  test("a ledger that cannot be read denies", async () => {
+    mkdirSync(ledgerPath(root), { recursive: true });
+    const output = JSON.stringify(await update({ taskId: "2", status: "deleted" }));
+    expect(output).toContain('"permissionDecision":"deny"');
+    expect(output).toContain("invalid schema");
+  });
+
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("a ledger with no read permission denies", async () => {
+    logVerdict(1, "2");
+    chmodSync(ledgerPath(root), 0o000);
+    expect(isDenied(await update({ taskId: "2", status: "deleted" }))).toBe(true);
   });
 });
 
@@ -82,6 +109,17 @@ test.each([[null], [false]])("unmarking the final task with final: %j is denied,
   expect(isDenied(await update({ taskId: "2", metadata: { final: value } }))).toBe(true);
   logVerdict(0, "2");
   expect(isDenied(await update({ taskId: "2", metadata: { final: value } }))).toBe(true);
+});
+
+test.each([[true], [1], ["yes"]])("hiding the final task with _internal: %j is denied, with or without a verdict", async (value) => {
+  expect(isDenied(await update({ taskId: "2", metadata: { _internal: value } }))).toBe(true);
+  logVerdict(0, "2");
+  expect(isDenied(await update({ taskId: "2", metadata: { _internal: value } }))).toBe(true);
+});
+
+test("_internal on another task, and a falsy _internal on the final task, pass", async () => {
+  expect(isDenied(await update({ taskId: "1", metadata: { _internal: true } }))).toBe(false);
+  expect(isDenied(await update({ taskId: "2", metadata: { _internal: false } }))).toBe(false);
 });
 
 test("final: true on the final task, and any final key on another task, pass", async () => {

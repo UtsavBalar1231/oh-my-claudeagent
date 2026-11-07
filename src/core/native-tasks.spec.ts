@@ -146,4 +146,11 @@ describe("a run", () => {
     expect(taskListIdFor("/other/my app")).not.toBe(taskListIdFor("/work/my app"));
     expect(taskListIdFor("C:\\work\\app")).toMatch(/^omca-app-/);
   });
+
+  test("taskListIdFor names one list for every spelling of a root, and keeps a POSIX root's id", () => {
+    expect(taskListIdFor("C:\\a\\b")).toBe(taskListIdFor("c:/a/b/"));
+    expect(taskListIdFor("C:\\a\\b")).not.toBe(taskListIdFor("D:\\a\\b"));
+    expect(taskListIdFor("/")).toBe("omca-project-8a5edab2");
+    expect(taskListIdFor("/home/utsav/dev/softs/oh-my-claudeagent")).toBe("omca-oh-my-claudeagent-d9bdbc9d");
+  });
 });

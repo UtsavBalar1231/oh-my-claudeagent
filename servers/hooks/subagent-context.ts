@@ -18,12 +18,13 @@ export const OMCA_TOOLS =
 const EDITING_GUIDANCE = [
   "[EDITS] Change an existing file with Edit, which touches only the lines that need it, rather than rewriting it with Write or a shell heredoc. Read the file before you Edit it, so old_string matches its current content.",
   "[VERIFICATION] Record each build, test, or lint run with evidence_log, including its real exit code. Write .omca/evidence/verification-evidence.json only through that tool, never by hand or through a shell redirect: the TaskCompleted gate reads it as the audit trail.",
-  "[FINAL TASK] A run's final task completes only after a passing final_verification entry names it: evidence_log(..., task_id=<its id>).",
 ];
 const ORCHESTRATING_GUIDANCE = [
   "[ANTI-DUPLICATION] Do not duplicate an active delegate's search. Continue non-overlapping work, then independently check its delivered findings. A background launch acknowledgement is not a result; wait for the actual task notification. Do not poll the child's transcript or send holding messages.",
   "[TEAM CONTRACT] OMCA agents are thin wrappers over Claude-native subagents and agent teams. Use subagents when workers only need to report back. Use native agent teams when workers need the shared task list or direct teammate messaging.",
 ];
+const FINAL_TASK =
+  "[FINAL TASK] A run's final task completes only after a passing final_verification entry names it: evidence_log(..., task_id=<its id>).";
 const ORCHESTRATING = new Set(["orchestrator", "planner"]);
 const PLANNING = new Set(["planner", "analyzer", "orchestrator"]);
 const EDITING = new Set(["executor", "build-fixer", "orchestrator"]);
@@ -59,6 +60,7 @@ export const handle: Handler = (payload, { root }) => {
     `[OMCA TOOLS] ${OMCA_TOOLS}`,
     ...runLines(root, payload.session_id, EDITING.has(name) || isOrchestrator),
     ...(EDITING.has(name) ? EDITING_GUIDANCE : []),
+    ...(name === "orchestrator" ? [FINAL_TASK] : []),
     ...(isOrchestrator ? ORCHESTRATING_GUIDANCE : [LEAF_WORKER, NEVER_STUB]),
   ].join("\n");
   return { hookSpecificOutput: { hookEventName: "SubagentStart", additionalContext } };

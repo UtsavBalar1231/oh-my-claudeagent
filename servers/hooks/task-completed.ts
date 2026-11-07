@@ -10,7 +10,14 @@ function finalTaskBlock({ task_id: taskId, session_id: sessionId }: Payload, roo
   if (typeof taskId !== "string" || taskId === "" || typeof sessionId !== "string" || isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "final-verification")) return undefined;
   const task = readTasks(root, sessionId).find(({ id }) => id === taskId);
   if (task?.isFinal !== true) return undefined;
-  const ledger = readLedger(readOrNull(ledgerPath(root)) ?? "{}");
+  let text: string | null;
+  try {
+    text = readOrNull(ledgerPath(root));
+  } catch (error) {
+    console.error("omca: could not read the evidence ledger:", error);
+    return { decision: "block", reason: INVALID_LEDGER_REASON };
+  }
+  const ledger = readLedger(text ?? "{}");
   if (ledger.kind === "refused") return { decision: "block", reason: INVALID_LEDGER_REASON };
   if (ledger.entries.some((entry) => provesTask(entry, taskId))) return undefined;
   return {
