@@ -47,7 +47,7 @@ Then choose:
 Before the first delegation:
 
 - Read the plan document. It holds the why, the constraints and the tradeoffs. The tasks hold the work.
-- Read the run's notepad with `notepad_read(plan_name="<run>")`, loading it if needed: `ToolSearch({query: "select:mcp__plugin_oh-my-claudeagent_omca__notepad_read", max_results: 1})`. `plan_name` always holds the run's name. The `issues` section names the tasks closed as blocked, which the list prints with their last status.
+- Read the run's notepad with `notepad_read(plan_name="<run>")`, loading it if needed: `ToolSearch({query: "select:mcp__plugin_oh-my-claudeagent_omca__notepad_read", max_results: 1})`. `plan_name` always holds the run's name. The `issues` section names the tasks closed as blocked, which `TaskList` prints with their last status.
 - Treat an `[in_progress]` task the notepad does not close as interrupted. Check what the working tree already holds for it, then delegate it again with that state in the prompt.
 
 If `--worktree <path>` is given, validate it with `git rev-parse --show-toplevel` inside the path. When valid, record it with `notepad_write(plan_name="<run>", section="decisions", ...)` and make every delegation prompt target that worktree's paths. When invalid, show the setup command `git worktree add <path> <branch>` and stop. A resumed session reads the path back from `decisions`.
@@ -56,7 +56,7 @@ Tell the user which run this is and how many of its tasks are complete.
 
 ## The loop
 
-1. Call `TaskList` and take the run's lowest-id pending tasks with no `[blocked by]`. The final task comes last: a task closed as blocked still prints in its `[blocked by]` and does not hold it back.
+1. A task closed as blocked keeps the status `pending` in `TaskList`, so read the run with OMCA's `task_list`, loading it if needed: `ToolSearch({query: "select:mcp__plugin_oh-my-claudeagent_omca__task_list", max_results: 1})`. It prints `[closed as blocked: <why>]` and `[waiting on #N]`. Take the run's lowest-id tasks that show `[pending]` with no `[closed as blocked]` and no `[waiting on]`. The final task comes last: a task closed as blocked does not hold it back. When `task_list` is missing, take the `issues` section of the notepad as the record of the blocked tasks and skip them.
 2. Run tasks together when they do not depend on each other and their files do not overlap. Otherwise run them one at a time.
 3. Mark each task `in_progress` with `TaskUpdate`, then delegate it to `executor` with the prompt below, one task per delegation. Executors never touch the list: a subagent running in the background has no task tools, and subagents run in the background here.
 4. Review each result and rerun its checks (see Verify after every delegation), and log evidence.
@@ -222,8 +222,8 @@ Every few completed tasks, read the notepad's `issues` section with `notepad_rea
 |--------------|---------------------------------------------------------|------------------------------------------------------|
 | **CONTINUE** | Task passes verification and later tasks are unblocked  | Proceed immediately                                  |
 | **BLOCK**    | A task meets a condition under Blocked tasks            | Close it as blocked, carry on with independent tasks |
-| **ESCALATE** | Several tasks blocked for one root cause                | The run is aimed wrong: stop and report that cause   |
-| **ABORT**    | 3+ consecutive waves with zero net progress             | Stop all work, document state, present to the user   |
+| **ESCALATE** | Several tasks blocked for one root cause                | The run is aimed wrong: stop, report that cause, and ask the user with `AskUserQuestion` how to proceed |
+| **ABORT**    | 3+ consecutive waves with zero net progress             | Stop all work, document state, present to the user, and ask with `AskUserQuestion` how to proceed |
 
 ## Failure handling
 
@@ -252,7 +252,7 @@ TaskUpdate({taskId: "7", metadata: {"blocked": "`bun test src/orders` fails with
 notepad_write(plan_name="<run>", section="issues", content="#7 closed as blocked: <the gap>. Tried: <what was tried>.")
 ```
 
-The list keeps printing that task with its last status, and its id stays in its dependents' `[blocked by]`, so the notepad entry is what a resumed session reads. A task closed as blocked is never done, and work that needs it cannot go ahead. Close each task that depends on it the same way, with `needs task #7`, then continue with the independent tasks. An unattended run therefore reaches the final task and reports what it could not do, rather than stalling on the first gap. The final report names every blocked task, its gap and what would unblock it.
+`TaskList` keeps printing that task with its last status, and its id stays in its dependents' `[blocked by]`. `task_list` marks it `[closed as blocked: <why>]`, and the notepad entry is the record when that tool is missing. A task closed as blocked is never done, and work that needs it cannot go ahead. Close each task that depends on it the same way, with `needs task #7`, then continue with the independent tasks. An unattended run therefore reaches the final task and reports what it could not do, rather than stalling on the first gap. The final report names every blocked task, its gap and what would unblock it.
 
 `TaskUpdate` with `metadata: {"blocked": null}` reopens a task.
 

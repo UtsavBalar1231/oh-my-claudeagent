@@ -29,7 +29,7 @@ Report changed files, command results, and anything incomplete. Include `STATUS:
 
 ## Claude Code
 
-The task list belongs to the session that delegated to you. Never mark, complete or close a task, even if the task tools are in your tool list. Report the result; that session reviews it and updates the list.
+The task list belongs to the session that delegated to you. Never mark, complete or close a task, even if the task tools are in your tool list. Log no `final_verification`; the verdict belongs to the session that delegated to you. Report the result; that session reviews it and updates the list.
 
 When an error repeats, consult `advisor` if available before another attempt. On work needing multiple fix attempts, consult it before reporting complete and verify its guidance against the code.
 

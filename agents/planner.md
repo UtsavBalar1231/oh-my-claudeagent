@@ -311,7 +311,7 @@ Write anything the orchestrator must act on in the description, because the task
 
 Only after the user approves (Phase 3). Load the task tools, which are deferred in the main session: `ToolSearch({query: "select:TaskCreate,TaskUpdate,TaskList,TaskGet", max_results: 4})`.
 
-1. Call `TaskList`. If an open run already has this name, ask the user whether to replace it or pick another name.
+1. `TaskList` shows no run names, so load OMCA's `task_list` with `ToolSearch({query: "select:mcp__plugin_oh-my-claudeagent_omca__task_list", max_results: 1})` and call it. It prints each run's name. If an open run already has this name, ask the user whether to pick another name or abandon the old run. To abandon it, log `evidence_log(evidence_type="final_verification", exit_code=1, task_id="<old final id>", ...)` with the reason, then call `TaskUpdate` with `status: "deleted"` on each of its tasks. Deleting the final task needs that verdict first.
 2. Create the tasks in order, because execution takes the lowest id first:
 
    ```
@@ -446,7 +446,7 @@ On reaching the User Confirmation Gate (below), record the gate state: `notepad_
 1. **User Confirmation Gate**: After the reviewer approves, show the document's path and the proposed task titles, then ask via `AskUserQuestion`: "Plan approved by the reviewer. What would you like to do? (you can also type a custom response to modify the plan or stop here)":
    - **"Approve and create the tasks"**: ExitPlanMode (if active), then create the tasks (see Creating the tasks)
    - **"Run analyzer review"**: invoke the analyzer for gap analysis
-2. **Hand off**: once the tasks exist, tell the user to run `/oh-my-claudeagent:start-work`, which only the user can invoke. Stopping with open tasks continues the session with the next task unless the turn asks the user, so make this handoff a question via `AskUserQuestion`, with the options "I will run start-work" and "Stop here for now". If the session continues with a next task anyway, repeat the instruction and stop: execution belongs to `/oh-my-claudeagent:start-work`.
+2. **Hand off**: once the tasks exist, tell the user to run `/oh-my-claudeagent:start-work`, which only the user can invoke. Stopping with open tasks continues the session with the next task unless the turn asks the user, so make this handoff a question via `AskUserQuestion`, with the options "I will run start-work" and "Stop here for now". If the session continues with a next task anyway, ask again with `AskUserQuestion`: execution belongs to `/oh-my-claudeagent:start-work`.
 
 ### Plan mode exit
 

@@ -19,6 +19,8 @@ After every build, test, or lint run, call `evidence_log` with the real exit cod
 
 ## Claude Code
 
+Log no `final_verification`; the verdict belongs to the session that delegated to you.
+
 When the same error returns after a fix, consult `advisor` if available before another attempt. Test its guidance against the code rather than treating it as proof.
 
 ## Worktree Isolation
