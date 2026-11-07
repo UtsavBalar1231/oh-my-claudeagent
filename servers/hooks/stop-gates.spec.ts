@@ -34,9 +34,11 @@ const drift = (...findings: string[]): Output =>
 
 const roots: string[] = [];
 const configDir = process.env.CLAUDE_CONFIG_DIR;
+const SAVED = ["CLAUDE_CODE_TASK_LIST_ID", "CLAUDE_CODE_ENABLE_TODO_TOOLS"].map((name) => [name, process.env[name]] as const);
 let config: string;
 
 beforeEach(() => {
+  for (const [name] of SAVED) delete process.env[name];
   config = mkdtempSync(join(tmpdir(), "omca-stop-gates-config-"));
   roots.push(config);
   process.env.CLAUDE_CONFIG_DIR = config;
@@ -46,6 +48,10 @@ afterEach(() => {
   delete process.env.OMCA_DISABLED_HOOKS;
   if (configDir === undefined) delete process.env.CLAUDE_CONFIG_DIR;
   else process.env.CLAUDE_CONFIG_DIR = configDir;
+  for (const [name, value] of SAVED) {
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
