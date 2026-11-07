@@ -38,14 +38,14 @@ A task is open when its `status` is not `completed` and it has no `metadata.bloc
 
 | Question | pending or in progress | completed | blocked |
 | --- | --- | --- | --- |
-| The plan-continuation gate counts it as remaining | yes | no | no |
+| The task-continuation gate counts it as remaining | yes | no | no |
 | Candidate for the next task | yes, when nothing holds it back | no | no |
 | Counted as done | no | yes | no |
 | Releases a task that waits on it | no | yes | no |
 
 ### The final task
 
-The last task of a run carries `metadata.final: true`. Marking it completed is refused until the ledger holds a `final_verification` entry with `exit_code` 0 and `task_id` equal to its id. A run is closed when it has a task and none is open. The plan-continuation gate stays silent for a closed run, and the final-verification gate fires until that entry exists.
+The last task of a run carries `metadata.final: true`. Marking it completed is refused until the ledger holds a `final_verification` entry with `exit_code` 0 and `task_id` equal to its id. A run is closed when it has a task and none is open. While the final task is open, the task-continuation gate holds the stop, and the gate stays silent for a closed run.
 
 ### Example
 
@@ -120,7 +120,7 @@ Lengths are counted in characters, not bytes. `evidence_log` rejects an unknown 
 
 One reader parses every ledger. It refuses text that is not JSON, not an object, whose `entries` is present and not a list, or whose `version` is present and not 1. It returns the well-formed entries in file order and skips the rest. An entry is well-formed when `type` is a known type, `command` is a string, `exit_code` is a number and `timestamp` parses as a date. A missing `output_snippet` reads as empty. A skipped entry stays in the file, because the writer preserves every entry it reads.
 
-`evidence_log` throws an error that names the file and writes nothing when the reader refuses the existing ledger. Move the file aside to keep logging. A missing file starts a new ledger. A document with no `entries` key is accepted by the writer, which adds the list, and is treated as corrupt by the Stop gate below.
+`evidence_log` throws an error that names the file and writes nothing when the reader refuses the existing ledger. Move the file aside to keep logging. A missing file starts a new ledger. A document with no `entries` key is accepted by the writer, which adds the list, and counts as holding no entries in the TaskCompleted check below.
 
 ### Rotation
 
@@ -128,9 +128,9 @@ When the server starts, it checks the live ledger. If the file is over 1 MiB or 
 
 ### What the gates accept
 
-- **Stop gate.** A session with a run cannot stop, once no task is open, until the ledger holds a `final_verification` entry with `exit_code` 0 whose `task_id` is the run's final task. The gate treats a missing ledger as no evidence, and a ledger that the reader refuses, or that has no `entries` list, as corrupt. Both hold the stop with a message, within the gate's block budget.
+- **Task continuation gate.** A session that touched a task cannot stop while its run has an open task, the final task included.
 - **Later code changes.** No gate reads `tree`. The Evidence tab shows a passing verdict as stale once a later entry carries a different `tree`, OpenCode's panel does the same, and at Stop a completion claim over a verdict whose `tree` differs from the working directory shows the user a message.
-- **TaskCompleted.** When the session ran a verification command within the last hour, the ledger must have been modified at or after the time that command finished, give or take 2 seconds, and must hold at least one well-formed entry. A malformed entry beside a good one does not block.
+- **TaskCompleted.** Completing a run's final task is refused until the ledger holds the passing `final_verification` entry for it. A missing ledger counts as no evidence, and a ledger the reader refuses blocks with a message. For any task, when the session ran a verification command within the last hour, the ledger must have been modified at or after the time that command finished, give or take 2 seconds, and must hold at least one well-formed entry. A malformed entry beside a good one does not block.
 
 ### Example
 

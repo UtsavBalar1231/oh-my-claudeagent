@@ -76,7 +76,7 @@ done. With the advisor off, they escalate to architect.
 | Skill | Run it with | What it does |
 | --- | --- | --- |
 | plan | `/oh-my-claudeagent:plan <task>` | planner planning, with analyzer and reviewer. It writes the plan document and creates the run's tasks. Only you can start it |
-| start-work | `/oh-my-claudeagent:start-work [--worktree <path>]` | Runs the open tasks of a run in the main session, delegating each task. Only you can start it |
+| start-work | `/oh-my-claudeagent:start-work [run name] [--worktree <path>]` | Runs the open tasks of a run in the main session, delegating each task. The run name picks one of several open runs. Only you can start it |
 | analyzer | `/oh-my-claudeagent:analyzer` | Runs analyzer on a request or plan, in a forked context |
 | reviewer | `/oh-my-claudeagent:reviewer <plan>` | Runs reviewer on a plan, in a forked context |
 | build-fixer | `/oh-my-claudeagent:build-fixer` | Runs build-fixer on a failing build, in a forked context |
@@ -174,10 +174,10 @@ rejects `model.fork`, `http.fetch` and `store.*`.
 | `UserPromptSubmit` | any | `mod-notice` (on the launch session's first prompt, a message when the mod is not running), `guidance` (first prompt: guidance, session id, the open run, and the session title `OMCA: <run>`), `keyword-detector` |
 | `UserPromptExpansion` | any | `guidance`, `slash-mode-detector` |
 | `SubagentStart` | any | `subagent-context`: protocol, date, output contract and run context for each subagent |
-| `PreToolUse` | `Write`, `Edit` | `comment-gate` |
+| `PreToolUse` | `Write`, `Edit`, `TaskUpdate` | `final-task-guard` (on `TaskUpdate`), `comment-gate` |
 | `PostToolUse` | `Read`, `Write`, `Edit`, `Agent`, `SubagentHandback`, `Bash`, `PowerShell` | `verification-recorder`, `context-injector`, `empty-task-response` |
 | `PostToolUseFailure` | any | `failure-recovery`: advice on a failed call, and a stuck-loop note from a tool's third failure in five minutes |
-| `Stop` | any | `stop-gates`: task continuation (open tasks of a run), final verification, drift guard, in that order |
+| `Stop` | any | `stop-gates`: task continuation (open tasks of a run), drift guard, in that order |
 | `TaskCompleted` | any | `task-completed`: refuses to complete a task while a recent verification is unlogged, and a run's final task until its `final_verification` is logged |
 
 Each stop gate continues the turn at most five times in a session and gets that budget back once
@@ -207,7 +207,9 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | `bash-guard` | The guard's review and its refusals. The catastrophic-removal deny stays |
 | `refusal-recovery` | The follow-up prompt after a `reasoning_extraction` refusal |
 | `stop-gates` | Every stop gate |
-| `task-continuation`, `final-verification`, `drift-guard` | One stop gate |
+| `task-continuation`, `drift-guard` | One stop gate |
+| `final-verification` | The final task's refusals: completing it without a passing verdict, and marking it blocked, deleting it or unmarking it without any verdict |
+| `final-task-guard` | The refusals on updates that mark the final task blocked, delete it or unmark it, leaving the completion check on |
 | `task-completed` | The task completion check |
 | `verification-recorder` | Recording verification commands, which the band, the turn line and the task check read |
 | `context-injector` | `AGENTS.md`, `README.md` and rule injection when a file is read or edited |

@@ -16,7 +16,8 @@ hand. `.omca/plans/*.md` stay on disk as documents that nothing reads. Evidence 
 working, but `plan_sha256` is ignored and an entry with no `task_id` proves no task. Notepads are
 unchanged. Allow rules that name `boulder_*` match nothing and do no harm. The task tools now turn on
 in every session, which brings Claude Code's `todo_reminder` nudge, and each checkout gets one
-shared task list.
+shared task list. `OMCA_DISABLED_HOOKS=plan-continuation` is now `task-continuation`;
+`plan-receipts`, `plan-write-guard`, `plan-format-warn` and `compact` name nothing.
 
 ### Added
 

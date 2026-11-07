@@ -170,8 +170,8 @@ to use another list.
 
 Run `/oh-my-claudeagent:start-work`. The session reads the run's tasks, hands each open task to
 an executor agent (in parallel where `blockedBy` allows it), records a verification for each,
-and marks the task completed. Add `--worktree <path>` to have every task work in an existing git
-worktree.
+and marks the task completed. With several open runs, add the run's name to pick one. Add
+`--worktree <path>` to have every task work in an existing git worktree.
 
 To resume after an interruption, or from a new session, run `/oh-my-claudeagent:start-work` again.
 It continues from the first open task. `/loop` cannot run `start-work` for you, because only you
@@ -182,9 +182,7 @@ can start it.
 After any build, test, lint or typecheck command, the agent logs the result with
 `evidence_log`. These checks run when a session tries to stop:
 
-- **Plan continuation**: the run still has open tasks.
-- **Final verification**: no task is open, but no `final_verification` entry with exit code 0
-  names the final task's id.
+- **Task continuation**: the run still has open tasks, the final task included.
 - **Drift guard**: the last reply claims the work is done while a changed line still holds a
   stub marker.
 

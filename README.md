@@ -54,8 +54,8 @@ panel opened with `/omca`. Build and Plan remain available. See
 3. Open `/omca` to watch the agents, the evidence and the notepad while it runs, and `/tasklist`
    for the task list.
 
-When the session tries to stop with tasks open, or with none open and no final
-verification logged, OMCA sends it back to work with the reason.
+When the session tries to stop with tasks open, or tries to complete the final task with no
+verdict logged, OMCA sends it back to work with the reason.
 
 ## Try it
 
