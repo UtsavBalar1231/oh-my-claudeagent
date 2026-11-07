@@ -17,7 +17,7 @@ hooks, its interface (band, pane, doctor, status line) and its state under `.omc
 
 A plan is a free-form Markdown document that nothing parses. OMCA resolves the plans directory
 the way Claude Code does: the `plansDirectory` setting relative to the project when set, otherwise
-`~/.claude/plans`, and an active plan-mode file over both. `<project>/.omca/plans` is the
+`plans/` in the Claude config directory (`CLAUDE_CONFIG_DIR`, or `~/.claude`), and an active plan-mode file over both. `<project>/.omca/plans` is the
 second accepted home, for project-local plans, and `plansDirectory: ".omca/plans"` makes it
 the default. A run is a set of tasks in Claude Code's own task list: every task carries
 `metadata.run`, the last carries `metadata.final: true`, and `metadata.blocked` closes a task

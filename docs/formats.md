@@ -16,7 +16,7 @@ The ledger carries `"version": 1` as its first key. A file without `version` rea
 
 ## Plan documents
 
-A plan is a Markdown file anywhere on disk. The planner writes plans to the plans directory (`plansDirectory`, else `~/.claude/plans`) or to `.omca/plans` under the project for a project-local plan; `plansDirectory: ".omca/plans"` makes the second the default. `.omca/` is gitignored. Its headings, tables and prose are free-form: nothing about a plan is parsed, and no check reads or refuses a plan file. A run's progress, next task and completion come from the tasks, never from the document.
+A plan is a Markdown file anywhere on disk. The planner writes plans to the plans directory (`plansDirectory`, else `plans/` in `CLAUDE_CONFIG_DIR`, or `~/.claude`) or to `.omca/plans` under the project for a project-local plan; `plansDirectory: ".omca/plans"` makes the second the default. `.omca/` is gitignored. Its headings, tables and prose are free-form: nothing about a plan is parsed, and no check reads or refuses a plan file. A run's progress, next task and completion come from the tasks, never from the document.
 
 ## Tasks
 

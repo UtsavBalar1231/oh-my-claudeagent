@@ -147,7 +147,7 @@ Run `/oh-my-claudeagent:plan <what you want done>`. The planner agent interviews
 the plan needs, consults analyzer for gaps, writes the plan, and has reviewer review it. The plan
 is a Markdown document that nothing parses, so its headings and prose are the planner's to choose.
 It lands in your plans directory: the `plansDirectory` setting when you set one, relative to the
-project, and `~/.claude/plans` otherwise. Ask for a project-local plan and it lands in
+project, and `plans/` in the Claude config directory (`CLAUDE_CONFIG_DIR`, or `~/.claude`) otherwise. Ask for a project-local plan and it lands in
 `.omca/plans` under the project instead. To make that the default, set
 `plansDirectory: ".omca/plans"`. `.omca/` is gitignored, so those plans stay out of commits.
 

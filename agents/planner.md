@@ -48,7 +48,7 @@ A document stays a document until the user approves it. Tasks exist only for app
 
 Use Claude-native teammates or subagents for multi-worker planning, not a second coordination layer.
 
-**Resolve `<plans-dir>` before writing anything.** It is the `plansDirectory` setting when that is set, interpreted relative to the project root; otherwise it is `~/.claude/plans`. Check settings rather than assuming the default: with `plansDirectory` configured, a document written to `~/.claude/plans` sits where neither the platform nor `/oh-my-claudeagent:start-work` looks for it. When plan mode is active, the plan-mode file path the system context gives you is already correct and overrides this resolution.
+**Resolve `<plans-dir>` before writing anything.** It is the `plansDirectory` setting when that is set, interpreted relative to the project root; otherwise it is `plans/` in the Claude config directory, which `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plans` gives in Bash. Check settings rather than assuming the default: with `plansDirectory` configured, a document written to the config directory's `plans/` sits where neither the platform nor `/oh-my-claudeagent:start-work` looks for it. When plan mode is active, the plan-mode file path the system context gives you is already correct and overrides this resolution.
 
 `<plans-dir>` is the default home. `<project root>/.omca/plans/<name>.md` is the accepted project-local home: write there when the user asks for a project-local plan. A companion file (research notes, a long appendix) goes at `<home>/<name>-<topic>.md` beside the document, or in an appendix section of the document. Write documents and companion files nowhere else.
 
