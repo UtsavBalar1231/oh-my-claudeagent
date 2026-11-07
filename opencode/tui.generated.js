@@ -216,15 +216,18 @@ function runState(tasks) {
     blocked: planned.filter((task) => task.run === name && task.blockedReason !== "")
   };
 }
+var finalLast = (tasks) => [...tasks.filter((task) => !task.isFinal), ...tasks.filter((task) => task.isFinal)];
 function groupTasks(tasks) {
-  const pending = tasks.filter((task) => task.status === "pending" && task.blockedReason === "");
+  const live = tasks.filter((task) => task.blockedReason === "");
+  const pending = live.filter((task) => task.status === "pending");
   const groups = [
-    { name: "Now", tasks: tasks.filter((task) => task.status === "in_progress" && task.blockedReason === "") },
-    { name: "Next", tasks: pending.filter((task) => openBlockers(task, tasks).length === 0) },
-    { name: "Waiting", tasks: tasks.filter((task) => task.status !== "completed" && (task.blockedReason !== "" || task.status === "pending" && openBlockers(task, tasks).length > 0)) },
-    { name: "Done", tasks: tasks.filter((task) => task.status === "completed") }
+    { name: "Running", tasks: live.filter((task) => task.status === "in_progress") },
+    { name: "Ready", tasks: pending.filter((task) => openBlockers(task, tasks).length === 0) },
+    { name: "Blocked", tasks: tasks.filter((task) => task.blockedReason !== "") },
+    { name: "Waiting", tasks: pending.filter((task) => openBlockers(task, tasks).length > 0) },
+    { name: "Done", tasks: live.filter((task) => task.status === "completed") }
   ];
-  return groups.filter((group) => group.tasks.length > 0);
+  return groups.filter((group) => group.tasks.length > 0).map((group) => ({ ...group, tasks: finalLast(group.tasks) }));
 }
 
 // opencode/tui-model.ts
@@ -387,6 +390,7 @@ var UNICODE_SET = {
   waiting: "\u2298",
   blocked: "\u2297",
   agent: "\u25C6",
+  final: "\u25C6",
   mask: "\u2039masked\u203A"
 };
 var UNICODE = { tier: "unicode", ...UNICODE_SET };
@@ -402,7 +406,8 @@ var NERD = {
   progress: "\uF042",
   waiting: "\uF056",
   blocked: "\uF05E",
-  agent: "\uF007"
+  agent: "\uF007",
+  final: "\uF11E"
 };
 var WIDE_SYMBOLS = [
   [8986, 8987],

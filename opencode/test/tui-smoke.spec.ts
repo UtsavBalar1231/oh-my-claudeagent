@@ -107,7 +107,7 @@ describe.skipIf(!opencodeBin || !tmux || process.platform === "win32")("native O
     terminal("resize-window", "-t", "omca", "-x", "160", "-y", "32")
     terminal("send-keys", "-t", "omca", "2")
     await until("Tasks tab", 5_000, async () => capture().includes("OMCA / Tasks") && capture().includes("Stuck task"), capture)
-    for (const text of ["#1 First task", "Waiting", "Blocked: no access", "0/3 completed"]) expect(capture()).toContain(text)
+    for (const text of ["#1 First task", "Ready", "Blocked: no access", "0/3 completed"]) expect(capture()).toContain(text)
     terminal("send-keys", "-t", "omca", "6")
     await until("Doctor tab", 5_000, async () => capture().includes("Read-only server health"), capture)
     terminal("send-keys", "-t", "omca", "Escape")
