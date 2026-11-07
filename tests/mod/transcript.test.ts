@@ -127,6 +127,16 @@ test("a folded shell group gets one receipt row per verification run under the e
   expect(await group($, calls)).toEqual([ENGINE_ROW, "  ⎿  ✓ just test · 12 pass, 0 fail", "  ⎿  ✗ just lint · exit 1 · 1 problem (1 error)"]);
 });
 
+test("a folded group holding the glyph test shows the line it printed, the glyphs as printed, under the engine's line", async ($, on) => {
+  await engine($, on);
+  const printed = "\uf05d \uf085 \uf06e \uf120";
+  const test = bash('bun "${CLAUDE_PLUGIN_ROOT}/scripts/setup-statusline.ts" --glyph-test', { output: { stdout: `${printed}\n`, stderr: "", interrupted: false, isImage: false } });
+
+  expect(await group($, [test])).toEqual([ENGINE_ROW, `  ⎿  glyph test ${printed}`]);
+  expect(await group($, [test], { isExpanded: true })).toEqual([ENGINE_ROW]);
+  expect(await group($, [bash('echo "--glyph-test"', { output: { stdout: `${printed}\n`, stderr: "", interrupted: false, isImage: false } })])).toEqual([ENGINE_ROW]);
+});
+
 test("an unfolded group, a group with no verification run, a running one and another surface keep the engine's drawing", async ($, on) => {
   await engine($, on);
   const passed = bash("just test", { output: { stdout: "12 pass\n", stderr: "", interrupted: false, isImage: false } });
