@@ -4,8 +4,6 @@
   "ast_find_rule",
   "ast_dump_tree",
   "ast_test_rule",
-  "boulder_write",
-  "boulder_progress",
   "evidence_log",
   "evidence_read",
   "notepad_write",
@@ -17,5 +15,7 @@
   "categories_list",
   "file_read",
   "session_search",
+  "task_get",
+  "task_list",
   "agents_migrate"
 ]

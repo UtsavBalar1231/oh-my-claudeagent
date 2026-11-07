@@ -17,13 +17,26 @@ event is unregistered on purpose; `docs/references.md` carries the per-event rea
 `dispatch.ts`, which runs the features that share the event in a fixed order, each in its own
 try/catch. `host.ts` defines the `Host` closures a feature receives in place of `$`, so a
 feature module takes `host` and never `$`. The features are `bash-guard`, `server-check`,
-`mod-marker`, `compact`, `agents-tracker`, `agent-rows`, `metrics`, `band`, `pane` with its `tabs/`,
-`footer`, `group-rows`, `plan-receipts`, `keyword-paint`, `spinner`, `completion`, `refusal-recovery` and `omca-router`. `doctor.ts` runs the Doctor page's checks and fixes for
-`tabs/doctor.ts`; it registers no event. Pure logic lives in `src/core/`.
+`mod-marker`, `agents-tracker`, `agent-rows`, `metrics`, `band`, `pane` with its `tabs/`, `footer`,
+`group-rows`, `keyword-paint`, `completion`, `refusal-recovery`, `omca-router`, `task-tools` and
+`task-list`. `doctor.ts` runs the Doctor page's checks and fixes for `tabs/doctor.ts`; it registers
+no event. Pure logic lives in `src/core/`.
 
-`spinner` rewrites only the `suffix` of the terminal's main-loop Spinner, to `… · task 7/14`, from
-the band atom. A Spinner whose `requestId` is a tracked agent id, and every desktop Spinner, pass
-through unchanged.
+The mod's only view of planned work is Claude Code's native task list. State is the task files under
+`<config dir>/tasks/<list id>/`; the mod has no plan file format, parser or registry, and it keeps
+OMCA's task view in one pane. The band, the spinner and the transcript carry no task facts, since the
+native panel and spinner show them.
+
+`task-tools` turns the task tools on and names the checkout's list at `session.start`, each only
+where nothing has set its variable, and the marker reports the list id as `task_list`.
+
+`task-list` is its own pane, `tasklist`, opened by `/tasklist`, apart from the `omca` pane. The list
+reads into the `tasks` atom at `session.start`, after each `TaskCreate` and `TaskUpdate`, at each main
+`turn.complete`, and from a 2 s timer while the pane is open. It keeps finished tasks whose files
+Claude Code deleted. Rows group as Now, Next, Waiting and Done, and Enter opens a task's page. A row's
+aside is why a task was closed as blocked; otherwise `final` for a final task, then what it waits on
+or its owner. The head row names the run beside the counts when the list has one. Closing the pane
+stops the timer and forgets its place without touching the `omca` pane.
 
 Three features redraw Claude Code's own transcript rows on the terminal, and every other surface
 keeps the engine's rows. None of them reads a file during a drawing, and the row hooks read only
@@ -57,22 +70,6 @@ atoms written once per turn or per finished agent, since a row subscribes to eve
   draw bytes and not a file, and a refusal carrying `fix: "tmux-passthrough"` writes one transcript
   line naming tmux's `allow-passthrough` and `focus-events`.
   An expanded group is left as drawn.
-
-`plan-receipts` adds OMCA's own rows to the transcript with `$.ui.place`, which the engine draws
-through the `Placed` component on every surface. At each main `turn.complete` it compares the bound
-plan's done tasks with those of the last main turn, and the tasks that finished get one row with
-their verdicts from `proofFacts`, plus the plan's outcome when they end it. A row lands under the turn
-line, since the engine draws that line before `turn.complete` hooks run, and a subagent's turn
-places none because its row would land among the main turn's tool rows. The first read of a plan, at
-`session.start` or when it becomes bound, only records what is done, and so does the first main turn
-after a hot reload, which starts the module's memory over. The `receipts` atom holds the rows' facts,
-capped at 200; a drawing reads it. Each main turn moves a stored verdict only toward proof (`settled`):
-a run that lands late settles a row, while a later task's edit to a shared file, which makes the
-live verdict read unproven, leaves it alone, and the band and the Plan tab carry the live verdict.
-A turn that settles nothing writes nothing, because a write redraws every placed row. A rejected call
-(a client older than 2.1.314) or a result with no `requestId` means no row stands, and a plan's end
-then toasts; a result with a `requestId` stands for a surface yet to attach. The band keeps the
-plan's end notification.
 
 `keyword-paint` underlines what the server's `keyword-detector` would match in the draft, from the
 same `keywordSpans` reader in `src/core/keywords.ts`, only with `enableKeywordTriggers` on and that
@@ -124,7 +121,7 @@ a `Text` outside `Run` that holds a digit sets `tabular`, and the row gaps of th
 tabs and the band's button gap are the named steps `"md"` and `"lg"` in place of cells. The
 terminal keeps its cell gaps. `resolveSession` (`host.ts`) does not read the engine version.
 
-The pane's `ui.scroll` hook reads one committed layout (`regions.ts`). Each terminal drawing
+Each pane's `ui.scroll` hook reads that pane's committed layout (`regions.ts`). Each terminal drawing
 collects its own on `view.layout`: every scroll region and every list that draws its own window,
 with its rect in the tab's rows and columns, the tab rows above the tab, the engine's offset it
 drew at, whether the pane padded the tree, and the rows the tree takes. The drawing commits it in
@@ -153,7 +150,7 @@ overflowing region, a row, a page (`bodyRows`) or an end (`contentRows`) at a ti
 
 - `UserPromptSubmit` and `UserPromptExpansion` route to the server's `keyword-detector` and
   `slash-mode-detector` handlers, and both to its `guidance` handler, which injects the
-  guidance template, the session id and the bound plan's context on a session's first prompt.
+  guidance template, the session id and the open run's context on a session's first prompt.
 - The mod and the server each report when the other is missing. At `session.start` and each main `turn.start`
   the mod's `server-check.ts` asks the engine to connect the `omca` server and, when it finds it not connected, writes one line
   to the transcript: that bun is not on PATH, or the engine's reason with a pointer to `/mcp`.
@@ -163,14 +160,12 @@ overflowing region, a row, a page (`bodyRows`) or an end (`contentRows`) at a ti
   judges it. `OMCA_DISABLED_HOOKS=mod-notice` silences the server's line.
 - `SessionStart` for `clear` or `compact` routes to the server's `session-start` handler,
   which re-injects that context after a compaction and hands it back to the next prompt
-  after `/clear`. The mod's `session.compact` feature (`compact.ts`) tells the summarizer to
-  keep the bound plan with its open and blocked tasks. It does not run for a user-installed plugin where an
-  organization manages Claude Code, so the server handler's re-injection is the only cover there.
+  after `/clear`. The mod registers no `session.compact` hook: tasks persist across compaction
+  natively, so its summary has nothing to restate.
 - `SubagentStart` routes to the server's `subagent-context` handler.
-- `Stop` routes to the server's `stop-gates` handler, which runs plan continuation, final
-  verification, and the drift guard in that order and answers with the first block.
-  `OMCA_DISABLED_HOOKS=stop-gates` turns off all three; `plan-continuation`,
-  `final-verification`, or `drift-guard` turns off one.
+- `Stop` routes to the server's `stop-gates` handler, which runs task continuation and the drift
+  guard in that order and answers with the first block. `OMCA_DISABLED_HOOKS=stop-gates` turns off
+  both; `task-continuation` or `drift-guard` turns off one.
 - The destructive-command guard lives in the mod, on `tool.check` for Bash, PowerShell and Monitor
   (whose commands are bash: Monitor needs Git Bash on Windows)
   (`hooks/bash-guard.ts`, with its patterns in `src/core/destructive.ts`). A recursive removal
@@ -207,4 +202,4 @@ overflowing region, a row, a page (`bodyRows`) or an end (`contentRows`) at a ti
   to `/fewer-permission-prompts`.
 - Claude Code owns the hook lifecycle. OMCA supplies the mod's module and the
   `type: mcp_tool` handlers whose `tool` is `omca_hook`, and every registered handler is of that
-  type. Start-up pruning and the exit unbind run in the server process, outside any hook.
+  type. Start-up pruning runs in the server process, outside any hook.

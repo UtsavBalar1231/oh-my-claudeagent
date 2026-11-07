@@ -1,7 +1,7 @@
 import { field, inputText, isRecord, text } from "./tool-input.ts";
 import { type Glyphs, oneLine } from "./ui-kit.ts";
 import { isVerificationCommand } from "./verification.ts";
-import { fitPieces, type Piece, TONE_KEYS } from "./visual.ts";
+import { fitPieces, type Piece, piecesWidth, TONE_KEYS } from "./visual.ts";
 
 /** One call as a folded tool group carries it. */
 export type GroupCall = {
@@ -78,4 +78,68 @@ export function receiptRow(receipt: ShellReceipt, g: Glyphs, columns: number): P
     { text: `${mark.glyph} `, color: mark.color },
   ];
   return fitPieces([...lead, { text: oneLine(receipt.command) }, ...facts.flatMap((fact) => [dot, fact])], columns, g.ellipsis);
+}
+
+const OPERATORS = new Set([";", "&", "|", "\n"]);
+const ENV_ASSIGNMENT = /^[A-Za-z_]\w*=/;
+const basename = (path: string): string => path.slice(path.search(/[^\\/]*$/));
+
+/** The words of each simple command, quotes removed, so a quoted plugin-root path reads as the path it names. */
+function commandWords(command: string): string[][] {
+  const segments: string[][] = [[]];
+  let word = "";
+  let isWord = false;
+  let quote = "";
+  const endWord = () => {
+    if (isWord) segments.at(-1)?.push(word);
+    word = "";
+    isWord = false;
+  };
+  for (const char of command) {
+    if (quote !== "") {
+      if (char === quote) quote = "";
+      else word += char;
+    } else if (char === '"' || char === "'") {
+      quote = char;
+      isWord = true;
+    } else if (OPERATORS.has(char)) {
+      endWord();
+      segments.push([]);
+    } else if (/\s/.test(char)) endWord();
+    else {
+      word += char;
+      isWord = true;
+    }
+  }
+  endWord();
+  return segments;
+}
+
+/** Whether a command runs the status line script with `--glyph-test`; a command that only names them in a string does not. */
+function isGlyphTestCommand(command: string): boolean {
+  return commandWords(command).some((words) => {
+    const [first, ...rest] = words.filter((word, index) => index > 0 || !ENV_ASSIGNMENT.test(word));
+    const afterBun = first !== undefined && /^bun(?:\.exe)?$/.test(basename(first)) ? rest : [];
+    const [script, ...args] = afterBun[0] === "run" ? afterBun.slice(1) : afterBun;
+    return script !== undefined && basename(script) === "setup-statusline.ts" && args.includes("--glyph-test");
+  });
+}
+
+/** The line a finished, successful glyph test call printed, as it printed it, or null when the call is anything else. */
+export function glyphTestLine(call: GroupCall): string | null {
+  if (!SHELLS.has(call.tool) || call.isRunning || call.isErrored || call.isInterrupted) return null;
+  if (!isGlyphTestCommand(inputText(call.input, "command")) || !isRecord(call.output)) return null;
+  const printed = plain(text(field(call.output, "stdout")))
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\p{Cc}/gu, ""))
+    .filter((line) => line.trim() !== "");
+  return printed.at(-1) ?? null;
+}
+
+/** The glyph test's row under the group: a muted label, then the printed line whole. The label goes when the line would not fit beside it, and the line is never cut. */
+export function glyphTestRow(line: string, g: Glyphs, columns: number): Piece[] {
+  const indent: Piece = { text: g.tier === "ascii" ? ASCII_INDENT : INDENT, color: TONE_KEYS.muted };
+  const label: Piece = { text: "glyph test ", color: TONE_KEYS.muted };
+  const printed: Piece = { text: line };
+  return piecesWidth([indent, label, printed]) <= columns ? [indent, label, printed] : [indent, printed];
 }

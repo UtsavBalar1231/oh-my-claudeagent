@@ -1,7 +1,8 @@
 
  ▐▛███▛█   Claude Code v2.1.316
 ▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · /…/omca-visual-80x40-XXXXXX/cwd
+
 
 
 
@@ -20,8 +21,8 @@
 
 
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
-│ 1: Agents  2: Plan  3: Evidence  4: Notepad                                  │
-│  COMPLETE  proof-ledger   build   test   lint   manual  10-02 13:35      │
+│ 1: Agents  2: Evidence  3: Notepad                                           │
+│ latest runs   build   test   lint   manual                               │
 │   ↑ 1 more                                                                   │
 │ ── Fri 2026-10-02 ───────────────────────────────────────────────────────    │
 │     13:00  test    just test-mod                           executor        │
@@ -32,7 +33,6 @@
 │   ↓ 13 more                                                                  │
 │ t: Type  x: Fails  f: Find  c: Copy  r: Rerun  3/16 · ↑↓ move                │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-█████ 6/6                                                                   [-]
                                                             ◐ medium · /effort
 ─────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 

@@ -20,7 +20,12 @@ const SCENARIOS: Record<string, { tool: string; args: Json }> = {
   "native-general": { tool: "subagent", args: { agent: "general", description: "native general worker", prompt: "OMCA-SCENARIO:warm-up" } },
   "native-explore": { tool: "subagent", args: { agent: "explore", description: "native explore worker", prompt: "OMCA-SCENARIO:warm-up" } },
   "discover-tools": { tool: "execute", args: { code: 'return search({namespace:"omca",query:"ast_search"});' } },
-  "plan-checkbox": { tool: "edit", args: { path: "work.md", oldString: "- [ ] 1. First task", newString: "- [x] 1. First task" } },
+  "task-create": { tool: "omca_task_create", args: { subject: "Stub task", description: "Done when the stub says so", metadata: { run: "stub-run" } } },
+  "task-final": { tool: "omca_task_create", args: { subject: "Final verification", description: "Review the run", metadata: { run: "stub-run", final: true } } },
+  "task-close-final": { tool: "omca_task_update", args: { taskId: "2", status: "completed" } },
+  "task-verdict": { tool: "omca_evidence_log", args: { evidence_type: "final_verification", command: "stub review", exit_code: 0, output_snippet: "COMPLETE", task_id: "2" } },
+  "task-first-done": { tool: "omca_task_update", args: { taskId: "1", status: "completed" } },
+  "task-worker": { tool: "subagent", args: { agent: "omca-executor", description: "task worker", prompt: "OMCA-SCENARIO:task-first-done" } },
   "write-file": { tool: "write", args: { path: "explored.txt", content: "explored\n" } },
 }
 const SUBAGENT_ID = "omca-explorer"

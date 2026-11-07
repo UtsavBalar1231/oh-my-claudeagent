@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { copyFixture, maskLive, maskScratch, mouseReports, parseSizes, parseView, teardown, withoutBlink } from "./visual.ts";
@@ -18,8 +18,8 @@ afterEach(() => {
 
 describe("parseView", () => {
   test("reads every field and defaults the optional ones", () => {
-    expect(parseView('{"command":"/omca plan","keys":["n","Escape"],"mockScript":"turn","fixture":"pane"}')).toEqual({
-      command: "/omca plan",
+    expect(parseView('{"command":"/omca evidence","keys":["n","Escape"],"mockScript":"turn","fixture":"pane"}')).toEqual({
+      command: "/omca evidence",
       keys: ["n", "Escape"],
       mockScript: "turn",
       fixture: "pane",
@@ -75,52 +75,22 @@ test("parseSizes reads columns by rows and refuses anything else", () => {
   expect(() => parseSizes("80")).toThrow('a size is <columns>x<rows>, not "80"');
 });
 
-test("copyFixture copies the tree and points {{cwd}} at the copy", () => {
+test("copyFixture copies the tree, points {{cwd}} at the copy, and dates every file an hour back", () => {
   const from = temp("omca-visual-fixture-");
   const to = join(temp("omca-visual-copy-"), "cwd");
   mkdirSync(join(from, ".omca", "state"), { recursive: true });
-  writeFileSync(join(from, ".omca", "state", "boulder.json"), '{"active_plan":"{{cwd}}/plans/p.md","again":"{{cwd}}"}');
+  writeFileSync(join(from, ".omca", "state", "mod.json"), '{"dir":"{{cwd}}/src","again":"{{cwd}}"}');
   writeFileSync(join(from, "notes.md"), "no token here\n");
 
   copyFixture(from, to);
 
-  expect(readFileSync(join(to, ".omca", "state", "boulder.json"), "utf8")).toBe(
-    `{"active_plan":"${to}/plans/p.md","again":"${to}"}`,
-  );
+  expect(readFileSync(join(to, ".omca", "state", "mod.json"), "utf8")).toBe(`{"dir":"${to}/src","again":"${to}"}`);
   expect(readFileSync(join(to, "notes.md"), "utf8")).toBe("no token here\n");
-  expect(readFileSync(join(from, ".omca", "state", "boulder.json"), "utf8")).toContain("{{cwd}}");
-});
-
-test("copyFixture takes a plan boulder.json names from the shared plans when the fixture lacks it, keeps the fixture's own, and dates every file an hour back", () => {
-  const from = temp("omca-visual-fixture-");
-  const shared = temp("omca-visual-shared-");
-  const to = join(temp("omca-visual-copy-"), "cwd");
-  mkdirSync(join(from, ".omca", "state"), { recursive: true });
-  mkdirSync(join(from, "plans"));
-  writeFileSync(join(from, ".omca", "state", "boulder.json"), '{"a":"{{cwd}}/plans/shared.md","b":"{{cwd}}/plans/own.md","c":"{{cwd}}/plans/nowhere.md"}');
-  writeFileSync(join(from, "plans", "own.md"), "fixture's own\n");
-  writeFileSync(join(shared, "shared.md"), "shared plan\n");
-  writeFileSync(join(shared, "own.md"), "shared copy\n");
-
-  copyFixture(from, to, shared);
-
-  expect(readdirSync(join(to, "plans")).sort()).toEqual(["own.md", "shared.md"]);
-  expect(readFileSync(join(to, "plans", "shared.md"), "utf8")).toBe("shared plan\n");
-  expect(readFileSync(join(to, "plans", "own.md"), "utf8")).toBe("fixture's own\n");
-  for (const name of ["own.md", "shared.md"]) {
-    const age = Date.now() - statSync(join(to, "plans", name)).mtimeMs;
+  expect(readFileSync(join(from, ".omca", "state", "mod.json"), "utf8")).toContain("{{cwd}}");
+  for (const path of [join(to, "notes.md"), join(to, ".omca", "state", "mod.json")]) {
+    const age = Date.now() - statSync(path).mtimeMs;
     expect(age).toBeGreaterThanOrEqual(3_600_000 - 1_000);
     expect(age).toBeLessThan(3_600_000 + 60_000);
-  }
-  expect(Date.now() - statSync(join(to, ".omca", "state", "boulder.json")).mtimeMs).toBeGreaterThanOrEqual(3_600_000 - 1_000);
-});
-
-test("the band and pane fixtures get the 46-task plan from tests/fixtures/plans", () => {
-  const plan = readFileSync(join(import.meta.dir, "..", "..", "tests", "fixtures", "plans", "46-task-plan.md"), "utf8");
-  for (const fixture of ["band", "pane"]) {
-    const to = join(temp(`omca-visual-${fixture}-`), "cwd");
-    copyFixture(join(import.meta.dir, "..", "..", "tests", "mod", "visual", "fixtures", fixture), to);
-    expect(readFileSync(join(to, "plans", "46-task-plan.md"), "utf8")).toBe(plan);
   }
 });
 

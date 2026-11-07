@@ -1,4 +1,4 @@
-import { afterAll, afterEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,8 +14,18 @@ const KEYWORD_BANNER =
   "[HANDOFF MODE DETECTED] Handoff is user-driven and its skill cannot be model-invoked: suggest running /oh-my-claudeagent:handoff instead of improvising a summary.";
 const ROOT = mkdtempSync(join(tmpdir(), "omca-slash-"));
 
+const SAVED = ["CLAUDE_CODE_TASK_LIST_ID", "CLAUDE_CODE_ENABLE_TODO_TOOLS"].map((name) => [name, process.env[name]] as const);
+
+beforeEach(() => {
+  for (const [name] of SAVED) delete process.env[name];
+});
+
 afterEach(() => {
   delete process.env.OMCA_DISABLED_HOOKS;
+  for (const [name, value] of SAVED) {
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
 });
 
 afterAll(() => rmSync(ROOT, { recursive: true, force: true }));

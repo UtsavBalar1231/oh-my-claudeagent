@@ -55,7 +55,7 @@
       "title": "Show the band above the prompt",
       "type": "boolean",
       "default": true,
-      "description": "When false, the band with the bound plan, the last verification and the suggested next actions is not drawn.",
+      "description": "When false, the band with the unlogged verification and the button that logs it is not drawn.",
       "sensitive": false
     },
     "guardMode": {

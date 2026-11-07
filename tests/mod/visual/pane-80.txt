@@ -1,4 +1,4 @@
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · /…/omca-visual-80x40-XXXXXX/cwd
 
 
 ❯ Fix the parser with the executor
@@ -12,14 +12,14 @@
 
 ✻ Waiting for executor, explorer, architect · NN.Nk in NN out · $X.XX
 
- executor  Fix the heading parser                     1s · 2 calls · 16.4k tok
+ executor  Fix the heading parser                      1s · 2 calls · 9.8k tok
   ⎿  Fenced lines are skipped now, and the heading tests pass.
 
 ● ok
 
 ✻ Waiting for explorer, architect · NN.Nk in N out · $X.XX
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
-│ 1: Agents  2: Plan  3: Evidence  4: Notepad                                  │
+│ 1: Agents  2: Evidence  3: Notepad                                           │
 │  explorer · Map the router callers             sonnet-5-5  high       Ns    │
 │   ✻ Bash ls plans                                                 3 calls    │
 │                                                                              │
@@ -32,7 +32,7 @@
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
                                                             ◐ medium · /effort
-─────────────────────────────────────────────────────────── OMCA: 46-task-plan ─
+─────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 
 ────────────────────────────────────────────────────────────────────────────────
   ⏸ manual mode on · /tasks to see subagents · ← for agents · ↓ to manage

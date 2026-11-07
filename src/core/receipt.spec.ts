@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { type GroupCall, receiptRow, shellReceipt } from "./receipt.ts";
+import { type GroupCall, glyphTestLine, glyphTestRow, receiptRow, shellReceipt } from "./receipt.ts";
 import { glyphs } from "./ui-kit.ts";
 import { piecesWidth, TONE_KEYS } from "./visual.ts";
 
@@ -77,5 +77,61 @@ describe("receiptRow", () => {
 
   test("draws the ASCII set when asked", () => {
     expect(text(receiptRow(pass, A, 80))).toBe("  |  + just test - 12 pass, 0 fail");
+  });
+});
+
+describe("glyphTestLine", () => {
+  const printed = "\uf05d \uf085 \uf06e \uf120";
+  const test4 = (command: string, extra: Partial<GroupCall> = {}) => call(command, { output: { stdout: `${printed}\n`, stderr: "" }, ...extra });
+
+  test("a finished run of the script with the flag yields the line it printed, glyphs untouched", () => {
+    expect(glyphTestLine(test4('bun "${CLAUDE_PLUGIN_ROOT}/scripts/setup-statusline.ts" --glyph-test'))).toBe(printed);
+    expect(glyphTestLine(test4("bun /home/me/.claude/plugins/cache/omca/scripts/setup-statusline.ts --glyph-test"))).toBe(printed);
+    expect(glyphTestLine(test4("cd /work && bun run scripts/setup-statusline.ts --glyph-test | cat"))).toBe(printed);
+    expect(glyphTestLine({ ...test4("bun scripts/setup-statusline.ts --glyph-test"), tool: "PowerShell" })).toBe(printed);
+  });
+
+  test("takes the last non-empty line and drops colors", () => {
+    const stdout = `warning\n\u001b[32m${printed}\u001b[0m\n\n`;
+    expect(glyphTestLine(test4("bun scripts/setup-statusline.ts --glyph-test", { output: { stdout, stderr: "" } }))).toBe(printed);
+    expect(glyphTestLine(test4("bun scripts/setup-statusline.ts --glyph-test", { output: { stdout: "\n", stderr: "" } }))).toBeNull();
+  });
+
+  test("a command that only mentions the script or the flag yields nothing", () => {
+    expect(glyphTestLine(test4('echo "--glyph-test"'))).toBeNull();
+    expect(glyphTestLine(test4('echo "bun scripts/setup-statusline.ts --glyph-test"'))).toBeNull();
+    expect(glyphTestLine(test4("echo bun scripts/setup-statusline.ts --glyph-test"))).toBeNull();
+    expect(glyphTestLine(test4("bun scripts/setup-statusline.ts --settings s.json"))).toBeNull();
+    expect(glyphTestLine(test4("bun scripts/other.ts --glyph-test"))).toBeNull();
+  });
+
+  test("a running, failed or stopped call, or another tool, yields nothing", () => {
+    const command = "bun scripts/setup-statusline.ts --glyph-test";
+    expect(glyphTestLine(test4(command, { isRunning: true }))).toBeNull();
+    expect(glyphTestLine(test4(command, { isErrored: true, output: "Exit code 1" }))).toBeNull();
+    expect(glyphTestLine(test4(command, { isInterrupted: true }))).toBeNull();
+    expect(glyphTestLine({ ...test4(command), tool: "Read" })).toBeNull();
+  });
+});
+
+describe("glyphTestRow", () => {
+  const printed = "\uf05d \uf085 \uf06e \uf120";
+
+  test("hangs a muted label and the printed line under the group", () => {
+    const row = glyphTestRow(printed, U, 80);
+    expect(text(row)).toBe(`  ⎿  glyph test ${printed}`);
+    expect(row.find((piece) => piece.text === "glyph test ")?.color).toBe(TONE_KEYS.muted);
+    expect(row.at(-1)).toEqual({ text: printed });
+  });
+
+  test("keeps the glyphs whole at a narrow width by dropping the label", () => {
+    const row = glyphTestRow(printed, U, 14);
+    expect(text(row)).toBe(`  ⎿  ${printed}`);
+    expect(piecesWidth(row)).toBeLessThanOrEqual(14);
+    expect(text(glyphTestRow(printed, U, 8))).toBe(`  ⎿  ${printed}`);
+  });
+
+  test("uses the ASCII indent on the ASCII tier and never swaps the glyphs for its own", () => {
+    expect(text(glyphTestRow(printed, A, 80))).toBe(`  |  glyph test ${printed}`);
   });
 });

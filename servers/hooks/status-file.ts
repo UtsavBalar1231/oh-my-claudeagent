@@ -1,11 +1,12 @@
-import { readFileSync, statSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { asRegistry, parseRegistry, resolveBoundPlan } from "../../src/core/boulder.ts";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { ledgerCoversSlot } from "../../src/core/evidence.ts";
-import { BOULDER, LEDGER, statusPath as sessionStatusPath } from "../../src/core/omca-paths.ts";
+import { type NativeTask, parseTask, runState, taskListDir, taskListIdFor, withHistory } from "../../src/core/native-tasks.ts";
+import { LEDGER, statusPath as sessionStatusPath } from "../../src/core/omca-paths.ts";
+import { configDir, toPlatform } from "../../src/core/path.ts";
 import { isSafeId } from "../../src/core/session-id.ts";
 import { isRecord } from "../../src/core/tool-input.ts";
-import { errorCode, gitWorktreeRoots, hasCode, isMissing, writeFileAtomic } from "../io.ts";
+import { gitWorktreeRoots, hasCode, isMissing, writeFileAtomic } from "../io.ts";
 import type { Session } from "./session-state.ts";
 
 export const STAMP_INTERVAL_MS = 5_000;
@@ -17,7 +18,6 @@ export function statusPath(root: string, sessionId: string): string {
 }
 
 export const ledgerPath = (root: string): string => join(root, LEDGER);
-export const registryPath = (root: string): string => join(root, BOULDER);
 
 /** The mod's marker for the session, or undefined when the id cannot name a file or the mod never wrote one. */
 export function readMarker(root: string, sessionId: string): Record<string, unknown> | undefined {
@@ -37,66 +37,85 @@ const writtenAtOf = (marker: Record<string, unknown> | undefined): number | unde
   typeof marker?.written_at === "number" ? marker.written_at : undefined;
 
 /**
- * When the mod last marked the session, or undefined when it never has. The mod writes the marker
- * under its session root, which a worktree move changes, so a root marker not newer than `after`
- * sends the search through every worktree of the repository.
+ * The mod's newest marker for the session, or undefined when it never wrote one. The mod writes the
+ * marker under its session root, which a worktree move changes, so a root marker not newer than
+ * `after` sends the search through every worktree of the repository.
  */
-export function markerWrittenAt(root: string, sessionId: string, after = -Infinity): number | undefined {
-  const own = writtenAtOf(readMarker(root, sessionId));
-  if (own !== undefined && own > after) return own;
-  let latest = own;
+export function latestMarker(root: string, sessionId: string, after = -Infinity): Record<string, unknown> | undefined {
+  const own = readMarker(root, sessionId);
+  const ownAt = writtenAtOf(own);
+  if (ownAt !== undefined && ownAt > after) return own;
+  let latest = ownAt === undefined ? undefined : own;
+  let latestAt = ownAt;
   for (const worktree of new Set(gitWorktreeRoots(root))) {
-    let at: number | undefined;
+    let marker: Record<string, unknown> | undefined;
     try {
-      at = writtenAtOf(readMarker(worktree, sessionId));
+      marker = readMarker(worktree, sessionId);
     } catch {
       continue;
     }
-    if (at !== undefined && (latest === undefined || at > latest)) latest = at;
+    const at = writtenAtOf(marker);
+    if (at !== undefined && (latestAt === undefined || at > latestAt)) {
+      latest = marker;
+      latestAt = at;
+    }
   }
   return latest;
 }
 
-type Unreadable = { kind: "unreadable"; path: string; code: string };
-export type RegistryRead = { kind: "absent" } | { kind: "corrupt" } | Unreadable | { kind: "ok"; data: unknown };
-export type PlanFile = { bytes: Buffer; content: string };
-export type BoundPlanRead =
-  | Exclude<RegistryRead, { kind: "ok" }>
-  | { kind: "unbound" }
-  | { kind: "ok"; name: string; path: string; boundAt: unknown; file: PlanFile | undefined };
+/** When the mod last marked the session, or undefined when it never has. */
+export const markerWrittenAt = (root: string, sessionId: string, after = -Infinity): number | undefined => writtenAtOf(latestMarker(root, sessionId, after));
 
-const unreadable = (path: string, error: unknown): Unreadable => ({ kind: "unreadable", path, code: errorCode(error) ?? String(error) });
+export type ReadOptions = { atPrompt?: boolean };
 
-/** The plan registry. Only text that is not JSON is corrupt; any other refusal of `parseRegistry` reads as an empty registry. */
-export function readRegistry(root: string): RegistryRead {
-  const path = registryPath(root);
-  let text: string;
+function taskListIdOf(root: string, sessionId: string, atPrompt: boolean): string {
+  let marker: Record<string, unknown> | undefined;
   try {
-    text = readFileSync(path, "utf8");
+    marker = latestMarker(root, sessionId);
   } catch (error) {
-    return isMissing(error) ? { kind: "absent" } : unreadable(path, error);
+    console.error(`omca: could not read the mod marker of session ${sessionId}:`, error);
   }
-  const parsed = parseRegistry(text);
-  if (parsed.kind === "ok") return { kind: "ok", data: parsed.registry };
-  return parsed.code === "unparseable" ? { kind: "corrupt" } : { kind: "ok", data: asRegistry({}) };
+  // With no marker, a prompt is a session's first, as after `/clear`: the mod is about to name the list as it always does.
+  // On any later event the mod is not running, and the client keeps tasks under the session id.
+  if (marker === undefined) return process.env.CLAUDE_CODE_TASK_LIST_ID || (atPrompt ? taskListIdFor(root) : sessionId);
+  const named = marker.task_list;
+  return typeof named === "string" && named !== "" ? named : sessionId;
 }
 
 /**
- * The plan this session is explicitly bound to, with its file. `file` is undefined when the plan
- * file is missing; any other error reading it is `unreadable`.
+ * The session's native task list in id order, as `runState` needs it. The client deletes a finished
+ * list on its own, so a missing directory is an empty list and a file gone or torn mid-read is skipped.
  */
-export function readBoundPlan(root: string, sessionId: string, registry = readRegistry(root)): BoundPlanRead {
-  if (registry.kind !== "ok") return registry;
-  const plan = resolveBoundPlan(registry.data, sessionId, true);
-  if (plan === undefined || !("plan_name" in plan)) return { kind: "unbound" };
-  const path = resolve(root, plan.active_plan);
-  const bound = { kind: "ok", name: plan.plan_name, path: plan.active_plan, boundAt: asRegistry(registry.data).bindings[sessionId]?.bound_at } as const;
+export function readTasks(root: string, sessionId: string, { atPrompt = false }: ReadOptions = {}): NativeTask[] {
+  const config = configDir(process.env);
+  if (config === undefined) return [];
+  const dir = taskListDir(toPlatform(process.platform), config, taskListIdOf(root, sessionId, atPrompt));
+  let names: string[];
   try {
-    const bytes = readFileSync(path);
-    return { ...bound, file: { bytes, content: bytes.toString("utf8") } };
+    names = readdirSync(dir);
   } catch (error) {
-    return isMissing(error) ? { ...bound, file: undefined } : unreadable(path, error);
+    if (!isMissing(error)) console.error(`omca: could not list the tasks in ${dir}:`, error);
+    return [];
   }
+  const tasks = names
+    .filter((name) => name.endsWith(".json") && !name.startsWith("."))
+    .flatMap((name) => {
+      try {
+        return parseTask(readFileSync(join(dir, name), "utf8")) ?? [];
+      } catch {
+        return [];
+      }
+    });
+  return withHistory([], tasks);
+}
+
+export type OpenRun = { name: string; open: readonly NativeTask[]; next: NativeTask };
+
+/** The session's run while it has tasks still to do. Every open task may wait on another, and `next` then names the first. */
+export function readOpenRun(root: string, sessionId: string, options: ReadOptions = {}): OpenRun | undefined {
+  const run = runState(readTasks(root, sessionId, options));
+  const next = run?.next ?? run?.open[0];
+  return run === undefined || next === undefined ? undefined : { name: run.name, open: run.open, next };
 }
 
 export const seconds = (ms: number): number => Math.floor(ms / 1000);

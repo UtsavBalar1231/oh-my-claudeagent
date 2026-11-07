@@ -3,7 +3,6 @@ import type { Features, Input } from "./dispatch.ts";
 import type { Host } from "./host.ts";
 import * as pane from "./pane.ts";
 import * as doctor from "./tabs/doctor.ts";
-import * as plan from "./tabs/plan.ts";
 import * as stats from "./tabs/stats.ts";
 
 export type Subcommand = (
@@ -12,11 +11,10 @@ export type Subcommand = (
   args: string,
 ) => CommandRunResult | undefined | Promise<CommandRunResult | undefined>;
 
-export const USAGE = "Usage: /omca [plan [name|path]|stats|doctor]";
+export const USAGE = "Usage: /omca [stats|doctor]";
 
 const SUBCOMMANDS = new Map<string, Subcommand>([
   ["", pane.command],
-  ["plan", plan.command],
   ["stats", stats.command],
   ["doctor", doctor.command],
 ]);

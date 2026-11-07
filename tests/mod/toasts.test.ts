@@ -1,17 +1,8 @@
 import type { On } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
-import { BOULDER, LEDGER, ROOT, run, SESSION, type World, world, write } from "./world.ts";
+import { LEDGER, ROOT, run, SESSION, type World, world, write } from "./world.ts";
 
 const STATUS = `${ROOT}/.omca/state/session/${SESSION}.json`;
-const PLAN = `${ROOT}/plans/widget.md`;
-
-const registry = JSON.stringify({
-  plans: { widget: { active_plan: PLAN, started_at: "2026-10-02T10:00:00Z", session_ids: [SESSION] } },
-  bindings: { [SESSION]: { plan_name: "widget", bound_at: 1 } },
-});
-
-const planText = (done: number, total: number) =>
-  `# Widget\n\n## TODOs\n\n${Array.from({ length: total }, (_, i) => `- [${i < done ? "x" : " "}] ${i + 1}. Task ${i + 1}`).join("\n")}\n`;
 
 const status = (at: number, exitCode: number) =>
   JSON.stringify({ session_id: SESSION, last_hook_at: at, verification: { command: "bun test", at, exit_code: exitCode, evidence_logged: false } });
@@ -75,8 +66,8 @@ test("a nonzero verification toasts once, and one from before the session toasts
   expect(w.toasts).toHaveLength(1);
 });
 
-test("a subagent's turn reads no file while the registry, plan, ledger and status file keep their stamps, and still toasts a failed verification", async ($, on) => {
-  const w = setup(on, { [BOULDER]: registry, [PLAN]: planText(3, 14), [STATUS]: status(1000, 0), [LEDGER]: JSON.stringify({ entries: [] }) });
+test("a subagent's turn reads no file while the ledger and status file keep their stamps, and still toasts a failed verification", async ($, on) => {
+  const w = setup(on, { [STATUS]: status(1000, 0), [LEDGER]: JSON.stringify({ entries: [] }) });
   await start($);
   await mainTurn($);
   w.contentReads.length = 0;
@@ -87,47 +78,4 @@ test("a subagent's turn reads no file while the registry, plan, ledger and statu
   write(w, STATUS, status(2000, 1));
   await finish($, "quiet-2");
   expect(w.toasts).toEqual(["Verification failed: bun test (exit 1)"]);
-});
-
-test("a plan going from 13/14 to 14/14 places one receipt and raises one notification, with no toast", async ($, on) => {
-  const notified: unknown[] = [];
-  on("ui.notify", (_$, e) => (notified.push(e), { value: { isSent: true, channel: "kitty" } }));
-  const w = setup(on, { [BOULDER]: registry, [PLAN]: planText(13, 14) });
-  await start($);
-  await mainTurn($);
-  expect(w.toasts).toEqual([]);
-
-  write(w, PLAN, planText(14, 14));
-  await mainTurn($);
-  await mainTurn($);
-  expect(w.placed).toHaveLength(1);
-  expect(w.toasts).toEqual([]);
-  expect(notified).toEqual([{ text: "Plan complete: widget 14/14", title: "OMCA" }]);
-});
-
-test("a plan closing with a blocked task notifies that it closed, not that it is complete", async ($, on) => {
-  const notified: unknown[] = [];
-  on("ui.notify", (_$, e) => (notified.push(e), { value: { isSent: true, channel: "kitty" } }));
-  const w = setup(on, { [BOULDER]: registry, [PLAN]: "- [x] 1. a\n- [ ] 2. b\n" });
-  await start($);
-  await mainTurn($);
-
-  write(w, PLAN, "- [x] 1. a\n- [~] 2. b\n");
-  await mainTurn($);
-  await mainTurn($);
-  expect(notified).toEqual([{ text: "Plan closed: widget 1/2, 1 blocked", title: "OMCA" }]);
-});
-
-test("an engine that raises no notification still places the plan's receipt and logs why", async ($, on) => {
-  on("ui.notify", () => {
-    throw new Error("no notification channel");
-  });
-  const w = setup(on, { [BOULDER]: registry, [PLAN]: planText(13, 14) });
-  await start($);
-  await mainTurn($);
-  write(w, PLAN, planText(14, 14));
-  await mainTurn($);
-  expect(w.placed).toHaveLength(1);
-  expect(w.toasts).toEqual([]);
-  expect(w.logs.some((line) => line.startsWith("band: notifying failed:"))).toBe(true);
 });

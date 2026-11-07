@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { commandTab, footerStatus, nextRunnable, noRunnableNote, plain, snapshotReader, targetKey, waitingOn, type ReadState, type Target } from "./tui-model.ts";
+import type { NativeTask } from "../src/core/native-tasks.ts";
+import { commandTab, footerStatus, noRunnableNote, plain, snapshotReader, targetKey, type ReadState, type Target } from "./tui-model.ts";
 
 const target = (sessionID: string, directory = "/checkout"): Target => ({ sessionID, location: { directory } });
 const tick = async () => { await Promise.resolve(); await Promise.resolve(); };
@@ -17,52 +18,35 @@ test("/omca accepts only inspection tabs, with or without the slash prefix", () 
   expect(commandTab()).toBe("Overview");
   expect(commandTab(" /omca  evidence ")).toBe("Evidence");
   expect(commandTab("doctor")).toBe("Doctor");
-  expect(commandTab("plan")).toBe("Plan");
+  expect(commandTab("tasks")).toBe("Tasks");
   expect(commandTab("agents")).toBe("Agents");
   expect(commandTab("notepad")).toBe("Notepad");
   expect(commandTab("start-work")).toBeUndefined();
-  expect(commandTab("plan /other/file")).toBeUndefined();
+  expect(commandTab("plan")).toBeUndefined();
+  expect(commandTab("tasks /other/file")).toBeUndefined();
 });
 
-describe("blocked tasks in the plan view", () => {
-  const row = (number: number, state: "open" | "done" | "blocked", dependencies: number[] = []) => ({ number, state, dependencies });
+describe("blocked tasks in the task view", () => {
+  const row = (id: string, status: NativeTask["status"], blockedReason = ""): NativeTask => ({ id, subject: `Task ${id}`, description: "", activeForm: "", status, owner: "", blocks: [], blockedBy: [], run: "work", isFinal: false, blockedReason, details: [] });
 
-  test("a blocked dependency keeps its dependent waiting", () => {
-    const tasks = [row(1, "blocked"), row(2, "open", [1])];
-    expect(waitingOn(row(2, "open", [1]), tasks)).toEqual([1]);
+  test("a run with an open task and none runnable says so", () => {
+    expect(noRunnableNote([row("1", "pending"), row("2", "pending")])).toBe("No task can run: every open task waits on another open task.");
   });
 
-  test("a done dependency leaves nothing to wait on", () => {
-    const tasks = [row(1, "done"), row(2, "open", [1])];
-    expect(waitingOn(row(2, "open", [1]), tasks)).toEqual([]);
+  test("a run with no open task and a blocked one says it is not complete", () => {
+    expect(noRunnableNote([row("1", "completed"), row("2", "pending", "no access")])).toBe("No task is open and 1 closed as blocked, so this run is not complete.");
   });
 
-  test("the next task passes over a blocked task and its dependent", () => {
-    expect(nextRunnable([row(1, "blocked"), row(2, "open", [1]), row(3, "open")])?.number).toBe(3);
-  });
-
-  test("a chain of dependents of a blocked task has no next task", () => {
-    expect(nextRunnable([row(1, "blocked"), row(2, "open", [1]), row(3, "open", [2])])).toBeUndefined();
-  });
-
-  test("a plan with only dependents of a blocked task says none can run", () => {
-    expect(noRunnableNote([row(1, "blocked"), row(2, "open", [1])])).toBe("No task can run: every open task waits on a blocked task.");
-  });
-
-  test("a plan with no open task and a blocked one says it is not complete", () => {
-    expect(noRunnableNote([row(1, "done"), row(2, "blocked")])).toBe("No task is open and 1 blocked, so this plan is not complete. Changing [~] back to [ ] reopens a task.");
-  });
-
-  test("a plan with every task done keeps the checked note", () => {
-    expect(noRunnableNote([row(1, "done")])).toBe("All task boxes are checked. Review acceptance criteria and verification before finishing.");
+  test("a run with every task completed says that", () => {
+    expect(noRunnableNote([row("1", "completed")])).toBe("Every task of this run is completed.");
   });
 
   test("the footer adds the blocked count", () => {
-    expect(footerStatus([row(1, "done"), row(2, "blocked"), row(3, "open")])).toBe("OMCA: 1/3 ⊗1");
+    expect(footerStatus([row("1", "completed"), row("2", "pending", "no access"), row("3", "pending")])).toBe("OMCA: 1/3 ⊗1");
   });
 
   test("the footer stays plain with none blocked", () => {
-    expect(footerStatus([row(1, "done"), row(2, "open")])).toBe("OMCA: 1/2");
+    expect(footerStatus([row("1", "completed"), row("2", "pending")])).toBe("OMCA: 1/2");
   });
 });
 

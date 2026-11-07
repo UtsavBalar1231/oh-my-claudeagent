@@ -31,8 +31,8 @@ describe("registry", () => {
   test("lists every handler per event, in order", () => {
     const names = Object.fromEntries(Object.entries(REGISTRY).map(([event, handlers]) => [event, handlers.map(([name]) => name)]));
     expect(names).toEqual({
-      PreToolUse: ["plan-write-guard", "comment-gate"],
-      PostToolUse: ["verification-recorder", "context-injector", "plan-format-warn", "empty-task-response"],
+      PreToolUse: ["final-task-guard", "comment-gate"],
+      PostToolUse: ["verification-recorder", "context-injector", "task-touch", "empty-task-response"],
       PostToolUseFailure: ["failure-recovery"],
       UserPromptSubmit: ["mod-notice", "guidance", "keyword-detector"],
       UserPromptExpansion: ["guidance", "slash-mode-detector"],
@@ -74,7 +74,7 @@ describe("hooks.json against the registry", () => {
     UserPromptSubmit: ["agent_id", "prompt", "session_title"],
     UserPromptExpansion: ["command_name"],
     SubagentStart: ["agent_type"],
-    TaskCompleted: [],
+    TaskCompleted: ["task_id"],
     Stop: ["transcript_path", "stop_hook_active", "last_assistant_message", "background_tasks"],
     SessionStart: ["source"],
   };
@@ -82,6 +82,10 @@ describe("hooks.json against the registry", () => {
   test("hooks.json registers exactly the registry's events, and the table covers each one", () => {
     expect(Object.keys(HOOKS).toSorted()).toEqual(Object.keys(REGISTRY).toSorted());
     expect(Object.keys(READS).toSorted()).toEqual(Object.keys(REGISTRY).toSorted());
+  });
+
+  test("PostToolUse reaches the task tools, whose touch the continuation gate waits for", () => {
+    expect(HOOKS.PostToolUse?.map(({ matcher }) => matcher)).toEqual(["Read|Write|Edit|Agent|SubagentHandback|Bash|PowerShell|TaskCreate|TaskUpdate"]);
   });
 
   test("every entry passes its event, the session id and each field its handlers read, substituted from the payload", () => {

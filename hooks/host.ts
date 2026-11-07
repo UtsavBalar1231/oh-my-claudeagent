@@ -1,9 +1,6 @@
-import type { EngineInterface, FsBytes, PluginState, SessionMessage, Settings, SettingsReadArgs, StateRead, StateSetOptions, StateSetResult } from "claude-code";
-import { parseRegistry, resolveBoundPlan } from "../src/core/boulder.ts";
-import { readLedger } from "../src/core/evidence.ts";
-import { BOULDER, LEDGER } from "../src/core/omca-paths.ts";
-import { configDir, type Env as PathEnv, homeDir, inferPlatform, isAbsolutePath, joinPath, type Platform, samePath } from "../src/core/path.ts";
-import { parseRuns, provingRuns, type Run, type Verdict, verdictFrom } from "../src/core/proof.ts";
+import type { EngineInterface, PluginState, SessionMessage, Settings, SettingsReadArgs, StateRead, StateSetOptions, StateSetResult } from "claude-code";
+import { LEDGER } from "../src/core/omca-paths.ts";
+import { configDir, type Env as PathEnv, homeDir, inferPlatform, type Platform } from "../src/core/path.ts";
 import { type GlyphTier, glyphTier } from "../src/core/ui-kit.ts";
 
 export type State = PluginState["oh-my-claudeagent"];
@@ -32,6 +29,9 @@ export type Host = {
     HOMEDRIVE: Env;
     HOMEPATH: Env;
     CLAUDE_CONFIG_DIR: Env;
+    CLAUDE_CODE_TASK_LIST_ID: Env;
+    CLAUDE_CODE_ENABLE_TODO_TOOLS: Env;
+    CLAUDE_CODE_ENABLE_TASKS: Env;
     OMCA_GLYPHS: Env;
     OMCA_DISABLED_HOOKS: Env;
     CLAUDE_CODE_SUBAGENT_MODEL_FORCE: Env;
@@ -45,7 +45,6 @@ export type Host = {
   };
   fs: {
     read: (path: string) => Promise<string>;
-    readBytes: (path: string) => Promise<FsBytes>;
     write: Engine["fs"]["write"];
     stat: Engine["fs"]["stat"];
     list: Engine["fs"]["list"];
@@ -63,10 +62,8 @@ export type Host = {
     resolve: Engine["ui"]["resolve"];
     copy: Engine["ui"]["copy"];
     toast: Engine["ui"]["toast"];
-    notify: Engine["ui"]["notify"];
     blit: Engine["ui"]["blit"];
     view: Engine["ui"]["view"];
-    place: Engine["ui"]["place"];
     status: Engine["ui"]["status"];
   };
   session: {
@@ -79,6 +76,9 @@ export type Host = {
     transcript: (args: { agentId: string }) => Promise<SessionMessage[] | { deny: string }>;
   };
   settings: { read: (args?: Pick<SettingsReadArgs, "source">) => Promise<Settings> };
+  tool: { list: Engine["tool"]["list"] };
+  enableTaskTools: () => ReturnType<Engine["env"]["set"]>;
+  nameTaskList: (id: string) => ReturnType<Engine["env"]["set"]>;
   agent: { list: Engine["agent"]["list"] };
   command: { register: Engine["command"]["register"] };
   clock: {
@@ -154,12 +154,6 @@ export async function sessionOf(host: Host): Promise<Session> {
 /** What `sessionOf` resolved, for a drawing that must not wait on the engine. */
 export const resolvedSession = (): Session => session ?? UNRESOLVED;
 
-/** The file's raw bytes, so a digest covers exactly what the server hashes. */
-export async function bytesOf(host: Host, path: string): Promise<Uint8Array> {
-  const { base64 } = await host.fs.readBytes(path);
-  return Uint8Array.fromBase64(base64);
-}
-
 /**
  * Puts `text` in the prompt box. Where the box does not take it, as on a surface that draws its
  * own composer, a toast carries the text so the person can type it.
@@ -170,29 +164,10 @@ export async function fillPrompt(host: Host, text: string): Promise<void> {
   host.ui.toast(refusal === "dialog" ? `Close the open dialog, then type: ${text}` : `The prompt box cannot be filled here. Type: ${text}`);
 }
 
-/** The plan this session is bound to, undefined when none is; throws when the registry is not JSON. */
-export async function boundPlanOf(host: Host): Promise<{ name: string; path: string } | undefined> {
-  const [root, sessionId] = await Promise.all([host.session.root(), host.session.id()]);
-  const registry = `${root}/${BOULDER}`;
-  if (!(await host.fs.exists(registry))) return undefined;
-  const parsed = parseRegistry(await host.fs.read(registry));
-  if (parsed.kind === "refused" && parsed.code === "unparseable") throw new Error(parsed.reason);
-  const plan = parsed.kind === "ok" ? resolveBoundPlan(parsed.registry, sessionId, true) : undefined;
-  return plan === undefined || plan.active_plan === "" ? undefined : { name: plan.plan_name, path: plan.active_plan };
-}
-
 /** The evidence ledger's modification time in whole seconds, 0 when there is none. */
 export async function ledgerWrittenAt(host: Host, root: string): Promise<number> {
   const path = `${root}/${LEDGER}`;
   return (await host.fs.exists(path)) ? Math.floor((await host.fs.stat(path)).mtimeMs / 1000) : 0;
-}
-
-/** The ledger as the shared reader takes it, undefined while there is none; throws when the reader refuses it. */
-export async function ledgerDocument(host: Host, path: string): Promise<unknown> {
-  if (!(await host.fs.exists(path))) return undefined;
-  const read = readLedger(await host.fs.read(path));
-  if (read.kind === "refused") throw new Error(read.reason);
-  return read.document;
 }
 
 /** `mtimeMs:size`, or `absent` when the file cannot be stated. */
@@ -201,94 +176,3 @@ export const stampOf = (host: Host, path: string): Promise<string> =>
     ({ mtimeMs, size }) => `${mtimeMs}:${size}`,
     () => "absent",
   );
-
-type Ledger = { path: string; seen: string; proving: readonly Run[]; error: string | null };
-
-// The ledger is rewritten whole and only ever appended to, so every write moves its size and a
-// read at an unchanged stamp would parse the same text.
-let ledger: Ledger | undefined;
-
-/** The ledger's test, build and lint runs newest first, read again only when its stamp moves. */
-async function ledgerOf(host: Host, root: string): Promise<Ledger> {
-  const path = `${root}/${LEDGER}`;
-  const seen = await stampOf(host, path);
-  if (ledger?.path === path && ledger.seen === seen) return ledger;
-  let runs: Run[] = [];
-  let error: string | null = null;
-  if (seen !== "absent") {
-    try {
-      runs = parseRuns(await host.fs.read(path));
-    } catch (failure) {
-      error = reason(failure);
-    }
-  }
-  ledger = { path, seen, proving: provingRuns(runs), error };
-  return ledger;
-}
-
-/**
- * What proves a plan's tasks: each listed file's modification time, null for one that cannot be
- * stated, and the ledger's test, build and lint runs newest first, or why the ledger could not be
- * read. `ledgerSeen` changes when the ledger does.
- */
-export type ProofFacts = {
-  changes: ReadonlyMap<string, number | null>;
-  proving: readonly Run[];
-  ledgerError: string | null;
-  ledgerSeen: string;
-  startedAt: number | undefined;
-};
-
-// Keyed on the event a dispatch hands every feature, so features of one dispatch share the files'
-// stats and the entry goes with the event.
-const statted = new WeakMap<object, { files: string; changes: ReadonlyMap<string, number | null> }>();
-
-async function changesOf(host: Host, root: string, paths: readonly string[]): Promise<ReadonlyMap<string, number | null>> {
-  const { platform } = await sessionOf(host);
-  const stamps = await Promise.all(
-    paths.map((path) =>
-      host.fs.stat(isAbsolutePath(platform, path) ? path : joinPath(platform, root, path)).then(
-        (stat) => (stat.kind === "file" ? stat.mtimeMs : null),
-        () => null,
-      ),
-    ),
-  );
-  return new Map(paths.map((path, index) => [path, stamps[index] ?? null]));
-}
-
-/** The registry's `started_at` for the plan at `planPath` in milliseconds, undefined when it is unregistered, has none or has one that does not parse. */
-async function startOf(host: Host, root: string, planPath: string): Promise<number | undefined> {
-  const registry = `${root}/${BOULDER}`;
-  if (!(await host.fs.exists(registry))) return undefined;
-  const parsed = parseRegistry(await host.fs.read(registry));
-  if (parsed.kind !== "ok") return undefined;
-  const { platform } = await sessionOf(host);
-  const entry = Object.values(parsed.registry.plans).find(({ active_plan: file }) => file !== undefined && samePath(platform, file, planPath));
-  const startedAt = Date.parse(entry?.started_at ?? "");
-  return Number.isNaN(startedAt) ? undefined : startedAt;
-}
-
-/** `within` is the dispatch's event, so a second call in the same dispatch stats no file again. `planPath` names the plan whose start floors the change times. */
-export async function proofFacts(host: Host, files: readonly string[], planPath: string, within?: object): Promise<ProofFacts> {
-  const root = await host.session.root();
-  const paths = [...new Set(files)];
-  const key = JSON.stringify(paths);
-  const shared = within === undefined ? undefined : statted.get(within);
-  const changes = shared?.files === key ? shared.changes : await changesOf(host, root, paths);
-  if (within !== undefined) statted.set(within, { files: key, changes });
-  const { seen, proving, error } = await ledgerOf(host, root);
-  return { changes, proving, ledgerError: error, ledgerSeen: seen, startedAt: await startOf(host, root, planPath) };
-}
-
-/** A task's proof from the facts: undefined when the ledger is unreadable or none of its files can be stated. */
-export function verdictFor(facts: ProofFacts, files: readonly string[]): Verdict | undefined {
-  if (facts.ledgerError !== null) return undefined;
-  return verdictFrom(
-    files.flatMap((file) => {
-      const at = facts.changes.get(file);
-      return at === undefined || at === null ? [] : [at];
-    }),
-    facts.proving,
-    facts.startedAt,
-  );
-}

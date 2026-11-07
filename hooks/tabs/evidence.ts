@@ -10,23 +10,18 @@ import {
   rerunPrompt,
   shownIndices,
   TYPE_WORDS,
-  treeMovedSince,
-  verdictOf,
 } from "../../src/core/evidence.ts";
-import { planTasks, taskCounts } from "../../src/core/checkboxes.ts";
-import { BOULDER, LEDGER } from "../../src/core/omca-paths.ts";
-import { sha256Hex } from "../../src/core/sha256.ts";
+import { LEDGER } from "../../src/core/omca-paths.ts";
 import { agentGlyph, clockOf, COLUMN_GAP, dayOf, displayWidth, fitEnd, fitMiddle, oneLine, padEnd, shortType, wrapText } from "../../src/core/ui-kit.ts";
-import { agentKey, chip, type ChipTone, fitPieces, ON_SURFACE, type Piece, piecesWidth, redact, rule, TONE_KEYS } from "../../src/core/visual.ts";
+import { agentKey, chip, fitPieces, ON_SURFACE, type Piece, piecesWidth, redact, rule, TONE_KEYS } from "../../src/core/visual.ts";
 import type { Input } from "../dispatch.ts";
-import { boundPlanOf, bytesOf, fillPrompt, type Host, reason, type State } from "../host.ts";
+import { fillPrompt, type Host, reason, type State } from "../host.ts";
 import { blanks, buttonRow, noticeRow, refocus, type TabView, type View, wrapAt } from "../pane.ts";
 import { codeUnits, resetOffset, ScrollRegion, type Unit } from "../regions.ts";
 import { Card, Field, isRemote, Line, Pieces } from "../ui.ts";
 
 type Ledger = State["ledger"];
 type Entry = Ledger["entries"][number];
-type Bound = { name: string; path: string } | { name: string; error: string } | null;
 type Block = { element: RenderElement; height: number };
 
 const POINTER_CELLS = 2;
@@ -44,14 +39,12 @@ const DETAIL_INDENT = 4;
 const OPENED_REGION = "evidence-opened";
 const CARD_CHROME_ROWS = 3;
 const CARD_INSET = 2;
-// An entry with its two cue rows; the verdict, the filter state and the key row each give way before it.
+// An entry with its two cue rows; the latest runs, the filter state and the key row each give way before it.
 const MIN_TIMELINE_ROWS = 3;
 const NEIGHBOURS = 2;
 // The card's chrome and enough rows inside it to carry both scroll cues and some content.
 const MIN_CARD_ROWS = CARD_CHROME_ROWS + 5;
 const MIN_OPENED_ROWS = 2;
-// A docked body shorter than this draws the verdict as one line, as the Plan header does.
-const CARD_FROM_ROWS = 24;
 const NO_LIMIT = Number.POSITIVE_INFINITY;
 // Desktop refuses a tree of more than 2,000 nodes. Counting every element and every text leaf, an entry
 // row is 28 nodes (39 with a day heading of its own) and the rest of the pane about 50, so 40 entries
@@ -59,14 +52,12 @@ const NO_LIMIT = Number.POSITIVE_INFINITY;
 export const ENTRY_CAP = 40;
 
 let seen: string | undefined;
-let boulder: { stamp: string; bound: Bound } | undefined;
 let filter: Filter = { type: null, isFailuresOnly: false, query: "" };
 let isSearching = false;
 let focused: number | undefined;
 let cardFor: number | undefined;
 let first = 0;
 let pageStart = 0;
-let pagedFor: string | null | undefined;
 let note = "";
 let laid: { shown: readonly number[]; perPage: number } | undefined;
 
@@ -74,30 +65,6 @@ async function stamp(host: Host, path: string): Promise<string> {
   if (!(await host.fs.exists(path))) return "missing";
   const { mtimeMs, size } = await host.fs.stat(path);
   return `${mtimeMs}:${size}`;
-}
-
-async function boundPlan(host: Host, root: string): Promise<{ stamp: string; bound: Bound }> {
-  const path = `${root}/${BOULDER}`;
-  try {
-    const at = await stamp(host, path);
-    if (boulder?.stamp === at) return boulder;
-    const bound = (await boundPlanOf(host)) ?? null;
-    boulder = { stamp: at, bound };
-    return boulder;
-  } catch (error) {
-    boulder = undefined;
-    return { stamp: "failed", bound: { name: "", error: `Could not read ${BOULDER}: ${reason(error)}` } };
-  }
-}
-
-async function planOf(host: Host, bound: Bound): Promise<Ledger["plan"]> {
-  if (bound === null || "error" in bound) return bound;
-  try {
-    const bytes = await bytesOf(host, bound.path);
-    return { name: bound.name, sha: sha256Hex(bytes), blocked: taskCounts(planTasks(new TextDecoder().decode(bytes))).blocked };
-  } catch (error) {
-    return { name: bound.name, error: `Could not read the plan file: ${reason(error)}` };
-  }
 }
 
 async function entriesOf(host: Host, path: string, at: string): Promise<Pick<Ledger, "entries" | "error">> {
@@ -109,20 +76,14 @@ async function entriesOf(host: Host, path: string, at: string): Promise<Pick<Led
   }
 }
 
-/** Reads the ledger and the bound plan's bytes into the ledger atom when either changed since the last read. */
+/** Reads the ledger into the ledger atom when it changed since the last read. */
 export async function sync(host: Host, root: string): Promise<void> {
   if ((await host.state.ledger.get()).value === undefined) seen = undefined;
   const path = `${root}/${LEDGER}`;
-  const { stamp: boulderAt, bound } = await boundPlan(host, root);
-  const planPath = bound !== null && "path" in bound ? bound.path : "";
-  const [ledgerAt, planAt] = await Promise.all([
-    stamp(host, path).catch((error: unknown) => `failed:${reason(error)}`),
-    planPath === "" ? "" : stamp(host, planPath).catch(() => "failed"),
-  ]);
-  const key = JSON.stringify([ledgerAt, boulderAt, planPath, planAt]);
+  const key = await stamp(host, path).catch((error: unknown) => `failed:${reason(error)}`);
   if (key === seen) return;
-  const [ledger, plan, readAt] = await Promise.all([entriesOf(host, path, ledgerAt), planOf(host, bound), host.clock.now()]);
-  await host.state.ledger.set({ ...ledger, plan, readAt });
+  const [ledger, readAt] = await Promise.all([entriesOf(host, path, key), host.clock.now()]);
+  await host.state.ledger.set({ ...ledger, readAt });
   seen = key;
 }
 
@@ -159,7 +120,6 @@ function moveFocus(shown: readonly number[], by: number): void {
 }
 
 const masked = (view: View, text: string) => redact(text, view.home, view.g.mask);
-const when = (at: number) => `${dayOf(at).slice(5)} ${clockOf(at)}`;
 
 const line = (view: View, pieces: readonly Piece[], room: number) => Line(view.kit, fitPieces(pieces, room, view.g.ellipsis));
 const gap: Piece = { text: " ".repeat(COLUMN_GAP) };
@@ -169,7 +129,7 @@ const capital = (word: string) => `${word.slice(0, 1).toUpperCase()}${word.slice
 const outcome = (view: View, code: number): Piece =>
   code === 0 ? { text: view.g.check, color: TONE_KEYS.ok } : { text: view.g.cross, color: TONE_KEYS.fail };
 
-// The final verification, the plan's own, reads bold; every other type is a muted category.
+// The final verification reads bold; every other type is a muted category.
 const typePiece = (type: EvidenceType): Piece =>
   type === "final_verification"
     ? { text: padEnd(TYPE_WORDS[type], TYPE_CELLS), color: ON_SURFACE, bold: true }
@@ -213,69 +173,25 @@ function wrapGroups(groups: readonly (readonly Piece[])[], room: number, sep: Pi
   return lines;
 }
 
-function verdictLine(view: View, ledger: Ledger): { tone: ChipTone; title: string; groups: Piece[][]; when: Piece[] } {
-  const { plan } = ledger;
-  const mark = (label: string, tone: ChipTone, text: string): Piece[] => [chip(label, tone, view.isAscii), { text: ` ${text}` }];
-  const at = (time: number): Piece[] => [{ text: when(time), color: TONE_KEYS.muted }];
-  if (plan === null) {
-    return { tone: "muted", title: "Final verification", groups: [mark("NO PLAN", "muted", "no plan is bound to this session")], when: [] };
-  }
-  const title = `Final verification ${view.g.dot} ${plan.name}`;
-  if ("error" in plan) return { tone: "warn", title, groups: [mark("UNKNOWN", "warn", masked(view, plan.error).text)], when: [] };
-  const verdict = verdictOf(ledger.entries, plan.sha);
-  switch (verdict.kind) {
-    case "complete":
-      if (treeMovedSince(ledger.entries, verdict.entry)) {
-        return { tone: "warn", title, groups: [mark("STALE", "warn", "code changed since it passed"), at(verdict.entry.at)], when: at(verdict.entry.at) };
-      }
-      return plan.blocked > 0
-        ? { tone: "warn", title, groups: [mark("CLOSED", "warn", `not complete, ${plan.blocked} blocked`), at(verdict.entry.at)], when: at(verdict.entry.at) }
-        : { tone: "ok", title, groups: [mark("COMPLETE", "ok", "matches the current plan"), at(verdict.entry.at)], when: at(verdict.entry.at) };
-    case "stale":
-      return { tone: "warn", title, groups: [mark("STALE", "warn", "plan edited since it passed"), at(verdict.entry.at)], when: at(verdict.entry.at) };
-    case "missing":
-      return verdict.failed === null
-        ? { tone: "fail", title, groups: [mark("MISSING", "fail", "no passing run yet")], when: [] }
-        : {
-            tone: "fail",
-            title,
-            groups: [mark("MISSING", "fail", `last run exited ${verdict.failed.exitCode}`), at(verdict.failed.at)],
-            when: at(verdict.failed.at),
-          };
-  }
+// Each proving type's newest run as a checklist, so a reader sees what is broken now.
+function latestGroups(view: View, entries: readonly Entry[]): Piece[][] {
+  return latestByType(entries).map(({ type, isPassing }): Piece[] => [outcome(view, isPassing ? 0 : 1), { text: ` ${TYPE_WORDS[type]}` }]);
 }
 
-// Each proving type's newest run as a checklist, so a reader sees what is broken now. With no plan bound
-// the checklist stands alone under the verdict, so it is labelled as the ledger's newest runs.
-function latestGroups(view: View, entries: readonly Entry[], isLabelled: boolean): Piece[][] {
-  const runs = latestByType(entries).map(({ type, isPassing }): Piece[] => [outcome(view, isPassing ? 0 : 1), { text: ` ${TYPE_WORDS[type]}` }]);
-  return isLabelled && runs.length > 0 ? [[{ text: "latest runs", color: TONE_KEYS.muted }], ...runs] : runs;
-}
-
-function header(view: View, ledger: Ledger, isCard: boolean): Block {
-  const { tone, title, groups, when: time } = verdictLine(view, ledger);
-  const latest = latestGroups(view, ledger.entries, ledger.plan === null);
-  const sep = { text: ` ${view.g.dot} `, color: TONE_KEYS.muted };
-  if (!isCard) {
-    const pieces: Piece[] = [...(groups[0]?.slice(0, 1) ?? [])];
-    if (ledger.plan !== null) pieces.push({ text: ` ${ledger.plan.name}`, bold: true });
-    const more = { text: ` ${view.g.ellipsis}`, color: TONE_KEYS.muted };
-    for (const group of [...latest, ...(time.length === 0 ? [] : [time])]) {
-      const next = [gap, ...group];
-      if (piecesWidth(pieces) + piecesWidth(next) > view.width) {
-        if (piecesWidth(pieces) + piecesWidth([more]) <= view.width) pieces.push(more);
-        break;
-      }
-      pieces.push(...next);
+function header(view: View, ledger: Ledger): Block | undefined {
+  const latest = latestGroups(view, ledger.entries);
+  if (latest.length === 0) return undefined;
+  const pieces: Piece[] = [{ text: "latest runs", color: TONE_KEYS.muted }];
+  const more = { text: ` ${view.g.ellipsis}`, color: TONE_KEYS.muted };
+  for (const group of latest) {
+    const next = [gap, ...group];
+    if (piecesWidth(pieces) + piecesWidth(next) > view.width) {
+      if (piecesWidth(pieces) + piecesWidth([more]) <= view.width) pieces.push(more);
+      break;
     }
-    return { element: line(view, pieces, view.width), height: 1 };
+    pieces.push(...next);
   }
-  const inner = view.width - 4;
-  const lines = [...wrapGroups(groups, inner, sep), ...wrapGroups(latest, inner, gap)];
-  return {
-    element: Card(view.kit, { key: "verdict", title: fitEnd(title, inner, view.g.ellipsis), tone, isAscii: view.isAscii, children: lines.map((pieces) => line(view, pieces, inner)) }),
-    height: 3 + lines.length,
-  };
+  return { element: line(view, pieces, view.width), height: 1 };
 }
 
 type Layout = { command: number; agent: number };
@@ -477,11 +393,10 @@ function actions(host: Host, view: View, ledger: Ledger, entry: Entry | undefine
   ];
   if (entry === undefined) return filters;
   const command = masked(view, entry.command).text;
-  const planSha = ledger.plan !== null && "sha" in ledger.plan ? ledger.plan.sha : null;
   return [
     ...filters,
     ["c", "Copy", (surface) => copyCommand(host, command, surface)],
-    ["r", "Rerun", () => fillPrompt(host, rerunPrompt(entry.type, command, planSha))],
+    ["r", "Rerun", () => fillPrompt(host, rerunPrompt(entry.type, command))],
   ];
 }
 
@@ -527,12 +442,7 @@ type Item = { index: number; entry: Entry };
 // One page of `ENTRY_CAP` entries under their day headings, with a Button to the newer page above and
 // the older one below: the surface scrolls the pane itself, and refuses a tree past its node cap, so a
 // page replaces the last rather than adding to it.
-function remoteTimeline(host: Host, view: View, ledger: Ledger, items: readonly Item[], current: number, layout: Layout, list: { width: number; isExpanded: boolean }): Drawn {
-  const planName = ledger.plan?.name ?? null;
-  if (planName !== pagedFor) {
-    pageStart = 0;
-    pagedFor = planName;
-  }
+function remoteTimeline(host: Host, view: View, items: readonly Item[], current: number, layout: Layout, list: { width: number; isExpanded: boolean }): Drawn {
   pageStart = Math.min(pageStart, Math.max(0, items.length - 1));
   const to = Math.min(pageStart + ENTRY_CAP, items.length);
   const open = items[current];
@@ -590,7 +500,7 @@ function timeline(host: Host, view: View, ledger: Ledger, shown: readonly number
     return { elements: [view.kit.Text({ dimColor: true, wrap: "wrap", children: [empty] })], height: wrapText(empty, list.width).length };
   }
   const layout = layoutOf(ledger.entries, list.width - (isRemote(view.kit) ? CLOCK_CHROME_CELLS : 0));
-  if (isRemote(view.kit)) return remoteTimeline(host, view, ledger, items, current, layout, list);
+  if (isRemote(view.kit)) return remoteTimeline(host, view, items, current, layout, list);
   const days = items.map(({ entry }) => dayOf(entry.at));
   const opensDay = days.map((day, position) => position === 0 || days[position - 1] !== day);
   const rowsAt = (position: number) => 1 + (opensDay[position] === true ? 1 : 0);
@@ -641,19 +551,11 @@ function timeline(host: Host, view: View, ledger: Ledger, shown: readonly number
   return { elements, height: isBelow ? room : height + (isAbove ? 1 : 0) };
 }
 
-// A final verification proves the plan whose hash it carries; one without a hash proves any plan.
-function planLine(view: View, entry: Entry, plan: Ledger["plan"]): Piece[] {
-  if (entry.planSha === "") return [{ text: "Proves any plan: it carries no plan hash", color: TONE_KEYS.muted }];
-  if (plan === null || !("sha" in plan)) return [{ text: "For a plan this session no longer has bound", color: TONE_KEYS.muted }];
-  if (entry.planSha === plan.sha) return [{ text: `${view.g.check} `, color: TONE_KEYS.ok }, { text: `For ${plan.name} as it is now`, color: TONE_KEYS.muted }];
-  return [{ text: `${view.g.warn} `, color: TONE_KEYS.warn }, { text: `For an earlier version of ${plan.name}`, color: TONE_KEYS.muted }];
-}
-
 /**
- * The focused run in full: its exit code, when and by whom, the plan a final verification covers,
- * then its command and its output, both wrapped rather than cut.
+ * The focused run in full: its exit code, when and by whom, then its command and its output, both
+ * wrapped rather than cut.
  */
-function cardUnits(view: View, entry: Entry, plan: Ledger["plan"], room: number): Unit[] {
+function cardUnits(view: View, entry: Entry, room: number): Unit[] {
   const { Text } = view.kit;
   const muted = TONE_KEYS.muted;
   const command = masked(view, entry.command);
@@ -664,13 +566,13 @@ function cardUnits(view: View, entry: Entry, plan: Ledger["plan"], room: number)
       [{ text: `exit ${entry.exitCode}`, color: entry.exitCode === 0 ? TONE_KEYS.ok : TONE_KEYS.fail }],
       [{ text: `${dayOf(entry.at)} ${clockOf(entry.at, true)}`, color: muted }],
       ...(entry.verifiedBy === null ? [] : [agentMeta(view, entry.verifiedBy)]),
+      ...(entry.type !== "final_verification" ? [] : [entry.taskId === "" ? [{ text: "names no task", color: muted }] : [{ text: `Task #${entry.taskId}` }]]),
       ...(hidden === 0 ? [] : [[{ text: `${words(hidden, "secret")} masked`, color: muted }]]),
     ],
     room,
     { text: ` ${view.g.dot} `, color: muted },
   );
-  const lead = [...facts, ...(entry.type === "final_verification" ? [planLine(view, entry, plan)] : [])];
-  const units: Unit[] = lead.map((pieces) => ({ element: line(view, pieces, room), rows: 1 }));
+  const units: Unit[] = facts.map((pieces) => ({ element: line(view, pieces, room), rows: 1 }));
   const section = (label: string) => units.push({ element: Text({ children: [" "] }), rows: 1 }, { element: Text({ color: muted, children: [label] }), rows: 1 });
   section("Command");
   units.push(...codeUnits(view.kit, command.text, room, "bash"));
@@ -684,9 +586,9 @@ function cardUnits(view: View, entry: Entry, plan: Ledger["plan"], room: number)
 }
 
 /** The card's content scrolls inside its border; `at` is the card's own corner in the tab's rows and columns. */
-function detailCard(view: View, entry: Entry, index: number, plan: Ledger["plan"], width: number, room: number, at: { left: number; top: number }): Drawn {
+function detailCard(view: View, entry: Entry, index: number, width: number, room: number, at: { left: number; top: number }): Drawn {
   const inner = width - 4;
-  const units = cardUnits(view, entry, plan, inner);
+  const units = cardUnits(view, entry, inner);
   const height = Math.max(1, Math.min(units.length, room - CARD_CHROME_ROWS));
   const isPass = entry.exitCode === 0;
   const name = entry.type === "final_verification" ? "Final verification" : `${TYPE_WORDS[entry.type].replace(/^./, (first) => first.toUpperCase())} run`;
@@ -723,11 +625,13 @@ export const view: TabView = async (host, view) => {
     const failure = `${view.g.cross} ${masked(view, ledger.error).text}`;
     return [Text({ color: TONE_KEYS.fail, wrap: "wrap", children: [failure] }), Text({ dimColor: true, wrap: "wrap", children: [why] })];
   }
-  const head = header(view, ledger, !view.isInline && view.rows >= CARD_FROM_ROWS);
   if (ledger.entries.length === 0) {
     const how = "Record a run with an evidence_log call after a build, test or lint.";
-    return [head.element, noticeRow(view, { kind: "empty" }, words), Text({ dimColor: true, wrap: "wrap", children: [how] })];
+    return [noticeRow(view, { kind: "empty" }, words), Text({ dimColor: true, wrap: "wrap", children: [how] })];
   }
+  const head = header(view, ledger);
+  const headRows = head === undefined ? [] : [head.element];
+  const headHeight = head?.height ?? 0;
 
   const shown = shownIndices(ledger.entries, filter, view.home);
   const current = Math.max(0, shown.indexOf(focused ?? -1));
@@ -738,18 +642,18 @@ export const view: TabView = async (host, view) => {
   const entry = index === undefined ? undefined : ledger.entries[index];
   const status = shown.length === 0 ? `0/${ledger.entries.length} ${view.g.dot} nothing matches` : statusOf(view, current, shown.length);
   const filters = filterRow(host, view, shown.length, ledger.entries.length);
-  const spare = view.rows - head.height - filters.length - MIN_TIMELINE_ROWS;
+  const spare = view.rows - headHeight - filters.length - MIN_TIMELINE_ROWS;
   const allKeys = keyRows(view, actions(host, view, ledger, entry), status, Math.max(1, spare));
   const keys = spare < 1 ? [] : allKeys;
-  const room = Math.max(MIN_TIMELINE_ROWS, view.rows - head.height - filters.length - keys.length);
-  const top = head.height + filters.length;
+  const room = Math.max(MIN_TIMELINE_ROWS, view.rows - headHeight - filters.length - keys.length);
+  const top = headHeight + filters.length;
   const isSplit = view.tier === "split" && entry !== undefined && index !== undefined && room >= MIN_CARD_ROWS;
   const listWidth = isSplit ? Math.floor(view.width * MASTER_SHARE) : view.width;
   const list = timeline(host, view, ledger, shown, current, room, { width: listWidth, top, isExpanded: !isSplit });
   if (!isRemote(view.kit) && laid !== undefined) view.layout.lists.push({ left: 0, top, width: listWidth, height: room, move: (by) => moveFocus(shown, by) });
   let body = list;
   if (isSplit) {
-    const card = detailCard(view, entry, index, ledger.plan, view.width - listWidth - COLUMN_GAP, room, { left: listWidth + COLUMN_GAP, top });
+    const card = detailCard(view, entry, index, view.width - listWidth - COLUMN_GAP, room, { left: listWidth + COLUMN_GAP, top });
     body = {
       elements: [
         Box({
@@ -763,8 +667,8 @@ export const view: TabView = async (host, view) => {
       height: Math.max(list.height, card.height),
     };
   }
-  if (isRemote(view.kit)) return [head.element, ...filters, ...body.elements, ...keys];
+  if (isRemote(view.kit)) return [...headRows, ...filters, ...body.elements, ...keys];
   const filled = top + Math.max(room, body.height) + keys.length;
   // One row past the body brings the arrows and the wheel to `scroll` instead of the focus ring.
-  return [head.element, ...filters, ...body.elements, ...blanks(view, room - body.height), ...keys, ...blanks(view, view.rows + 1 - filled)];
+  return [...headRows, ...filters, ...body.elements, ...blanks(view, room - body.height), ...keys, ...blanks(view, view.rows + 1 - filled)];
 };

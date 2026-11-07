@@ -1,6 +1,6 @@
 import type { RenderElement } from "claude-code";
 import { inlineMarkdown } from "../src/core/markdown.ts";
-import { chunks } from "../src/core/plan-reader.ts";
+import { chunks } from "../src/core/text.ts";
 import { displayWidth, fitEnd, type Glyphs, padEnd } from "../src/core/ui-kit.ts";
 import { wrapPieces } from "../src/core/visual.ts";
 import { CodeBlock, isRemote, type Kit, Line } from "./ui.ts";
@@ -12,13 +12,13 @@ import { CodeBlock, isRemote, type Kit, Line } from "./ui.ts";
 export type Unit = { element: RenderElement; rows: number };
 
 /** Where a region sits in its tab's own rows and columns. */
-export type Region = { key: string; left: number; top: number; width: number; height: number };
+type Region = { key: string; left: number; top: number; width: number; height: number };
 
 type Rect = Omit<Region, "key">;
 type Cell = { column: number; row: number };
 
 /** A list that draws its own window: the wheel over its rows moves it `by` rows. */
-export type Pinned = Rect & { move: (by: number) => unknown };
+type Pinned = Rect & { move: (by: number) => unknown };
 
 /**
  * What one terminal drawing laid out: its regions and lists in the tab's rows and columns, the
@@ -35,10 +35,13 @@ export type Layout = {
   treeRows: number;
 };
 
-// Each region's offset, in units, outlives a drawing; the layout is the latest committed drawing's only.
+const EMPTY: Layout = { seq: 0, regions: [], lists: [], chromeRows: 0, shownOffset: 0, isPadded: false, treeRows: 0 };
+
+// Each region's offset, in units, outlives a drawing; a pane's layout is its latest committed
+// drawing's only, since two panes can be open at once and each scrolls by its own.
 const offsets = new Map<string, number>();
 let drawings = 0;
-let committed: Layout = { seq: 0, regions: [], lists: [], chromeRows: 0, shownOffset: 0, isPadded: false, treeRows: 0 };
+const committed = new Map<string, Layout>();
 let aimed: string | undefined;
 
 const clamp = (value: number, low: number, high: number) => Math.min(high, Math.max(low, value));
@@ -54,11 +57,11 @@ export function newLayout(chromeRows: number, shownOffset: number): Layout {
  * and scrolls concurrently and a drawing awaits its tab, so a drawing that started earlier and
  * finishes later never replaces a newer one.
  */
-export function commitLayout(layout: Layout): void {
-  if (layout.seq > committed.seq) committed = layout;
+export function commitLayout(pane: string, layout: Layout): void {
+  if (layout.seq > (committed.get(pane)?.seq ?? 0)) committed.set(pane, layout);
 }
 
-export const committedLayout = (): Layout => committed;
+export const committedLayout = (pane: string): Layout => committed.get(pane) ?? EMPTY;
 
 /** Puts a region back at its top, as when what it shows changes. */
 export function resetOffset(key: string): void {
@@ -74,8 +77,8 @@ export function aimKeys(key: string | undefined): void {
  * Moves the aimed region, or the first that holds more than it shows, by a row, by its height less
  * one, or to an end; false when no region overflows.
  */
-export function scrollKeyed(by: number, step: "row" | "page" | "end"): boolean {
-  const { regions } = committed;
+export function scrollKeyed(pane: string, by: number, step: "row" | "page" | "end"): boolean {
+  const { regions } = committedLayout(pane);
   const region = regions.find((one) => one.key === aimed && one.max > 0) ?? regions.find((one) => one.max > 0);
   if (region === undefined) return false;
   const move = step === "row" ? by : step === "page" ? Math.sign(by) * Math.max(1, region.height - 1) : Math.sign(by) * region.max;

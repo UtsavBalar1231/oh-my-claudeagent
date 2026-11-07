@@ -1,13 +1,19 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { bindPlan } from "../state.ts"
 import { type Agent, installPackage, isolatedEnv, type Listing, opencodeBin, packageFixture, removeDir, scratchDir, type Server, startServer, startStubProvider, until, writeConfig } from "./harness.ts"
 
 const tmux = Bun.which("tmux")
 if (process.env.CI === "true" && process.env.RUNNER_OS === "Linux" && (!tmux || !opencodeBin)) throw new Error("Linux CI requires OpenCode and tmux; terminal coverage must not silently skip")
 let fixture: { root: string; ws: string; server: Server; sessionID: string; socket: string; stopProvider: () => Promise<void>; stopPackage: () => Promise<void> } | undefined
 const quote = (value: string) => `'${value.replaceAll("'", "'\\''")}'`
+
+function writeTask(id: string, subject: string, metadata: Record<string, unknown> = {}, status = "pending"): void {
+  if (!fixture) throw new Error("Terminal fixture is not ready")
+  const dir = join(fixture.ws, ".omca", "state", "tasks")
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, `${id}.json`), JSON.stringify({ id, subject, description: "", activeForm: "", status, owner: "", blocks: [], blockedBy: [], metadata: { run: "work", ...metadata } }))
+}
 
 function terminal(...args: string[]): string {
   if (!fixture || !tmux) throw new Error("Terminal fixture is not ready")
@@ -42,9 +48,9 @@ describe.skipIf(!opencodeBin || !tmux || process.platform === "win32")("native O
     const created = await server.api<{ data?: { id: string } }>("POST", "/api/session", ws, { title: "OMCA terminal inspection", agent: "omca", location: { directory: ws } })
     if (!created.body?.data?.id) throw new Error(created.text)
     fixture.sessionID = created.body.data.id
-    const plan = join(ws, "work.md")
-    writeFileSync(plan, "# Work\n\nStatus: FINAL\n\n- [ ] 1. First task\n- [ ] 2. Second task\n- [~] 3. Stuck task\n")
-    await bindPlan(ws, fixture.sessionID, plan)
+    writeTask("1", "First task")
+    writeTask("2", "Second task")
+    writeTask("3", "Stuck task", { blocked: "no access" })
     const seeded = await server.api("POST", `/api/session/${fixture.sessionID}/prompt`, ws, { text: "OMCA-TUI-FIXTURE: Reply briefly without tools." })
     if (seeded.status >= 400) throw new Error(seeded.text)
     const configDir = join(root, "config", "opencode")
@@ -91,21 +97,25 @@ describe.skipIf(!opencodeBin || !tmux || process.platform === "win32")("native O
       }
       return false
     }, capture)
-    expect(capture()).toContain("Current plan")
+    expect(capture()).toContain("Current run")
     expect(capture()).toContain("First task")
-    expect(capture()).not.toContain("SHA256")
     expect(capture()).not.toContain("Native server-authored verification")
     for (const width of [120, 200, 80]) {
       terminal("resize-window", "-t", "omca", "-x", String(width), "-y", "32")
       await until(`OMCA panel at ${width} columns`, 5_000, async () => capture().includes("OMCA / Overview"), capture)
     }
+    terminal("resize-window", "-t", "omca", "-x", "160", "-y", "32")
+    terminal("send-keys", "-t", "omca", "2")
+    await until("Tasks tab", 5_000, async () => capture().includes("OMCA / Tasks") && capture().includes("Stuck task"), capture)
+    for (const text of ["#1 First task", "Waiting", "Blocked: no access", "0/3 completed"]) expect(capture()).toContain(text)
     terminal("send-keys", "-t", "omca", "6")
     await until("Doctor tab", 5_000, async () => capture().includes("Read-only server health"), capture)
     terminal("send-keys", "-t", "omca", "Escape")
     await until("panel closed", 5_000, async () => !capture().includes("Read-only server health"), capture)
-    const edited = await fixture.server.api("POST", `/api/session/${fixture.sessionID}/prompt`, fixture.ws, { text: "OMCA-SCENARIO:plan-checkbox" })
+    writeTask("1", "First task", {}, "completed")
+    const edited = await fixture.server.api("POST", `/api/session/${fixture.sessionID}/prompt`, fixture.ws, { text: "OMCA-SCENARIO:write-file" })
     expect(edited.status, edited.text).toBeLessThan(400)
-    await until("footer reflects the native edit with the panel closed", 10_000, async () => capture().includes("OMCA: 1/3 ⊗1"), capture)
+    await until("footer reflects the changed list with the panel closed", 10_000, async () => capture().includes("OMCA: 1/3 ⊗1"), capture)
     expect(fixture.server.log()).not.toContain("failed to load plugin")
   }, 90_000)
 })

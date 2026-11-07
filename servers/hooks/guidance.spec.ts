@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, spyOn, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,7 +12,9 @@ const TEMPLATE = readFileSync(join(REPO, "templates", "claudemd.md"), "utf8");
 const NOW = 1_786_000_000_000;
 
 const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
+const configDir = process.env.CLAUDE_CONFIG_DIR;
 const roots: string[] = [];
+let config: string;
 
 beforeAll(() => {
   delete process.env.CLAUDE_PLUGIN_ROOT;
@@ -22,7 +24,15 @@ afterAll(() => {
   if (pluginRoot !== undefined) process.env.CLAUDE_PLUGIN_ROOT = pluginRoot;
 });
 
+beforeEach(() => {
+  config = mkdtempSync(join(tmpdir(), "omca-guidance-config-"));
+  roots.push(config);
+  process.env.CLAUDE_CONFIG_DIR = config;
+});
+
 afterEach(() => {
+  if (configDir === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+  else process.env.CLAUDE_CONFIG_DIR = configDir;
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
@@ -32,13 +42,15 @@ function project(): string {
   return root;
 }
 
-function bind(root: string, sessionId: string, planFile: string): void {
-  mkdirSync(join(root, ".omca", "state"), { recursive: true });
-  const registry = {
-    plans: { "hello-plan": { active_plan: planFile, started_at: "2026-10-02T10:00:00Z", session_ids: [sessionId] } },
-    bindings: { [sessionId]: { plan_name: "hello-plan", bound_at: 1_786_000_000 } },
-  };
-  writeFileSync(join(root, ".omca", "state", "boulder.json"), JSON.stringify(registry));
+function mark(root: string, sessionId: string, listId = sessionId): void {
+  mkdirSync(join(root, ".omca", "state", "mod"), { recursive: true });
+  writeFileSync(join(root, ".omca", "state", "mod", `${sessionId}.json`), JSON.stringify({ written_at: NOW, task_list: listId }));
+}
+
+function writeTasks(listId: string, ...tasks: readonly Record<string, unknown>[]): void {
+  const dir = join(config, "tasks", listId);
+  mkdirSync(dir, { recursive: true });
+  for (const task of tasks) writeFileSync(join(dir, `${String(task.id)}.json`), JSON.stringify({ description: "", status: "pending", metadata: { run: "hello-run" }, ...task }));
 }
 
 const prompt = (event: "UserPromptSubmit" | "UserPromptExpansion", sessionId: string, extra: Record<string, string> = {}): Payload => ({
@@ -52,13 +64,13 @@ const prompt = (event: "UserPromptSubmit" | "UserPromptExpansion", sessionId: st
 const run = (payload: Payload, root = project(), now = NOW): Output | undefined =>
   guidance(payload, { root, now, session: touchSession(String(payload.session_id)) }) as Output | undefined;
 
-const injected = (event: string, sessionId: string, plan = ""): Output => ({
-  hookSpecificOutput: { hookEventName: event, additionalContext: `${TEMPLATE}\nSession ${sessionId}${plan}` },
+const injected = (event: string, sessionId: string, run = ""): Output => ({
+  hookSpecificOutput: { hookEventName: event, additionalContext: `${TEMPLATE}\nSession ${sessionId}${run}` },
 });
 
-const planLines = (path: string, next: string): string =>
-  `\n[ACTIVE PLAN] hello-plan: ${path}\n[NEXT TASK] ${next}\n` +
-  "[NOTEPAD] Record discoveries, decisions and blockers with notepad_write('hello-plan', section, content); the sections are learnings, issues, decisions and problems.";
+const runLines = (open: string): string =>
+  `\n[ACTIVE RUN] hello-run: ${open}\n` +
+  "[NOTEPAD] Record discoveries, decisions and blockers with notepad_write('hello-run', section, content); the sections are learnings, issues, decisions and problems.";
 
 describe("first-prompt guidance", () => {
   test("the first prompt of a session gets the template and its Session line", () => {
@@ -129,76 +141,61 @@ describe("first-prompt guidance", () => {
   });
 });
 
-describe("bound plan context", () => {
-  test("the first prompt of a plan-bound session carries the plan's name, path, next open task and notepad line", () => {
+describe("run context", () => {
+  test("the first prompt carries the run's name, open count, next task and notepad line", () => {
     const root = project();
     const id = crypto.randomUUID();
-    const plan = join(root, "hello-plan.md");
-    writeFileSync(plan, "# Hello\n\n- [x] 1. Write the parser\n- [ ] 2. Say hello\n- [ ] 3. Say goodbye\n");
-    bind(root, id, plan);
-    expect(run(prompt("UserPromptExpansion", id), root)).toEqual(injected("UserPromptExpansion", id, planLines(plan, "Say hello")));
+    mark(root, id);
+    writeTasks(id, { id: "1", subject: "Write the parser", status: "completed" }, { id: "2", subject: "Say hello" }, { id: "3", subject: "Say goodbye", blockedBy: ["2"] });
+    expect(run(prompt("UserPromptExpansion", id), root)).toEqual(injected("UserPromptExpansion", id, runLines("2 open, next #2 Say hello")));
   });
 
-  test("a plan whose numbered tasks are all checked says none is open", () => {
+  test("the marker's list is the one read", () => {
     const root = project();
     const id = crypto.randomUUID();
-    const plan = join(root, "hello-plan.md");
-    writeFileSync(plan, "- [x] 1. Say hello\n");
-    bind(root, id, plan);
-    expect(run(prompt("UserPromptExpansion", id), root)).toEqual(
-      injected("UserPromptExpansion", id, planLines(plan, "None open: every numbered task is checked.")),
-    );
+    writeTasks("omca-shared", { id: "1", subject: "Say hello" });
+    mkdirSync(join(root, ".omca", "state", "mod"), { recursive: true });
+    writeFileSync(join(root, ".omca", "state", "mod", `${id}.json`), JSON.stringify({ written_at: NOW, task_list: "omca-shared" }));
+    expect(run(prompt("UserPromptExpansion", id), root)).toEqual(injected("UserPromptExpansion", id, runLines("1 open, next #1 Say hello")));
   });
 
-  test("a plan with blocked tasks and none open names them and does not call every task checked", () => {
+  test("a run with nothing open adds no line", () => {
     const root = project();
     const id = crypto.randomUUID();
-    const plan = join(root, "hello-plan.md");
-    writeFileSync(plan, "- [x] 1. Say hello\n- [~] 2. Say goodbye\n- [~] 3. Wave\n");
-    bind(root, id, plan);
-    expect(run(prompt("UserPromptExpansion", id), root)).toEqual(
-      injected("UserPromptExpansion", id, planLines(plan, "None open: every numbered task is checked or blocked (blocked: 2, 3).")),
-    );
+    mark(root, id);
+    writeTasks(id, { id: "1", subject: "Say hello", status: "completed" }, { id: "2", subject: "Wave", metadata: { run: "hello-run", blocked: "no hand" } });
+    expect(run(prompt("UserPromptExpansion", id), root)).toEqual(injected("UserPromptExpansion", id));
   });
 
-  test("the next open task skips a blocked one", () => {
+  test("tasks with no run add no line", () => {
     const root = project();
     const id = crypto.randomUUID();
-    const plan = join(root, "hello-plan.md");
-    writeFileSync(plan, "- [~] 1. Say hello\n- [ ] 2. Say goodbye\n");
-    bind(root, id, plan);
-    expect(run(prompt("UserPromptExpansion", id), root)).toEqual(injected("UserPromptExpansion", id, planLines(plan, "Say goodbye")));
+    mark(root, id);
+    writeTasks(id, { id: "1", subject: "Say hello", metadata: {} });
+    expect(run(prompt("UserPromptExpansion", id), root)).toEqual(injected("UserPromptExpansion", id));
   });
 
-  test("an unparseable registry is logged and the template still goes out", () => {
+  test("the run's line does not depend on the session having touched a task", () => {
     const root = project();
     const id = crypto.randomUUID();
-    mkdirSync(join(root, ".omca", "state"), { recursive: true });
-    writeFileSync(join(root, ".omca", "state", "boulder.json"), "{not json");
-    const errors = spyOn(console, "error").mockImplementation(() => {});
-    try {
-      expect(run(prompt("UserPromptExpansion", id), root)).toEqual(injected("UserPromptExpansion", id));
-      expect(errors.mock.calls.map(([message]) => message)).toEqual([
-        `omca: guidance: ${join(root, ".omca", "state", "boulder.json")} is not valid JSON, so no plan context is added`,
-      ]);
-    } finally {
-      errors.mockRestore();
-    }
+    mark(root, id);
+    writeTasks(id, { id: "1", subject: "Say hello" });
+    expect(findSession(id)?.hasTouchedTask).toBeUndefined();
+    expect(run(prompt("UserPromptExpansion", id), root)).toEqual(injected("UserPromptExpansion", id, runLines("1 open, next #1 Say hello")));
   });
 });
 
 describe("session title", () => {
-  test("the first UserPromptSubmit titles the session after its bound plan", () => {
+  test("the first UserPromptSubmit titles the session after its run", () => {
     const root = project();
     const id = crypto.randomUUID();
-    const plan = join(root, "hello-plan.md");
-    writeFileSync(plan, "- [ ] 1. Say hello\n");
-    bind(root, id, plan);
+    mark(root, id);
+    writeTasks(id, { id: "1", subject: "Say hello" });
     expect(run(prompt("UserPromptSubmit", id), root)).toEqual({
       hookSpecificOutput: {
         hookEventName: "UserPromptSubmit",
-        additionalContext: `${TEMPLATE}\nSession ${id}${planLines(plan, "Say hello")}`,
-        sessionTitle: "OMCA: hello-plan",
+        additionalContext: `${TEMPLATE}\nSession ${id}${runLines("1 open, next #1 Say hello")}`,
+        sessionTitle: "OMCA: hello-run",
       },
     });
     expect(run(prompt("UserPromptSubmit", id), root)).toBeUndefined();
@@ -207,14 +204,13 @@ describe("session title", () => {
   test("a slash command's UserPromptSubmit carries the title and its UserPromptExpansion adds nothing", () => {
     const root = project();
     const id = crypto.randomUUID();
-    const plan = join(root, "hello-plan.md");
-    writeFileSync(plan, "- [ ] 1. Say hello\n");
-    bind(root, id, plan);
+    mark(root, id);
+    writeTasks(id, { id: "1", subject: "Say hello" });
     expect(run(prompt("UserPromptSubmit", id), root)).toEqual({
       hookSpecificOutput: {
         hookEventName: "UserPromptSubmit",
-        additionalContext: `${TEMPLATE}\nSession ${id}${planLines(plan, "Say hello")}`,
-        sessionTitle: "OMCA: hello-plan",
+        additionalContext: `${TEMPLATE}\nSession ${id}${runLines("1 open, next #1 Say hello")}`,
+        sessionTitle: "OMCA: hello-run",
       },
     });
     expect(run(prompt("UserPromptExpansion", id), root)).toBeUndefined();
@@ -223,23 +219,29 @@ describe("session title", () => {
   test("a title the user set is kept", () => {
     const root = project();
     const id = crypto.randomUUID();
-    const plan = join(root, "hello-plan.md");
-    writeFileSync(plan, "- [ ] 1. Say hello\n");
-    bind(root, id, plan);
-    expect(run(prompt("UserPromptSubmit", id, { session_title: "my session" }), root)).toEqual(
-      injected("UserPromptSubmit", id, planLines(plan, "Say hello")),
-    );
+    mark(root, id);
+    writeTasks(id, { id: "1", subject: "Say hello" });
+    expect(run(prompt("UserPromptSubmit", id, { session_title: "my session" }), root)).toEqual(injected("UserPromptSubmit", id, runLines("1 open, next #1 Say hello")));
   });
 
-  test("an unbound session, a bound plan whose file is gone, and a missing registry set no title", () => {
+  test("a resumed session's first prompt still gets the title and no template", () => {
     const root = project();
-    const bound = crypto.randomUUID();
-    bind(root, bound, join(root, "deleted.md"));
-    const unbound = crypto.randomUUID();
-    const unregistered = crypto.randomUUID();
-    expect(run(prompt("UserPromptSubmit", bound), root)).toEqual(injected("UserPromptSubmit", bound));
-    expect(run(prompt("UserPromptSubmit", unbound), root)).toEqual(injected("UserPromptSubmit", unbound));
-    expect(run(prompt("UserPromptSubmit", unregistered))).toEqual(injected("UserPromptSubmit", unregistered));
+    const id = crypto.randomUUID();
+    mark(root, id);
+    writeTasks(id, { id: "1", subject: "Say hello" });
+    mkdirSync(join(root, ".omca", "state", "session"), { recursive: true });
+    writeFileSync(statusPath(root, id), JSON.stringify({ session_id: id, last_hook_at: 1, verification: null }));
+    expect(run(prompt("UserPromptSubmit", id), root)).toEqual({ hookSpecificOutput: { hookEventName: "UserPromptSubmit", sessionTitle: "OMCA: hello-run" } });
+  });
+
+  test("a session with no tasks and a run with nothing open set no title", () => {
+    const root = project();
+    const closed = crypto.randomUUID();
+    mark(root, closed);
+    writeTasks(closed, { id: "1", subject: "Say hello", status: "completed" });
+    const none = crypto.randomUUID();
+    expect(run(prompt("UserPromptSubmit", closed), root)).toEqual(injected("UserPromptSubmit", closed));
+    expect(run(prompt("UserPromptSubmit", none), root)).toEqual(injected("UserPromptSubmit", none));
   });
 });
 

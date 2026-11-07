@@ -1,6 +1,6 @@
-import { type TaskState, taskCounts } from "../src/core/checkboxes.ts";
+import { isOpen, type NativeTask } from "../src/core/native-tasks.ts";
 
-export const tabs = ["Overview", "Plan", "Agents", "Evidence", "Notepad", "Doctor"] as const;
+export const tabs = ["Overview", "Tasks", "Agents", "Evidence", "Notepad", "Doctor"] as const;
 export type Tab = typeof tabs[number];
 
 export function commandTab(input = ""): Tab | undefined {
@@ -8,25 +8,25 @@ export function commandTab(input = ""): Tab | undefined {
   return name === "" ? "Overview" : tabs.find((tab) => tab.toLowerCase() === name);
 }
 
-type PlanRow = { number: number; state: TaskState; dependencies: readonly number[] };
-
-/** A task's dependencies that are not done. A blocked dependency stays here, so its dependents never run. */
-export const waitingOn = (task: PlanRow, tasks: readonly PlanRow[]): number[] =>
-  task.dependencies.filter((number) => tasks.find((item) => item.number === number)?.state !== "done");
-
-export const nextRunnable = <T extends PlanRow>(tasks: readonly T[]): T | undefined =>
-  tasks.find((task) => task.state === "open" && waitingOn(task, tasks).length === 0);
+export function taskCounts(tasks: readonly NativeTask[]) {
+  return {
+    total: tasks.length,
+    done: tasks.filter((task) => task.status === "completed").length,
+    blocked: tasks.filter((task) => task.blockedReason !== "").length,
+    open: tasks.filter(isOpen).length,
+  };
+}
 
 /** What the Overview says when no task can run next. */
-export function noRunnableNote(tasks: readonly PlanRow[]): string {
+export function noRunnableNote(tasks: readonly NativeTask[]): string {
   const { blocked, open } = taskCounts(tasks);
-  if (open > 0) return "No task can run: every open task waits on a blocked task.";
-  if (blocked > 0) return `No task is open and ${blocked} blocked, so this plan is not complete. Changing [~] back to [ ] reopens a task.`;
-  return "All task boxes are checked. Review acceptance criteria and verification before finishing.";
+  if (open > 0) return "No task can run: every open task waits on another open task.";
+  if (blocked > 0) return `No task is open and ${blocked} closed as blocked, so this run is not complete.`;
+  return "Every task of this run is completed.";
 }
 
 // The native footer gives its status 20 cells at 80 columns, and a longer one is cut off.
-export function footerStatus(tasks: readonly PlanRow[]): string {
+export function footerStatus(tasks: readonly NativeTask[]): string {
   const { done, blocked, total } = taskCounts(tasks);
   return `OMCA: ${done}/${total}${blocked === 0 ? "" : ` ⊗${blocked}`}`;
 }

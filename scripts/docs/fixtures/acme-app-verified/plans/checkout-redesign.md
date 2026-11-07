@@ -93,7 +93,7 @@
   - Do: Tell support what changed and how to turn the flag off.
   - Done when: support signs off.
   - Depends: 11
-- [x] 14. Remove the old checkout page
+- [ ] 14. Remove the old checkout page
   - File: `src/pages/old-checkout.tsx`
   - Do: Delete the page and its route once the flag is on for everyone.
   - Done when: `just ci` exits 0.

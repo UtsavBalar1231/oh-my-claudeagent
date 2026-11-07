@@ -186,5 +186,5 @@ test("featuresFor takes the site's features in module order and skips modules wi
 
   expect(featuresFor("turn.complete", { band, pane, footer }).map(([name]) => name)).toEqual(["band", "footer"]);
   expect(featuresFor("ui.render Pane", { band, pane, footer }).map(([name]) => name)).toEqual(["pane"]);
-  expect(featuresFor("session.compact", { band, pane, footer })).toEqual([]);
+  expect(featuresFor("ui.render ToolGroup", { band, pane, footer })).toEqual([]);
 });

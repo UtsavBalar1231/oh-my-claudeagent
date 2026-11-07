@@ -15,8 +15,7 @@ import {
   rerunPrompt,
   shownIndices,
   treeMovedSince,
-  verdictOf,
-} from "./evidence.ts";
+  provesTask } from "./evidence.ts";
 import { sha256Hex } from "./sha256.ts";
 import { clockOf, dayOf } from "./ui-kit.ts";
 
@@ -117,7 +116,7 @@ const run = (overrides: Partial<Evidence>): Evidence => ({
   at: at("2026-10-02T12:00:00Z"),
   snippet: "",
   verifiedBy: "executor",
-  planSha: "",
+  taskId: "",
   tree: "",
   ...overrides,
 });
@@ -131,7 +130,7 @@ describe("parseLedger", () => {
         { type: "lint", command: "just lint", exit_code: "0", timestamp: "2026-10-02T12:07:00Z" },
         { type: "lint", command: "just lint", exit_code: 0, timestamp: "not a time" },
         null,
-        { type: "final_verification", command: "just ci", exit_code: 1, timestamp: "2026-10-02T12:08:00Z", verified_by: "", plan_sha256: "ab" },
+        { type: "final_verification", command: "just ci", exit_code: 1, timestamp: "2026-10-02T12:08:00Z", verified_by: "", plan_sha256: "ab", task_id: "7" },
       ],
     });
     expect(parseLedger(text)).toEqual([
@@ -142,10 +141,10 @@ describe("parseLedger", () => {
         at: at("2026-10-02T12:05:00Z"),
         snippet: "10 passed",
         verifiedBy: "oh-my-claudeagent:executor",
-        planSha: "",
+  taskId: "",
         tree: "",
       },
-      { type: "final_verification", command: "just ci", exitCode: 1, at: at("2026-10-02T12:08:00Z"), snippet: "", verifiedBy: null, planSha: "ab", tree: "" },
+      { type: "final_verification", command: "just ci", exitCode: 1, at: at("2026-10-02T12:08:00Z"), snippet: "", verifiedBy: null, taskId: "7", tree: "" },
     ]);
   });
 
@@ -157,41 +156,6 @@ describe("parseLedger", () => {
     expect(() => parseLedger('{"items":[]}')).toThrow("it holds no entries list");
     expect(() => parseLedger("{")).toThrow("it is not valid JSON");
     expect(() => parseLedger('{"version":2}')).toThrow('its "version" is 2, and only version 1 is supported');
-  });
-});
-
-describe("verdictOf", () => {
-  const SHA = "a".repeat(64);
-  const final = (exitCode: number, planSha: string, iso: string) => run({ type: "final_verification", exitCode, planSha, at: at(iso) });
-
-  test("a passing final verification scoped to the plan's bytes is complete", () => {
-    const proof = final(0, SHA, "2026-10-02T11:00:00Z");
-    expect(verdictOf([proof, run({})], SHA)).toEqual({ kind: "complete", entry: proof });
-  });
-
-  test("a passing final verification with no scope matches any plan, as the Stop gate reads it", () => {
-    const proof = final(0, "", "2026-10-02T11:00:00Z");
-    expect(verdictOf([proof], SHA)).toEqual({ kind: "complete", entry: proof });
-  });
-
-  test("one scoped to other bytes is stale, and the newest such entry is named", () => {
-    const older = final(0, "b".repeat(64), "2026-10-02T09:00:00Z");
-    const newer = final(0, "c".repeat(64), "2026-10-02T10:00:00Z");
-    expect(verdictOf([older, newer], SHA)).toEqual({ kind: "stale", entry: newer });
-  });
-
-  test("a matching pass anywhere in the ledger wins over a newer stale one", () => {
-    const proof = final(0, SHA, "2026-10-02T09:00:00Z");
-    expect(verdictOf([proof, final(0, "c".repeat(64), "2026-10-02T10:00:00Z")], SHA)).toEqual({ kind: "complete", entry: proof });
-  });
-
-  test("only failing final verifications are missing, naming the newest failure", () => {
-    const failed = final(1, SHA, "2026-10-02T10:00:00Z");
-    expect(verdictOf([final(2, SHA, "2026-10-02T09:00:00Z"), failed], SHA)).toEqual({ kind: "missing", failed });
-  });
-
-  test("no final verification at all is missing with nothing failed", () => {
-    expect(verdictOf([run({})], SHA)).toEqual({ kind: "missing", failed: null });
   });
 });
 
@@ -296,14 +260,11 @@ describe("placeEntries", () => {
 
 describe("rerunPrompt", () => {
   test("a check is run again and logged as its own type", () => {
-    expect(rerunPrompt("lint", "just lint", "ab")).toBe("Run `just lint` again and log the result with evidence_log as lint evidence.");
+    expect(rerunPrompt("lint", "just lint")).toBe("Run `just lint` again and log the result with evidence_log as lint evidence.");
   });
 
-  test("a final verification names the plan's current bytes when they are known", () => {
-    expect(rerunPrompt("final_verification", "just ci", "ab")).toBe(
-      'Run the final verification again (`just ci`) and log the verdict with evidence_log as final_verification evidence with plan_sha256="ab".',
-    );
-    expect(rerunPrompt("final_verification", "just ci", null)).toBe(
+  test("a final verification is logged as a verdict", () => {
+    expect(rerunPrompt("final_verification", "just ci")).toBe(
       "Run the final verification again (`just ci`) and log the verdict with evidence_log as final_verification evidence.",
     );
   });
@@ -358,4 +319,13 @@ describe("treeMovedSince", () => {
     const verdict = stamped("");
     expect(treeMovedSince([verdict, stamped("b")], verdict)).toBe(false);
   });
+});
+
+test("provesTask holds only for a passing final verification logged for that task", () => {
+  const entry = (fields: Record<string, unknown>) => ({ type: "final_verification", exitCode: 0, command: "review", at: 0, snippet: "", verifiedBy: null, taskId: "7", tree: "", ...fields }) as Evidence;
+  expect(provesTask(entry({}), "7")).toBe(true);
+  expect(provesTask(entry({}), "8")).toBe(false);
+  expect(provesTask(entry({ exitCode: 1 }), "7")).toBe(false);
+  expect(provesTask(entry({ type: "test" }), "7")).toBe(false);
+  expect(provesTask(entry({ taskId: "" }), "7")).toBe(false);
 });

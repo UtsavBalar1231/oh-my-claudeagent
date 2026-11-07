@@ -116,7 +116,7 @@ function checkoutTree(ref: string | null, dest: string): Packaged {
 }
 
 // A ref whose status line is the Python renderer installs it with uv, as that ref's omca-setup does:
-// the package files under statusline/, the servers/tools resolver beside them, and a venv over the copy.
+// the package files under statusline/, the servers/tools modules beside them, and a venv over the copy.
 function installStatusline(root: string, dest: string): string[] {
   const bunRenderer = join(root, "statusline", "main.ts");
   if (existsSync(bunRenderer)) return ["bun", bunRenderer];
@@ -126,7 +126,7 @@ function installStatusline(root: string, dest: string): string[] {
   for (const file of readdirSync(join(root, "statusline")).filter((f) => f.endsWith(".py"))) {
     copyFileSync(join(root, "statusline", file), join(dest, "statusline", file));
   }
-  for (const file of ["__init__.py", "_boulder_core.py"]) {
+  for (const file of readdirSync(join(root, "servers", "tools")).filter((f) => f.endsWith(".py"))) {
     copyFileSync(join(root, "servers", "tools", file), join(dest, "servers", "tools", file));
   }
   run(["uv", "sync", "--quiet", "--project", dest]);

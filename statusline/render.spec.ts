@@ -1,6 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { describe, expect, test } from "bun:test";
+import { readdirSync, readFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { AGENT_ICONS, displayWidth, type GlyphTier } from "../src/core/ui-kit.ts";
 import { NO_REPO } from "./git.ts";
@@ -15,7 +14,6 @@ import {
   NERD_GLYPHS,
   type Payload,
   projectDirOf,
-  readPlan,
   render,
   renderBar,
   ringGlyph,
@@ -253,189 +251,6 @@ describe("pull request segment", () => {
 
   test.each([["unknown_future_state"], ["constructor"]])("review state %s adds no glyph", (state) => {
     expect(composePr(withPr({ number: 5, review_state: state }), "nerd")).toBe(`${C}#5${R}`);
-  });
-});
-
-describe("plan segment", () => {
-  let dir = "";
-  const SESSION = "sess-test";
-  const THREE_OF_TEN = `${[1, 2, 3].map((n) => `- [x] ${n}. Done ${n}`).join("\n")}\n${[4, 5, 6, 7, 8, 9, 10].map((n) => `- [ ] ${n}. Pending ${n}`).join("\n")}\n`;
-
-  beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "omca-statusline-plan-"));
-    mkdirSync(join(dir, ".omca", "state"), { recursive: true });
-  });
-
-  afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
-  });
-
-  function bind(plan: string | null, sessionId = SESSION): void {
-    const path = join(dir, "plan.md");
-    if (plan !== null) writeFileSync(path, plan);
-    writeBoulder({ plans: { p: { active_plan: path } }, bindings: { [sessionId]: { plan_name: "p" } } });
-  }
-
-  const writeBoulder = (content: unknown): void =>
-    writeFileSync(join(dir, ".omca", "state", "boulder.json"), typeof content === "string" ? content : JSON.stringify(content));
-
-  const plan = (sessionId = SESSION) => readPlan(dir, sessionId);
-  const rendered = (env: Record<string, string>, sessionId = SESSION): string[] =>
-    lines({ model: { display_name: "m" }, session_id: sessionId, workspace: { project_dir: dir } }, NO_REPO, env);
-
-  test("an open task gives progress and its label", () => {
-    bind(THREE_OF_TEN);
-    expect(plan()).toEqual({ done: 3, blocked: 0, total: 10, label: "Pending 4" });
-  });
-
-  test("a label past 80 code points is capped", () => {
-    bind(`- [ ] 1. ${"v".repeat(100)}\n`);
-    expect(plan()?.label).toBe(`${"v".repeat(79)}…`);
-  });
-
-  test("the segment reads count, arrow and label", () => {
-    bind(THREE_OF_TEN);
-    expect(rendered(ASCII)).toEqual([[`${C}> m${R}`, `${G}T: 3/10${R} ${D}-> Pending 4${R}`].join(S), [WAITING, `${D}> ${basename(dir)}${R}`].join(S), ZERO]);
-  });
-
-  test("the Nerd Font segment uses the task glyph and a unicode arrow", () => {
-    bind(THREE_OF_TEN);
-    expect(rendered(NERD)[0]).toContain(`${G}\uf0ae 3/10${R} ${D}→ Pending 4${R}`);
-  });
-
-  test("a blocked task is counted apart and skipped for the label", () => {
-    bind("- [x] 1. Done\n- [~] 2. Stuck\n- [ ] 3. Open\n");
-    expect(plan()).toEqual({ done: 1, blocked: 1, total: 3, label: "Open" });
-  });
-
-  test("the session row draws the blocked count after the tally", () => {
-    bind("- [x] 1. Done\n- [~] 2. Stuck\n- [ ] 3. Open\n");
-    expect(rendered(ASCII)[0]).toBe([`${C}> m${R}`, `${G}T: 1/3${R}${S}${Y}1 blocked${R} ${D}-> Open${R}`].join(S));
-  });
-
-  test("the compact line draws the blocked count after the tally", () => {
-    bind("- [x] 1. Done\n- [~] 2. Stuck\n- [ ] 3. Open\n");
-    expect(rendered({ OMCA_GLYPHS: "unicode", COLUMNS: "50" })[0]).toBe([`${C}> m${R}`, `${G}T: 1/3${R}${S}${Y}1 blocked${R}`].join(S));
-  });
-
-  test("a plan with no open task and a blocked one stays on the status line with no next task", () => {
-    bind("- [x] 1. Done\n- [~] 2. Stuck\n");
-    expect(plan()).toEqual({ done: 1, blocked: 1, total: 2, label: null });
-    expect(rendered(ASCII)[0]).toBe([`${C}> m${R}`, `${G}T: 1/2${R}${S}${Y}1 blocked${R}`].join(S));
-  });
-
-  test("a plan with nothing done counts zero", () => {
-    bind("- [ ] 1. First\n- [ ] 2. Second\n");
-    expect(plan()).toEqual({ done: 0, blocked: 0, total: 2, label: "First" });
-  });
-
-  test("a task without a label gives only the count", () => {
-    bind("- [x] 1. Done\n- [ ] 2.\n");
-    expect(plan()).toEqual({ done: 1, blocked: 0, total: 2, label: null });
-    expect(rendered(ASCII)[0]).toBe([`${C}> m${R}`, `${G}T: 1/2${R}`].join(S));
-  });
-
-  test("a label is cut to 80 characters with an ellipsis", () => {
-    bind(`- [ ] 1. ${"a".repeat(100)}\n`);
-    expect(plan()?.label).toBe(`${"a".repeat(79)}…`);
-  });
-
-  test.each([
-    ["every task checked", "- [x] 1. First\n- [x] 2. Second\n"],
-    ["only unnumbered checkboxes", "# Plan\n\n- [ ] just a note\n- [x] another note\n"],
-    ["an empty plan", ""],
-  ])("a bound plan with %s gives nothing", (_, text) => {
-    bind(text);
-    expect(plan()).toBeNull();
-  });
-
-  test("a bound plan whose file is gone gives nothing", () => {
-    bind(null);
-    expect(plan()).toBeNull();
-  });
-
-  test("no registry gives nothing", () => {
-    expect(plan()).toBeNull();
-  });
-
-  test.each(["{ not json", "[]"])("a registry that is %s gives nothing", (text) => {
-    writeBoulder(text);
-    expect(plan()).toBeNull();
-  });
-
-  test("a registry of another version gives nothing even when it binds the session", () => {
-    const path = join(dir, "plan.md");
-    writeFileSync(path, THREE_OF_TEN);
-    writeBoulder({ version: 2, plans: { p: { active_plan: path } }, bindings: { [SESSION]: { plan_name: "p" } } });
-    expect(plan()).toBeNull();
-    writeBoulder({ version: 1, plans: { p: { active_plan: path } }, bindings: { [SESSION]: { plan_name: "p" } } });
-    expect(plan()?.done).toBe(3);
-  });
-
-  test("an empty project directory gives nothing", () => {
-    expect(readPlan("", SESSION)).toBeNull();
-  });
-
-  test("a binding for another session gives nothing even when it is the only plan", () => {
-    bind(THREE_OF_TEN, "some-other-session");
-    expect(plan("sess-new")).toBeNull();
-    expect(rendered(ASCII, "sess-new")[0]).not.toContain("T:");
-  });
-
-  test("an empty session id gives nothing", () => {
-    bind(THREE_OF_TEN);
-    expect(plan("")).toBeNull();
-  });
-
-  test("a plan entry with a null path gives nothing", () => {
-    writeBoulder({ plans: { p: { active_plan: null } }, bindings: { [SESSION]: { plan_name: "p" } } });
-    expect(plan()).toBeNull();
-  });
-
-  test("a binding to a plan missing from the registry gives nothing", () => {
-    writeBoulder({ plans: {}, bindings: { [SESSION]: { plan_name: "ghost" } } });
-    expect(plan()).toBeNull();
-  });
-
-  test("an empty registry gives nothing", () => {
-    writeBoulder({ plans: {}, bindings: {} });
-    expect(plan()).toBeNull();
-  });
-
-  describe("shared registry schemas", () => {
-    const schema = (name: string): Record<string, unknown> =>
-      JSON.parse(readFileSync(join(import.meta.dir, "..", "tests", "fixtures", "boulder-schemas", `${name}.json`), "utf8"));
-    const rawSchema = (name: string): string => readFileSync(join(import.meta.dir, "..", "tests", "fixtures", "boulder-schemas", `${name}.json`), "utf8");
-
-    test("a flat registry resolves no plan", () => {
-      writeFileSync(join(dir, "plan.md"), THREE_OF_TEN);
-      writeBoulder({ ...schema("old-flat"), active_plan: join(dir, "plan.md") });
-      expect(plan("sess-flat")).toBeNull();
-    });
-
-    test("an explicit binding picks its own plan among several", () => {
-      writeFileSync(join(dir, "plan-a.md"), "- [ ] 1. First\n- [ ] 2. Second\n");
-      writeFileSync(join(dir, "plan-b.md"), THREE_OF_TEN);
-      const registry = schema("two-plan") as { plans: Record<string, { active_plan: string }>; bindings: Record<string, unknown> };
-      registry.plans["plan-a"] = { active_plan: join(dir, "plan-a.md") };
-      registry.plans["plan-b"] = { active_plan: join(dir, "plan-b.md") };
-      registry.bindings["sess-bound"] = { plan_name: "plan-b", bound_at: "2026-03-01T00:00:00Z" };
-      writeBoulder(registry);
-      expect(plan("sess-bound")).toEqual({ done: 3, blocked: 0, total: 10, label: "Pending 4" });
-    });
-
-    test("an unbound session among several plans gives nothing", () => {
-      writeFileSync(join(dir, "plan-b.md"), THREE_OF_TEN);
-      const registry = schema("two-plan") as { plans: Record<string, { active_plan: string }> };
-      registry.plans["plan-b"] = { active_plan: join(dir, "plan-b.md") };
-      writeBoulder(registry);
-      expect(plan("sess-unbound")).toBeNull();
-    });
-
-    test.each([["corrupt"], ["half-written"]])("a %s registry gives nothing", (name) => {
-      writeBoulder(rawSchema(name));
-      expect(plan("sess")).toBeNull();
-    });
   });
 });
 
@@ -1072,26 +887,10 @@ describe("stacked rows", () => {
 });
 
 describe("layout", () => {
-  const SESSION = "layout-session";
-  let dir = "";
-
-  beforeEach(() => {
-    dir = mkdtempSync(join(tmpdir(), "omca-statusline-layout-"));
-    mkdirSync(join(dir, ".omca", "state"), { recursive: true });
-    writeFileSync(join(dir, "plan.md"), "- [x] 1. Done\n- [ ] 2. Wire the order summary panel into the payment step and cover it with a test\n- [ ] 3. Later\n");
-    writeFileSync(
-      join(dir, ".omca", "state", "boulder.json"),
-      JSON.stringify({ plans: { p: { active_plan: join(dir, "plan.md") } }, bindings: { [SESSION]: { plan_name: "p" } } }),
-    );
-  });
-
-  afterEach(() => {
-    rmSync(dir, { recursive: true, force: true });
-  });
+  const dir = "/work/layout-app";
 
   const rich = (): Payload => ({
     model: { display_name: "Opus 5.5" },
-    session_id: SESSION,
     workspace: { project_dir: dir, added_dirs: ["/a", "/b"] },
     effort: { level: "high" },
     agent: { name: "oh-my-claudeagent:orchestrator" },
@@ -1105,12 +904,12 @@ describe("layout", () => {
   const at = (columns: number, rows?: number): string[] =>
     lines(rich(), richGit, { ...ASCII, COLUMNS: String(columns), ...(rows === undefined ? {} : { LINES: String(rows) }) });
 
-  test("a terminal narrower than 60 columns gets one compact line: model, plan count, context percentage, branch", () => {
-    expect(at(59).map(visible)).toEqual(["> Opus 5.5 · T: 1/3 · 34% · * v3-typescript-mods"]);
+  test("a terminal narrower than 60 columns gets one compact line: model, context percentage, branch", () => {
+    expect(at(59).map(visible)).toEqual(["> Opus 5.5 · 34% · * v3-typescript-mods"]);
   });
 
   test("the compact line drops its lowest segments first when they do not fit", () => {
-    expect(at(40).map(visible)).toEqual(["> Opus 5.5 · T: 1/3 · 34%"]);
+    expect(at(40).map(visible)).toEqual(["> Opus 5.5 · 34%"]);
     expect(at(16).map(visible)).toEqual(["> Opus 5.5"]);
   });
 
@@ -1124,38 +923,36 @@ describe("layout", () => {
     expect(lines(rich(), richGit, { ...ASCII, COLUMNS: "59" })[0]).toContain(`${S}${G}34%${R}${S}`);
   });
 
-  const SESSION_ROW = "> Opus 5.5 · E: high · T: 1/3 -> Wire the order summary panel into the payment step and cover it with a test";
+  const SESSION_ROW = "> Opus 5.5 · E: high";
   const USAGE_ROW = "~ 2m05s · ━━━━────── 45% 5h (resets 6pm) · ━━━━━━━━── 80% 7d (resets mon 5pm)";
   const branchOf = (bar: string): string => `${bar} 34%  200k · * v3-typescript-mods ~3  +2  ?1`;
   const BAR_20 = "━━━━━━━─────────────";
+  const BAR_BY_COLUMNS: Record<number, string> = { 120: "━━━━────────" };
 
-  test("at 120 columns each row starts its own line, and the workspace row wraps within itself", () => {
-    expect(at(120).map(visible)).toEqual([
+  test("at 100 columns each row starts its own line, and the workspace row wraps within itself", () => {
+    expect(at(100).map(visible)).toEqual([
       SESSION_ROW,
-      `${branchOf("━━━━────────")} · > ${basename(dir)} · W: wt <- main · #42 +`,
+      `${branchOf("━━━━───────")} · > ${basename(dir)} · W: wt <- main · #42 +`,
       "+42/-7 · +2 dirs",
       USAGE_ROW,
     ]);
   });
 
-  test.each([200, 300])("at %p columns each row is one line of its own", (columns) => {
-    expect(at(columns).map(visible)).toEqual([SESSION_ROW, `${branchOf(BAR_20)} · > ${basename(dir)} · W: wt <- main · #42 + · +42/-7 · +2 dirs`, USAGE_ROW]);
+  test.each([120, 200, 300])("at %p columns each row is one line of its own", (columns) => {
+    expect(at(columns).map(visible)).toEqual([SESSION_ROW, `${branchOf(BAR_BY_COLUMNS[columns] ?? BAR_20)} · > ${basename(dir)} · W: wt <- main · #42 + · +42/-7 · +2 dirs`, USAGE_ROW]);
   });
 
   test("at 80 columns the rows wrap, and the lowest-ranked segments drop so the time and 5 hour limit stay", () => {
     expect(at(80).map(visible)).toEqual([
-      "> Opus 5.5 · E: high · T: 1/3 -> Wire the order summary panel into the pa…",
-      branchOf(BAR_20),
-      `> ${basename(dir)} · W: wt <- main · #42 +`,
+      SESSION_ROW,
+      `${branchOf("━━━━━──────────")} · > ${basename(dir)}`,
+      "W: wt <- main · #42 +",
       "~ 2m05s · ━━━━────── 45% 5h (resets 6pm)",
     ]);
   });
 
-  test("a short terminal keeps only the highest-ranked segments: model, plan, context and branch", () => {
-    expect(at(80, 19).map(visible)).toEqual([
-      "> Opus 5.5 · E: high · T: 1/3 -> Wire the order summary panel into the pa…",
-      branchOf(BAR_20),
-    ]);
+  test("a short terminal keeps only the highest-ranked segments: model, context and branch", () => {
+    expect(at(80, 19).map(visible)).toEqual([SESSION_ROW, branchOf(BAR_20)]);
   });
 
   test("a terminal of 60 columns gets the full layout", () => {
@@ -1174,25 +971,8 @@ describe("layout", () => {
     expect(at(80)).toHaveLength(4);
   });
 
-  test("the short layout keeps the first two lines of the tall one", () => {
-    expect(at(80, 15)).toEqual(at(80).slice(0, 2));
-  });
-
-  test("only the next-task label is ellipsized, to the room its line has", () => {
-    const [first] = at(60).map(visible);
-    expect(first).toBe("> Opus 5.5 · E: high · T: 1/3 -> Wire the order summa…");
-    expect(displayWidth(first ?? "")).toBe(54);
-  });
-
-  test("a wide terminal shows the whole label", () => {
-    expect(at(200).map(visible)[0]).toBe("> Opus 5.5 · E: high · T: 1/3 -> Wire the order summary panel into the payment step and cover it with a test");
-  });
-
-  test("the label wraps with its segment instead of being squeezed under 12 cells", () => {
-    const data: Payload = { ...rich(), model: { display_name: "x".repeat(28) } };
-    const [first, second] = lines(data, richGit, { ...ASCII, COLUMNS: usable(60) }).map(visible);
-    expect(first).toBe(`> ${"x".repeat(28)} · E: high`);
-    expect(second).toStartWith("T: 1/3 -> Wire the order summary panel");
+  test("a height under 20 gives the same two lines at any height", () => {
+    expect(at(80, 15)).toEqual(at(80, 19));
   });
 
   test("every line fits the columns left after the margins, at every width and height, counting wide characters as two", () => {

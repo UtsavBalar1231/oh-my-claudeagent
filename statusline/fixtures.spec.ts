@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import type { GitInfo } from "./git.ts";
 import { NO_REPO } from "./git.ts";
 import { displayWidth } from "../src/core/ui-kit.ts";
@@ -29,7 +29,6 @@ interface Fixture {
   env?: Record<string, string>;
   lastResortCut?: boolean;
   git?: Partial<GitInfo>;
-  files?: Record<string, unknown>;
   repo?: string;
   payload: Payload;
 }
@@ -83,14 +82,6 @@ function load(name: string): Fixture {
   return JSON.parse(readFileSync(join(FIXTURES, `${name}.json`), "utf8").replaceAll("@ROOT@", JSON.stringify(root).slice(1, -1)));
 }
 
-function writeFiles(files: Record<string, unknown>): void {
-  for (const [path, content] of Object.entries(files)) {
-    const target = join(root, path.replaceAll("@ROOT@", root));
-    mkdirSync(dirname(target), { recursive: true });
-    writeFileSync(target, typeof content === "string" ? content : JSON.stringify(content));
-  }
-}
-
 function runMain(payload: Payload, env: Record<string, string>): string {
   const result = Bun.spawnSync([process.execPath, MAIN], {
     stdin: new TextEncoder().encode(JSON.stringify(payload)),
@@ -105,7 +96,6 @@ const RST = "\x1b[0m";
 const SEPARATOR = ` \x1b[90m·${RST} `;
 const ESCAPES = /\x1b\[[0-9;]*m|\x1b\]8;;[^\x07]*\x07/g;
 const BAR_RUN = /(?:\x1b\[[0-9;]*m[━─\u{f0766}\u{f0a9e}-\u{f0aa5}]\x1b\[0m)+|\x1b\[90m─+\x1b\[0m/gu;
-const PLAN_PIECE = /^(\x1b\[32m\S+ \d+\/\d+\x1b\[0m \x1b\[90m(?:->|→) )(.*)\x1b\[0m$/;
 
 // White and bright white vanish on a light background; text that needs to stand out uses the default foreground.
 const NEAR_WHITE = /\x1b\[(?:[0-9;]*;)?(?:37|97|38;5;(?:7|15|25[0-5]))(?:;[0-9;]*)?m/;
@@ -115,36 +105,23 @@ const outputLines = (output: string): string[] => output.split("\n").filter(Bool
 const pieces = (output: string): string[] =>
   outputLines(output).flatMap((line) => line.slice(0, -RST.length).split(SEPARATOR).map((piece) => piece.replace(BAR_RUN, "━")));
 
-// A bar draws to the room its line has (a ring where a short row needs one) and the next-task label
-// to the room it is left, so those two compare by shape; any other piece must equal the one the
-// roomiest terminal of its layout draws (the compact layout ends at 59 columns, the full one has no
-// upper end).
+// A bar draws to the room its line has (a ring where a short row needs one), so bars compare by
+// shape; any other piece must equal the one the roomiest terminal of its layout draws (the compact
+// layout ends at 59 columns, the full one has no upper end).
 function cutPieces(output: string, wide: string): string[] {
   const whole = new Set(pieces(wide));
-  const wholeLabels = new Map([...whole].flatMap((piece) => {
-    const match = PLAN_PIECE.exec(piece);
-    return match?.[1] === undefined ? [] : [[match[1], match[2] ?? ""] as const];
-  }));
-  return pieces(output).filter((piece) => {
-    if (whole.has(piece)) return false;
-    const match = PLAN_PIECE.exec(piece);
-    const label = match?.[1] === undefined ? undefined : wholeLabels.get(match[1]);
-    return label === undefined || !label.startsWith((match?.[2] ?? "").replace(/…$/, ""));
-  });
+  return pieces(output).filter((piece) => !whole.has(piece));
 }
 
-test("the whole-segment check flags a segment cut mid-text and accepts a shortened label", () => {
-  const plan = (label: string): string => `\x1b[32mT: 1/3${RST} \x1b[90m-> ${label}${RST}`;
+test("the whole-segment check flags a segment cut mid-text", () => {
   const row = (...parts: string[]): string => `${parts.join(SEPARATOR)}${RST}\n`;
-  const wide = row("alpha", plan("Wire the widget"), "omega");
+  const wide = row("alpha", "omega");
+  expect(cutPieces(row("alpha", "omega"), wide)).toEqual([]);
   expect(cutPieces(row("alpha", "ome"), wide)).toEqual(["ome"]);
-  expect(cutPieces(row("alpha", plan("Wire the…"), "omega"), wide)).toEqual([]);
-  expect(cutPieces(row("alpha", plan("Wire a…")), wide)).toEqual([plan("Wire a…")]);
 });
 
 function produce(fixture: Fixture, env: Record<string, string>): string {
   if (fixture.repo) return runMain(fixture.payload, env);
-  writeFiles(fixture.files ?? {});
   return `${render(fixture.payload, { ...NO_REPO, ...fixture.git }, env, NOW)}\n`;
 }
 

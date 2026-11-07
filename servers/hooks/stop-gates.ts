@@ -1,32 +1,23 @@
-import { createHash } from "node:crypto";
-import { readFileSync, statSync } from "node:fs";
+import { statSync } from "node:fs";
 import { open } from "node:fs/promises";
 import { join } from "node:path";
-import { allTasksClosed, blockedNumbers, type PlanTask, planTasks, taskCounts } from "../../src/core/checkboxes.ts";
 import { addedLines, type Candidate, hasCompletionClaim, hasStubMarker, isStubFinding } from "../../src/core/drift.ts";
-import { entriesOf, evidenceOf, readLedger, verdictOf } from "../../src/core/evidence.ts";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
-import { hasPassingFinalVerification } from "../../src/core/next-actions.ts";
 import { FRESH_BACKOFF, spendBlock, type StopGate, stepBackoff } from "../../src/core/stop-ledger.ts";
 import { field, isRecord, text } from "../../src/core/tool-input.ts";
-import { errorCode, isMissing } from "../io.ts";
-import { workingTreeStamp } from "../tree-stamp.ts";
+import { isMissing } from "../io.ts";
 import type { Context, Handler, Payload } from "./registry.ts";
 import type { Session } from "./session-state.ts";
-import { ledgerMtimeSeconds, ledgerPath, readBoundPlan, readRegistry, type RegistryRead, registryPath, seconds } from "./status-file.ts";
+import { readOpenRun, seconds } from "./status-file.ts";
 
 type Json = Readonly<Record<string, unknown>>;
-type LedgerFile = { kind: "absent" } | { kind: "corrupt" } | { kind: "unreadable"; code: string } | { kind: "ok"; document: Record<string, unknown> };
-type Plan = { name: string; path: string; boundAt: unknown; bytes: Buffer; tasks: PlanTask[] };
 type Entries = Iterable<Json | undefined>;
-type Turn = { payload: Payload; context: Context; registry: RegistryRead; transcript: () => Promise<Entries>; plan: () => Plan | undefined };
+type Turn = { payload: Payload; context: Context; transcript: () => Promise<Entries> };
 type Gate = (turn: Turn) => Promise<string | undefined>;
 
 const COMPACTION_FRESH_SECONDS = 60;
 // The gates read only the current turn's records, which sit at the end of the transcript.
 const TRANSCRIPT_TAIL_BYTES = 2 * 1024 * 1024;
-// A binding this old with no evidence logged since looks abandoned rather than worked.
-const STALE_BINDING_SECONDS = 86_400;
 // About 1 ms of scan per file; a larger change set is machine-generated.
 const MAX_CHANGED_FILES = 500;
 // Past this a file is generated or data, not worth a read at every Stop.
@@ -43,35 +34,15 @@ const GIT_DIFF = ["-c", "diff.mnemonicPrefix=false", "-c", "diff.noprefix=false"
 const withoutTrailingNewlines = (value: string): string => value.replace(/\n+$/, "");
 const nonEmptyLines = (value: string): string[] => value.split("\n").filter(Boolean);
 
-function readLedgerFile(path: string): LedgerFile {
-  let raw: string;
-  try {
-    raw = readFileSync(path, "utf8");
-  } catch (error) {
-    if (isMissing(error)) return { kind: "absent" };
-    return { kind: "unreadable", code: errorCode(error) ?? String(error) };
-  }
-  const read = readLedger(raw);
-  return read.kind === "ok" && entriesOf(read.document) !== undefined ? { kind: "ok", document: read.document } : { kind: "corrupt" };
-}
-
-function boundPlan(payload: Payload, root: string, registry: RegistryRead): Plan | undefined {
-  if (typeof payload.session_id !== "string") return undefined;
-  const read = readBoundPlan(root, payload.session_id, registry);
-  if (read.kind === "unreadable" && registry.kind === "ok") console.error(`omca: Stop gates could not read the plan ${read.path} (${read.code})`);
-  if (read.kind !== "ok" || read.file === undefined) return undefined;
-  return { name: read.name, path: read.path, boundAt: read.boundAt, bytes: read.file.bytes, tasks: planTasks(read.file.content) };
-}
-
 const spend = (session: Session | undefined, gate: StopGate): boolean => session !== undefined && spendBlock((session.stopBlocks ??= new Map()), gate);
 
 const refund = (session: Session | undefined, gate: StopGate): void => {
   session?.stopBlocks?.delete(gate);
 };
 
-const settlePlan = (session: Session | undefined): void => {
-  refund(session, "plan-continuation");
-  if (session !== undefined) delete session.planBackoff;
+const settleRun = (session: Session): void => {
+  refund(session, "task-continuation");
+  delete session.runBackoff;
 };
 
 async function readTail(path: string): Promise<string> {
@@ -175,7 +146,7 @@ function askedUserThisTurn(entries: Entries): boolean {
 }
 
 // A spawned subagent is a background task, so every parallel wave ends a turn this way; the
-// turn is paused until the work wakes it, not stalled mid-plan. A background shell (a dev
+// turn is paused until the work wakes it, not stalled mid-run. A background shell (a dev
 // server, a watcher) runs on its own and wakes nothing, so it does not count.
 const hasLiveBackgroundTask = (tasks: unknown): boolean =>
   Array.isArray(tasks) &&
@@ -184,74 +155,31 @@ const hasLiveBackgroundTask = (tasks: unknown): boolean =>
 const isFreshCompaction = (session: Session | undefined, now: number): boolean =>
   session?.compactedAt !== undefined && now - session.compactedAt < COMPACTION_FRESH_SECONDS * 1000;
 
-function isStaleBinding(root: string, boundAt: unknown, nowSeconds: number): boolean {
-  if (typeof boundAt !== "number" || !Number.isInteger(boundAt) || boundAt < 0) return false;
-  return nowSeconds - boundAt > STALE_BINDING_SECONDS && ledgerMtimeSeconds(root) <= boundAt;
-}
-
-const planContinuation: Gate = async (turn) => {
-  const { payload, context, registry } = turn;
+// A list outlives its session, so only a session that touched a task answers for the run: one that
+// starts beside an unfinished list picks the run up by touching it.
+const taskContinuation: Gate = async (turn) => {
+  const { payload, context } = turn;
   const { root, session } = context;
-  if (registry.kind === "corrupt" || registry.kind === "unreadable") {
-    if (!spend(session, "plan-continuation")) return undefined;
-    const problem = registry.kind === "corrupt" ? "is not valid JSON" : `cannot be read (${registry.code})`;
-    return `[PLAN CONTINUATION] ${registryPath(root)} ${problem}, so this session's plan state cannot be resolved and plan-scoped enforcement is off. Repair or delete the file, then stop again. Set OMCA_DISABLED_HOOKS=plan-continuation to bypass.`;
-  }
-  const plan = turn.plan();
-  const open = plan === undefined ? [] : plan.tasks.filter((task) => task.state === "open");
-  const unchecked = open.length;
-  if (plan === undefined || unchecked === 0) {
-    settlePlan(session);
+  if (session?.hasTouchedTask !== true) return undefined;
+  const run = readOpenRun(root, session.id);
+  if (run === undefined) {
+    settleRun(session);
     return undefined;
   }
-  if (session?.planBackoff !== undefined && session.planBackoff.plan !== plan.name) settlePlan(session);
+  if (session.runBackoff !== undefined && session.runBackoff.run !== run.name) settleRun(session);
   if (hasLiveBackgroundTask(payload.background_tasks)) {
-    refund(session, "plan-continuation");
+    refund(session, "task-continuation");
     return undefined;
   }
-  const nowSeconds = seconds(context.now);
   if (PAUSE_REQUEST.test(lastText(await turn.transcript(), "user").toLowerCase().replaceAll("'", ""))) return undefined;
   if (isFreshCompaction(session, context.now)) return undefined;
-  if (isStaleBinding(root, plan.boundAt, nowSeconds)) return undefined;
   if (BLOCKING_QUESTIONS.test(await assistantText(turn)) || askedUserThisTurn(await turn.transcript())) return undefined;
-  if (session === undefined) return undefined;
-  const step = stepBackoff(session.planBackoff?.backoff ?? FRESH_BACKOFF, unchecked, nowSeconds);
-  if (step.isWindowReset) refund(session, "plan-continuation");
-  session.planBackoff = { plan: plan.name, backoff: step.state };
-  if (!step.isBlocking || !spend(session, "plan-continuation")) return undefined;
-  const next = open[0]?.label ?? "";
-  return `[PLAN CONTINUATION] The bound plan '${plan.name}' still has ${unchecked} open ${unchecked === 1 ? "task" : "tasks"} (next: ${next}). Continue with the next task. If its work is already done and reviewed, flip its checkbox. If it cannot proceed, close it as blocked (\`- [~] N.\` with a \`- Blocked:\` line), or record why with notepad_write and ask the user; a turn that asks the user is not blocked.`;
-};
-
-const finalVerification: Gate = async (turn) => {
-  const { root, session } = turn.context;
-  if (turn.registry.kind === "corrupt" || turn.registry.kind === "unreadable") {
-    const problem = turn.registry.kind === "corrupt" ? "is not valid JSON" : `cannot be read (${turn.registry.code})`;
-    console.error(`omca: final-verification: ${registryPath(root)} ${problem}, so no plan resolves and this gate is not enforcing. Repair or delete the file.`);
-    return undefined;
-  }
-  const plan = turn.plan();
-  if (plan === undefined || !allTasksClosed(taskCounts(plan.tasks))) return undefined;
-  const ledger = readLedgerFile(ledgerPath(root));
-  if (ledger.kind === "corrupt") {
-    return spend(session, "final-verification") ? `[FINAL VERIFICATION] Evidence file corrupt. Repair ${ledgerPath(root)} before stopping.` : undefined;
-  }
-  if (ledger.kind === "unreadable") {
-    return spend(session, "final-verification") ? `[FINAL VERIFICATION] Evidence file unreadable (${ledger.code}). Fix ${ledgerPath(root)} before stopping.` : undefined;
-  }
-  const sha256 = createHash("sha256").update(plan.bytes).digest("hex");
-  if (ledger.kind === "ok" && hasPassingFinalVerification(ledger.document, sha256)) {
-    refund(session, "final-verification");
-    return undefined;
-  }
-  if (!spend(session, "final-verification")) return undefined;
-  const record = (exitCodes: string, after: string): string =>
-    `Record the verdict of the plan's completeness review, running the review first if it has not run: evidence_log(evidence_type="final_verification", command="<what the review covered>", exit_code=<${exitCodes}>, output_snippet="<verdict>", plan_sha256="${sha256}"). ${after} Set OMCA_DISABLED_HOOKS=final-verification to bypass.`;
-  const blocked = blockedNumbers(plan.tasks);
-  if (blocked.length === 0) {
-    return `[FINAL VERIFICATION] Every task in plan '${plan.path}' is checked, but no final_verification evidence matches its current contents. ${record("0 for COMPLETE, 1 for INCOMPLETE", "An INCOMPLETE verdict means fixing the gap and reviewing again.")}`;
-  }
-  return `[FINAL VERIFICATION] Plan '${plan.path}' has no open task but is not complete, because these tasks are blocked: ${blocked.join(", ")}. No final_verification evidence matches its current contents. ${record("0 when the tasks marked done pass review, 1 when one fails a requirement", "An exit_code=0 verdict's output_snippet must name every blocked task and its gap. An exit_code=1 verdict means fixing that requirement and reviewing again.")}`;
+  const count = run.open.length;
+  const step = stepBackoff(session.runBackoff?.backoff ?? FRESH_BACKOFF, count, seconds(context.now));
+  if (step.isWindowReset) refund(session, "task-continuation");
+  session.runBackoff = { run: run.name, backoff: step.state };
+  if (!step.isBlocking || !spend(session, "task-continuation")) return undefined;
+  return `[TASK CONTINUATION] Run '${run.name}' still has ${count} open ${count === 1 ? "task" : "tasks"} (next: #${run.next.id} ${run.next.subject}). Continue with the next task. If its work is already done and reviewed, complete it with TaskUpdate. If it cannot proceed, close it as blocked with TaskUpdate metadata {"blocked": "<why>"}, or ask the user; a turn that asks the user is not blocked.`;
 };
 
 async function git(root: string, args: readonly string[]): Promise<{ code: number; stdout: string }> {
@@ -302,22 +230,8 @@ const driftGuard: Gate = async (turn) => {
   return `[DRIFT GUARD] Completion claimed but stub markers remain on added/untracked lines:\n${listed}\nResolve the stubs before claiming done, or stop claiming completion. Set OMCA_DISABLED_HOOKS=drift-guard to bypass.`;
 };
 
-// Display only: the gate reads the plan's hash, so a verdict the code has moved past still opens it.
-async function staleVerdictNote(turn: Turn): Promise<string | undefined> {
-  const plan = turn.plan();
-  if (plan === undefined) return undefined;
-  const ledger = readLedgerFile(ledgerPath(turn.context.root));
-  if (ledger.kind !== "ok") return undefined;
-  const verdict = verdictOf(evidenceOf(ledger.document), createHash("sha256").update(plan.bytes).digest("hex"));
-  if (verdict.kind !== "complete" || verdict.entry.tree === "" || !hasCompletionClaim(await assistantText(turn))) return undefined;
-  const current = await workingTreeStamp(turn.context.root);
-  if (current === null || current === verdict.entry.tree) return undefined;
-  return `OMCA: the final verification of plan '${plan.name}' ran before the latest code changes, so it no longer describes this checkout.`;
-}
-
 const GATES: readonly (readonly [StopGate, Gate])[] = [
-  ["plan-continuation", planContinuation],
-  ["final-verification", finalVerification],
+  ["task-continuation", taskContinuation],
   ["drift-guard", driftGuard],
 ];
 
@@ -326,16 +240,8 @@ const GATES: readonly (readonly [StopGate, Gate])[] = [
 export const handle: Handler = async (payload, context) => {
   const disabled = process.env.OMCA_DISABLED_HOOKS;
   if (payload.stop_hook_active === "true" || isHookDisabled(disabled, "stop-gates")) return undefined;
-  const registry = readRegistry(context.root);
   let entries: Promise<Entries> | undefined;
-  let plan: { value: Plan | undefined } | undefined;
-  const turn: Turn = {
-    payload,
-    context,
-    registry,
-    transcript: () => (entries ??= readTranscript(payload.transcript_path)),
-    plan: () => (plan ??= { value: boundPlan(payload, context.root, registry) }).value,
-  };
+  const turn: Turn = { payload, context, transcript: () => (entries ??= readTranscript(payload.transcript_path)) };
   for (const [name, gate] of GATES) {
     if (isHookDisabled(disabled, name)) continue;
     try {
@@ -345,12 +251,5 @@ export const handle: Handler = async (payload, context) => {
       console.error(`omca: the ${name} Stop gate failed:`, error);
     }
   }
-  if (isHookDisabled(disabled, "final-verification")) return undefined;
-  try {
-    const note = await staleVerdictNote(turn);
-    return note === undefined ? undefined : { systemMessage: note };
-  } catch (error) {
-    console.error("omca: the stale verdict check failed:", error);
-    return undefined;
-  }
+  return undefined;
 };

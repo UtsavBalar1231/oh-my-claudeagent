@@ -103,9 +103,9 @@ function startServer(env: Record<string, string | undefined> = {}, project = git
     return runtime;
   };
   const prompt = (sessionId: string) => call("omca_hook", { event: "UserPromptSubmit", session_id: sessionId, prompt: "go" });
-  const mark = (sessionId: string, writtenAt: number | string, root = project) => {
+  const mark = (sessionId: string, writtenAt: number | string, root = project, taskTools = true) => {
     mkdirSync(join(root, ".omca", "state", "mod"), { recursive: true });
-    writeFileSync(join(root, ".omca", "state", "mod", `${sessionId}.json`), typeof writtenAt === "string" ? writtenAt : JSON.stringify({ written_at: writtenAt }));
+    writeFileSync(join(root, ".omca", "state", "mod", `${sessionId}.json`), typeof writtenAt === "string" ? writtenAt : JSON.stringify({ written_at: writtenAt, task_tools: taskTools }));
   };
   return { health, report, prompt, mark, project };
 }
@@ -114,6 +114,17 @@ test("health_check reports hooks_inactive before any hook call reaches the serve
   const { health, mark } = startServer();
   mark("s-1", Date.now());
   expect(await health()).toEqual(HOOKS_INACTIVE);
+});
+
+test("health_check refuses when the fresh marker says the task tools are off, and names what keeps them off", async () => {
+  const { health, mark, prompt, project } = startServer();
+  await prompt("s-1");
+  mark("s-1", Date.now() + 1_000, project, false);
+  const report = await health();
+  expect(report.runtime).toBe("task_tools_absent");
+  expect(report.runtime_reason).toContain("CLAUDE_CODE_ENABLE_TODO_TOOLS");
+  mark("s-1", Date.now() + 1_000);
+  expect(await health()).toEqual({ runtime: "ok" });
 });
 
 test("health_check reports mod_absent when the session has no mod marker", async () => {
@@ -228,7 +239,6 @@ test("health_check reports a fresh project's state directory present and its sta
   const { report } = startServer();
   expect((await report()).state).toEqual({
     dir: "present",
-    "boulder.json": "absent",
     "verification-evidence.json": "absent",
   });
 });
@@ -237,11 +247,9 @@ test("health_check tells a valid state file from one that does not parse", async
   const { report, project } = startServer();
   mkdirSync(join(project, ".omca", "state"), { recursive: true });
   mkdirSync(join(project, ".omca", "evidence"), { recursive: true });
-  writeFileSync(join(project, ".omca", "state", "boulder.json"), '{"plans": {}, "bindings": {}}');
   writeFileSync(join(project, ".omca", "evidence", "verification-evidence.json"), '{"entries": [');
   expect((await report()).state).toEqual({
     dir: "present",
-    "boulder.json": "valid",
     "verification-evidence.json": "invalid",
   });
 });
@@ -250,11 +258,9 @@ test("health_check calls a state file the writers refuse invalid even when it is
   const { report, project } = startServer();
   mkdirSync(join(project, ".omca", "state"), { recursive: true });
   mkdirSync(join(project, ".omca", "evidence"), { recursive: true });
-  writeFileSync(join(project, ".omca", "state", "boulder.json"), '{"version":2,"plans":{},"bindings":{}}');
   writeFileSync(join(project, ".omca", "evidence", "verification-evidence.json"), '{"version":2,"entries":[]}');
   expect((await report()).state).toEqual({
     dir: "present",
-    "boulder.json": "invalid",
     "verification-evidence.json": "invalid",
   });
 });
@@ -264,7 +270,6 @@ test("health_check inspects the project named by working_directory", async () =>
   const other = gitProject();
   expect((await report({ working_directory: other })).state).toEqual({
     dir: "absent",
-    "boulder.json": "absent",
     "verification-evidence.json": "absent",
   });
 });

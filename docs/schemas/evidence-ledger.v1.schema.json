@@ -16,7 +16,7 @@
         "type": "object",
         "properties": {
           "type": {
-            "description": "The kind of run. Only final_verification can satisfy the Stop gate.",
+            "description": "The kind of run. Only a final_verification entry with a task_id can close a run's final task.",
             "type": "string",
             "enum": ["build", "test", "lint", "manual", "final_verification"]
           },
@@ -44,10 +44,9 @@
             "type": "string",
             "maxLength": 200
           },
-          "plan_sha256": {
-            "description": "SHA-256 of the plan file's bytes, as 64 lowercase hex characters. Absent when logged empty.",
-            "type": "string",
-            "pattern": "^[0-9a-f]{64}$"
+          "task_id": {
+            "description": "The id of the native task a final_verification entry closes. Absent when logged empty.",
+            "type": "string"
           },
           "tree": {
             "description": "Tree hash of the working directory when the entry was logged, written by the server. Absent outside a git repository or when git could not produce it.",

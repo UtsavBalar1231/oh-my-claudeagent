@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, spyOn, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,10 +7,18 @@ import { dispatch } from "./registry.ts";
 const NOW = new Date(2026, 9, 2, 12).getTime();
 const PLUGIN_ROOT = join(import.meta.dir, "..", "..");
 const SESSION = "session-1";
+const configDir = process.env.CLAUDE_CONFIG_DIR;
 const temps: string[] = [];
 
+beforeEach(() => {
+  process.env.CLAUDE_CONFIG_DIR = temp();
+});
+
 afterEach(() => {
+  delete process.env.CLAUDE_CODE_TASK_LIST_ID;
   delete process.env.OMCA_DISABLED_HOOKS;
+  if (configDir === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+  else process.env.CLAUDE_CONFIG_DIR = configDir;
   for (const dir of temps.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
@@ -20,26 +28,13 @@ function temp(): string {
   return dir;
 }
 
-const registry = (plans: Record<string, string>, bindings: Record<string, string> = {}) => ({
-  plans: Object.fromEntries(Object.entries(plans).map(([name, file]) => [name, { active_plan: file }])),
-  bindings: Object.fromEntries(Object.entries(bindings).map(([id, name]) => [id, { plan_name: name }])),
-});
+const project = (): string => temp();
 
-function writeBoulder(root: string, boulder: unknown): void {
-  mkdirSync(join(root, ".omca", "state"), { recursive: true });
-  writeFileSync(join(root, ".omca", "state", "boulder.json"), typeof boulder === "string" ? boulder : JSON.stringify(boulder));
-}
-
-function project(boulder?: unknown): string {
-  const root = temp();
-  if (boulder !== undefined) writeBoulder(root, boulder);
-  return root;
-}
-
-function planFile(root: string, name = "my-plan.md"): string {
-  const file = join(root, name);
-  writeFileSync(file, "# Plan\n- task 1\n");
-  return file;
+function writeTasks(sessionId: string, ...tasks: readonly Record<string, unknown>[]): void {
+  process.env.CLAUDE_CODE_TASK_LIST_ID = sessionId;
+  const dir = join(String(process.env.CLAUDE_CONFIG_DIR), "tasks", sessionId);
+  mkdirSync(dir, { recursive: true });
+  for (const task of tasks) writeFileSync(join(dir, `${String(task.id)}.json`), JSON.stringify({ status: "pending", metadata: { run: "my-run" }, ...task }));
 }
 
 async function contextOf(agentType: string | undefined, root = project(), sessionId = SESSION): Promise<string> {
@@ -59,11 +54,11 @@ const COMMON =
   "\n[OUTPUT MANDATE] Your final response is the deliverable; intermediate tool results are not forwarded. Return findings, evidence and remaining limits, keeping any markers your agent requires." +
   "\n[FILE TOOLS] Read files with the Read tool, not cat, head, tail, or sed -n in Bash: Read numbers the lines and pages a large file with offset and limit." +
   "\n[REFUSALS] When a permission check denies a call or the user declines it, that decides the outcome the call was after. Do not get there through another tool, command, path or host. Report what stays undone and carry on with the rest. Retry only when the denial's own message says to wait and try again." +
-  "\n[OMCA TOOLS] `evidence_log`, `boulder_progress` and `notepad_write` are always available. Load any other omca tool with ToolSearch first, by its full name: `select:mcp__plugin_oh-my-claudeagent_omca__ast_search`. A guessed prefix finds nothing.";
+  "\n[OMCA TOOLS] `evidence_log` and `notepad_write` are always available. Load any other omca tool with ToolSearch first, by its full name: `select:mcp__plugin_oh-my-claudeagent_omca__ast_search`. A guessed prefix finds nothing.";
 const EDITING_GUIDANCE =
   "\n[EDITS] Change an existing file with Edit, which touches only the lines that need it, rather than rewriting it with Write or a shell heredoc. Read the file before you Edit it, so old_string matches its current content." +
-  "\n[VERIFICATION] Record each build, test, or lint run with evidence_log, including its real exit code. Write .omca/evidence/verification-evidence.json only through that tool, never by hand or through a shell redirect: the Stop and TaskCompleted gates read it as the audit trail." +
-  "\n[PLAN SHA] When logging a final_verification entry, take plan_sha256 from boulder_progress for the active plan and pass it as evidence_log(..., plan_sha256=<plan_sha256>) so the Stop gate scopes evidence to this plan run.";
+  "\n[VERIFICATION] Record each build, test, or lint run with evidence_log, including its real exit code. Write .omca/evidence/verification-evidence.json only through that tool, never by hand or through a shell redirect: the TaskCompleted gate reads it as the audit trail.";
+const FINAL_TASK = "\n[FINAL TASK] A run's final task completes only after a passing final_verification entry names it: evidence_log(..., task_id=<its id>).";
 const ORCHESTRATING_GUIDANCE =
   "\n[ANTI-DUPLICATION] Do not duplicate an active delegate's search. Continue non-overlapping work, then independently check its delivered findings. A background launch acknowledgement is not a result; wait for the actual task notification. Do not poll the child's transcript or send holding messages." +
   "\n[TEAM CONTRACT] OMCA agents are thin wrappers over Claude-native subagents and agent teams. Use subagents when workers only need to report back. Use native agent teams when workers need the shared task list or direct teammate messaging.";
@@ -71,13 +66,11 @@ const WORKER_CONTRACT =
   "\n[YOU ARE A LEAF WORKER] Do this task yourself: do not delegate to other agents or wait on them. Guidance about waiting for background agents or ending a turn while agents run, whether it reaches you from memory, CLAUDE.md, or the output style, is for the orchestrator and does not apply to you." +
   "\n[NEVER STUB] Your final message is the whole deliverable: put your complete findings in it, never a bare status word or a note that you are waiting.";
 
-const notepadLine = (name: string) =>
-  `\n[NOTEPAD AVAILABLE] Plan: ${name}. Return discoveries, issues and decisions for the primary to checkpoint; do not call notepad_write from this read-only assignment. Sections: learnings, issues, decisions, problems.`;
-
-const planBlock = (file: string, name: string) =>
-  `\n[ACTIVE PLAN] Refer to: ${file}` +
-  `\nThe plan file at ${file} is READ-ONLY for you: the orchestrator flips its checkboxes after reviewing your report, so an edit here would record progress nobody verified.` +
-  notepadLine(name);
+const RUN_BLOCK =
+  "\n[ACTIVE RUN] my-run: 1 open, next #2 Say hello" +
+  "\nRead the run's tasks with task_list and task_get, which work in every agent. Load them with ToolSearch: `select:mcp__plugin_oh-my-claudeagent_omca__task_list,mcp__plugin_oh-my-claudeagent_omca__task_get`." +
+  "\nTask status is the orchestrator's: it completes each task after reviewing the report, so a TaskUpdate to completed from a worker would record progress nobody verified." +
+  "\n[NOTEPAD AVAILABLE] Run: my-run. Return discoveries, issues and decisions for the primary to checkpoint; do not call notepad_write from this read-only assignment. Sections: learnings, issues, decisions, problems.";
 
 describe("the injected context, exactly", () => {
   test("a read-only worker gets the protocol, date, mandate, file tools and worker contract", async () => {
@@ -96,18 +89,21 @@ describe("the injected context, exactly", () => {
   });
 
   test("orchestrator gets the planner protocol, editing and orchestrating guidance, and no worker contract", async () => {
-    expect(await contextOf(omca("orchestrator"))).toBe(PLANNER_PROTOCOL + COMMON + EDITING_GUIDANCE + ORCHESTRATING_GUIDANCE);
+    expect(await contextOf(omca("orchestrator"))).toBe(PLANNER_PROTOCOL + COMMON + EDITING_GUIDANCE + FINAL_TASK + ORCHESTRATING_GUIDANCE);
+  });
+
+  test("only the orchestrator is told how to log the final verdict", async () => {
+    expect(await contextOf(omca("orchestrator"))).toContain("[FINAL TASK]");
+    for (const type of ["executor", "build-fixer", "planner", "explorer"]) expect(await contextOf(omca(type))).not.toContain("[FINAL TASK]");
   });
 
   test("planner gets only the orchestrating guidance", async () => {
     expect(await contextOf(omca("planner"))).toBe(PLANNER_PROTOCOL + COMMON + ORCHESTRATING_GUIDANCE);
   });
 
-  test("a bound plan's lines sit between the file tools line and the worker contract", async () => {
-    const root = project();
-    const file = planFile(root);
-    writeBoulder(root, registry({ "my-plan": file }, { [SESSION]: "my-plan" }));
-    expect(await contextOf(omca("explorer"), root)).toBe(AUTONOMOUS_PROTOCOL + COMMON + planBlock(file, "my-plan") + WORKER_CONTRACT);
+  test("an open run's lines sit between the file tools line and the worker contract", async () => {
+    writeTasks(SESSION, { id: "1", subject: "Parse", status: "completed" }, { id: "2", subject: "Say hello" });
+    expect(await contextOf(omca("explorer"))).toBe(AUTONOMOUS_PROTOCOL + COMMON + RUN_BLOCK + WORKER_CONTRACT);
   });
 
   test("an agent type that is absent is treated as an unlisted worker", async () => {
@@ -133,78 +129,37 @@ describe("role lookup", () => {
   });
 });
 
-describe("plan context", () => {
-  test("no boulder.json: plan context (READ-ONLY) is absent", async () => {
-    expect(await contextOf(omca("explorer"))).not.toContain("READ-ONLY");
+describe("run context", () => {
+  test("no tasks: no run context", async () => {
+    const context = await contextOf(omca("explorer"));
+    expect(context).not.toContain("[ACTIVE RUN]");
+    expect(context).not.toContain("[NOTEPAD AVAILABLE]");
   });
 
-  test("a plan file that is missing drops the plan lines and keeps the notepad line", async () => {
-    const root = project(registry({ "ghost-plan": "/tmp/nonexistent-plan-12345.md" }, { [SESSION]: "ghost-plan" }));
-    const context = await contextOf(omca("explorer"), root);
-    expect(context).not.toContain("[ACTIVE PLAN]");
-    expect(context).toContain("[NOTEPAD AVAILABLE]");
+  test("a run with nothing open and tasks with no run add no run context", async () => {
+    writeTasks(SESSION, { id: "1", subject: "Parse", status: "completed" }, { id: "2", subject: "Ad hoc", metadata: {} });
+    expect(await contextOf(omca("explorer"))).toBe(AUTONOMOUS_PROTOCOL + COMMON + WORKER_CONTRACT);
   });
 
   test("blocking questions: notepad sections list excludes questions", async () => {
-    const root = project();
-    writeBoulder(root, registry({ "my-plan": planFile(root) }, { [SESSION]: "my-plan" }));
-    const context = await contextOf(omca("explorer"), root);
+    writeTasks(SESSION, { id: "1", subject: "Parse" });
+    const context = await contextOf(omca("explorer"));
     expect(context).toContain("learnings, issues, decisions, problems");
     expect(context).not.toContain("learnings, issues, decisions, problems, questions");
   });
 
   test("read-only workers relay checkpoints while editing workers may append them", async () => {
-    const root = project();
-    writeBoulder(root, registry({ "my-plan": planFile(root) }, { [SESSION]: "my-plan" }));
-    const readonly = await contextOf(omca("explorer"), root);
+    writeTasks(SESSION, { id: "1", subject: "Parse" });
+    const readonly = await contextOf(omca("explorer"));
     expect(readonly).toContain("primary to checkpoint");
     expect(readonly).not.toContain("Use notepad_write(");
-    expect(await contextOf(omca("executor"), root)).toContain("Use notepad_write('my-plan'");
+    expect(await contextOf(omca("executor"))).toContain("Use notepad_write('my-run'");
   });
 
-  test("plan resolution: explicit binding for this session wins over other plans", async () => {
-    const root = project();
-    const planA = planFile(root, "plan-a.md");
-    const planB = planFile(root, "plan-b.md");
-    writeBoulder(root, registry({ "plan-a": planA, "plan-b": planB }, { [SESSION]: "plan-a" }));
-    const context = await contextOf(omca("explorer"), root);
-    expect(context).toContain(`[ACTIVE PLAN] Refer to: ${planA}`);
-    expect(context).not.toContain(planB);
-  });
-
-  test("plan resolution: no binding + single registered plan injects no plan context", async () => {
-    const root = project();
-    writeBoulder(root, registry({ "plan-a": planFile(root, "plan-a.md") }));
-    const context = await contextOf(omca("explorer"), root);
-    expect(context).not.toContain("[ACTIVE PLAN]");
-    expect(context).not.toContain("[NOTEPAD AVAILABLE]");
-  });
-
-  test("plan resolution: no binding + multiple plans injects no plan context", async () => {
-    const root = project();
-    const planA = planFile(root, "plan-a.md");
-    const planB = planFile(root, "plan-b.md");
-    writeBoulder(root, registry({ "plan-a": planA, "plan-b": planB }));
-    const context = await contextOf(omca("explorer"), root);
-    expect(context).not.toContain("[ACTIVE PLAN]");
-    expect(context).not.toContain(planA);
-    expect(context).not.toContain(planB);
-  });
-
-  test("plan resolution: empty registry injects no plan context", async () => {
-    const context = await contextOf(omca("explorer"), project({ plans: {}, bindings: {} }));
-    expect(context).not.toContain("[ACTIVE PLAN]");
-    expect(context).not.toContain("[NOTEPAD AVAILABLE]");
-  });
-
-  test("an unparseable registry logs the failure and leaves the rest of the context", async () => {
-    const error = spyOn(console, "error").mockImplementation(() => undefined);
-    try {
-      expect(await contextOf(omca("explorer"), project("{not json"))).toBe(AUTONOMOUS_PROTOCOL + COMMON + WORKER_CONTRACT);
-      expect(error).toHaveBeenCalledTimes(1);
-    } finally {
-      error.mockRestore();
-    }
+  test("another session's list is not this session's run", async () => {
+    writeTasks("other-session", { id: "1", subject: "Parse" });
+    process.env.CLAUDE_CODE_TASK_LIST_ID = "this-session";
+    expect(await contextOf(omca("explorer"))).not.toContain("[ACTIVE RUN]");
   });
 });
 

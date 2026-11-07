@@ -97,7 +97,7 @@ test("a marker that cannot be parsed raises no notice, because the mod's state i
     const root = project({ id: launch, text: "{ half a marker" });
     const output: Output = await dispatch({ event: "UserPromptSubmit", session_id: launch }, root, NOW);
     expect(output.systemMessage).toBeUndefined();
-    expect(errors.mock.calls.map((call) => call[0])).toEqual(["omca: UserPromptSubmit handler mod-notice failed:"]);
+    expect(errors.mock.calls.map((call) => call[0])).toEqual(["omca: UserPromptSubmit handler mod-notice failed:", `omca: could not read the mod marker of session ${launch}:`]);
   } finally {
     errors.mockRestore();
   }

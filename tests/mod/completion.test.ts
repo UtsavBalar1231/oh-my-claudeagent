@@ -1,8 +1,6 @@
 import type { On } from "claude-code";
 import { type Engine, type EngineCall, expect, test } from "claude-code/testing";
-import { BOULDER, ROOT, world } from "./world.ts";
-
-const PLAN = "# Plan\n\n## TODOs\n\n- [ ] 1. Only task\n";
+import { world } from "./world.ts";
 
 const typed = ($: Engine, text: string) => {
   const start = text.lastIndexOf(" ") + 1;
@@ -29,36 +27,6 @@ test("a word after a subcommand, or outside /omca, gets nothing", async ($, on) 
   typeahead(on);
 
   expect(texts(await typed($, "/omca stats d"))).toEqual([]);
-  expect(texts(await typed($, "please run d"))).toEqual([]);
-});
-
-test("after /omca plan the typeahead offers the plansDirectory's plans the token begins, newest first", async ($, on) => {
-  const w = world(on, {}, { plansDirectory: "./plans" });
-  typeahead(on);
-  w.files.set(`${ROOT}/plans/billing-export.md`, { text: PLAN, mtimeMs: 1_000 });
-  w.files.set(`${ROOT}/plans/billing-backfill.md`, { text: PLAN, mtimeMs: 2_000 });
-  w.files.set(`${ROOT}/plans/checkout.md`, { text: PLAN, mtimeMs: 3_000 });
-  w.files.set(`${ROOT}/plans/notes.txt`, { text: "", mtimeMs: 4_000 });
-
-  expect(texts(await typed($, "/omca plan bill"))).toEqual(["billing-backfill", "billing-export"]);
-  expect(texts(await typed($, "/omca plan c"))).toEqual(["checkout"]);
-  expect(texts(await typed($, "/omca plan n"))).toEqual([]);
-});
-
-test("after /omca plan with no plans directory on disk the typeahead offers nothing", async ($, on) => {
-  world(on, {}, { plansDirectory: "./plans" });
-  typeahead(on);
-
   expect(texts(await typed($, "/omca plan b"))).toEqual([]);
-});
-
-test("after /omca plan the typeahead offers .omca/plans names and the registry's keys", async ($, on) => {
-  const registry = { plans: { zulu: { active_plan: "/elsewhere/other-name.md" }, ghost: { active_plan: "/elsewhere/gone.md" } }, bindings: {} };
-  world(on, { [BOULDER]: JSON.stringify(registry), [`${ROOT}/.omca/plans/alpha-draft.md`]: PLAN, "/elsewhere/other-name.md": PLAN });
-  typeahead(on);
-
-  expect(texts(await typed($, "/omca plan a"))).toEqual(["alpha-draft"]);
-  expect(texts(await typed($, "/omca plan z"))).toEqual(["zulu"]);
-  expect(texts(await typed($, "/omca plan o"))).toEqual(["other-name"]);
-  expect(texts(await typed($, "/omca plan g"))).toEqual([]);
+  expect(texts(await typed($, "please run d"))).toEqual([]);
 });

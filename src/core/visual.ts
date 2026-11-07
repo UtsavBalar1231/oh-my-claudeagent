@@ -141,7 +141,7 @@ export const piecesWidth = (pieces: readonly { text: string }[]): number => piec
 
 // Chip text is `inverseText` on a solid tone, the only chip pairing that reads in both themes;
 // tint keys such as `diffAdded` measure 1.5 to 3.0 under text in the light theme.
-export const CHIP_TONES = ["ok", "fail", "warn", "active", "info", "plan", "muted"] as const;
+export const CHIP_TONES = ["ok", "fail", "warn", "active", "info", "muted"] as const;
 export type ChipTone = (typeof CHIP_TONES)[number];
 const CHIP_TEXT: ThemeKey = "inverseText";
 const CHIP_MAX = 12;

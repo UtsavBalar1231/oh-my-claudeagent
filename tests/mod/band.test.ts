@@ -1,15 +1,11 @@
 import type { Args, Elements, On, RenderElement } from "claude-code";
 import { type Engine, type EngineCall, expect, mock, type Mounted, test } from "claude-code/testing";
-import { sha256Hex } from "../../src/core/sha256.ts";
 import { displayWidth } from "../../src/core/ui-kit.ts";
 import { hostSpelling } from "./world.ts";
 
 const PLUGIN = "oh-my-claudeagent";
 const SESSION = "00000000-0000-4000-8000-0000000000aa";
 const ROOT = "/work";
-const PLAN_NAME = "widget-rewrite";
-const PLAN_PATH = `${ROOT}/plans/${PLAN_NAME}.md`;
-const BOULDER = `${ROOT}/.omca/state/boulder.json`;
 const STATUS = `${ROOT}/.omca/state/session/${SESSION}.json`;
 const LEDGER = `${ROOT}/.omca/evidence/verification-evidence.json`;
 const NOW_MS = 1_790_000_000_000;
@@ -19,7 +15,6 @@ const AFTER_RUN_MS = (RAN_AT + 5) * 1000;
 const SURFACES = ["terminal", "desktop"] as const;
 
 const LOG_FILL = "Log evidence for `just test` with evidence_log";
-const START_FILL = `/oh-my-claudeagent:start-work ${PLAN_PATH}`;
 
 type Files = Map<string, { text: string; mtimeMs: number }>;
 type Band = Mounted<"terminal" | "desktop", "AbovePrompt">;
@@ -27,16 +22,6 @@ type World = { fills: string[]; submits: string[]; logs: string[] };
 type Kit = Elements[keyof Elements];
 
 const engineBand = ({ Text }: Kit): RenderElement => Text({ children: ["engine band"] });
-
-function planText(done: number, total: number): string {
-  const tasks = Array.from({ length: total }, (_, i) => `- [${i < done ? "x" : " "}] ${i + 1}. Port module ${i + 1}`);
-  return `# Widget rewrite\n\n## TODOs\n\n${tasks.join("\n")}\n`;
-}
-
-const BOUND = JSON.stringify({
-  plans: { [PLAN_NAME]: { active_plan: PLAN_PATH, started_at: "2026-09-01T10:00:00Z", session_ids: [SESSION] } },
-  bindings: { [SESSION]: { plan_name: PLAN_NAME, bound_at: 1_789_990_000 } },
-});
 
 const statusFile = (command: string) =>
   JSON.stringify({
@@ -46,7 +31,6 @@ const statusFile = (command: string) =>
   });
 
 const ledger = (entries: readonly object[]) => JSON.stringify({ entries });
-const final = (fields: object) => ({ type: "final_verification", command: "just ci", timestamp: "2026-10-02T12:00:00Z", exit_code: 0, ...fields });
 
 function files(entries: Record<string, string | { text: string; mtimeMs: number }>): Files {
   return new Map(
@@ -56,9 +40,6 @@ function files(entries: Record<string, string | { text: string; mtimeMs: number 
     ]),
   );
 }
-
-const bound = (done: number, total: number, extra: Record<string, string | { text: string; mtimeMs: number }> = {}) =>
-  files({ [BOULDER]: BOUND, [PLAN_PATH]: planText(done, total), ...extra });
 
 function world(on: On, disk: Files, beneath: (kit: Kit) => RenderElement = engineBand): World {
   const fills: string[] = [];
@@ -79,7 +60,7 @@ function world(on: On, disk: Files, beneath: (kit: Kit) => RenderElement = engin
   on("fs.read", (_$, e) => {
     const file = disk.get(spelled(e.path));
     if (file === undefined) throw new Error(`ENOENT: no such file or directory, open '${spelled(e.path)}'`);
-    return { value: e.as === "bytes" ? { base64: btoa(String.fromCharCode(...new TextEncoder().encode(file.text))) } : file.text };
+    return { value: file.text };
   });
   on("fs.stat", (_$, e) => {
     const file = disk.get(spelled(e.path));
@@ -159,188 +140,9 @@ async function onEachSurface($: Engine, check: (band: Band) => Promise<void>, bo
   }
 }
 
-test("with no plan and no verification the band draws nothing and the engine's drawing stands", async ($, on) => {
-  world(on, files({}));
-  await start($);
-  await turn($);
-
-  await onEachSurface($, async (band) => {
-    expect(await texts(band)).toEqual(["engine band"]);
-  });
-});
-
-test("a bound plan with no verification shows the plan and no actions until a turn completes", async ($, on) => {
-  world(on, bound(12, 46));
-  await start($);
-
-  await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13");
-    expect(await buttons(band)).toEqual([]);
-  });
-});
-
-test("an unlogged verification shows as not logged and offers to log it before start-work", async ($, on) => {
-  world(on, bound(12, 46, { [STATUS]: statusFile("just test"), [LEDGER]: ledger([]) }));
-  await start($);
-  await turn($);
-
-  await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13 · ! just test evidence not logged");
-    expect(await buttons(band)).toEqual([
-      { key: "log-evidence", label: "Log evidence", hotkey: "1", plain: true },
-      { key: "start-work", label: "Start work", hotkey: "2", plain: true },
-    ]);
-  });
-});
-
-test("a ledger written after the run counts as logged, whatever the status file says", async ($, on) => {
-  world(on, bound(12, 46, { [STATUS]: statusFile("just test"), [LEDGER]: { text: ledger([]), mtimeMs: AFTER_RUN_MS } }));
-  await start($);
-  await turn($);
-
-  await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13 · ✓ just test evidence logged");
-    expect(await buttons(band)).toEqual([{ key: "start-work", label: "Start work", hotkey: "1", plain: true }]);
-  });
-});
-
-test("with no plan an unlogged verification still draws the band, its only action to log it", async ($, on) => {
-  world(on, files({ [STATUS]: statusFile("just test") }));
-  await start($);
-  await turn($);
-
-  await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toBe("! just test evidence not logged");
-    expect(await buttons(band)).toEqual([{ key: "log-evidence", label: "Log evidence", hotkey: "1", plain: true }]);
-  });
-});
-
-test("an unreadable registry draws a one-line reason in the band", async ($, on) => {
-  const { logs } = world(on, files({ [BOULDER]: "{ not json" }));
-  await start($);
-  expect(logs.filter((line) => line.startsWith("band"))).toEqual([]);
-
-  await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toMatch(/^✗ Cannot read \.omca\/state\/boulder\.json: \S[^\n]*$/);
-    expect(await buttons(band)).toEqual([]);
-  });
-});
-
-test("a registry of another version binds no plan and draws no failure", async ($, on) => {
-  const { logs } = world(on, files({ [BOULDER]: BOUND.replace("{", '{"version":2,'), [PLAN_PATH]: planText(3, 46) }));
-  await start($);
-  expect(logs.filter((line) => line.startsWith("band"))).toEqual([]);
-
-  await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).not.toMatch(/Cannot read/);
-    expect(await buttons(band)).toEqual([]);
-  });
-});
-
-test("a complete plan without a passing final verification offers to run it", async ($, on) => {
-  world(on, bound(46, 46, { [LEDGER]: ledger([final({ exit_code: 1 })]) }));
-  await start($);
-  await turn($);
-
-  await onEachSurface($, async (band) => {
-    expect(await buttons(band)).toEqual([
-      { key: "final-verification", label: "Run final verification", hotkey: "1", plain: true },
-    ]);
-  });
-});
-
-test("a malformed ledger entry beside the passing final verification does not hide it", async ($, on) => {
-  const scoped = final({ plan_sha256: sha256Hex(new TextEncoder().encode(planText(46, 46))) });
-  world(on, bound(46, 46, { [LEDGER]: ledger([{ type: "test" }, scoped]) }));
-  await start($);
-  await turn($);
-
-  await onEachSurface($, async (band) => {
-    expect((await buttons(band)).map((button) => button.key)).toEqual(["review"]);
-  });
-});
-
-test("a ledger of another version on a complete plan names the failure", async ($, on) => {
-  world(on, bound(46, 46, { [LEDGER]: JSON.stringify({ version: 2, entries: [] }) }));
-  await start($);
-  await turn($);
-
-  await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toMatch(/^✗ Cannot read \.omca\/evidence\/verification-evidence\.json: its "version" is 2/);
-  });
-});
-
-test("a final verification scoped to other plan bytes does not count", async ($, on) => {
-  const stale = final({ plan_sha256: sha256Hex(new TextEncoder().encode(planText(45, 46))) });
-  world(on, bound(46, 46, { [LEDGER]: ledger([stale]) }));
-  await start($);
-  await turn($);
-
-  await onEachSurface($, async (band) => {
-    expect((await buttons(band)).map((button) => button.key)).toEqual(["final-verification"]);
-  });
-});
-
-test("a complete plan with a passing final verification for its current bytes offers the architect review", async ($, on) => {
-  const scoped = final({ plan_sha256: sha256Hex(new TextEncoder().encode(planText(46, 46))) });
-  world(on, bound(46, 46, { [LEDGER]: ledger([scoped]) }));
-  await start($);
-  await turn($);
-
-  await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toBe("█████ 46/46");
-    expect(await buttons(band)).toEqual([{ key: "review", label: "Review with the architect", hotkey: "1", plain: true }]);
-  });
-});
-
-test("a plan's bytes reach the digest unchanged, a byte order mark, CRLF and multibyte characters included", async ($, on) => {
-  const text = `\uFEFF# Widget rewrite \u65e5\u672c\u8a9e \u{1F680}\r\n\r\n## TODOs\r\n\r\n- [x] 1. Port the caf\u00e9 module \u2014 done\r\n`;
-  const scoped = final({ plan_sha256: sha256Hex(new TextEncoder().encode(text)) });
-  world(on, files({ [BOULDER]: BOUND, [PLAN_PATH]: text, [LEDGER]: ledger([scoped]) }));
-  await start($);
-  await turn($);
-
-  const band = await mount($, "terminal");
-  expect((await buttons(band)).map((button) => button.key)).toEqual(["review"]);
-});
-
-test("an unreadable ledger on a complete plan names the failure and still offers the final verification", async ($, on) => {
-  const disk = bound(46, 46, { [LEDGER]: "{ not json" });
-  world(on, disk);
-  await start($);
-  await turn($);
-
-  await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toMatch(
-      /^✗ Cannot read \.omca\/evidence\/verification-evidence\.json: \S[^\n]*$/,
-    );
-    expect(await buttons(band)).toEqual([
-      { key: "final-verification", label: "Run final verification", hotkey: "1", plain: true },
-    ]);
-  });
-
-  const scoped = final({ plan_sha256: sha256Hex(new TextEncoder().encode(planText(46, 46))) });
-  disk.set(LEDGER, { text: ledger([scoped]), mtimeMs: BEFORE_RUN_MS });
-  await turn($);
-
-  await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toBe("█████ 46/46");
-    expect(await buttons(band)).toEqual([{ key: "review", label: "Review with the architect", hotkey: "1", plain: true }]);
-  });
-});
-
-test("an unlogged verification comes before the final verification", async ($, on) => {
-  world(on, bound(46, 46, { [STATUS]: statusFile("just test"), [LEDGER]: ledger([]) }));
-  await start($);
-  await turn($);
-
-  await onEachSurface($, async (band) => {
-    expect((await buttons(band)).map((button) => [button.hotkey, button.key])).toEqual([
-      ["1", "log-evidence"],
-      ["2", "final-verification"],
-    ]);
-  });
-});
+const UNLOGGED_ROW = "! just test evidence not logged";
+const LOG_BUTTON = { key: "log-evidence", label: "Log evidence", hotkey: "1", plain: true };
+const UNLOGGED = () => files({ [STATUS]: statusFile("just test"), [LEDGER]: ledger([]) });
 
 const SPAWN = {
   prompt: "Port module 13.",
@@ -352,34 +154,73 @@ const SPAWN = {
   fork: false,
 } as const;
 
-test("start-work is withheld while an agent is running", async ($, on) => {
-  world(on, bound(12, 46));
+test("with no verification the band draws nothing and the engine's drawing stands", async ($, on) => {
+  world(on, files({}));
   await start($);
-  await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_1" });
   await turn($);
 
   await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13");
+    expect(await texts(band)).toEqual(["engine band"]);
+  });
+});
+
+test("a verification shows at session start, and its action only once a turn completes", async ($, on) => {
+  world(on, UNLOGGED());
+  await start($);
+
+  await onEachSurface($, async (band) => {
+    expect(await statusRow(band)).toBe(UNLOGGED_ROW);
     expect(await buttons(band)).toEqual([]);
   });
 });
 
-test("running agents leave the band as it was, since the engine lists them under the prompt", async ($, on) => {
-  world(on, bound(12, 46));
+test("an unlogged verification shows as not logged and offers to log it", async ($, on) => {
+  world(on, UNLOGGED());
   await start($);
-  const band = await mount($, "terminal");
-  expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13");
+  await turn($);
 
-  await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_1" });
-  await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_2" });
-  await band.redraw();
-  expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13");
+  await onEachSurface($, async (band) => {
+    expect(await statusRow(band)).toBe(UNLOGGED_ROW);
+    expect(await buttons(band)).toEqual([LOG_BUTTON]);
+  });
 });
 
-test("the bar and the glyphs draw in their theme keys, the words plain or inactive", async ($, on) => {
-  world(on, bound(12, 46, { [STATUS]: statusFile("just test") }));
+test("a ledger written after the run counts as logged, whatever the status file says, and offers nothing", async ($, on) => {
+  world(on, files({ [STATUS]: statusFile("just test"), [LEDGER]: { text: ledger([]), mtimeMs: AFTER_RUN_MS } }));
   await start($);
-  await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_1" });
+  await turn($);
+
+  await onEachSurface($, async (band) => {
+    expect(await statusRow(band)).toBe("✓ just test evidence logged");
+    expect(await buttons(band)).toEqual([]);
+  });
+});
+
+test("a status file that is not JSON draws a one-line reason in the band", async ($, on) => {
+  const { logs } = world(on, files({ [STATUS]: "{ not json" }));
+  await start($);
+  expect(logs.filter((line) => line.startsWith("band"))).toEqual([]);
+
+  await onEachSurface($, async (band) => {
+    expect(await statusRow(band)).toMatch(/^✗ Cannot read the session status file: \S[^\n]*$/);
+    expect(await buttons(band)).toEqual([]);
+  });
+});
+
+test("the band reads no plan: a registry, a plan file and the task list leave it as it was", async ($, on) => {
+  const w = world(on, files({ [`${ROOT}/.omca/state/boulder.json`]: "{ not json", [`${ROOT}/plans/widget.md`]: "- [ ] 1. a\n" }));
+  await start($);
+  await turn($);
+
+  await onEachSurface($, async (band) => {
+    expect(await texts(band)).toEqual(["engine band"]);
+  });
+  expect(w.logs.filter((line) => line.startsWith("band"))).toEqual([]);
+});
+
+test("the glyph draws in its theme key, the words plain or inactive", async ($, on) => {
+  world(on, files({ [STATUS]: statusFile("just test") }));
+  await start($);
   await turn($);
 
   const band = await mount($, "terminal");
@@ -387,15 +228,6 @@ test("the bar and the glyphs draw in their theme keys, the words plain or inacti
     .slice(1)
     .map(({ text, props }) => [text, props["color"] ?? (props["weight"] === "semibold" ? "bold" : props["dimColor"] === true ? "dim" : "plain")]);
   expect(styled).toEqual([
-    ["█", "success"],
-    ["▎", "success"],
-    ["███", "subtle"],
-    [" 12/46", "inactive"],
-    [" · ", "inactive"],
-    ["next ", "inactive"],
-    ["13", "bold"],
-    [" Port module 13", "plain"],
-    [" · ", "inactive"],
     ["! ", "warning"],
     ["just test", "plain"],
     [" evidence not logged", "plain"],
@@ -403,181 +235,109 @@ test("the bar and the glyphs draw in their theme keys, the words plain or inacti
   ]);
 });
 
-test("proof counts draw only when the band carries them", async ($, on) => {
-  const atoms = new Map<string, { value: unknown; version: number }>();
-  let proof: object | undefined;
-  on("state.get", (_$, e) => {
-    const read = atoms.get(e.key) ?? { value: undefined, version: 0 };
-    const { value } = read;
-    const isBand = e.key === "band" && proof !== undefined && typeof value === "object" && value !== null;
-    return { value: isBand ? { ...read, value: { ...value, proof } } : read };
-  });
-  on("state.set", (_$, e) => {
-    const version = (atoms.get(e.key)?.version ?? 0) + 1;
-    atoms.set(e.key, { value: e.value, version });
-    return { value: { isSet: true, version } };
-  });
-  world(on, bound(12, 46));
+test("running agents leave the band as it was, since the engine lists them under the prompt", async ($, on) => {
+  world(on, UNLOGGED());
   await start($);
-  const band = await mount($, "terminal");
-  expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13");
-
-  proof = { proven: 52, unproven: 4, failed: 0 };
-  await band.redraw();
-  expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13 · ✓ 52 proven  ! 4 unproven");
-  const colors = (await band.findAll({ type: "Text" })).filter(({ text }) => /^(?:[✓!✗] |\d+ \w+)$/.test(text)).map(({ text, props }) => [text, props["color"] ?? "plain"]);
-  expect(colors).toEqual([
-    ["✓ ", "success"],
-    ["52 proven", "plain"],
-    ["! ", "warning"],
-    ["4 unproven", "plain"],
-  ]);
-});
-
-test("the band counts a done task's proof and an open task's failure, from its files' change times and the newest run since", async ($, on) => {
-  const task = (n: number, isDone: boolean, file?: string) =>
-    [`- [${isDone ? "x" : " "}] ${n}. Port module ${n}`, ...(file === undefined ? [] : [`  - File: \`${file}\``])].join("\n");
-  const tasks = [task(1, true, "src/a.ts"), task(2, true, "src/b.ts"), task(3, false, "src/a.ts"), task(4, false, "src/b.ts"), task(5, false, "src/gone.ts"), task(6, false)];
-  const plan = `# Widget rewrite\n\n## TODOs\n\n${tasks.join("\n")}\n`;
-  const run = (at: number, exitCode: number) => ({
-    type: "test",
-    command: "just test",
-    exit_code: exitCode,
-    output_snippet: "",
-    timestamp: new Date(at * 1000).toISOString(),
-    verified_by: "executor",
-  });
-  const disk = files({
-    [BOULDER]: BOUND,
-    [PLAN_PATH]: plan,
-    [`${ROOT}/src/a.ts`]: { text: "a", mtimeMs: BEFORE_RUN_MS },
-    [`${ROOT}/src/b.ts`]: { text: "b", mtimeMs: AFTER_RUN_MS },
-    [LEDGER]: ledger([run(RAN_AT, 0)]),
-  });
-  world(on, disk);
-  await start($);
-  const band = await mount($, "terminal");
-  expect(await statusRow(band)).toBe("█▋███ 2/6 · next 3 Port module 3 · ✓ 1 proven  ! 1 unproven");
-
-  disk.set(LEDGER, { text: ledger([run(RAN_AT, 0), run(RAN_AT + 10, 1)]), mtimeMs: AFTER_RUN_MS + 10_000 });
   await turn($);
-  expect(await statusRow(band)).toBe("█▋███ 2/6 · next 3 Port module 3 · ✗ 4 failed");
-});
-
-test("the band counts only file changes since the plan's registered start", async ($, on) => {
-  const task = (n: number, isDone: boolean, file: string) => `- [${isDone ? "x" : " "}] ${n}. Port module ${n}\n  - File: \`${file}\``;
-  const plan = `# Widget rewrite\n\n## TODOs\n\n${[task(1, true, "src/a.ts"), task(2, false, "src/a.ts"), task(3, false, "src/b.ts")].join("\n")}\n`;
-  const failing = JSON.stringify({
-    entries: [{ type: "test", command: "just test", exit_code: 1, timestamp: new Date((RAN_AT + 10) * 1000).toISOString() }],
-  });
-  const startedAt = new Date((RAN_AT - 10) * 1000).toISOString();
-  const registry = JSON.stringify({
-    plans: { [PLAN_NAME]: { active_plan: PLAN_PATH, started_at: startedAt, session_ids: [SESSION] } },
-    bindings: { [SESSION]: { plan_name: PLAN_NAME, bound_at: 1_789_990_000 } },
-  });
-  const disk = files({
-    [BOULDER]: registry,
-    [PLAN_PATH]: plan,
-    [`${ROOT}/src/a.ts`]: { text: "a", mtimeMs: BEFORE_RUN_MS },
-    [`${ROOT}/src/b.ts`]: { text: "b", mtimeMs: AFTER_RUN_MS },
-    [LEDGER]: failing,
-  });
-  world(on, disk);
-  await start($);
   const band = await mount($, "terminal");
-  expect(await statusRow(band)).toBe("█▋███ 1/3 · next 2 Port module 2 · ✗ 1 failed");
+  expect(await statusRow(band)).toBe(UNLOGGED_ROW);
+
+  await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_1" });
+  await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_2" });
+  await band.redraw();
+  expect(await statusRow(band)).toBe(UNLOGGED_ROW);
+  expect(await buttons(band)).toEqual([LOG_BUTTON]);
 });
 
 test("a press fills the prompt with the exact text and never submits", async ($, on) => {
-  const { fills, submits } = world(on, bound(12, 46, { [STATUS]: statusFile("just test") }));
+  const { fills, submits } = world(on, UNLOGGED());
   await start($);
   await turn($);
 
   const band = await mount($, "terminal");
   await band.press({ key: "log-evidence" });
-  await band.press({ key: "start-work" });
 
-  expect(fills).toEqual([LOG_FILL, START_FILL]);
+  expect(fills).toEqual([LOG_FILL]);
   expect(submits).toEqual([]);
 });
 
-test("a sub-agent's turn refreshes the plan row and leaves the actions alone", async ($, on) => {
-  const disk = bound(12, 46);
+test("a sub-agent's turn refreshes the status row and leaves the actions alone", async ($, on) => {
+  const disk = files({});
   world(on, disk);
   await start($);
   await turn($);
   const band = await mount($, "terminal");
-  expect((await buttons(band)).map((button) => button.key)).toEqual(["start-work"]);
+  expect(await buttons(band)).toEqual([]);
 
   disk.set(STATUS, { text: statusFile("just test"), mtimeMs: BEFORE_RUN_MS });
   await turn($, "agent-1");
   await band.redraw();
-  expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13 · ! just test evidence not logged");
-  expect((await buttons(band)).map((button) => button.key)).toEqual(["start-work"]);
+  expect(await statusRow(band)).toBe(UNLOGGED_ROW);
+  expect(await buttons(band)).toEqual([]);
 
   await turn($);
   await band.redraw();
-  expect((await buttons(band)).map((button) => button.key)).toEqual(["log-evidence", "start-work"]);
+  expect((await buttons(band)).map((button) => button.key)).toEqual(["log-evidence"]);
 });
 
 test("typing into the prompt clears the actions; an edit that leaves it empty does not", async ($, on) => {
-  world(on, bound(12, 46, { [STATUS]: statusFile("just test") }));
+  world(on, UNLOGGED());
   await start($);
   await turn($);
   const band = await mount($, "terminal");
 
   await edit($, "", "");
   await band.redraw();
-  expect((await buttons(band)).length).toBe(2);
+  expect((await buttons(band)).length).toBe(1);
 
   await edit($, "", "h");
   await band.redraw();
   expect(await buttons(band)).toEqual([]);
-  expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13 · ! just test evidence not logged");
+  expect(await statusRow(band)).toBe(UNLOGGED_ROW);
 });
 
 test("a bare digit that is a shown hotkey keeps the actions so the engine can press its Button", async ($, on) => {
-  const { fills } = world(on, bound(12, 46, { [STATUS]: statusFile("just test") }));
+  const { fills } = world(on, UNLOGGED());
   await start($);
   await turn($);
   const band = await mount($, "terminal");
 
-  for (const [text, inputText] of [["", "1"], ["", "2"], ["", " 1 "]] as const) {
+  for (const [text, inputText] of [["", "1"], ["", " 1 "]] as const) {
     await edit($, text, inputText);
     await band.redraw();
-    expect((await buttons(band)).map((button) => button.hotkey), JSON.stringify(inputText)).toEqual(["1", "2"]);
+    expect((await buttons(band)).map((button) => button.hotkey), JSON.stringify(inputText)).toEqual(["1"]);
   }
-  await band.press({ key: "start-work" });
-  expect(fills).toEqual([START_FILL]);
+  await band.press({ key: "log-evidence" });
+  expect(fills).toEqual([LOG_FILL]);
 });
 
 test("a digit with no shown Button, or a digit with more text, still clears the actions", async ($, on) => {
-  world(on, bound(12, 46, { [STATUS]: statusFile("just test") }));
+  world(on, UNLOGGED());
   await start($);
   await turn($);
   const band = await mount($, "terminal");
 
-  await edit($, "", "3");
+  await edit($, "", "2");
   await band.redraw();
   expect(await buttons(band)).toEqual([]);
 
   await turn($);
   await band.redraw();
-  expect((await buttons(band)).length).toBe(2);
+  expect((await buttons(band)).length).toBe(1);
   await edit($, "1", "2");
   await band.redraw();
   expect(await buttons(band)).toEqual([]);
 });
 
 test("a prompt filled from history, an undo, the engine or another plugin clears the actions", async ($, on) => {
-  world(on, bound(12, 46, { [STATUS]: statusFile("just test") }));
+  world(on, UNLOGGED());
   await start($);
   const band = await mount($, "terminal");
 
   for (const origin of [{ kind: "history" }, { kind: "undo" }, { kind: "engine" }, { kind: "plugin", name: "other-plugin" }] as const) {
     await turn($);
     await band.redraw();
-    expect((await buttons(band)).length, origin.kind).toBe(2);
+    expect((await buttons(band)).length, origin.kind).toBe(1);
     await change($, "earlier draft", origin);
     await band.redraw();
     expect(await buttons(band), origin.kind).toEqual([]);
@@ -585,11 +345,11 @@ test("a prompt filled from history, an undo, the engine or another plugin clears
 });
 
 test("while an agent's transcript is in view the band holds its actions, and typing there keeps them for the main view", async ($, on) => {
-  world(on, bound(12, 46, { [STATUS]: statusFile("just test") }));
+  world(on, UNLOGGED());
   await start($);
   await turn($);
   const main = await mount($, "terminal");
-  expect((await buttons(main)).length).toBe(2);
+  expect((await buttons(main)).length).toBe(1);
   await main.unmount();
   const agent = await mount($, "terminal", 120, { agentId: "a1" });
   expect(await buttons(agent)).toEqual([]);
@@ -599,24 +359,24 @@ test("while an agent's transcript is in view the band holds its actions, and typ
   await change($, "earlier draft", { kind: "history" });
   await agent.unmount();
   const back = await mount($, "terminal");
-  expect((await buttons(back)).length).toBe(2);
+  expect((await buttons(back)).length).toBe(1);
 });
 
 test("the band's own fill, an emptied prompt and a lone shown hotkey keep the actions", async ($, on) => {
-  world(on, bound(12, 46, { [STATUS]: statusFile("just test") }));
+  world(on, UNLOGGED());
   await start($);
   await turn($);
   const band = await mount($, "terminal");
 
-  await change($, "Start work", { kind: "plugin", name: "oh-my-claudeagent" });
+  await change($, LOG_FILL, { kind: "plugin", name: "oh-my-claudeagent" });
   await change($, "", { kind: "clear" });
   await change($, "1", { kind: "engine" });
   await band.redraw();
-  expect((await buttons(band)).map((button) => button.hotkey)).toEqual(["1", "2"]);
+  expect((await buttons(band)).map((button) => button.hotkey)).toEqual(["1"]);
 });
 
 test("at 40 columns no Text in the band is wider than 40 cells", async ($, on) => {
-  world(on, bound(12, 46, { [STATUS]: statusFile("bun test src servers statusline scripts opencode --coverage") }));
+  world(on, files({ [STATUS]: statusFile("bun test src servers statusline scripts opencode --coverage") }));
   await start($);
   await turn($);
 
@@ -624,7 +384,7 @@ test("at 40 columns no Text in the band is wider than 40 cells", async ($, on) =
     $,
     async (band) => {
       const rows = await texts(band);
-      expect(rows).toEqual(["█▎███ 12/46", "█", "▎", "███", " 12/46", "engine band"]);
+      expect(rows[0]).toMatch(/^! bun test .*… evidence not logged$/);
       for (const text of rows) expect(displayWidth(text), text).toBeLessThanOrEqual(40);
       for (const button of await buttons(band)) expect(displayWidth(`1: ${button.label}`)).toBeLessThanOrEqual(40);
     },
@@ -633,8 +393,8 @@ test("at 40 columns no Text in the band is wider than 40 cells", async ($, on) =
 });
 
 test("at 80, 120 and 200 columns on both surfaces the rows read the same and end a space before the collapse mark", async ($, on) => {
-  const long = "bun test src servers statusline scripts opencode --coverage --reporter=junit --timeout 20000";
-  const disk = bound(12, 46, { [STATUS]: statusFile("just test") });
+  const long = `bun test src ${"servers/".repeat(15)}`;
+  const disk = UNLOGGED();
   world(on, disk);
   await start($);
   await turn($);
@@ -643,11 +403,8 @@ test("at 80, 120 and 200 columns on both surfaces the rows read the same and end
     await onEachSurface(
       $,
       async (band) => {
-        expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13 · ! just test evidence not logged");
-        expect((await buttons(band)).map((button) => `${button.hotkey}: ${button.label}`)).toEqual([
-          "1: Log evidence",
-          "2: Start work",
-        ]);
+        expect(await statusRow(band)).toBe(UNLOGGED_ROW);
+        expect((await buttons(band)).map((button) => `${button.hotkey}: ${button.label}`)).toEqual(["1: Log evidence"]);
       },
       columns,
     );
@@ -660,30 +417,25 @@ test("at 80, 120 and 200 columns on both surfaces the rows read the same and end
       $,
       async (band) => {
         const row = (await statusRow(band)) ?? "";
-        expect(row).toMatch(/^█▎███ 12\/46 · next 13 Port module 13 · ! bun test src .*… evidence not logged$/);
+        expect(row).toMatch(/^! bun test src .*… evidence not logged$/);
         expect(displayWidth(row)).toBe(columns - 4);
       },
       columns,
     );
   }
-  await onEachSurface(
-    $,
-    async (band) => expect(await statusRow(band)).toBe(`█▎███ 12/46 · next 13 Port module 13 · ! ${long} evidence not logged`),
-    200,
-  );
+  await onEachSurface($, async (band) => expect(await statusRow(band)).toBe(`! ${long} evidence not logged`), 200);
 });
 
-test("at 60 and 52 columns the unverified-evidence warning stays and the next task's title shrinks, down to `next 13`", async ($, on) => {
-  world(on, bound(12, 46, { [STATUS]: statusFile("just test") }));
+test("too narrow for the full wording the row keeps the command and says not logged", async ($, on) => {
+  world(on, UNLOGGED());
   await start($);
   await turn($);
 
-  await onEachSurface($, async (band) => expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port mod… · ! just test not logged"), 60);
-  await onEachSurface($, async (band) => expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 · ! just test not logged"), 52);
+  await onEachSurface($, async (band) => expect(await statusRow(band)).toBe("! just test not logged"), 30);
 });
 
 test("showBand false draws nothing, whatever the state", { options: { showBand: false } }, async ($, on) => {
-  world(on, bound(12, 46, { [STATUS]: statusFile("just test") }));
+  world(on, UNLOGGED());
   await start($);
   await turn($);
 
@@ -693,7 +445,7 @@ test("showBand false draws nothing, whatever the state", { options: { showBand: 
 });
 
 test("the band yields to a survey", async ($, on) => {
-  world(on, bound(12, 46, { [STATUS]: statusFile("just test") }));
+  world(on, UNLOGGED());
   await start($);
   await turn($);
 
@@ -716,15 +468,15 @@ test("another mod's band stays beneath the rows, in a Box with no size, position
       key: "other-band",
       children: [Text({ children: ["other mod's band"] }), Button({ key: "other-press", label: "Theme", onPress: () => void presses.push("other-press") })],
     });
-  world(on, bound(12, 46, { [STATUS]: statusFile("just test") }), otherBand);
+  world(on, UNLOGGED(), otherBand);
   await start($);
   await turn($);
 
   await onEachSurface($, async (band) => {
     const rows = await texts(band);
-    expect(rows[0]).toBe("█▎███ 12/46 · next 13 Port module 13 · ! just test evidence not logged");
+    expect(rows[0]).toBe(UNLOGGED_ROW);
     expect(rows.at(-1)).toBe("other mod's band");
-    expect((await buttons(band)).map((button) => button.key)).toEqual(["log-evidence", "start-work", "other-press"]);
+    expect((await buttons(band)).map((button) => button.key)).toEqual(["log-evidence", "other-press"]);
     const holder = await band.find({ key: "omca-band" });
     expect(holder?.type).toBe("Box");
     const layout = ["width", "height", "minWidth", "minHeight", "position", "top", "left", "right", "bottom", "display", "overflow"];
@@ -737,23 +489,23 @@ test("another mod's band stays beneath the rows, in a Box with no size, position
 });
 
 test("a burst of turn ends leaves the mounted band on the last state, drawn without any invalidate", async ($, on) => {
-  const disk = bound(12, 46);
+  const disk = UNLOGGED();
   world(on, disk);
   await start($);
   const band = await mount($, "terminal");
-  expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13");
+  expect(await statusRow(band)).toBe(UNLOGGED_ROW);
 
   for (let n = 0; n < 8; n++) {
     disk.set(STATUS, { text: statusFile(`just test ${n}`), mtimeMs: BEFORE_RUN_MS + n });
     await turn($, n % 2 === 0 ? undefined : `agent-${n}`);
   }
 
-  expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13 · ! just test 7 evidence not logged");
-  expect((await buttons(band)).map((button) => button.key)).toEqual(["log-evidence", "start-work"]);
+  expect(await statusRow(band)).toBe("! just test 7 evidence not logged");
+  expect((await buttons(band)).map((button) => button.key)).toEqual(["log-evidence"]);
 
   disk.set(STATUS, { text: statusFile("just test again"), mtimeMs: BEFORE_RUN_MS });
   await turn($);
-  expect(await statusRow(band)).toBe("█▎███ 12/46 · next 13 Port module 13 · ! just test again evidence not logged");
+  expect(await statusRow(band)).toBe("! just test again evidence not logged");
 });
 
 test("a turn that changes nothing writes nothing to the band", async ($, on) => {
@@ -766,7 +518,7 @@ test("a turn that changes nothing writes nothing to the band", async ($, on) => 
     atoms.set(e.key, { value: e.value, version });
     return { value: { isSet: true, version } };
   });
-  world(on, bound(12, 46));
+  world(on, UNLOGGED());
   await start($);
   await turn($);
   const band = await mount($, "terminal");
@@ -779,7 +531,7 @@ test("a turn that changes nothing writes nothing to the band", async ($, on) => 
   expect([await texts(band), await buttons(band)]).toEqual(before.drawn);
 });
 
-test("with no plan bound, running agents draw no band and the engine's drawing stands", async ($, on) => {
+test("with no verification, running agents draw no band and the engine's drawing stands", async ($, on) => {
   world(on, files({}));
   await start($);
   await turn($);

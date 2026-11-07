@@ -16,21 +16,15 @@ describe("SHOTS", () => {
     }
   });
 
-  test("captures every README scene as a still and the two animated scenes as GIFs", () => {
-    expect(SHOTS.filter((shot) => shot.format === "png").map((shot) => shot.name)).toEqual(["hero", "band", "transcript", "plan", "evidence", "agents", "mascots", "guard", "doctor", "statusline"]);
-    expect(SHOTS.filter((shot) => shot.format === "gif").map((shot) => shot.name)).toEqual(["pane-tour", "guard-dialog"]);
+  test("captures every README scene as a still and the animated scene as a GIF", () => {
+    expect(SHOTS.filter((shot) => shot.format === "png").map((shot) => shot.name)).toEqual(["hero", "band", "transcript", "evidence", "agents", "mascots", "guard", "doctor", "statusline"]);
+    expect(SHOTS.filter((shot) => shot.format === "gif").map((shot) => shot.name)).toEqual(["guard-dialog"]);
   });
 
-  test("the plan scene is ready only once the executor holds task 7 and task 6 is focused", () => {
-    const board = "◆ executor on 7\n✓ 6 proven · ! 1 unproven\n◐ 7 Wire the order summary panel  ! unproven\nk: Run check  s: Start here  c: Copy  m: More";
-    expect(still("plan")?.ready(`${board}\n6. Build the payment step`)).toBe(true);
-    expect(still("plan")?.ready(board)).toBe(false);
-  });
-
-  test("the hero scene is ready only with task 7's detail beside the list, which a dock draws from 207 columns", () => {
-    const board = "◆ executor on 7\n✓ 6 proven · ! 1 unproven\n◐ 7 Wire the order summary panel  ! unproven\nk: Run check  s: Start here  c: Copy  m: More";
-    expect(still("hero")?.ready(`${board}\n7. Wire the order summary panel`)).toBe(true);
-    expect(still("hero")?.ready(board)).toBe(false);
+  test("the hero scene is ready only with the Agents tab beside the transcript, which a dock draws from 207 columns", () => {
+    const screen = "● The executor is on task 7.\n1: Agents  2: Evidence  3: Notepad";
+    expect(still("hero")?.ready(`${screen}\nWire the order summary panel`)).toBe(true);
+    expect(still("hero")?.ready(screen)).toBe(false);
     expect(still("hero")?.cols).toBeGreaterThanOrEqual(207);
   });
 
@@ -52,7 +46,7 @@ describe("SHOTS", () => {
   });
 
   test("only the pane scenes crop to the pane", () => {
-    expect(SHOTS.filter((shot) => shot.crop === "pane").map((shot) => shot.name)).toEqual(["plan", "evidence", "agents", "mascots", "doctor"]);
+    expect(SHOTS.filter((shot) => shot.crop === "pane").map((shot) => shot.name)).toEqual(["evidence", "agents", "mascots", "doctor"]);
   });
 
   test("the guard scenes are ready only once the dialog holds the command", () => {
@@ -76,10 +70,8 @@ describe("CLIPS", () => {
       "clip-refusal",
       "clip-plan",
       "clip-delegate",
-      "clip-board",
       "clip-guard",
       "clip-verify",
-      "clip-board-light",
       "clip-tour",
     ]);
     const pairs = ["clip-plain-stop", "clip-plain-reset", "clip-refusal", "clip-guard"];
@@ -97,14 +89,10 @@ describe("CLIPS", () => {
     expect(targets(clip("clip-plan"))).toEqual(["question"]);
     expect(marks(clip("clip-delegate"))).toEqual(["cmd-typed", "spawned", "pane", "lanes"]);
     expect(targets(clip("clip-delegate"))).toEqual(["tool-row", "lane-head"]);
-    for (const name of ["clip-board", "clip-board-light"]) {
-      expect(marks(clip(name))).toEqual(["cmd-typed", "board", "focus-moved", "task-open"]);
-      expect(targets(clip(name))).toEqual(["proven-chip"]);
-    }
     expect(marks(clip("clip-guard"))).toEqual(["cmd-typed", "dialog", "refused"]);
     expect(targets(clip("clip-guard"))).toEqual(["discard-lines"]);
     expect(marks(clip("clip-verify"))).toEqual(["cmd-typed", "tests-pass", "evidence-logged", "complete"]);
-    expect(marks(clip("clip-tour"))).toEqual(["cmd-typed", "agents-tab", "plan-tab", "evidence-tab", "notepad-tab", "stats-typed", "stats-tab"]);
+    expect(marks(clip("clip-tour"))).toEqual(["cmd-typed", "agents-tab", "evidence-tab", "notepad-tab", "stats-typed", "stats-tab"]);
     expect(targets(clip("clip-verify"))).toEqual(["complete-chip", "verdict-line"]);
     expect(targets(clip("clip-tour"))).toEqual(["band", "cost-row", "notepad-section", "stats-header"]);
   });
@@ -137,13 +125,8 @@ describe("CLIPS", () => {
     expect(CLIPS.filter((shot) => shot.env?.["OMCA_DISABLED_HOOKS"] === "").map((shot) => shot.name)).toEqual(["clip-refusal", "clip-verify"]);
   });
 
-  test("the board target finds a row's proven mark, not an unproven one or the header's count", () => {
-    const screen = "│ ✓ 6 proven · ! 1 unproven │\n7 Wire  ! unproven\n1 Add the cart  ✓ proven";
-    expect(locate(screen, target(clip("clip-board"), "proven-chip") ?? /^$/)).toEqual({ row: 2, col: 16, len: 8, rows: 1 });
-  });
-
   test("a target over two rows spans from its leftmost text, skipping the indent", () => {
-    const screen = "● Ran 1 stop hook\n  ⎿  Stop hook feedback: the bound plan\n  still has 8 unchecked tasks\n\n● Task 7 is still open";
+    const screen = "● Ran 1 stop hook\n  ⎿  Stop hook feedback: this run still\n  has 8 open tasks\n\n● Task 7 is still open";
     expect(locate(screen, target(clip("clip-refusal"), "stop-line") ?? /^$/)).toEqual({ row: 1, col: 2, len: 37, rows: 2 });
   });
 

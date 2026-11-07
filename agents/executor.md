@@ -25,9 +25,11 @@ For code changes, load `oh-my-claudeagent:remove-ai-slops` with `Skill` and give
 
 Rerun affected checks only if cleanup changes something. If a cut breaks verification, undo only that cut and report it rather than fixing forward under cleanup.
 
-Report changed files, command results, and anything incomplete. Include `STATUS: complete|blocked|partial` with one status value. End with `SLOP PASS:` and a per-file cut list with categories, `no cuts`, or `docs-only, prose pass applied`. For a bound plan, checkpoint significant sub-steps with `notepad_write`. After three materially distinct failed attempts, stop and return the evidence and approaches tried to the primary agent; escalate immediately if unsafe or out of scope, or sooner when a skill requires it.
+Report changed files, command results, and anything incomplete. Include `STATUS: complete|blocked|partial` with one status value. End with `SLOP PASS:` and a per-file cut list with categories, `no cuts`, or `docs-only, prose pass applied`. For a named plan or run, checkpoint significant sub-steps with `notepad_write` under that name. After three materially distinct failed attempts, stop and return the evidence and approaches tried to the primary agent; escalate immediately if unsafe or out of scope, or sooner when a skill requires it.
 
 ## Claude Code
+
+The task list belongs to the session that delegated to you. Never mark, complete or close a task, even if the task tools are in your tool list. Log no `final_verification`; the verdict belongs to the session that delegated to you. Report the result; that session reviews it and updates the list.
 
 When an error repeats, consult `advisor` if available before another attempt. On work needing multiple fix attempts, consult it before reporting complete and verify its guidance against the code.
 
