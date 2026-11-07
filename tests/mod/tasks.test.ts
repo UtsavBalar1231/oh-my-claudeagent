@@ -182,6 +182,17 @@ test("a task closed as blocked shows why as its aside, and its page says it whol
   await ui.unmount();
 });
 
+test("an in-progress task closed as blocked sits under Waiting and is not counted as running", async ($, on) => {
+  world(on, filesOf({ id: "1", subject: "Call the vendor", status: "in_progress", metadata: { blocked: "vendor API down" } }, { id: "2", subject: "Ship" }));
+  const ui = await open($);
+  const page = rows(await ui.drawn());
+  expect(page[0]?.trimEnd()).toEndWith("0 of 2 done");
+  expect(page.join("\n")).not.toContain("running");
+  const lines = page.map((line) => line.trimEnd());
+  expect(lines[lines.indexOf("Waiting") + 1]).toContain("#1 Call the vendor");
+  await ui.unmount();
+});
+
 test("a final task is marked final, before whatever else its aside says", async ($, on) => {
   const FINAL = { final: true };
   world(

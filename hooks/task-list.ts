@@ -187,7 +187,7 @@ const sum = (heights: readonly number[]) => heights.reduce((total, rows) => tota
 
 function headRow(view: View, tasks: readonly NativeTask[]): RenderElement {
   const done = tasks.filter((task) => task.status === "completed").length;
-  const active = tasks.filter((task) => task.status === "in_progress").length;
+  const active = tasks.filter((task) => task.status === "in_progress" && task.blockedReason === "").length;
   const words = `${done} of ${tasks.length} done${active > 0 ? ` ${view.g.dot} ${active} running` : ""}`;
   const meter = view.width >= MIN_BAR_ROOM ? [...bar({ done, active, todo: tasks.length - done - active }, BAR_CELLS, view.isAscii), { text: " " }] : [];
   const run = runState(tasks)?.name;
