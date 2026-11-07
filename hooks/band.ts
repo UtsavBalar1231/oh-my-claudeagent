@@ -3,11 +3,12 @@ import { type Band, bandView, BUTTON_GAP, type Span, type Tone } from "../src/co
 import { ledgerCoversSlot } from "../src/core/evidence.ts";
 import { type NextAction, nextActions } from "../src/core/next-actions.ts";
 import { exitCodeOf, LEDGER, statusPath, verificationOf } from "../src/core/omca-paths.ts";
+import { type RunSummary, runSummary } from "../src/core/run-line.ts";
 import { fitEnd, type GlyphTier, glyphs, oneLine } from "../src/core/ui-kit.ts";
 import { TONE_KEYS } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
 import { fillPrompt, type Host, ledgerWrittenAt, reason, sessionOf, stampOf } from "./host.ts";
-import { isRemote, type Kit, kitOf, Run, type TextStyle } from "./ui.ts";
+import { isRemote, type Kit, kitOf, Line, Run, type TextStyle } from "./ui.ts";
 
 type Snapshot = { band: Band; exitCode: number | null };
 
@@ -87,6 +88,12 @@ async function clearActionsFor(host: Host, text: string): Promise<void> {
   await host.state.nextActions.set([]);
 }
 
+async function openRun(host: Host): Promise<RunSummary | undefined> {
+  const { value } = await host.state.tasks.get();
+  const run = value === undefined ? undefined : runSummary(value.tasks);
+  return run?.isOpen === true ? run : undefined;
+}
+
 const withoutReadAt = (band: Band | undefined): string => JSON.stringify({ ...band, readAt: 0 });
 
 async function writeBand(host: Host, band: Band): Promise<void> {
@@ -130,7 +137,7 @@ export const band: Features = {
       const snapshot = await snapshotOf(host);
       toastChanges(host, snapshot);
       await writeBand(host, snapshot.band);
-      if (e.agentId === undefined) await writeActions(host, nextActions({ verification: snapshot.band.verification }));
+      if (e.agentId === undefined) await writeActions(host, nextActions({ verification: snapshot.band.verification, isRunOpen: (await openRun(host)) !== undefined }));
       return undefined;
     },
   },
@@ -151,12 +158,15 @@ export const band: Features = {
     post: async (host, e, beneath) => {
       isAgentInView = e.props.view.agentId !== undefined;
       if (!host.options.showBand || e.props.hasSurvey) return undefined;
-      const [{ value: snapshot }, { value: actions = [] }] = await Promise.all([host.state.band.get(), host.state.nextActions.get()]);
-      const view = bandView(snapshot, isAgentInView ? [] : actions, e.props.bodyColumns, glyphTier);
+      const [{ value: snapshot }, { value: actions = [] }, run] = await Promise.all([host.state.band.get(), host.state.nextActions.get(), openRun(host)]);
+      const view = bandView(snapshot, isAgentInView ? [] : actions, e.props.bodyColumns, glyphTier, run);
       if (view === undefined) return undefined;
       const kit = kitOf(host.ui.resolve(e), e.surface);
       const { Box, Button } = kit;
-      const rows = view.status.length === 0 ? [] : [Box({ key: "status", children: [row(kit, view.status)] })];
+      const rows = [
+        ...(view.status.length === 0 ? [] : [Box({ key: "status", children: [row(kit, view.status)] })]),
+        ...(view.run.length === 0 ? [] : [Box({ key: "run", children: [Line(kit, view.run)] })]),
+      ];
       if (view.buttons.length > 0) {
         rows.push(
           Box({

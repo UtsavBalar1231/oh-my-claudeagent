@@ -2,7 +2,7 @@ import { type Engine, expect, type Plugin, test } from "claude-code/testing";
 import { displayWidth, usableColumns } from "../../src/core/ui-kit.ts";
 import { joinPath } from "../../src/core/path.ts";
 import { TASK_TOOLS_OFF } from "../../src/core/native-tasks.ts";
-import { bodyColumns, focusRequests, LAYOUTS, pane, POSIX, rows, run, SESSION, type Size, SIZES, spreadRows, usage, world, write } from "./world.ts";
+import { bodyColumns, focusRequests, isAscii, LAYOUTS, LEDGER, local, pane, POSIX, rows, run, SESSION, type Size, SIZES, spreadRows, usage, world, write } from "./world.ts";
 
 const DOCK: Size = { columns: 160, rows: 45, placement: "dock" };
 const SHORT: Size = { columns: 160, rows: 16, placement: "dock" };
@@ -30,7 +30,10 @@ async function open($: Engine, size: Size = DOCK) {
   return $.ui.mount({ ...pane("terminal", size), requestId: "tasklist" });
 }
 
-const body = (lines: readonly string[]) => lines.slice(lines.findIndex((line) => line.includes("done")));
+// Rows as they read: runs of spaces as two, a rule or the bar as one cell of each kind.
+const norm = (line: string) => line.trimEnd().replace(/ {2,}/g, "  ").replace(/─+/g, "─").replace(/━+/g, "━");
+const shown = async (ui: { drawn: () => Promise<Parameters<typeof rows>[0]> }) => rows(await ui.drawn()).map(norm);
+const RULE = /^(Running|Ready|Blocked|Waiting|Done)\b.*─$/;
 
 // Another plugin's close reaches the pane's close feature with origin `plugin`; a test cannot raise the person's Esc.
 const CLOSER: Plugin = {
@@ -118,99 +121,112 @@ test("the open pane reads the list every two seconds", { plugins: [CLOSER] }, as
   await $.command.run(closeRun);
 });
 
-test("the list runs in the order the work runs, each open task with what it does", async ($, on) => {
+test("the list runs in the order the work runs, each section under its rule, a blank row between them when the pane has the rows", async ($, on) => {
   world(on, filesOf(...WORK));
   const ui = await open($);
-  const lines = body(rows(await ui.drawn()).map((line) => line.trimEnd()));
-  expect(lines[0]).toEndWith("1 of 4 done · 1 running");
-  expect(lines.slice(1).map((line) => line.replace(/ {2,}/g, "  "))).toEqual([
-    "Now",
-    "◐ #2 Port the parser  executor",
-    "  Move it to the helper.",
+  const lines = await shown(ui);
+  expect(lines.slice(0, 14)).toEqual([
+    "1 of 4 done",
+    "━─",
+    "◐ 1 running  ○ 1 ready  · 1 waiting",
     "",
-    "Next",
-    "○ #4 Update the docs",
-    "  Cover the helper.",
+    "Running ─",
+    "◐ #2  Port the parser  executor",
     "",
-    "Waiting",
-    "⊗ #3 Add the migration  waits on #2",
-    "  Forward only.",
+    "Ready ─",
+    "○ #4  Update the docs",
     "",
-    "Done",
-    "✓ #1 Map the auth flow",
+    "Waiting ─",
+    "· #3  Add the migration  ← #2",
+    "",
+    "Done ✓ 1 ─ d: show ─",
   ]);
+  expect(lines.at(-1)).toBe("↑↓ move  ⏎ open  d: done  esc close");
+  expect(lines.at(-2)).toBe("");
   await ui.unmount();
+});
+
+test("a pane short of rows drops the blank rows first, then the counts row", async ($, on) => {
+  world(on, filesOf(...WORK));
+  const compact = await open($, { columns: 160, rows: 15, placement: "dock" });
+  const lines = await shown(compact);
+  expect(lines.slice(0, 10)).toEqual(["1 of 4 done", "━─", "◐ 1 running  ○ 1 ready  · 1 waiting", "Running ─", "◐ #2  Port the parser  executor", "Ready ─", "○ #4  Update the docs", "Waiting ─", "· #3  Add the migration  ← #2", "Done ✓ 1 ─ d: show ─"]);
+  await compact.unmount();
+  const shorter = await open($, { columns: 160, rows: 14, placement: "dock" });
+  expect((await shown(shorter)).slice(0, 3)).toEqual(["1 of 4 done", "━─", "Running ─"]);
+  await shorter.unmount();
 });
 
 const RUN = { run: "auth-rewrite" };
 
-test("the head row names the run beside the counts when the list has one", async ($, on) => {
+test("the head row names the run on the left and its count on the right", async ($, on) => {
   world(on, filesOf({ id: "1", subject: "Port", metadata: RUN }, { id: "2", subject: "Docs", status: "completed", metadata: RUN }));
   const ui = await open($);
   const head = rows(await ui.drawn())[0]?.trimEnd() ?? "";
-  expect(head).toEndWith("1 of 2 done · auth-rewrite");
+  expect(head).toStartWith("auth-rewrite ");
+  expect(head).toEndWith(" 1 of 2 done");
+  expect(displayWidth(head)).toBe(usableColumns(bodyColumns(DOCK)));
   await ui.unmount();
 });
 
 test("a list with no run names none", async ($, on) => {
   world(on, filesOf({ id: "1", subject: "Port" }));
   const plain = await open($);
-  expect(rows(await plain.drawn())[0]?.trimEnd()).toEndWith("0 of 1 done");
+  expect(rows(await plain.drawn())[0]?.trimEnd()).toBe("0 of 1 done");
   await plain.unmount();
 });
 
-test("a long run name gives way to the counts at the narrowest size", async ($, on) => {
+test("a long run name wraps to two rows and keeps its count whole at the narrowest size", async ($, on) => {
   world(on, filesOf({ id: "1", subject: "Port", metadata: { run: "r".repeat(300) } }));
   const size: Size = { columns: 80, rows: 40, placement: "inline" };
   const ui = await open($, size);
-  const head = rows(await ui.drawn())[0] ?? "";
-  expect(head).toContain("0 of 1 done · rrr");
-  expect(displayWidth(head.trimEnd())).toBeLessThanOrEqual(usableColumns(bodyColumns(size)));
+  const head = rows(await ui.drawn()).slice(0, 3).map((line) => line.trimEnd());
+  expect(head[0]).toMatch(/^r+$/);
+  expect(head[1]).toMatch(/^r+…$/);
+  expect(head[2]).toEndWith("0 of 1 done");
+  for (const line of head) expect(displayWidth(line)).toBeLessThanOrEqual(usableColumns(bodyColumns(size)));
   await ui.unmount();
 });
 
-test("a task closed as blocked shows why as its aside, and its page says it whole", async ($, on) => {
+test("a task closed as blocked sits under Blocked whatever its status, with why on its own row, and its page says it whole", async ($, on) => {
   const why = `the vendor API is down until ${"next ".repeat(30)}week`;
-  world(on, filesOf({ id: "1", subject: "Call the vendor", owner: "executor", metadata: { blocked: why } }, { id: "2", subject: "Ship" }));
+  world(on, filesOf({ id: "1", subject: "Call the vendor", status: "in_progress", owner: "executor", metadata: { blocked: why } }, { id: "2", subject: "Ship" }));
   const ui = await open($);
-  const lines = rows(await ui.drawn()).map((line) => line.trimEnd().replace(/ {2,}/g, "  "));
-  expect(lines[lines.indexOf("Waiting") + 1]).toStartWith("⊗ #1 Call the vendor  the vendor API");
+  const lines = await shown(ui);
+  expect(lines[0]).toBe("0 of 2 done");
+  expect(lines[2]).toBe("○ 1 ready  ⊗ 1 blocked");
+  const at = lines.indexOf("Blocked ─");
+  expect(lines[at + 1]).toBe("⊗ #1  Call the vendor");
+  expect(lines[at + 2]).toMatch(/^ {2}the vendor API is down until next .*…$/);
+  expect(lines.join("\n")).not.toContain("running");
   await ui.press({ key: "task-1" });
   const page = spreadRows(await ui.drawn()).map((line) => line.trimEnd());
-  expect(page.join(" ")).toContain("Blocked");
+  expect(page).toContain("⊗ Blocked · executor");
   expect(page.join(" ").replace(/ +/g, " ")).toContain(why.replace(/ +/g, " "));
   await ui.unmount();
 });
 
-test("an in-progress task closed as blocked sits under Waiting and is not counted as running", async ($, on) => {
-  world(on, filesOf({ id: "1", subject: "Call the vendor", status: "in_progress", metadata: { blocked: "vendor API down" } }, { id: "2", subject: "Ship" }));
-  const ui = await open($);
-  const page = rows(await ui.drawn());
-  expect(page[0]?.trimEnd()).toEndWith("0 of 2 done");
-  expect(page.join("\n")).not.toContain("running");
-  const lines = page.map((line) => line.trimEnd());
-  expect(lines[lines.indexOf("Waiting") + 1]).toContain("#1 Call the vendor");
-  await ui.unmount();
-});
-
-test("a final task is marked final, before whatever else its aside says", async ($, on) => {
-  const FINAL = { final: true };
+test("the final task sits last in its section with the final mark, and counts the tasks it still waits on", async ($, on) => {
   world(
     on,
     filesOf(
-      { id: "1", subject: "Port", status: "in_progress" },
-      { id: "2", subject: "Verify alone", metadata: FINAL },
-      { id: "3", subject: "Verify after", blockedBy: ["1"], metadata: FINAL },
-      { id: "4", subject: "Verify owned", status: "in_progress", owner: "executor", metadata: FINAL },
-      { id: "5", subject: "Verify blocked", metadata: { ...FINAL, blocked: "no runner" } },
+      { id: "1", subject: "Port", status: "in_progress", owner: "executor" },
+      { id: "2", subject: "Verify", blockedBy: ["1", "3", "4"], metadata: { final: true } },
+      { id: "3", subject: "Docs", blockedBy: ["1"] },
+      { id: "4", subject: "Tag" },
     ),
   );
   const ui = await open($);
-  const lines = rows(await ui.drawn()).map((line) => line.trimEnd().replace(/ {2,}/g, "  "));
-  expect(lines).toContain("○ #2 Verify alone  final");
-  expect(lines).toContain("⊗ #3 Verify after  final · waits on #1");
-  expect(lines).toContain("◐ #4 Verify owned  final · executor");
-  expect(lines).toContain("⊗ #5 Verify blocked  no runner");
+  const lines = await shown(ui);
+  const at = lines.indexOf("Waiting ─");
+  expect(lines.slice(at + 1, at + 3)).toEqual(["· #3  Docs  ← #1", "◆ #2  Verify  ← 3 open"]);
+  await ui.unmount();
+});
+
+test("a waiting task names its first open blocker and how many more", async ($, on) => {
+  world(on, filesOf({ id: "1", subject: "Port", status: "in_progress" }, { id: "2", subject: "Lint" }, { id: "3", subject: "Docs", blockedBy: ["1", "2"] }));
+  const ui = await open($);
+  expect(await shown(ui)).toContain("· #3  Docs  ← #1 +1");
   await ui.unmount();
 });
 
@@ -224,32 +240,31 @@ test("a secret in a blocked reason or a run name is masked", async ($, on) => {
   await ui.unmount();
 });
 
-test("a summary draws its code spans", async ($, on) => {
-  world(on, filesOf({ id: "1", subject: "Port", status: "in_progress", description: "Move `parseToken` over." }));
+test("the bar is heavy for what is done and running and light for the rest, a waiting task painted like a todo one", async ($, on) => {
+  world(on, filesOf({ id: "1", subject: "Map", status: "completed" }, { id: "2", subject: "Port", status: "in_progress" }, { id: "3", subject: "Docs", blockedBy: ["2"] }, { id: "4", subject: "Tag", blockedBy: ["2"] }));
   const ui = await open($);
-  expect(rows(await ui.drawn())).toContain("     Move parseToken over.");
+  const segments = (await ui.findAll({ type: "Text" })).filter((found) => /^(━+|─+)$/.test(String(found.children?.[0])));
+  const bar = segments.slice(0, 3).map((found) => [String(found.children?.[0]).charAt(0), found.props["color"]]);
+  expect(bar).toEqual([
+    ["━", "success"],
+    ["━", "claude"],
+    ["─", "inactive"],
+  ]);
   await ui.unmount();
 });
 
-test("the bar paints a waiting task like a todo one", async ($, on) => {
-  world(on, filesOf({ id: "1", subject: "Port", status: "in_progress" }, { id: "2", subject: "Docs", blockedBy: ["1"] }, { id: "3", subject: "Tag", blockedBy: ["1"] }));
-  const ui = await open($);
-  const segments = (await ui.findAll({ type: "Text" })).filter((found) => /^[█▏▎▍▌▋▊▉]+$/.test(String(found.children?.[0]))).map((found) => found.props["color"]);
-  expect(segments).not.toContain("warning");
-  expect(segments.at(-1)).toBe("subtle");
-  await ui.unmount();
-});
-
-test("Enter opens a task's page with its description, what it holds up and its metadata; b goes back to that row", async ($, on) => {
+test("Enter opens a task's page: its state, what it holds up before its description, and its metadata; b goes back to that row", async ($, on) => {
   const w = world(on, filesOf(...WORK));
   const ui = await open($);
   await ui.press({ key: "task-2" });
-  const lines = spreadRows(await ui.drawn()).map((line) => line.trimEnd());
-  expect(lines).toContain("◐ #2 Port the parser");
-  expect(lines).toContain("Running · executor");
+  const lines = spreadRows(await ui.drawn()).map(norm);
+  expect(lines[0]).toBe("#2 Port the parser");
+  expect(lines[1]).toBe("◐ Running · executor");
   expect(lines).toContain("Move it to the helper.");
   expect(lines).toContain("- Keep the errors");
-  expect(lines).toContain("Holds up  #3 Add the migration");
+  expect(lines.indexOf("Holds up ─")).toBeGreaterThan(1);
+  expect(lines[lines.indexOf("Holds up ─") + 1]).toBe("· #3  Add the migration");
+  expect(lines.indexOf("Holds up ─")).toBeLessThan(lines.indexOf("Description ─"));
   expect(lines).toContain('files  ["src/parser.ts"]');
   expect(lines).toContain("risk  low");
   await ui.press({ key: "b" });
@@ -271,7 +286,7 @@ test("the record of a finished list stays after Claude Code deletes its files", 
   await $.tool.call({ tool: "TaskUpdate", taskId: "9" });
   const lines = rows(await ui.drawn()).map((line) => line.trimEnd());
   expect(lines).toContain("Finished. Claude Code cleared its list; the record stays here.");
-  expect(lines).toContain("✓ #4 Update the docs");
+  expect(lines).toContain("✓ #4  Update the docs");
   expect(lines.join("\n")).toContain("4 of 4 done");
   await ui.unmount();
 });
@@ -284,10 +299,11 @@ test("a task deleted on purpose leaves the record, and a new list joins the fini
   w.files.delete(`${LIST}/2.json`);
   write(w, `${LIST}/3.json`, stored({ id: "3", subject: "Third" }));
   await $.tool.call({ tool: "TaskUpdate", taskId: "1", status: "deleted" });
-  const lines = rows(await ui.drawn()).join("\n");
-  expect(lines).toContain("#2 Second");
-  expect(lines).toContain("#3 Third");
-  expect(lines).not.toContain("#1 First");
+  const lines = (await shown(ui)).join("\n");
+  expect(lines).toContain("1 of 2 done");
+  expect(lines).toContain("Done ✓ 1");
+  expect(lines).toContain("#3  Third");
+  expect(lines).not.toContain("First");
   expect(lines).not.toContain("cleared its list");
   await ui.unmount();
 });
@@ -297,7 +313,7 @@ test("a task Claude Code keeps to itself and a file that is not a task stay out 
   const ui = await open($);
   const lines = rows(await ui.drawn()).join("\n");
   expect(lines).toContain("0 of 1 done");
-  expect(lines).toContain("#2 Shown");
+  expect(lines).toContain("#2  Shown");
   expect(lines).not.toContain("Hidden");
   await ui.unmount();
 });
@@ -305,7 +321,7 @@ test("a task Claude Code keeps to itself and a file that is not a task stay out 
 test("CLAUDE_CODE_TASK_LIST_ID names the list, cut to the characters Claude Code allows", async ($, on) => {
   world(on, Object.fromEntries([fileOf({ id: "1", subject: "Shared" }, `${HOME}/.claude/tasks/my-plan-1`)]), {}, { CLAUDE_CODE_TASK_LIST_ID: "my plan/1" });
   const ui = await open($);
-  expect(rows(await ui.drawn()).join("\n")).toContain("#1 Shared");
+  expect(rows(await ui.drawn()).join("\n")).toContain("#1  Shared");
   await ui.unmount();
 });
 
@@ -313,7 +329,7 @@ for (const layout of LAYOUTS) {
   test(`the session's list is read under the config directory on ${layout.name}`, async ($, on) => {
     world(on, { [joinPath(layout.platform, layout.home, ".claude", "tasks", SESSION, "1.json")]: stored({ id: "1", subject: "Found it" }) }, {}, {}, layout);
     const ui = await open($);
-    expect(rows(await ui.drawn()).join("\n")).toContain("#1 Found it");
+    expect(rows(await ui.drawn()).join("\n")).toContain("#1  Found it");
     await ui.unmount();
   });
 }
@@ -338,7 +354,7 @@ test("a turn's end reads the list, so tasks finished and deleted while the pane 
   const ui = await open($);
   const lines = rows(await ui.drawn()).join("\n");
   expect(lines).toContain("4 of 4 done");
-  expect(lines).toContain("#4 Update the docs");
+  expect(lines).toContain("#4  Update the docs");
   expect(lines).not.toContain("No tasks yet.");
   await ui.unmount();
 });
@@ -365,24 +381,24 @@ test("a list too long for the pane windows it: cues count tasks, Down carries th
   const tasks = many(20).map((task, index) => (index >= 6 && index < 12 ? { ...task, blockedBy: ["1"] } : task));
   world(on, filesOf(...tasks));
   const ui = await open($, SHORT);
-  const first = rows(await ui.drawn()).map((line) => line.trimEnd());
-  expect(first).toContain("○ #1 Step 1");
+  const first = await shown(ui);
+  expect(first).toContain("○  #1  Step 1");
   expect(first.some((line) => /^↓ \d+ more$/.test(line))).toBe(true);
-  expect(first.some((line) => line.startsWith("↑"))).toBe(false);
+  expect(first.some((line) => /^↑ \d+ more$/.test(line))).toBe(false);
+  expect(first.filter((line) => line !== "").at(-1)).toBe("↑↓ move  ⏎ open  esc close");
   const { bodyRows } = pane("terminal", SHORT).props.scroll;
   const down = { requestId: "tasklist", plugin: "oh-my-claudeagent", component: "Pane", offset: 0, by: 1, bodyRows, contentRows: bodyRows + 1, origin: { kind: "person" } } as const;
   for (let press = 0; press < 40; press += 1) {
     await $.ui.scroll(down);
-    const lines = rows(await ui.drawn()).map((line) => line.trimEnd());
-    const shown = lines.filter((line) => line !== "" && line !== " ");
-    expect(["Next", "Waiting", "Done"]).not.toContain(shown.at(-1));
-    const below = shown.at(-1)?.startsWith("↓") === true ? shown.at(-2) : undefined;
-    if (below !== undefined) expect(["Next", "Waiting", "Done"]).not.toContain(below);
+    const listed = (await shown(ui)).filter((line) => line !== "").slice(0, -1);
+    expect(listed.at(-1)).not.toMatch(RULE);
+    const below = listed.at(-1)?.startsWith("↓") === true ? listed.at(-2) : undefined;
+    if (below !== undefined) expect(below).not.toMatch(RULE);
   }
-  const end = rows(await ui.drawn()).map((line) => line.trimEnd());
-  expect(end.some((line) => line.startsWith("↑"))).toBe(true);
-  expect(end.some((line) => line.startsWith("↓"))).toBe(false);
-  expect(end.join("\n")).toContain("#12 Step 12");
+  const end = await shown(ui);
+  expect(end.some((line) => /^↑ \d+ more$/.test(line))).toBe(true);
+  expect(end.some((line) => /^↓ \d+ more$/.test(line))).toBe(false);
+  expect(end.join("\n")).toContain("#12  Step 12");
   await ui.unmount();
 });
 
@@ -429,5 +445,110 @@ test("a remote surface draws every task", async ($, on) => {
   await $.command.run(tasklist());
   const ui = await $.ui.mount({ ...pane("desktop", DOCK), requestId: "tasklist" });
   for (const n of [1, 15, 30]) expect(await ui.find({ key: `task-${n}` })).toBeDefined();
+  await ui.unmount();
+});
+
+test("Done folds into one rule row with its count, d shows and hides it, and a list with nothing else left shows it open", async ($, on) => {
+  world(on, filesOf(...WORK, { id: "5", subject: "Pick the library", status: "completed" }));
+  const ui = await open($);
+  expect(await shown(ui)).toContain("Done ✓ 2 ─ d: show ─");
+  expect((await shown(ui)).join("\n")).not.toContain("Map the auth flow");
+  await ui.press({ key: "d" });
+  const opened = await shown(ui);
+  const at = opened.indexOf("Done ✓ 2 ─ d: hide ─");
+  expect(opened.slice(at + 1, at + 3)).toEqual(["✓ #1  Map the auth flow", "✓ #5  Pick the library"]);
+  await ui.press({ key: "fold-done" });
+  expect((await shown(ui)).join("\n")).not.toContain("Map the auth flow");
+  await ui.unmount();
+});
+
+test("a list with nothing left but done tasks draws them under an open Done rule with no key for it", async ($, on) => {
+  world(on, filesOf({ id: "1", subject: "Map", status: "completed" }, { id: "2", subject: "Port", status: "completed" }));
+  const ui = await open($);
+  const lines = await shown(ui);
+  const at = lines.indexOf("Done ✓ 2 ─");
+  expect(lines.slice(at + 1, at + 3)).toEqual(["✓ #1  Map", "✓ #2  Port"]);
+  expect(lines.at(-1)).toBe("↑↓ move  ⏎ open  esc close");
+  expect(await ui.find({ key: "d" })).toBeUndefined();
+  await ui.unmount();
+});
+
+test("the run with work left is drawn in full, and every other run and the tasks in none fold to one row each", async ($, on) => {
+  world(
+    on,
+    filesOf(
+      { id: "1", subject: "Old port", status: "completed", metadata: { run: "old" } },
+      { id: "2", subject: "Old docs", status: "completed", metadata: { run: "old" } },
+      { id: "3", subject: "New port", status: "in_progress", metadata: RUN },
+      { id: "4", subject: "Loose end" },
+    ),
+  );
+  const ui = await open($);
+  const lines = await shown(ui);
+  expect(lines[0]).toBe("auth-rewrite  0 of 1 done");
+  expect(lines).toContain("old 2 of 2 done ─ show ─");
+  expect(lines).toContain("No run 0 of 1 done ─ show ─");
+  expect(lines.join("\n")).not.toContain("Old port");
+  await ui.press({ key: "fold-run-old" });
+  const opened = await shown(ui);
+  expect(opened).toContain("old 2 of 2 done ─ hide ─");
+  expect(opened).toContain("✓ #1  Old port");
+  await ui.unmount();
+});
+
+test("a page's links open the task they name, n and p step through the list's order, and b goes back to the row last shown", async ($, on) => {
+  const w = world(on, filesOf(...WORK));
+  const ui = await open($);
+  await ui.press({ key: "task-2" });
+  await ui.press({ key: "link-2-3" });
+  expect(spreadRows(await ui.drawn()).map(norm)[0]).toBe("#3 Add the migration");
+  expect(spreadRows(await ui.drawn()).map(norm)).toContain("◐ #2  Port the parser");
+  await ui.press({ key: "p" });
+  expect(spreadRows(await ui.drawn()).map(norm)[0]).toBe("#4 Update the docs");
+  await ui.press({ key: "n" });
+  await ui.press({ key: "n" });
+  expect(spreadRows(await ui.drawn()).map(norm)[0]).toBe("#1 Map the auth flow");
+  await ui.press({ key: "b" });
+  expect(await shown(ui)).toContain("✓ #1  Map the auth flow");
+  await w.clock.settle();
+  expect(focusRequests(w.logs).at(-1)).toBe("task-1");
+  await ui.unmount();
+});
+
+const FINAL_RUN: readonly Fields[] = [
+  { id: "1", subject: "Port", status: "completed", metadata: RUN },
+  { id: "2", subject: "Verify", blockedBy: ["1"], metadata: { ...RUN, final: true } },
+];
+
+const verdict = (taskId: string, exitCode: number, snippet: string) => ({ type: "final_verification", command: "just ci", exit_code: exitCode, output_snippet: snippet, timestamp: "2026-11-07T10:05:00Z", task_id: taskId });
+
+test("the final task's page shows the newest verdict naming it, read from the ledger as the page opens", async ($, on) => {
+  world(on, { ...filesOf(...FINAL_RUN), [LEDGER]: JSON.stringify({ entries: [verdict("2", 1, "2 failed"), verdict("9", 0, "other run"), verdict("2", 0, "all 412 passed\nmore")] }) });
+  const ui = await open($);
+  await ui.press({ key: "task-2" });
+  const lines = spreadRows(await ui.drawn()).map(norm);
+  expect(lines[1]).toBe("◆ Ready · final");
+  const at = lines.indexOf("Verdict ─");
+  expect(lines.slice(at + 1, at + 3)).toEqual([`✓ Passed · exit 0 · ${local("2026-11-07T10:05:00Z")}`, "all 412 passed"]);
+  expect(at).toBeLessThan(lines.indexOf("Waits on ─"));
+  await ui.unmount();
+});
+
+test("a final task no verdict names says so", async ($, on) => {
+  world(on, filesOf(...FINAL_RUN));
+  const ui = await open($);
+  await ui.press({ key: "task-2" });
+  expect(spreadRows(await ui.drawn()).map(norm)).toContain("No verdict names #2 yet");
+  await ui.unmount();
+});
+
+test("the ASCII tier draws the list and a page in ASCII alone", async ($, on) => {
+  world(on, filesOf(...WORK, { id: "5", subject: "Call", metadata: { blocked: "vendor down" } }, { id: "6", subject: "Verify", blockedBy: ["2", "3"], metadata: { final: true } }), {}, { OMCA_GLYPHS: "ascii" });
+  const ui = await open($);
+  const lines = rows(await ui.drawn()).map((line) => line.trimEnd());
+  for (const line of lines) expect(isAscii(line)).toBe(true);
+  expect(lines.map(norm)).toContain("= #6  Verify  <- 2 open");
+  await ui.press({ key: "task-3" });
+  for (const line of spreadRows(await ui.drawn())) expect(isAscii(line.trimEnd())).toBe(true);
   await ui.unmount();
 });

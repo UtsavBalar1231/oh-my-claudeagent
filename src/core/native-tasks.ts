@@ -24,7 +24,7 @@ export type NativeTask = {
   details: readonly { name: string; text: string }[];
 };
 
-export type TaskGroup = { name: "Now" | "Next" | "Waiting" | "Done"; tasks: readonly NativeTask[] };
+export type TaskGroup = { name: "Running" | "Ready" | "Blocked" | "Waiting" | "Done"; tasks: readonly NativeTask[] };
 
 /** OMCA requires the task tools and turns them on itself, so a session without them has something set against them. */
 export const TASK_TOOLS_OFF =
@@ -143,14 +143,21 @@ export function formatTasks(tasks: readonly NativeTask[]): string {
 /** One task in full. `blockedBy` also names tasks completed or given up on, so `openBlockers` says which still hold it back. */
 export const formatTask = (task: NativeTask, tasks: readonly NativeTask[]): string => JSON.stringify({ ...task, openBlockers: openBlockers(task, tasks) }, null, 2);
 
-/** The list in the order the work will run: what runs now, what can start next, what waits on another task, what is done. */
+const finalLast = (tasks: readonly NativeTask[]): NativeTask[] => [...tasks.filter((task) => !task.isFinal), ...tasks.filter((task) => task.isFinal)];
+
+/**
+ * The list in the order the work will run: what runs now, what can start, what was closed as
+ * blocked whatever its status, what waits on another task, what is done. A final task is last in its group.
+ */
 export function groupTasks(tasks: readonly NativeTask[]): TaskGroup[] {
-  const pending = tasks.filter((task) => task.status === "pending" && task.blockedReason === "");
+  const live = tasks.filter((task) => task.blockedReason === "");
+  const pending = live.filter((task) => task.status === "pending");
   const groups: TaskGroup[] = [
-    { name: "Now", tasks: tasks.filter((task) => task.status === "in_progress" && task.blockedReason === "") },
-    { name: "Next", tasks: pending.filter((task) => openBlockers(task, tasks).length === 0) },
-    { name: "Waiting", tasks: tasks.filter((task) => task.status !== "completed" && (task.blockedReason !== "" || (task.status === "pending" && openBlockers(task, tasks).length > 0))) },
-    { name: "Done", tasks: tasks.filter((task) => task.status === "completed") },
+    { name: "Running", tasks: live.filter((task) => task.status === "in_progress") },
+    { name: "Ready", tasks: pending.filter((task) => openBlockers(task, tasks).length === 0) },
+    { name: "Blocked", tasks: tasks.filter((task) => task.blockedReason !== "") },
+    { name: "Waiting", tasks: pending.filter((task) => openBlockers(task, tasks).length > 0) },
+    { name: "Done", tasks: live.filter((task) => task.status === "completed") },
   ];
-  return groups.filter((group) => group.tasks.length > 0);
+  return groups.filter((group) => group.tasks.length > 0).map((group) => ({ ...group, tasks: finalLast(group.tasks) }));
 }

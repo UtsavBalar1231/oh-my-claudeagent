@@ -27,7 +27,7 @@ declare module "claude-code" {
         };
       };
       nextActions: readonly {
-        kind: "log-evidence";
+        kind: "log-evidence" | "task-list";
         label: string;
         prompt: string;
       }[];

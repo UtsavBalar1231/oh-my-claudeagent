@@ -95,12 +95,12 @@ describe("groupTasks", () => {
   test("orders the work and leaves out empty groups", () => {
     const tasks = [task("1", "completed"), task("2", "in_progress"), task("3", "pending", ["2"]), task("4", "pending"), task("5", "pending", ["1"])];
     expect(groupTasks(tasks).map((group) => [group.name, group.tasks.map((each) => each.id)])).toEqual([
-      ["Now", ["2"]],
-      ["Next", ["4", "5"]],
+      ["Running", ["2"]],
+      ["Ready", ["4", "5"]],
       ["Waiting", ["3"]],
       ["Done", ["1"]],
     ]);
-    expect(groupTasks([task("1", "pending")]).map((group) => group.name)).toEqual(["Next"]);
+    expect(groupTasks([task("1", "pending")]).map((group) => group.name)).toEqual(["Ready"]);
     expect(groupTasks([])).toEqual([]);
   });
 
@@ -119,15 +119,21 @@ describe("a run", () => {
     expect(parsed).toMatchObject({ run: "demo", isFinal: true, blockedReason: "no board", details: [{ name: "risk", text: "low" }] });
   });
 
-  test("a task given up on is closed, holds nothing back and shows under Waiting", () => {
+  test("a task given up on is closed, holds nothing back and shows under Blocked whatever its status", () => {
     const gaveUp = planned("1", "pending", { blockedReason: "no board" });
+    const running = planned("3", "in_progress", { blockedReason: "vendor down" });
     const final = planned("2", "pending", { blockedBy: ["1"], isFinal: true });
     expect(isOpen(gaveUp)).toBe(false);
     expect(openBlockers(final, [gaveUp, final])).toEqual([]);
-    expect(groupTasks([gaveUp, final]).map((group) => [group.name, group.tasks.map((each) => each.id)])).toEqual([
-      ["Next", ["2"]],
-      ["Waiting", ["1"]],
+    expect(groupTasks([gaveUp, final, running]).map((group) => [group.name, group.tasks.map((each) => each.id)])).toEqual([
+      ["Ready", ["2"]],
+      ["Blocked", ["1", "3"]],
     ]);
+  });
+
+  test("a final task is last in its group", () => {
+    const final = planned("1", "pending", { isFinal: true });
+    expect(groupTasks([final, planned("2", "pending"), planned("3", "pending")]).map((group) => group.tasks.map((each) => each.id))).toEqual([["2", "3", "1"]]);
   });
 
   test("runState names what is open and what can go next, and ignores tasks outside a run", () => {

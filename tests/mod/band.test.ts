@@ -207,7 +207,7 @@ test("a status file that is not JSON draws a one-line reason in the band", async
   });
 });
 
-test("the band reads no plan: a registry, a plan file and the task list leave it as it was", async ($, on) => {
+test("the band reads no plan file: a registry and a plan file leave it as it was", async ($, on) => {
   const w = world(on, files({ [`${ROOT}/.omca/state/boulder.json`]: "{ not json", [`${ROOT}/plans/widget.md`]: "- [ ] 1. a\n" }));
   await start($);
   await turn($);

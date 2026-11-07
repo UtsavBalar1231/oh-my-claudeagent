@@ -16,6 +16,7 @@ import { pane } from "./pane.ts";
 import { groupRows } from "./group-rows.ts";
 import { serverCheck } from "./server-check.ts";
 import { TASK_COMMAND, taskList } from "./task-list.ts";
+import { taskRows } from "./task-rows.ts";
 import { taskTools } from "./task-tools.ts";
 
 function bindHost($: EngineInterface, options: Options): Host {
@@ -65,6 +66,7 @@ function bindHost($: EngineInterface, options: Options): Host {
       blit: (args) => $.ui.blit(args),
       view: (args) => $.ui.view(args),
       status: (text) => $.ui.status(text),
+      place: (args) => $.ui.place(args),
     },
     session: {
       id: () => $.session.id(),
@@ -175,9 +177,9 @@ export const register: Register = (on, pluginOptions) => {
   const taskCall = featuresFor("tool.call", { taskList });
   const sessionStart = featuresFor("session.start", { taskTools, refusalRecovery, pane, modMarker, band, serverCheck, keywordPaint, taskList });
   const promptSubmit = featuresFor("prompt.submit", { refusalRecovery, keywordPaint });
-  const turnStart = featuresFor("turn.start", { refusalRecovery, footer, modMarker, serverCheck });
+  const turnStart = featuresFor("turn.start", { refusalRecovery, footer, modMarker, serverCheck, taskRows });
   const turnStep = featuresFor("turn.step", { metrics, agentsTracker });
-  const turnComplete = featuresFor("turn.complete", { band, agentsTracker, agentRows, metrics, pane, footer, refusalRecovery, taskList });
+  const turnComplete = featuresFor("turn.complete", { agentsTracker, agentRows, metrics, pane, footer, refusalRecovery, taskList, band, taskRows });
   const agentSpawn = featuresFor("agent.spawn", { agentsTracker, metrics });
   const promptEdit = featuresFor("prompt.edit", { band, refusalRecovery, keywordPaint });
   const promptChange = featuresFor("prompt.change", { band, keywordPaint });
@@ -193,6 +195,7 @@ export const register: Register = (on, pluginOptions) => {
   const noticeRender = featuresFor("ui.render UserMessage", { agentRows });
   const launchRender = featuresFor("ui.render ToolUse", { agentRows });
   const groupRender = featuresFor("ui.render ToolGroup", { groupRows });
+  const placedRender = featuresFor("ui.render Placed", { taskRows });
 
   on("tool.check", { tool: /^(?:Bash|PowerShell|Monitor)$/ }, ($, e, next) =>
     dispatch(bindHost($, options), "tool.check", bash, e, next, guardFailed),
@@ -238,5 +241,8 @@ export const register: Register = (on, pluginOptions) => {
   );
   on("ui.render", { component: "ToolGroup" }, ($, e, next) =>
     dispatch(bindHost($, options), "ui.render ToolGroup", groupRender, e, next),
+  );
+  on("ui.render", { component: "Placed", props: { plugin: "oh-my-claudeagent" } }, ($, e, next) =>
+    dispatch(bindHost($, options), "ui.render Placed", placedRender, e, next),
   );
 };

@@ -65,6 +65,7 @@ export type Host = {
     blit: Engine["ui"]["blit"];
     view: Engine["ui"]["view"];
     status: Engine["ui"]["status"];
+    place: Engine["ui"]["place"];
   };
   session: {
     id: Engine["session"]["id"];

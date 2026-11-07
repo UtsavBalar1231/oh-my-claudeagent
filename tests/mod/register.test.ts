@@ -87,6 +87,7 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
         "ui.log",
         "ui.open",
         "ui.panes",
+        "ui.place",
         "ui.resolve",
         "ui.status",
         "ui.toast",
