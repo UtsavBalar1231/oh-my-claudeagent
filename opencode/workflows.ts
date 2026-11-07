@@ -36,6 +36,7 @@ Do not rewrite the approved scope. Ask before a substantive plan change, moving 
 A task that cannot finish closes with omca_task_update and metadata {"blocked": "<the gap>"}. It is not done and work that needs it cannot go ahead, so close its dependents the same way, carry on with the independent tasks, and name every blocked task in your report.
 If interrupted, explain what remains. Do not restart yourself to imitate a Stop gate.
 When every other task is completed or closed as blocked, review the whole run against the plan and record the verdict with omca_evidence_log: evidence_type final_verification, the final task's task_id, exit_code 0 for complete and 1 for incomplete. Complete the final task only after a passing verdict. On an incomplete verdict fix the gap and review again, or close the final task as blocked to stop here.
+A task closed as blocked does not make the verdict incomplete: the review covers everything that was done, records exit_code 0 with an output_snippet naming every blocked task and its gap, and the final task is then completed.
 At the end report historical evidence separately from current-checkout verification.
 
 Plan document or instructions:
