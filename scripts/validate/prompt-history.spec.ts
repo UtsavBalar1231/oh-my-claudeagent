@@ -22,7 +22,7 @@ const CURATED = [
   "Enter Socratic Interview Mode before Phase 1.",
   "Enter Socratic mode instead.",
   "The docs follow the hard cutover model.",
-  "`boulder_write` and `file_read` are discovery-deferred tools.",
+  "`ast_search` and `file_read` are discovery-deferred tools.",
   "Load each through ToolSearch before calling it.",
 ];
 

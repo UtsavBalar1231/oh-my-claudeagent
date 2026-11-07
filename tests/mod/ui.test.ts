@@ -100,11 +100,11 @@ test("on a remote surface a region draws every unit in one column, with no cue, 
   const tree = await drawn((kit) => {
     const layout = newLayout(0, 0);
     const region = ScrollRegion({ kit, g: glyphs("unicode"), key: "r", left: 0, top: 0, width: 30, height: 3, units: units(kit), layout });
-    commitLayout(layout);
+    commitLayout("p", layout);
     return region;
   }, "desktop");
   expect(tree).toEqual(stamp(box({ key: "r", width: 30, flexDirection: "column" }, ...Array.from({ length: 10 }, (_, n) => text({ tabular: true }, `line ${n + 1}`)))));
-  expect(scrollKeyed(1, "row")).toBe(false);
+  expect(scrollKeyed("p", 1, "row")).toBe(false);
 });
 
 test("code is one block a remote surface wraps itself, and a row per block on the terminal", async ($, on) => {
@@ -294,7 +294,7 @@ test("a region too short for its cues draws no cue and no height below one row, 
   const region = (height: number) => (kit: Kit) => {
     const layout = newLayout(0, 0);
     const element = ScrollRegion({ kit, g: glyphs("unicode"), key: "r", left: 0, top: 0, width: 30, height, units: units(kit), layout });
-    commitLayout(layout);
+    commitLayout("p", layout);
     return element;
   };
   for (const height of [0, 1, 2]) {
@@ -302,11 +302,11 @@ test("a region too short for its cues draws no cue and no height below one row, 
     expect(heightsOf(tree).every((value) => value >= 1)).toBe(true);
     expect(textIn(tree).some((text) => text.includes("more"))).toBe(false);
   }
-  expect(scrollKeyed(1, "row")).toBe(true);
+  expect(scrollKeyed("p", 1, "row")).toBe(true);
   expect(textIn(await drawn(region(2)))).toEqual(["line 2", "line 3"]);
   const cued = await drawn(region(3));
   expect(textIn(cued).map((text) => text.trim())).toEqual(["↑ 1 more", "line 2", "↓ more · wheel to scroll"]);
-  expect(scrollKeyed(1, "end")).toBe(true);
+  expect(scrollKeyed("p", 1, "end")).toBe(true);
   expect(textIn(await drawn(region(3))).map((text) => text.trim())).toEqual(["↑ 8 more", "line 9", "line 10"]);
 });
 
@@ -317,12 +317,27 @@ test("of two overlapping drawings the one that started later is the layout scrol
   const newer = newLayout(1, 0);
   await drawn((kit) => ScrollRegion({ kit, g: glyphs("unicode"), key: "old", left: 0, top: 0, width: 30, height: 3, units: units(kit), layout: older }));
   await drawn((kit) => ScrollRegion({ kit, g: glyphs("unicode"), key: "new", left: 40, top: 0, width: 30, height: 3, units: units(kit), layout: newer }));
-  commitLayout(newer);
-  commitLayout(older);
-  expect(committedLayout()).toBe(newer);
-  expect(committedLayout().regions.map((region) => region.key)).toEqual(["new"]);
-  expect(await scrollAt(committedLayout(), { column: 5, row: 1 }, 1)).toBe(false);
-  expect(await scrollAt(committedLayout(), { column: 45, row: 1 }, 1)).toBe(true);
+  commitLayout("p", newer);
+  commitLayout("p", older);
+  expect(committedLayout("p")).toBe(newer);
+  expect(committedLayout("p").regions.map((region) => region.key)).toEqual(["new"]);
+  expect(await scrollAt(committedLayout("p"), { column: 5, row: 1 }, 1)).toBe(false);
+  expect(await scrollAt(committedLayout("p"), { column: 45, row: 1 }, 1)).toBe(true);
+});
+
+test("each pane scrolls by its own committed layout, whichever drew last", async ($, on) => {
+  const drawn = gallery($, on);
+  const units = (kit: Kit): Unit[] => Array.from({ length: 10 }, (_, n) => ({ element: kit.Text({ children: [`line ${n + 1}`] }), rows: 1 }));
+  const first = newLayout(0, 0);
+  const second = newLayout(0, 0);
+  await drawn((kit) => ScrollRegion({ kit, g: glyphs("unicode"), key: "first", left: 0, top: 0, width: 30, height: 3, units: units(kit), layout: first }));
+  await drawn((kit) => ScrollRegion({ kit, g: glyphs("unicode"), key: "second", left: 0, top: 0, width: 30, height: 3, units: units(kit), layout: second }));
+  commitLayout("a", first);
+  commitLayout("b", second);
+  expect(committedLayout("a")).toBe(first);
+  expect(committedLayout("b")).toBe(second);
+  expect(committedLayout("never drawn").regions).toEqual([]);
+  expect(scrollKeyed("never drawn", 1, "row")).toBe(false);
 });
 
 const placeholder: RenderElement = { type: "Box", children: [] };

@@ -1,8 +1,6 @@
 import { type Engine, expect, type Mounted as MountedPane, test } from "claude-code/testing";
-import { sha256Hex } from "../../src/core/sha256.ts";
 import { displayWidth, padEnd, usableColumns } from "../../src/core/ui-kit.ts";
 import {
-  BOULDER,
   bodyColumns,
   cellsAcross,
   childrenOf,
@@ -15,7 +13,6 @@ import {
   resettableState,
   ROOT,
   run,
-  SESSION,
   SIZES,
   type Size,
   topRows,
@@ -25,41 +22,32 @@ import {
 
 const SURFACES = ["terminal", "desktop"] as const;
 
-const PLAN_PATH = `${ROOT}/plans/sample.md`;
-const PLAN_TEXT = "# Sample plan\n\n## TODOs\n\n- [x] 1. Wire the ledger\n";
-const BOUND = JSON.stringify({
-  plans: { sample: { active_plan: PLAN_PATH, started_at: "2026-10-01T08:00:00Z" } },
-  bindings: { [SESSION]: { plan_name: "sample" } },
-});
 const TOKEN = `ghp_${"a1B2c3D4".repeat(5)}`;
 const BEARER = `Bearer ${"x9".repeat(10)}`;
 const FAILING_OUTPUT = ["(fail) the ledger draws", "  expected 3", "  received 4", "at ledger.test.ts:40", "1 fail", "41 pass", "Ran 42 tests", "exit 1", "done", "end"].join("\n");
 
 const local = (day: number, hour: number, minute: number) => new Date(2026, 9, day, hour, minute, 0).toISOString();
 
-const evidence = (type: string, command: string, exit: number, timestamp: string, by: string, snippet: string, planSha?: string) => ({
+const evidence = (type: string, command: string, exit: number, timestamp: string, by: string, snippet: string) => ({
   type,
   command,
   exit_code: exit,
   output_snippet: snippet,
   timestamp,
   verified_by: by,
-  ...(planSha === undefined ? {} : { plan_sha256: planSha }),
 });
 
-const runs = (planSha: string) => [
+const RUNS = [
   evidence("build", "bun run build", 0, local(1, 9, 0), "oh-my-claudeagent:executor", "built in 1.2 s"),
   evidence("lint", "just lint", 1, local(1, 9, 30), "oh-my-claudeagent:explorer", "src/core/evidence.ts:12 unused import"),
   evidence("test", "just test-mod", 1, local(2, 10, 0), "oh-my-claudeagent:executor", FAILING_OUTPUT),
   evidence("test", `curl -H 'Authorization: ${BEARER}' https://ci.example/run && just test`, 0, local(2, 10, 20), "oh-my-claudeagent:executor", `pushed with token=${TOKEN}\n42 pass`),
   evidence("manual", "bun scripts/qa/visual.ts evidence", 0, local(2, 11, 0), "orchestrator", ""),
-  evidence("final_verification", "just ci", 0, local(2, 11, 45), "orchestrator", "COMPLETE", planSha),
+  evidence("final_verification", "just ci", 0, local(2, 11, 45), "orchestrator", "COMPLETE"),
 ];
 
-async function proofFiles(planSha?: string): Promise<Record<string, string>> {
-  const sha = planSha ?? sha256Hex(new TextEncoder().encode(PLAN_TEXT));
-  return { [PLAN_PATH]: PLAN_TEXT, [BOULDER]: BOUND, [LEDGER]: JSON.stringify({ entries: runs(sha) }) };
-}
+const FILES = { [LEDGER]: JSON.stringify({ entries: RUNS }) };
+const HEAD = "latest runs  ✓ build  ✓ test  ✗ lint  ✓ manual";
 
 // The drawing as text, one entry per terminal row: a bordered Box is framed, a Code block's
 // lines are marked `│`, an Input is bracketed, a row Box lays its children side by side, and a
@@ -131,7 +119,7 @@ type Mounted = MountedPane<"terminal", "Pane">;
 async function openEvidence($: Engine, size: Size): Promise<Mounted> {
   await $.command.run(run("", size.columns));
   const ui = await $.ui.mount(pane("terminal", size));
-  await ui.press({ key: "3" });
+  await ui.press({ key: "2" });
   await ui.redraw();
   return ui;
 }
@@ -147,16 +135,11 @@ const body = async (ui: Mounted, size: Size) => lines(await ui.drawn()).slice(CH
 const blanks = (count: number) => Array.from({ length: count }, () => " ");
 const SCROLL = { component: "Pane", requestId: "omca", offset: 0, origin: { kind: "person" } } as const;
 
-test("narrow: the verdict card, the day-grouped timeline and the focused entry opened under its row", async ($, on) => {
-  world(on, await proofFiles());
+test("narrow: the latest runs, the day-grouped timeline and the focused entry opened under its row", async ($, on) => {
+  world(on, FILES);
   const ui = await openEvidence($, DOCK_120);
   expect(await body(ui, DOCK_120)).toEqual([
-    "╭",
-    "│ Final verification · sample",
-    "│  COMPLETE  matches the current plan",
-    "│ 10-02 11:45",
-    "│ ✓ build  ✓ test  ✗ lint  ✓ manual",
-    "╰",
+    HEAD,
     "── Fri 2026-10-02 ─────────────────────────────────",
     "❯ ✓  11:45  final   just ci",
     "    │COMPLETE",
@@ -167,25 +150,23 @@ test("narrow: the verdict card, the day-grouped timeline and the focused entry o
     "── Thu 2026-10-01 ─────────────────────────────────",
     "  ✗  09:30  lint    just lint",
     "  ✓  09:00  build   bun run build",
-    ...blanks(16),
+    ...blanks(21),
     "t: Type  x: Fails  f: Find  c: Copy  r: Rerun",
     "1/6 · ↑↓ move",
     " ",
   ]);
-  expect(nodeByKey(await ui.drawn(), "verdict")?.props).toMatchObject({ borderStyle: "round", borderColor: "success" });
-  const verdict = nodeByKey(await ui.drawn(), "verdict");
-  const runs = childrenOf(verdict ?? { type: "Box" }).flatMap((line) => (isNode(line) ? runsOf(line) : []));
-  const latest = [" build", " test", " lint", " manual"].map((word) => runs.find((run) => run.text === word));
-  expect(latest).toEqual([{ text: " build" }, { text: " test" }, { text: " lint" }, { text: " manual" }]);
+  const head = topRows(await ui.drawn())[CHROME[DOCK_120.columns] ?? 0];
+  const runs = isNode(head) ? runsOf(head) : [];
+  expect([" build", " test", " lint", " manual"].map((word) => runs.find((run) => run.text === word))).toEqual([{ text: " build" }, { text: " test" }, { text: " lint" }, { text: " manual" }]);
   expect(runs.filter((run) => run.text === "✓" || run.text === "✗").map((run) => run.color)).toEqual(["success", "success", "error", "success"]);
   await ui.unmount();
 });
 
-test("standard: a one-line verdict above the timeline, agents named, the command shown again only when its row cut it", async ($, on) => {
-  world(on, await proofFiles());
+test("standard: the latest runs above the timeline, agents named, the command shown again only when its row cut it", async ($, on) => {
+  world(on, FILES);
   const ui = await openEvidence($, INLINE_80);
   expect(await body(ui, INLINE_80)).toEqual([
-    " COMPLETE  sample  ✓ build  ✓ test  ✗ lint  ✓ manual  10-02 11:45",
+    HEAD,
     "── Fri 2026-10-02 ───────────────────────────────────────────────────────",
     "❯ ✓  11:45  final   just ci                                ◆ orchestrator",
     "    │COMPLETE",
@@ -214,28 +195,24 @@ test("standard: a one-line verdict above the timeline, agents named, the command
 });
 
 test("wide: the list beside a card of the focused entry, which follows the focus", async ($, on) => {
-  world(on, await proofFiles());
+  world(on, FILES);
   const ui = await openEvidence($, DOCK_210);
   const shown = await body(ui, DOCK_210);
-  expect(shown.slice(0, 13)).toEqual([
-    "╭",
-    "│ Final verification · sample",
-    "│  COMPLETE  matches the current plan · 10-02 11:45",
-    "│ ✓ build  ✓ test  ✗ lint  ✓ manual",
-    "╰",
+  expect(shown.slice(0, 9)).toEqual([
+    HEAD,
     "── Fri 2026-10-02 ─────────────────────────────────────  ╭",
     "❯ ✓  11:45  final   just ci                              │ ✓ Final verification passed",
     "  ✓  11:00  manual  bun scripts/qa/visual.ts evidence    │ exit 0 · 2026-10-02 11:45:00",
     "  ✓  10:20  test    curl -H 'Authoriz…/run && just test  │ ◆ orchestrator",
-    "  ✗  10:00  test    just test-mod                        │ ✓ For sample as it is now",
-    "── Thu 2026-10-01 ─────────────────────────────────────  │",
-    "  ✗  09:30  lint    just lint                            │ Command",
-    "  ✓  09:00  build   bun run build                        │ │just ci",
+    "  ✗  10:00  test    just test-mod                        │",
+    "── Thu 2026-10-01 ─────────────────────────────────────  │ Command",
+    "  ✗  09:30  lint    just lint                            │ │just ci",
+    "  ✓  09:00  build   bun run build                        │",
   ]);
   expect(shown.slice(-2)).toEqual(["t: Type  x: Fails  f: Find  c: Copy  r: Rerun  1/6 · ↑↓ move", " "]);
 
   await $.ui.scroll({ ...SCROLL, by: 3, bodyRows: 46, contentRows: 47 });
-  expect((await body(ui, DOCK_210)).slice(5, 25)).toEqual([
+  expect((await body(ui, DOCK_210)).slice(1, 21)).toEqual([
     "── Fri 2026-10-02 ─────────────────────────────────────  ╭",
     "  ✓  11:45  final   just ci                              │ ✗ Test run failed",
     "  ✓  11:00  manual  bun scripts/qa/visual.ts evidence    │ exit 1 · 2026-10-02 10:00:00 · ◆ executor",
@@ -267,7 +244,7 @@ test("wide: the list beside a card of the focused entry, which follows the focus
 });
 
 test("rows lead with the outcome glyph in its tone, the type a muted word but the final verification bold, the program bold, masks dim, and the agent's glyph in its identity color", async ($, on) => {
-  world(on, await proofFiles());
+  world(on, FILES);
   const ui = await openEvidence($, DOCK_190);
   const tree = await ui.drawn();
   expect(runsOf(nodeByKey(tree, "entry-3"))).toEqual([
@@ -319,17 +296,14 @@ test("rows lead with the outcome glyph in its tone, the type a muted word but th
   await ui.unmount();
 });
 
-test("the card wraps a long command at its spaces, keeping every character, and says a final verification is for an earlier plan", async ($, on) => {
+test("the card wraps a long command at its spaces, keeping every character", async ($, on) => {
   const command = "bun test src/parser.spec.ts --reporter=junit --reporter-outfile=report.xml --timeout 5000";
   const entries = [
     evidence("test", command, 0, local(2, 9, 0), "executor", "ok"),
-    evidence("final_verification", "just ci", 0, local(2, 10, 0), "orchestrator", "COMPLETE", "0".repeat(64)),
+    evidence("final_verification", "just ci", 0, local(2, 10, 0), "orchestrator", "COMPLETE"),
   ];
-  world(on, { ...(await proofFiles()), [LEDGER]: JSON.stringify({ entries }) });
+  world(on, { [LEDGER]: JSON.stringify({ entries }) });
   const ui = await openEvidence($, DOCK_210);
-  const cardSide = (row: string) => row.slice(row.indexOf("│"));
-  expect((await body(ui, DOCK_210)).filter((row) => row.includes("For an earlier")).map(cardSide)).toEqual(["│ ! For an earlier version of sample"]);
-
   await $.ui.scroll({ ...SCROLL, by: 1, bodyRows: 46, contentRows: 47 });
   const card = nodeByKey(await ui.drawn(), "detail-0");
   const codes = (node: Node): Node[] => (node.type === "Code" ? [node] : childrenOf(node).flatMap((child) => (isNode(child) ? codes(child) : [])));
@@ -343,10 +317,10 @@ test("the card wraps a long command at its spaces, keeping every character, and 
 const OPENED_REGION = "evidence-opened";
 const TALL_OUTPUT = Array.from({ length: 80 }, (_, n) => `output line ${n + 1}`).join("\n");
 const TALL_RUNS = [evidence("lint", "just lint", 0, local(1, 9, 0), "executor", "clean"), evidence("test", "just test", 1, local(2, 10, 0), "executor", TALL_OUTPUT)];
-// The body's rows above the split, the list's width and the card's own offsets: the verdict card is 5 rows, the list 55 cells, then a 2-cell gap, the border and the padding.
+// The body's rows above the split, the list's width and the card's own offsets: the latest runs are 1 row, the list 55 cells, then a 2-cell gap, the border and the padding.
 const TAB_BAR_AND_RULE = 2;
-const CARD_AT = { column: 55 + 2 + 2 + 3, row: TAB_BAR_AND_RULE + 5 + 2 + 3 };
-const LIST_AT = { column: 10, row: TAB_BAR_AND_RULE + 5 + 3 };
+const CARD_AT = { column: 55 + 2 + 2 + 3, row: TAB_BAR_AND_RULE + 1 + 2 + 3 };
+const LIST_AT = { column: 10, row: TAB_BAR_AND_RULE + 1 + 3 };
 const tick = ($: Engine, by: number, pointer: { column: number; row: number }) => $.ui.scroll({ ...SCROLL, by, bodyRows: 46, contentRows: 47, pointer });
 
 // The region's cues are its Text children; the one above counts the rows scrolled past.
@@ -365,7 +339,7 @@ async function cardOf(ui: Mounted) {
 }
 
 test("a wheel tick over the card scrolls only the card; over the list it moves the focus and puts the card back at its top", async ($, on) => {
-  world(on, { ...(await proofFiles()), [LEDGER]: JSON.stringify({ entries: TALL_RUNS }) });
+  world(on, { [LEDGER]: JSON.stringify({ entries: TALL_RUNS }) });
   const ui = await openEvidence($, DOCK_210);
   const status = async () => (await body(ui, DOCK_210)).at(-2)?.replace(/^.*Rerun {2}/, "");
   const first = await cardOf(ui);
@@ -390,7 +364,7 @@ test("a wheel tick over the card scrolls only the card; over the list it moves t
 });
 
 test("pressing an entry's row selects it: the card shows that run and starts at its top", async ($, on) => {
-  world(on, await proofFiles());
+  world(on, FILES);
   const ui = await openEvidence($, DOCK_210);
   const cardSide = async () => (await body(ui, DOCK_210)).map((row) => row.slice(row.indexOf("│") + 2)).find((row) => /^[✓✗] .* (passed|failed)$/.test(row));
   expect(await cardSide()).toBe("✓ Final verification passed");
@@ -409,7 +383,7 @@ test("pressing an entry's row selects it: the card shows that run and starts at 
 });
 
 test("pressing a row puts a scrolled card back at its top, even on the entry already focused", async ($, on) => {
-  world(on, { ...(await proofFiles()), [LEDGER]: JSON.stringify({ entries: TALL_RUNS }) });
+  world(on, { [LEDGER]: JSON.stringify({ entries: TALL_RUNS }) });
   const tall = await openEvidence($, DOCK_210);
   await tick($, 4, CARD_AT);
   expect((await cardOf(tall)).offset).toBe(4);
@@ -425,7 +399,7 @@ test("pressing a row puts a scrolled card back at its top, even on the entry alr
 });
 
 test("an entry's row is one Button: its children draw the glyph, time, type, command and agent, and a press on the row selects the entry", async ($, on) => {
-  world(on, await proofFiles());
+  world(on, FILES);
   const ui = await openEvidence($, DOCK_190);
   const row = await ui.find({ key: "entry-1" });
   expect([row?.type, row?.props["label"], row?.props["plain"]]).toEqual(["Button", "just lint", true]);
@@ -455,7 +429,7 @@ test("an entry's row is one Button: its children draw the glyph, time, type, com
 });
 
 test("a desktop surface draws an entry as a Box around a time Button, and the terminal as one Button of Text", async ($, on) => {
-  const w = world(on, await proofFiles());
+  const w = world(on, FILES);
   const terminal = await openEvidence($, DOCK_190);
   const terminalRow = nodeByKey(await terminal.drawn(), "entry-1");
   expect(terminalRow?.type).toBe("Button");
@@ -466,7 +440,7 @@ test("a desktop surface draws an entry as a Box around a time Button, and the te
   w.surfaces = ["desktop"];
   await $.command.run(run("", DOCK_190.columns));
   const desktop = await $.ui.mount(pane("desktop", DOCK_190));
-  await desktop.press({ key: "3" });
+  await desktop.press({ key: "2" });
   await desktop.redraw();
   const desktopRow = nodeByKey(await desktop.drawn(), "entry-1");
   expect(desktopRow?.type).toBe("Box");
@@ -476,7 +450,7 @@ test("a desktop surface draws an entry as a Box around a time Button, and the te
 });
 
 test("a run whose output is taller than the card shows the more cue, and every output line is reachable by scrolling", async ($, on) => {
-  world(on, { ...(await proofFiles()), [LEDGER]: JSON.stringify({ entries: TALL_RUNS }) });
+  world(on, { [LEDGER]: JSON.stringify({ entries: TALL_RUNS }) });
   const ui = await openEvidence($, DOCK_210);
   const { height } = await cardOf(ui);
   const seen = new Set<string>();
@@ -503,7 +477,7 @@ test("a run whose output is taller than the card shows the more cue, and every o
 
 test("a mask inside a row's command is drawn dim", async ($, on) => {
   const entries = [evidence("test", `TOKEN=${TOKEN} just test`, 0, local(2, 9, 0), "executor", "ok"), evidence("lint", "just lint", 0, local(2, 10, 0), "executor", "ok")];
-  world(on, { ...(await proofFiles()), [LEDGER]: JSON.stringify({ entries }) });
+  world(on, { [LEDGER]: JSON.stringify({ entries }) });
   const ui = await openEvidence($, INLINE_80);
   expect(runsOf(nodeByKey(await ui.drawn(), "entry-0")).slice(7, 10)).toEqual([
     { text: "TOKEN=", bold: true },
@@ -513,56 +487,45 @@ test("a mask inside a row's command is drawn dim", async ($, on) => {
   await ui.unmount();
 });
 
-test("the verdict reads complete, stale, missing, with no plan, or with an unreadable plan", async ($, on) => {
-  const w = world(on, await proofFiles());
+test("the latest runs follow the ledger, and a ledger of final verifications alone draws none", async ($, on) => {
+  const w = world(on, FILES);
   const ui = await openEvidence($, DOCK_120);
-  const card = async () => lines(nodeByKey(await ui.drawn(), "verdict")).slice(1, 4);
-  const border = async () => nodeByKey(await ui.drawn(), "verdict")?.props?.["borderColor"];
-  const refresh = () => w.clock.advance(2000);
+  expect((await body(ui, DOCK_120))[0]).toBe(HEAD);
 
-  expect(await card()).toEqual(["│ Final verification · sample", "│  COMPLETE  matches the current plan", "│ 10-02 11:45"]);
-  expect(await border()).toBe("success");
+  write(w, LEDGER, JSON.stringify({ entries: RUNS.slice(0, 2) }));
+  await w.clock.advance(2000);
+  expect((await body(ui, DOCK_120))[0]).toBe("latest runs  ✓ build  ✗ lint");
 
-  write(w, PLAN_PATH, `${PLAN_TEXT}- [ ] 2. Added after the verification\n`);
-  await refresh();
-  expect(await card()).toEqual(["│ Final verification · sample", "│  STALE  plan edited since it passed", "│ 10-02 11:45"]);
-  expect(await border()).toBe("warning");
+  write(w, LEDGER, JSON.stringify({ entries: RUNS.slice(-1) }));
+  await w.clock.advance(2000);
+  expect((await body(ui, DOCK_120))[0]).toStartWith("── Fri 2026-10-02");
+  await ui.unmount();
+});
 
-  const failed = evidence("final_verification", "just ci", 1, local(2, 12, 0), "orchestrator", "INCOMPLETE", "f".repeat(64));
-  write(w, LEDGER, JSON.stringify({ entries: [...runs("e".repeat(64)).filter((entry) => entry.type !== "final_verification"), failed] }));
-  await refresh();
-  expect(await card()).toEqual(["│ Final verification · sample", "│  MISSING  last run exited 1 · 10-02 12:00", "│ ✓ build  ✓ test  ✗ lint  ✓ manual"]);
-  expect(await border()).toBe("error");
+test("the latest runs give way a type at a time on a narrow pane, with a mark for what is cut", async ($, on) => {
+  world(on, FILES);
+  const size: Size = { columns: 40, rows: 40, placement: "inline" };
+  const ui = await openEvidence($, size);
+  expect((await tabBody(ui))[0]).toBe("latest runs  ✓ build  ✓ test …");
+  await ui.unmount();
+});
 
-  write(w, LEDGER, JSON.stringify({ entries: runs("").slice(0, 2) }));
-  await refresh();
-  expect(await card()).toEqual(["│ Final verification · sample", "│  MISSING  no passing run yet", "│ ✓ build  ✗ lint"]);
-
-  w.files.delete(PLAN_PATH);
-  await refresh();
-  expect(await card()).toEqual([
-    "│ Final verification · sample",
-    "│  UNKNOWN  Could not read the plan file: ENOENT…",
-    "│ ✓ build  ✗ lint",
-  ]);
-  expect(await border()).toBe("warning");
-
-  write(w, BOULDER, JSON.stringify({ plans: {}, bindings: {} }));
-  await refresh();
-  expect(await card()).toEqual(["│ Final verification", "│  NO PLAN  no plan is bound to this session", "│ latest runs  ✓ build  ✗ lint"]);
-  expect(await border()).toBe("inactive");
+test("a registry and a bound plan on disk change nothing: the tab reads neither", async ($, on) => {
+  const registry = `${ROOT}/.omca/state/boulder.json`;
+  const plan = `${ROOT}/plans/sample.md`;
+  const bound = JSON.stringify({ plans: { sample: { active_plan: plan } }, bindings: { s1: { plan_name: "sample" } } });
+  const w = world(on, { ...FILES, [registry]: bound, [plan]: "- [~] 1. Blocked\n" });
+  const ui = await openEvidence($, DOCK_120);
+  expect((await body(ui, DOCK_120))[0]).toBe(HEAD);
+  expect(w.reads.filter((path) => path === registry || path === plan)).toEqual([]);
   await ui.unmount();
 });
 
 test("loading, an empty ledger, and an unreadable ledger each say so", async ($, on) => {
   const atoms = resettableState(on);
-  const w = world(on, { [PLAN_PATH]: PLAN_TEXT, [BOULDER]: BOUND });
+  const w = world(on, {});
   const ui = await openEvidence($, DOCK_120);
   expect(await body(ui, DOCK_120)).toEqual([
-    "╭",
-    "│ Final verification · sample",
-    "│  MISSING  no passing run yet",
-    "╰",
     "No verification evidence has been logged here yet.",
     "Record a run with an evidence_log call after a build, test or lint.",
   ]);
@@ -590,7 +553,7 @@ const entryRows = async (ui: Mounted) => lines(await ui.drawn()).filter((row) =>
 const statusRow = async (ui: Mounted) => (await body(ui, DOCK_120)).at(-2);
 
 test("t steps through the types the ledger holds and back to all, x keeps failures, and an empty match says so", async ($, on) => {
-  world(on, await proofFiles());
+  world(on, FILES);
   const ui = await openEvidence($, DOCK_120);
   const dim = async (key: string) => (await ui.find({ key }))?.props["dimColor"] === true;
   const types = async () => (await entryRows(ui)).map((row) => row.slice(12, 18));
@@ -622,7 +585,7 @@ test("t steps through the types the ledger holds and back to all, x keeps failur
 
   await ui.press({ key: "t" });
   expect(await entryRows(ui)).toEqual([]);
-  expect((await body(ui, DOCK_120)).slice(7, 8)).toEqual(["No entry matches the filter. Press t or x to change it."]);
+  expect((await body(ui, DOCK_120)).slice(2, 3)).toEqual(["No entry matches the filter. Press t or x to change it."]);
   expect((await ui.find({ type: "Text", text: /^No entry matches/ }))?.props).toEqual({ dimColor: true, wrap: "wrap" });
   expect(await statusRow(ui)).toBe("t: Manual  x: Fails  f: Find  0/6 · nothing matches");
   expect(await ui.find({ key: "c" })).toBeUndefined();
@@ -643,23 +606,23 @@ test("the arrows move the focus one entry, a page key a window, Home and End to 
   const entries = Array.from({ length: 600 }, (_, n) =>
     evidence(n % 7 === 0 ? "lint" : "test", `just test shard-${n}`, n % 5 === 0 ? 1 : 0, new Date(2026, 9, 2, 0, 0, n).toISOString(), "executor", `shard ${n}`),
   );
-  world(on, { [PLAN_PATH]: PLAN_TEXT, [BOULDER]: BOUND, [LEDGER]: JSON.stringify({ entries }) });
+  world(on, { [LEDGER]: JSON.stringify({ entries }) });
   const ui = await openEvidence($, DOCK_120);
   const scroll = (by: number) => $.ui.scroll({ ...SCROLL, by, bodyRows: 36, contentRows: 37 });
   const focusedRow = async () => (await entryRows(ui)).find((row) => row.startsWith("❯"))?.slice(20).trimEnd();
 
   expect(await body(ui, DOCK_120)).toHaveLength(35);
-  expect(await entryRows(ui)).toHaveLength(23);
+  expect(await entryRows(ui)).toHaveLength(27);
   expect(await focusedRow()).toBe("just test shard-599");
   expect(await statusRow(ui)).toBe("1/600 · ↑↓ move");
 
   await scroll(1);
   expect(await focusedRow()).toBe("just test shard-598");
   await scroll(36);
-  expect(await focusedRow()).toBe("just test shard-575");
-  expect(await statusRow(ui)).toBe("25/600 · ↑↓ move");
+  expect(await focusedRow()).toBe("just test shard-571");
+  expect(await statusRow(ui)).toBe("29/600 · ↑↓ move");
   await scroll(-1);
-  expect(await focusedRow()).toBe("just test shard-576");
+  expect(await focusedRow()).toBe("just test shard-572");
   await scroll(37);
   expect(await focusedRow()).toBe("just test shard-0");
   expect(await statusRow(ui)).toBe("600/600 · ↑↓ move");
@@ -676,7 +639,7 @@ test("a 1,000-entry ledger draws only the window around the focus, and Down, Pag
   const entries = Array.from({ length: 1000 }, (_, n) =>
     evidence("test", `just test shard-${n}`, 0, new Date(2026, 8, 1 + Math.floor(n / 100), 0, 0, n % 100).toISOString(), "executor", `shard ${n}`),
   );
-  world(on, { [PLAN_PATH]: PLAN_TEXT, [BOULDER]: BOUND, [LEDGER]: JSON.stringify({ entries }) });
+  world(on, { [LEDGER]: JSON.stringify({ entries }) });
   const ui = await openEvidence($, DOCK_120);
   const scroll = (by: number) => $.ui.scroll({ ...SCROLL, by, bodyRows: 36, contentRows: 37 });
   const drawnIndices = async () => {
@@ -686,27 +649,27 @@ test("a 1,000-entry ledger draws only the window around the focus, and Down, Pag
   const focusedRow = async () => (await entryRows(ui)).find((row) => row.startsWith("❯"))?.slice(20).trimEnd();
   const span = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, n) => from + n);
 
-  expect(await drawnIndices()).toEqual(span(977, 999));
+  expect(await drawnIndices()).toEqual(span(973, 999));
   expect(await focusedRow()).toBe("just test shard-999");
   expect(await statusRow(ui)).toBe("1/1000 · ↑↓ move");
 
   await scroll(1);
   expect(await focusedRow()).toBe("just test shard-998");
-  expect(await drawnIndices()).toEqual(span(977, 999));
+  expect(await drawnIndices()).toEqual(span(973, 999));
 
   await scroll(36);
-  expect(await focusedRow()).toBe("just test shard-975");
-  expect(await statusRow(ui)).toBe("25/1000 · ↑↓ move");
-  expect(await drawnIndices()).toEqual(span(975, 996));
+  expect(await focusedRow()).toBe("just test shard-971");
+  expect(await statusRow(ui)).toBe("29/1000 · ↑↓ move");
+  expect(await drawnIndices()).toEqual(span(971, 996));
 
   await scroll(1000);
   expect(await focusedRow()).toBe("just test shard-0");
   expect(await statusRow(ui)).toBe("1000/1000 · ↑↓ move");
-  expect(await drawnIndices()).toEqual(span(0, 22));
+  expect(await drawnIndices()).toEqual(span(0, 26));
 
   await scroll(-1000);
   expect(await focusedRow()).toBe("just test shard-999");
-  expect(await drawnIndices()).toEqual(span(977, 999));
+  expect(await drawnIndices()).toEqual(span(973, 999));
   await ui.unmount();
 });
 
@@ -718,7 +681,7 @@ test("c copies the focused command as drawn, masks and all, and r fills a rerun 
   on("prompt.submit", () => {
     throw new Error("the Evidence tab must never submit");
   });
-  world(on, { ...(await proofFiles()), [LEDGER]: JSON.stringify({ entries: runs(sha256Hex(new TextEncoder().encode(PLAN_TEXT))).map((entry, index) => (index === 3 ? { ...entry, command: `${entry.command} --home /home/u/project` } : entry)) }) });
+  world(on, { [LEDGER]: JSON.stringify({ entries: RUNS.map((entry, index) => (index === 3 ? { ...entry, command: `${entry.command} --home /home/u/project` } : entry)) }) });
   const ui = await openEvidence($, DOCK_120);
 
   await $.ui.scroll({ ...SCROLL, by: 2, bodyRows: 36, contentRows: 37 });
@@ -733,15 +696,13 @@ test("c copies the focused command as drawn, masks and all, and r fills a rerun 
   await $.ui.scroll({ ...SCROLL, by: -2, bodyRows: 36, contentRows: 37 });
   expect(await statusRow(ui)).toBe("1/6 · ↑↓ move");
   await ui.press({ key: "r" });
-  expect(fills.at(-1)).toBe(
-    `Run the final verification again (\`just ci\`) and log the verdict with evidence_log as final_verification evidence with plan_sha256="${sha256Hex(new TextEncoder().encode(PLAN_TEXT))}".`,
-  );
+  expect(fills.at(-1)).toBe("Run the final verification again (`just ci`) and log the verdict with evidence_log as final_verification evidence.");
   await ui.unmount();
 });
 
 test("a copy the surface refuses says why", async ($, on) => {
   on("ui.copy", () => ({ value: { isCopied: false, reason: "no-clipboard" } }));
-  world(on, await proofFiles());
+  world(on, FILES);
   const ui = await openEvidence($, DOCK_120);
   await ui.press({ key: "c" });
   expect(await statusRow(ui)).toBe("1/6 · ↑↓ move · could not copy: no-clipboard");
@@ -750,29 +711,27 @@ test("a copy the surface refuses says why", async ($, on) => {
 
 test("a rerun the prompt box refuses goes to a toast with the text to type", async ($, on) => {
   on("prompt.fill", () => ({ isFilled: false }));
-  const w = world(on, await proofFiles());
+  const w = world(on, FILES);
   const ui = await openEvidence($, DOCK_120);
 
   await ui.press({ key: "r" });
-  expect(w.toasts.at(-1)).toBe(
-    `The prompt box cannot be filled here. Type: Run the final verification again (\`just ci\`) and log the verdict with evidence_log as final_verification evidence with plan_sha256="${sha256Hex(new TextEncoder().encode(PLAN_TEXT))}".`,
-  );
+  expect(w.toasts.at(-1)).toBe("The prompt box cannot be filled here. Type: Run the final verification again (`just ci`) and log the verdict with evidence_log as final_verification evidence.");
   await ui.unmount();
 });
 
 test("f opens the Find field and moves the focus to it; typing filters, and submitting it empty closes it", async ($, on) => {
-  const w = world(on, await proofFiles());
+  const w = world(on, FILES);
   const ui = await openEvidence($, DOCK_120);
   expect(await ui.find({ key: "search" })).toBeUndefined();
 
   await ui.press({ key: "f" });
   await w.clock.settle();
-  expect((await body(ui, DOCK_120))[6]).toBe("[Find: command, agent or type] 6 of 6");
+  expect((await body(ui, DOCK_120))[1]).toBe("[Find: command, agent or type] 6 of 6");
   expect(w.logs.at(-1)).toBe("omca evidence could not focus search: no implementation for ui.focus");
 
   await ui.input({ key: "search", text: "JUST TEST", kind: "change" });
   expect((await entryRows(ui)).map((row) => row.slice(12, 18))).toEqual(["test  ", "test  "]);
-  expect((await body(ui, DOCK_120))[6]).toBe("[Find: JUST TEST] 2 of 6");
+  expect((await body(ui, DOCK_120))[1]).toBe("[Find: JUST TEST] 2 of 6");
   expect(await statusRow(ui)).toBe("1/2 · ↑↓ move");
   expect((await ui.find({ key: "search" }))?.props).toMatchObject({ label: "Find", value: "JUST TEST" });
   expect(await ui.find({ key: "f" })).toMatchObject({ props: { label: "Find" } });
@@ -787,10 +746,10 @@ test("f opens the Find field and moves the focus to it; typing filters, and subm
 });
 
 test("OMCA_GLYPHS=ascii draws the Evidence tab from the ASCII set", async ($, on) => {
-  world(on, await proofFiles(), {}, { OMCA_GLYPHS: "ascii" });
+  world(on, FILES, {}, { OMCA_GLYPHS: "ascii" });
   const ui = await openEvidence($, INLINE_80);
   expect(await body(ui, INLINE_80)).toEqual([
-    "[COMPLETE] sample  + build  + test  x lint  + manual  10-02 11:45",
+    "latest runs  + build  + test  x lint  + manual",
     "-- Fri 2026-10-02 -------------------------------------------------------",
     "> +  11:45  final   just ci                                @ orchestrator",
     "    │COMPLETE",
@@ -818,16 +777,14 @@ async function tabBody(ui: Mounted): Promise<string[]> {
 }
 
 const SHORT_INLINE: Size = { columns: 80, rows: 24, placement: "inline" };
-const SHORT_DOCK: Size = { columns: 120, rows: 28, placement: "dock" };
-const TALL_DOCK: Size = { columns: 120, rows: 29, placement: "dock" };
 
-test("a short pane hands the engine no more than its rows: the verdict, the filter state, a timeline row with its cues, then one key row with the counter", async ($, on) => {
-  world(on, await proofFiles());
+test("a short pane hands the engine no more than its rows: the latest runs, the filter state, a timeline row with its cues, then one key row with the counter", async ($, on) => {
+  world(on, FILES);
   const ui = await openEvidence($, SHORT_INLINE);
   const shown = await tabBody(ui);
   // The last row is the pad that keeps the arrows and the wheel on this tab's own scroll.
   expect(shown).toEqual([
-    " COMPLETE  sample  ✓ build  ✓ test  ✗ lint  ✓ manual  10-02 11:45",
+    HEAD,
     "── Fri 2026-10-02 ───────────────────────────────────────────────────────",
     "❯ ✓  11:45  final   just ci                                ◆ orchestrator",
     "    │COMPLETE",
@@ -838,7 +795,7 @@ test("a short pane hands the engine no more than its rows: the verdict, the filt
 
   await ui.press({ key: "x" });
   expect(await tabBody(ui)).toEqual([
-    " COMPLETE  sample  ✓ build  ✓ test  ✗ lint  ✓ manual  10-02 11:45",
+    HEAD,
     "  FAILING  2 of 6",
     "── Fri 2026-10-02 ───────────────────────────────────────────────────────",
     "❯ ✗  10:00  test    just test-mod                          ◆ executor",
@@ -849,25 +806,25 @@ test("a short pane hands the engine no more than its rows: the verdict, the filt
 
   await ui.press({ key: "f" });
   expect((await tabBody(ui)).slice(0, 3)).toEqual([
-    " COMPLETE  sample  ✓ build  ✓ test  ✗ lint  ✓ manual  10-02 11:45",
+    HEAD,
     "[Find: command, agent or type]  FAILING  2 of 6",
     "── Fri 2026-10-02 ───────────────────────────────────────────────────────",
   ]);
   await ui.unmount();
 });
 
-test("below five rows the key row is the first thing to go, and the Find field keeps its place under the verdict", async ($, on) => {
-  world(on, await proofFiles());
+test("below five rows the key row is the first thing to go, and the Find field keeps its place under the latest runs", async ($, on) => {
+  world(on, FILES);
   const base = pane("terminal", SHORT_INLINE);
   await $.command.run(run("", SHORT_INLINE.columns));
   const ui = await $.ui.mount({ ...base, props: { ...base.props, scroll: { offset: 0, bodyRows: 6 } } });
-  await ui.press({ key: "3" });
+  await ui.press({ key: "2" });
   await ui.press({ key: "f" });
   await ui.redraw();
   const shown = await tabBody(ui);
   expect(shown).toHaveLength(6);
   expect(shown.slice(0, 2)).toEqual([
-    " COMPLETE  sample  ✓ build  ✓ test  ✗ lint  ✓ manual  10-02 11:45",
+    HEAD,
     "[Find: command, agent or type] 6 of 6",
   ]);
   expect(shown.some((row) => row.startsWith("t: Type"))).toBe(false);
@@ -875,20 +832,8 @@ test("below five rows the key row is the first thing to go, and the Find field k
   await ui.unmount();
 });
 
-test("the verdict is one line in a dock shorter than 24 body rows and a card from there", async ($, on) => {
-  world(on, await proofFiles());
-  const short = await openEvidence($, SHORT_DOCK);
-  expect((await tabBody(short))[0]).toStartWith(" COMPLETE  sample  ✓ build");
-  expect(await nodeByKey(await short.drawn(), "verdict")).toBeUndefined();
-  await short.unmount();
-  const tall = await openEvidence($, TALL_DOCK);
-  expect((await tabBody(tall))[0]).toBe("╭");
-  expect(nodeByKey(await tall.drawn(), "verdict")).toBeDefined();
-  await tall.unmount();
-});
-
 test("entries out of view are counted in a cue above and one below, and the last entry has none below", async ($, on) => {
-  world(on, await proofFiles());
+  world(on, FILES);
   const ui = await openEvidence($, INLINE_80);
   const cues = async () => (await tabBody(ui)).filter((row) => /^ {2}[↑↓] \d+ more$/.test(row));
   expect(await cues()).toEqual(["  ↓ 2 more"]);
@@ -902,7 +847,7 @@ test("entries out of view are counted in a cue above and one below, and the last
 
 test("the opened entry takes every row left after two neighbours below it, and shows its long output in a region", async ($, on) => {
   const entries = Array.from({ length: 6 }, (_, n) => evidence("test", `just test shard-${n}`, 0, local(2, 9, n), "executor", TALL_OUTPUT));
-  world(on, { ...(await proofFiles()), [LEDGER]: JSON.stringify({ entries }) });
+  world(on, { [LEDGER]: JSON.stringify({ entries }) });
   const ui = await openEvidence($, DOCK_120);
   const shown = await tabBody(ui);
   const at = shown.findIndex((row) => row.startsWith("❯"));
@@ -916,7 +861,7 @@ test("the opened entry takes every row left after two neighbours below it, and s
 
 test("in the stacked layout the wheel over the opened entry scrolls its output and over the list moves the focus", async ($, on) => {
   const entries = Array.from({ length: 6 }, (_, n) => evidence("test", `just test shard-${n}`, 0, local(2, 9, n), "executor", TALL_OUTPUT));
-  world(on, { ...(await proofFiles()), [LEDGER]: JSON.stringify({ entries }) });
+  world(on, { [LEDGER]: JSON.stringify({ entries }) });
   const ui = await openEvidence($, DOCK_120);
   const at = (await tabBody(ui)).findIndex((row) => row.startsWith("❯"));
   const chrome = CHROME[DOCK_120.columns] ?? 0;
@@ -935,7 +880,7 @@ test("in the stacked layout the wheel over the opened entry scrolls its output a
 
 test("an empty ledger and a missing one both say how evidence gets recorded", async ($, on) => {
   const how = "Record a run with an evidence_log call after a build, test or lint.";
-  world(on, { [PLAN_PATH]: PLAN_TEXT, [BOULDER]: BOUND, [LEDGER]: JSON.stringify({ entries: [] }) });
+  world(on, { [LEDGER]: JSON.stringify({ entries: [] }) });
   const ui = await openEvidence($, DOCK_120);
   expect((await body(ui, DOCK_120)).slice(-2)).toEqual(["No verification evidence has been logged here yet.", how]);
   await ui.unmount();
@@ -943,13 +888,13 @@ test("an empty ledger and a missing one both say how evidence gets recorded", as
 
 test("Evidence rows stay inside the body less the gutter at every size, docked and inline, on both surfaces", async ($, on) => {
   const long = evidence("manual", `bun scripts/qa/visual.ts ${"evidence ".repeat(30)}`, 127, local(2, 12, 0), "oh-my-claudeagent:viewer", "x".repeat(400));
-  world(on, { ...(await proofFiles()), [LEDGER]: JSON.stringify({ entries: [...runs(""), long] }) });
+  world(on, { [LEDGER]: JSON.stringify({ entries: [...RUNS, long] }) });
   await $.command.run(run(""));
   for (const size of [...SIZES, DOCK_210]) {
     for (const surface of SURFACES) {
       const room = usableColumns(bodyColumns(size));
       const ui = await $.ui.mount(pane(surface, size));
-      await ui.press({ key: "3" });
+      await ui.press({ key: "2" });
       for (const searching of [false, true]) {
         if (searching) await ui.press({ key: "f" });
         for (const child of topRows(await ui.drawn())) {
@@ -962,34 +907,14 @@ test("Evidence rows stay inside the body less the gutter at every size, docked a
 });
 
 test("by default the rows and the checklist draw Nerd Font outcome glyphs and each agent's icon, a space or a gap after each", async ($, on) => {
-  world(on, await proofFiles(), {}, { OMCA_GLYPHS: "" });
+  world(on, FILES, {}, { OMCA_GLYPHS: "" });
   const ui = await openEvidence($, INLINE_80);
   expect((await body(ui, INLINE_80)).slice(0, 3)).toEqual([
-    " COMPLETE  sample  \u{f058} build  \u{f058} test  \u{f057} lint  \u{f058} manual  10-02 11:45",
+    "latest runs  \u{f058} build  \u{f058} test  \u{f057} lint  \u{f058} manual",
     "── Fri 2026-10-02 ───────────────────────────────────────────────────────",
     "❯ \u{f058}  11:45  final   just ci                                \u{f001} orchestrator",
   ]);
   const drawn = (await body(ui, INLINE_80)).join("\n");
   expect([...drawn.matchAll(/[\u{e000}-\u{f8ff}](?=\S)/gu)].map((match) => match[0])).toEqual([]);
-  await ui.unmount();
-});
-
-test("a passing verdict reads as stale once a later run saw different code", async ($, on) => {
-  const files = await proofFiles();
-  const { entries } = JSON.parse(files[LEDGER] ?? "{}") as { entries: Record<string, unknown>[] };
-  const stamped = entries.map((entry) => (entry["type"] === "final_verification" ? { ...entry, tree: "a" } : entry));
-  world(on, { ...files, [LEDGER]: JSON.stringify({ entries: [...stamped, { ...evidence("test", "just test", 0, local(2, 12, 0), "executor", "ok"), tree: "b" }] }) });
-  const ui = await openEvidence($, DOCK_120);
-  expect((await body(ui, DOCK_120))[2]).toBe("│  STALE  code changed since it passed");
-  await ui.unmount();
-});
-
-test("a passing verdict over a plan with blocked tasks reads as closed, never complete", async ($, on) => {
-  const text = "# Sample\n\n## TODOs\n\n- [x] 1. One\n- [~] 2. Two\n  - Blocked: needs a credential\n";
-  const sha = sha256Hex(new TextEncoder().encode(text));
-  const entries = [evidence("final_verification", "completeness review: closed with blocked tasks", 0, local(2, 11, 45), "orchestrator", "2 blocked: needs a credential", sha)];
-  world(on, { [PLAN_PATH]: text, [BOULDER]: BOUND, [LEDGER]: JSON.stringify({ entries }) });
-  const ui = await openEvidence($, DOCK_120);
-  expect((await body(ui, DOCK_120))[2]).toBe("│  CLOSED  not complete, 1 blocked · 10-02 11:45");
   await ui.unmount();
 });

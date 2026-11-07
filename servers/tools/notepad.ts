@@ -98,7 +98,7 @@ export const tools: Tool[] = [
     inputSchema: {
       type: "object",
       properties: {
-        plan_name: { type: "string", description: "Plan name (matches boulder plan_name)" },
+        plan_name: { type: "string", description: "The run's name, from its tasks' metadata.run" },
         section: { ...SECTION, description: "Notepad section to write to" },
         content: { type: "string", description: "Content to append (markdown)" },
         working_directory: WORKING_DIRECTORY,
@@ -186,7 +186,7 @@ export const tools: Tool[] = [
     inputSchema: {
       type: "object",
       properties: {
-        plan_name: { type: "string", description: "Plan name (matches boulder plan_name)" },
+        plan_name: { type: "string", description: "The run's name, from its tasks' metadata.run" },
         section: { ...SECTION, description: "Notepad section to compact" },
         working_directory: WORKING_DIRECTORY,
       },

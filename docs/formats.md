@@ -1,102 +1,90 @@
 # OMCA file formats, version 1
 
-This page describes the four formats OMCA reads and writes across sessions: plan files, the evidence ledger, notepads and the plan registry. Each section ends with a worked example.
+This page describes the formats OMCA reads and writes across sessions: plan documents, the task metadata it reads from Claude Code's task list, the evidence ledger and notepads. Each section ends with a worked example.
 
-The ledger, the registry and the notepads are written only by the `omca` server's tools (`evidence_log`, `boulder_write`, `notepad_write`, `notepad_compact`). Every write replaces the whole file atomically under a lock file beside it, so a reader never sees a half-written file. No hook stops a direct edit, and a file edited into an unreadable shape stops the gates that read it. A plan file is the exception: you or the model write it, and OMCA only reads it.
+The ledger and the notepads are written only by the `omca` server's tools (`evidence_log`, `notepad_write`, `notepad_compact`). Every write replaces the whole file atomically under a lock file beside it, so a reader never sees a half-written file. No hook stops a direct edit, and a file edited into an unreadable shape stops the gates that read it. A plan document is the exception: you or the model write it, and OMCA never reads it. The tasks belong to Claude Code, which writes them; OMCA only reads them.
 
-Two JSON Schemas (draft 2020-12) describe the JSON files:
+One JSON Schema (draft 2020-12) describes the ledger:
 
 - [`evidence-ledger.v1.schema.json`](schemas/evidence-ledger.v1.schema.json)
-- [`plan-registry.v1.schema.json`](schemas/plan-registry.v1.schema.json)
 
-Each schema describes what the writer emits. The readers are more lenient, and the sections below say where.
+The schema describes what the writer emits. The reader is more lenient, and the sections below say where.
 
 ## Versions
 
-Both JSON files carry `"version": 1` as their first key. A file without `version` reads as version 1. Any other value is refused, and the refusal names the value it found.
+The ledger carries `"version": 1` as its first key. A file without `version` reads as version 1. Any other value is refused, and the refusal names the value it found.
 
-## Plan files
+## Plan documents
 
-A plan is a Markdown file anywhere on disk. The registry records its path. The planner writes plans to the plans directory (`plansDirectory`, else `~/.claude/plans`) or to `.omca/plans` under the project for a project-local plan; `plansDirectory: ".omca/plans"` makes the second the default. `.omca/` is gitignored. The Plan tab picker lists both homes and every registered plan. The plan-write check covers any `.md` file in a directory named `plans`. Nothing about a plan is stored outside the file: progress, the next task and completion are all derived from its text each time they are needed.
-
-### Metadata
-
-A line of the form `**Status**: FINAL` or `**Status**: DRAFT` in any section before the first task sets the status the plan board shows. The match ignores case and the bold marks. The Stop gates do not read it.
-
-### Tasks
-
-A task is one line that matches this shape, with no indentation:
-
-```text
-- [ ] 12. Text of the task
-- [x] 12. Text of the task
-- [~] 12. Text of the task
-```
-
-The box holds a space (open), a lowercase `x` (done) or a `~` (blocked). The number is one or more digits followed by a dot, and the text follows. A `- [ ]` or `- [~]` line without a number, or a line with `[X]`, is not a task. When a plan file is written or edited, OMCA warns about each `- [ ]` or `- [~]` line that has no number. Task numbers are not checked for order or uniqueness.
-
-Before OMCA looks for tasks, it cleans the text: CRLF and lone CR become LF, and control characters, zero-width and bidirectional marks and the byte order mark are dropped. A task line inside a fenced code block is not a task. A line that starts, after any whitespace, with three backticks or three tildes opens or closes a fence, so a plan can show an example task safely.
-
-### Sub-bullets
-
-A task's details are sub-bullets indented two spaces under it, each of the form `- Name: text` with a capital letter starting the name. The plan board reads three names into structured fields: `File` or `Files` (the paths in the first code span of each comma-separated item), `Depends` or `Depends on` (task numbers) and `Done when` (code spans holding a command with an argument). It shows any other name, such as `Must NOT` or `Effort`, as plain text. No sub-bullet affects completion.
-
-A blocked task states its gap in an ordinary sub-bullet, `- Blocked: <one line>`, which shows as plain text like any other name.
-
-### Next task, progress and completion
-
-The next-task label is the text of the first open task, trimmed and cut to 80 code points. It is `null` when no task is open. A longer text keeps its first 79 code points, trailing whitespace trimmed, followed by `…`. The count is in code points, so an emoji is never split.
-
-A blocked task is closed for what runs next and is never counted as done:
-
-| Question | open `[ ]` | done `[x]` | blocked `[~]` |
-| --- | --- | --- | --- |
-| The plan-continuation gate counts it as remaining | yes | no | no |
-| Candidate for next task | yes | no | no |
-| Counted in `completed` | no | yes | no |
-| Counted in `remaining` | yes | no | no |
-| Satisfies another task's `Depends` | no | yes | no |
-
-A plan is complete when it has at least one task and every task is done. One blocked task means not complete, and a plan with no numbered tasks is never complete.
-
-A plan is closed when it has at least one task and no open task. The plan-continuation gate stays silent for a closed plan and the final-verification gate fires. When blocked tasks exist, its message names their numbers, and an `exit_code` 0 verdict's `output_snippet` must name every blocked task and its gap. A closed plan with blocked tasks stays registered, and changing a `[~]` back to `[ ]` reopens that task. A task whose `Depends` names a blocked task stays open and cannot run until the dependency is done.
-
-### The plan hash
-
-`plan_sha256` is the SHA-256 of the plan file's raw bytes as stored, written as 64 lowercase hex characters. The bytes are not cleaned first, so a byte order mark, CRLF line endings or a trailing newline each change the hash, while the task reader ignores them. Editing the plan after logging a hash makes that hash stop matching.
-
-### Example
-
-````markdown
-# Checkout redesign
-
-**Status**: FINAL
+A plan is a Markdown file anywhere on disk. The planner writes plans to the plans directory (`plansDirectory`, else `~/.claude/plans`) or to `.omca/plans` under the project for a project-local plan; `plansDirectory: ".omca/plans"` makes the second the default. `.omca/` is gitignored. Its headings, tables and prose are free-form: nothing about a plan is parsed, and no check reads or refuses a plan file. A run's progress, next task and completion come from the tasks, never from the document.
 
 ## Tasks
 
-- [x] 1. Add the order summary model
-  - File: `src/orders/summary.ts`
-  - Done when: `bun test src/orders` passes
-- [ ] 2. Wire the order summary panel
-  - File: `src/ui/summary-panel.ts`, `src/ui/checkout.ts`
-  - Done when: `bun test src/ui` passes
-  - Depends: 1
-  - Must NOT: change the payment flow
-  - Effort: medium
-````
+A run is a set of tasks in Claude Code's task list. Claude Code stores each task as `<config dir>/tasks/<list id>/<id>.json`, where the config dir is `CLAUDE_CONFIG_DIR` or `~/.claude`. The list id is `CLAUDE_CODE_TASK_LIST_ID`, which the mod sets at session start when nothing has, to `omca-<checkout name>-<8 hex characters of a hash of the checkout path>`, so one list serves every session in a checkout and its tasks outlive `/clear`. Claude Code deletes a list's files seconds after its last task completes.
 
-For this text, ending in one newline, `boulder_progress` reports:
+OMCA reads these fields of a task file: `id`, `subject`, `description`, `activeForm`, `status` (`pending`, `in_progress` or `completed`), `owner`, `blocks`, `blockedBy` and `metadata`. A file that is not JSON, lacks `id`, `subject` or a known `status`, or carries `metadata._internal` is not a task. Three `metadata` keys are OMCA's:
+
+| Key | Type | Meaning |
+| --- | --- | --- |
+| `run` | string | The run the task belongs to. A task without it is not part of a run and no OMCA gate reads it |
+| `final` | `true` | The run's last task. It cannot close until a `final_verification` entry for it is logged |
+| `blocked` | string | Why the task was given up on. It closes the task without completing it |
+
+Any other `metadata` key is shown as plain text on the task's page in the Tasks pane.
+
+### Open, closed and blocked
+
+A task is open when its `status` is not `completed` and it has no `metadata.blocked`. A blocked task is closed for what runs next and is never counted as done. A task is held back by each id in its `blockedBy` that names a task still open.
+
+| Question | pending or in progress | completed | blocked |
+| --- | --- | --- | --- |
+| The plan-continuation gate counts it as remaining | yes | no | no |
+| Candidate for the next task | yes, when nothing holds it back | no | no |
+| Counted as done | no | yes | no |
+| Releases a task that waits on it | no | yes | no |
+
+### The final task
+
+The last task of a run carries `metadata.final: true`. Marking it completed is refused until the ledger holds a `final_verification` entry with `exit_code` 0 and `task_id` equal to its id. A run is closed when it has a task and none is open. The plan-continuation gate stays silent for a closed run, and the final-verification gate fires until that entry exists.
+
+### Example
 
 ```json
 {
-  "total": 2,
-  "completed": 1,
-  "blocked": 0,
-  "remaining": 1,
-  "is_complete": false,
-  "plan_path": "/home/user/.claude/plans/checkout-redesign.md",
-  "plan_sha256": "8273361d9a4d2edf9cf1b59d0e4683c346939c0fea1486acdd3860808a820caa",
-  "next_task_label": "Wire the order summary panel"
+  "id": "2",
+  "subject": "Wire the order summary panel",
+  "description": "Add the panel to the payment step and cover it with a test.",
+  "activeForm": "Wiring the order summary panel",
+  "status": "pending",
+  "blocks": ["3"],
+  "blockedBy": ["1"],
+  "metadata": { "run": "checkout-redesign" }
+}
+```
+
+The run's last task, which a passing `final_verification` for id `3` closes:
+
+```json
+{
+  "id": "3",
+  "subject": "Run the full suite and record the verdict",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": ["2"],
+  "metadata": { "run": "checkout-redesign", "final": true }
+}
+```
+
+A task given up on states why:
+
+```json
+{
+  "id": "4",
+  "subject": "Migrate the legacy export",
+  "status": "pending",
+  "blocks": [],
+  "blockedBy": [],
+  "metadata": { "run": "checkout-redesign", "blocked": "the export service is not reachable from CI" }
 }
 ```
 
@@ -123,10 +111,10 @@ The writer keeps any other top-level key it finds and writes `version` first.
 | `output_snippet` | string | always | Relevant output, cut to 2,000 characters |
 | `timestamp` | string | always | UTC at seconds precision, for example `2026-10-02T12:05:00Z` |
 | `verified_by` | string | only when not empty | The agent or person that verified, cut to 200 characters |
-| `plan_sha256` | string | only when not empty | The plan hash, 64 lowercase hex characters |
+| `task_id` | string | only when not empty | The id of the task a `final_verification` entry closes |
 | `tree` | string | when git can produce it | The tree hash of the working directory as `git add -A` would record it, computed by the server with a scratch index, object directory and git-lfs storage. Claude Code's `.claude/worktrees` directory does not count. It is absent outside a git repository, or when git is missing, fails, or a git call takes over 3 seconds. A caller cannot supply it |
 
-Lengths are counted in characters, not bytes. `evidence_log` rejects an unknown `type`, a non-integer `exit_code` and a `plan_sha256` that is not 64 lowercase hex characters or empty.
+Lengths are counted in characters, not bytes. `evidence_log` rejects an unknown `type` and a non-integer `exit_code`.
 
 ### Reading
 
@@ -140,7 +128,7 @@ When the server starts, it checks the live ledger. If the file is over 1 MiB or 
 
 ### What the gates accept
 
-- **Stop gate.** A session bound to a plan cannot stop, once no task is open, until the ledger holds a `final_verification` entry with `exit_code` 0 whose `plan_sha256` is empty or equals the plan file's current hash. An entry without a hash matches any plan. The gate treats a missing ledger as no evidence, and a ledger that the reader refuses, or that has no `entries` list, as corrupt. Both hold the stop with a message, within the gate's block budget.
+- **Stop gate.** A session with a run cannot stop, once no task is open, until the ledger holds a `final_verification` entry with `exit_code` 0 whose `task_id` is the run's final task. The gate treats a missing ledger as no evidence, and a ledger that the reader refuses, or that has no `entries` list, as corrupt. Both hold the stop with a message, within the gate's block budget.
 - **Later code changes.** No gate reads `tree`. The Evidence tab shows a passing verdict as stale once a later entry carries a different `tree`, OpenCode's panel does the same, and at Stop a completion claim over a verdict whose `tree` differs from the working directory shows the user a message.
 - **TaskCompleted.** When the session ran a verification command within the last hour, the ledger must have been modified at or after the time that command finished, give or take 2 seconds, and must hold at least one well-formed entry. A malformed entry beside a good one does not block.
 
@@ -160,12 +148,12 @@ When the server starts, it checks the live ledger. If the file is over 1 MiB or 
     },
     {
       "type": "final_verification",
-      "command": "plan completeness review",
+      "command": "bun test",
       "exit_code": 0,
-      "output_snippet": "COMPLETE",
+      "output_snippet": "418 pass, 0 fail",
       "timestamp": "2026-10-02T12:40:00Z",
-      "verified_by": "reviewer",
-      "plan_sha256": "8273361d9a4d2edf9cf1b59d0e4683c346939c0fea1486acdd3860808a820caa"
+      "verified_by": "orchestrator",
+      "task_id": "3"
     }
   ]
 }
@@ -195,7 +183,7 @@ The file keeps text as written. `notepad_read` masks secrets in what it returns,
 
 ### Plan names
 
-A plan name is 1 to 128 characters of letters, digits, `.`, `_` and `-`, starting with a letter or digit. It must also be a safe file name on Windows: not a device name such as `nul` or `COM1`, with or without an extension, and not ending in a dot. The notepad tools and `boulder_write` reject any other name.
+A plan name is 1 to 128 characters of letters, digits, `.`, `_` and `-`, starting with a letter or digit. It must also be a safe file name on Windows: not a device name such as `nul` or `COM1`, with or without an extension, and not ending in a dot. The notepad tools reject any other name.
 
 ### Example
 
@@ -216,74 +204,4 @@ The deploy script failed when API_TOKEN=<value> was set in the shell.
 
 ```text
 [Compacted: 12 earlier lines removed]
-```
-
-## Plan registry
-
-The registry is `.omca/state/boulder.json`. Only `boulder_write` writes it, plus the server's own cleanup. Its schema is [`plan-registry.v1.schema.json`](schemas/plan-registry.v1.schema.json). One registry holds several plans, and each session binds to at most one.
-
-### Document
-
-| Key | Type | Meaning |
-| --- | --- | --- |
-| `version` | `1` | Written first. Optional when reading |
-| `plans` | object | Plan entries by plan name |
-| `bindings` | object | Binding entries by session id |
-
-The writer emits exactly these three keys and drops any other key when it rewrites the file. A reader ignores unknown keys, and reads a missing `plans` or `bindings` as empty.
-
-### Plan entries
-
-| Field | Type | Written | Meaning |
-| --- | --- | --- | --- |
-| `active_plan` | string | always | The path of the plan file |
-| `started_at` | string | always | UTC at seconds precision when the plan was first registered. Registering again keeps it |
-| `session_ids` | array of strings | always | Every session that registered the plan, in order |
-| `worktree_path` | string | only when not empty | The worktree the plan runs in. Registering again keeps the earlier value unless a new one is given |
-
-### Binding entries
-
-| Field | Type | Written | Meaning |
-| --- | --- | --- | --- |
-| `plan_name` | string | always | A key of `plans` |
-| `bound_at` | integer | always | Epoch seconds when the session was bound |
-
-`boulder_write` writes a binding only when the session id is not empty. An empty id resolves to the session of the most recent hook call, or to the server's own session id before any hook has run.
-
-### Resolution
-
-Everything that acts for a session, such as the Stop gates, subagent start, the compaction note and the status line, resolves strictly: only the session's own binding counts, and only when the plan it names still exists. `boulder_progress` resolves leniently. Without a plan path or name it takes the session's binding, else the only registered plan, else the plan with the latest `started_at`, the first listed winning a tie. A lookup by plan name skips that order.
-
-Completion is not stored. It is derived from the plan file's checkboxes, as the plan files section describes.
-
-### Refusal
-
-One reader parses the registry. It refuses text that is not JSON, not an object, whose `plans` or `bindings` is present and not an object, or whose `version` is present and not 1. A file that is an object with neither key reads as an empty registry.
-
-`boulder_write` throws an error naming the file when the registry is refused, and never replaces it. Repair or delete the file, then register the plan again. Every other reader treats a refused registry as empty and writes nothing back, with one exception: the Stop gates treat text that is not valid JSON as corrupt. The plan continuation gate then holds the stop with a message naming the file, and the final verification gate stops enforcing.
-
-### Cleanup
-
-The server removes stale entries. At start, it drops bindings to plans that no longer exist and every unbound plan that is complete, whose plan file is missing, or that has no `active_plan`. An unbound incomplete plan with a plan file is kept. On each `boulder_write`, it drops bindings older than 7 days and unbound complete plans started more than 7 days ago. At exit, it removes the bindings this server process made.
-
-### Example
-
-```json
-{
-  "version": 1,
-  "plans": {
-    "checkout-redesign": {
-      "active_plan": "/home/user/.claude/plans/checkout-redesign.md",
-      "started_at": "2026-10-02T10:00:00Z",
-      "session_ids": ["3f2b8c1e-7a4d-4c55-9b0e-1d2f6a8e9c10"],
-      "worktree_path": "/home/user/work/checkout-redesign"
-    }
-  },
-  "bindings": {
-    "3f2b8c1e-7a4d-4c55-9b0e-1d2f6a8e9c10": {
-      "plan_name": "checkout-redesign",
-      "bound_at": 1790935200
-    }
-  }
-}
 ```

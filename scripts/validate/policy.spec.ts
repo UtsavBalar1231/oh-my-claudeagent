@@ -31,7 +31,7 @@ describe("policy markers", () => {
   });
 
   test("each hook model marker is required in docs/references.md", async () => {
-    const markers = ["hooks/register.ts", "mcp_tool", "omca_hook", "tool.check", "OMCA_DISABLED_HOOKS", "boulder.json", "verification-evidence.json"];
+    const markers = ["hooks/register.ts", "mcp_tool", "omca_hook", "tool.check", "OMCA_DISABLED_HOOKS", "verification-evidence.json"];
     for (const marker of markers) {
       const result = await policy.run(fixture({ "docs/references.md": without(VALID["docs/references.md"], marker) }));
       expect(result.status).toBe("fail");

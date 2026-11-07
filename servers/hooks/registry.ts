@@ -1,13 +1,12 @@
 import { isSafeId } from "../../src/core/session-id.ts";
 import { handle as commentGate } from "./comment-gate.ts";
+import { handle as finalTaskGuard } from "./final-task-guard.ts";
 import { handle as contextInjector } from "./context-injector.ts";
 import { handle as emptyTaskResponse } from "./empty-task-response.ts";
 import { handle as failureRecovery } from "./failure-recovery.ts";
 import { handle as guidance } from "./guidance.ts";
 import { handle as keywordDetector } from "./keyword-detector.ts";
 import { handle as modNotice } from "./mod-notice.ts";
-import { handle as planFormatWarn } from "./plan-format-warn.ts";
-import { handle as planWriteGuard } from "./plan-write-guard.ts";
 import { type Session, touchSession } from "./session-state.ts";
 import { handle as sessionStart } from "./session-start.ts";
 import { handle as slashModeDetector } from "./slash-mode-detector.ts";
@@ -15,6 +14,7 @@ import { stampIfDue } from "./status-file.ts";
 import { handle as stopGates } from "./stop-gates.ts";
 import { handle as subagentContext } from "./subagent-context.ts";
 import { handle as taskCompleted } from "./task-completed.ts";
+import { handle as taskTouch } from "./task-touch.ts";
 import { handle as verificationRecorder } from "./verification-recorder.ts";
 
 /** The hook payload as the handlers see it: object-valued fields already decoded. */
@@ -33,13 +33,13 @@ export type Handler = (payload: Payload, context: Context) => Output | undefined
 
 export const REGISTRY: Readonly<Record<string, readonly (readonly [string, Handler])[]>> = {
   PreToolUse: [
-    ["plan-write-guard", planWriteGuard],
+    ["final-task-guard", finalTaskGuard],
     ["comment-gate", commentGate],
   ],
   PostToolUse: [
     ["verification-recorder", verificationRecorder],
     ["context-injector", contextInjector],
-    ["plan-format-warn", planFormatWarn],
+    ["task-touch", taskTouch],
     ["empty-task-response", emptyTaskResponse],
   ],
   PostToolUseFailure: [["failure-recovery", failureRecovery]],

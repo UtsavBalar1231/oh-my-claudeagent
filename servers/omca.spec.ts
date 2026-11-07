@@ -12,9 +12,9 @@ const CLIENT_TEXT_CAP_CHARS = 2048;
 const MAX_RESULT_SIZE_CEILING = 500_000;
 const MAX_RESULT_SIZE_TOOLS = ["evidence_read", "file_read", "ast_search", "session_search"];
 const OUTSIDE_INSTRUCTIONS = ["agents_migrate"];
-const ALWAYS_LOADED_TOOLS = ["boulder_progress", "evidence_log", "notepad_write"];
+const ALWAYS_LOADED_TOOLS = ["evidence_log", "notepad_write"];
 const TOOL_PREFIX = "mcp__plugin_oh-my-claudeagent_omca__";
-const WRITE_TOOLS = ["agents_migrate", "ast_replace", "boulder_write", "evidence_log", "notepad_compact", "notepad_write", "omca_hook"];
+const WRITE_TOOLS = ["agents_migrate", "ast_replace", "evidence_log", "notepad_compact", "notepad_write", "omca_hook"];
 const MODERN = "2026-07-28";
 const FALLBACK = "2025-11-25";
 const VERSION_META = "io.modelcontextprotocol/protocolVersion";
@@ -329,8 +329,6 @@ const INVALID_INPUT: Record<string, Message> = {
   ast_find_rule: {},
   ast_dump_tree: {},
   ast_test_rule: {},
-  boulder_write: {},
-  boulder_progress: { plan_path: 1 },
   evidence_log: {},
   evidence_read: { working_directory: 1 },
   notepad_write: {},
@@ -340,6 +338,8 @@ const INVALID_INPUT: Record<string, Message> = {
   health_check: { working_directory: 1 },
   file_read: {},
   session_search: {},
+  task_get: {},
+  task_list: { working_directory: 1 },
   omca_hook: {},
 };
 const TAKES_NO_INPUT = ["agents_list", "categories_list"];
@@ -449,8 +449,6 @@ describe("tool annotations", () => {
     ast_replace: { title: "Rewrite code by AST pattern", readOnlyHint: false, destructiveHint: true, idempotentHint: false },
     ast_search: reader("Search code by AST pattern"),
     ast_test_rule: reader("Test a YAML rule on a snippet"),
-    boulder_progress: reader("Check plan progress"),
-    boulder_write: { title: "Register work plan", readOnlyHint: false, destructiveHint: true, idempotentHint: true },
     categories_list: reader("List model categories"),
     evidence_log: { title: "Log verification evidence", readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     evidence_read: reader("Read verification evidence"),
@@ -462,6 +460,8 @@ describe("tool annotations", () => {
     notepad_write: { title: "Append to notepad", readOnlyHint: false, destructiveHint: false, idempotentHint: false },
     omca_hook: { title: "OMCA hook entry point", readOnlyHint: false, destructiveHint: false },
     session_search: reader("Search session transcripts"),
+    task_get: reader("Read one task"),
+    task_list: reader("Read the task list"),
   };
 
   test("every tool declares its title and hints exactly, with openWorldHint false", async () => {
@@ -514,7 +514,7 @@ describe("tool declaration contract", () => {
 
   test("the instructions tell the model how to load a deferred tool by its full name", async () => {
     const { instructions } = (await startServer().request("initialize", { protocolVersion: "2025-11-25" })).result as { instructions: string };
-    expect(instructions).toContain("`evidence_log`, `boulder_progress` and `notepad_write` are always available");
+    expect(instructions).toContain("`evidence_log` and `notepad_write` are always available");
     expect(instructions).toContain(`select:${TOOL_PREFIX}ast_search`);
   });
 
@@ -522,17 +522,6 @@ describe("tool declaration contract", () => {
     const result = (await startServer().request("initialize", { protocolVersion: "2025-11-25" })).result as { instructions: string };
     expect(result.instructions.length).toBeLessThanOrEqual(CLIENT_TEXT_CAP_CHARS);
     expect(EXPECTED_TOOLS.filter((name) => !OUTSIDE_INSTRUCTIONS.includes(name) && !result.instructions.includes(`\`${name}\``))).toEqual([]);
-  });
-
-  test("under OpenCode the instructions name the adapter's omca_ tools and no tool-loading step", async () => {
-    const { instructions } = (await startServer({ OMCA_CLIENT: "opencode" }).request("initialize", { protocolVersion: "2025-11-25" })).result as { instructions: string };
-    const named = [...instructions.matchAll(/`omca_([a-z_]+)`/g)].map((match) => match[1]);
-    expect(named.toSorted()).toEqual(
-      ["ast_dump_tree", "ast_find_rule", "ast_replace", "ast_search", "ast_test_rule", "boulder_progress", "evidence_log", "evidence_read", "file_read", "notepad_compact", "notepad_list", "notepad_read", "notepad_write"],
-    );
-    expect(instructions).toContain("None of them is in the Code Mode catalog, so `search` and `execute` cannot reach them.");
-    expect(instructions).not.toContain("ToolSearch");
-    expect(instructions).not.toContain(TOOL_PREFIX);
   });
 });
 
@@ -718,8 +707,7 @@ describe("progress", () => {
 
 describe("shutdown", () => {
   // The handler has 100 ms in production, before the client's SIGTERM. A shared CI runner can stall a
-  // process for several times that, so the specs allow 1 s: still a tenth of the registry lock's 10 s
-  // default wait, the regression these timings exist to catch.
+  // process for several times that, so the specs allow 1 s.
   const SHUTDOWN_BUDGET_MS = 1_000;
   const POSIX_SIGNALS_ONLY = "skipped on Windows: it has no POSIX signals, and the stdin-close spec covers it";
 
@@ -736,63 +724,12 @@ describe("shutdown", () => {
     });
   }
 
-  const OTHER_BINDING = { plan_name: "live", bound_at: Math.floor(Date.now() / 1000) };
-
-  async function bindAcrossClear(server: Server): Promise<string> {
-    await server.request("initialize", { protocolVersion: "2025-11-25", capabilities: {}, clientInfo: { name: "spec", version: "0" } });
-    server.send({ jsonrpc: "2.0", method: "notifications/initialized" });
-    const plan = join(server.project, "live.md");
-    writeFileSync(plan, "- [ ] 1. one\n");
-    const registry = join(server.project, ".omca", "state", "boulder.json");
-    writeFileSync(
-      registry,
-      JSON.stringify({ plans: { live: { active_plan: plan, started_at: "2026-10-02T10:00:00Z", session_ids: ["other"] } }, bindings: { other: OTHER_BINDING } }),
-    );
-    const call = (name: string, args: Message) => server.request("tools/call", { name, arguments: args });
-    await call("boulder_write", { active_plan: plan, plan_name: "live", session_id: "before-clear" });
-    await call("omca_hook", { event: "SessionStart", session_id: "after-clear", cwd: server.project, source: "clear" });
-    await call("boulder_write", { active_plan: plan, plan_name: "live", session_id: "" });
-    expect(Object.keys(JSON.parse(readFileSync(registry, "utf8")).bindings)).toEqual(["other", "before-clear", "after-clear"]);
-    return registry;
-  }
-
-  async function interrupt(server: Server): Promise<{ elapsed: number; stderr: string }> {
-    const sent = performance.now();
-    server.proc.kill("SIGINT");
-    expect(await server.proc.exited).toBe(0);
-    const elapsed = performance.now() - sent;
-    return { elapsed, stderr: await new Response(server.proc.stderr).text() };
-  }
-
-  test.skipIf(process.platform === "win32")(`SIGINT unbinds the session ids bound before and after /clear within the shutdown budget and leaves other sessions bound (${POSIX_SIGNALS_ONLY})`, async () => {
+  test("closing stdin exits 0, because Windows sends no signal", async () => {
     const server = startServer();
-    const registry = await bindAcrossClear(server);
-    const { elapsed } = await interrupt(server);
-    expect(elapsed).toBeLessThan(SHUTDOWN_BUDGET_MS);
-    const { plans, bindings } = JSON.parse(readFileSync(registry, "utf8"));
-    expect(bindings).toEqual({ other: OTHER_BINDING });
-    expect(plans.live.session_ids).toEqual(["other", "before-clear", "after-clear"]);
-  });
-
-  test("closing stdin unbinds the session ids and exits 0, because Windows sends no signal", async () => {
-    const server = startServer();
-    const registry = await bindAcrossClear(server);
+    await server.request("ping");
     server.proc.stdin.end();
     expect(await server.proc.exited).toBe(0);
     expect(server.proc.signalCode).toBeNull();
-    const { bindings } = JSON.parse(readFileSync(registry, "utf8"));
-    expect(bindings).toEqual({ other: OTHER_BINDING });
     expect(await new Response(server.proc.stderr).text()).toBe("");
-  });
-
-  test.skipIf(process.platform === "win32")(`SIGINT with the registry lock held skips the unbind, says so, and still exits 0 within the shutdown budget (${POSIX_SIGNALS_ONLY})`, async () => {
-    const server = startServer();
-    const registry = await bindAcrossClear(server);
-    const before = readFileSync(registry, "utf8");
-    writeFileSync(`${registry}.lock`, `${process.pid} ${Date.now()} spec-holder`);
-    const { elapsed, stderr } = await interrupt(server);
-    expect(elapsed).toBeLessThan(SHUTDOWN_BUDGET_MS);
-    expect(readFileSync(registry, "utf8")).toBe(before);
-    expect(stderr).toBe(`omca: ${registry}.lock stayed busy, so session ids before-clear, after-clear stay bound\n`);
   });
 });

@@ -131,8 +131,8 @@ Every detail in that snippet is load-bearing:
 - The `env -u` list is mandatory. A nested `claude -p` inherits the parent session's
   identity and messaging variables, which pulls in the parent project's settings and
   makes the run something other than a fresh session. Dropping `CLAUDE_CODE_SESSION_ID`
-  in particular: a run that inherited it has been observed alongside the parent
-  project's plan binding vanishing from `.omca/state/boulder.json`.
+  in particular: a run that inherited it shares the parent session's identity, and with it the
+  parent's task list.
 - The marker file is what separates a file the run created from the checkout itself.
   `git status` cannot do this job alone, because a run may write its output under
   `.omca/` or `.claude/`, both of which are gitignored, and the run then reads as having
@@ -146,8 +146,7 @@ Every detail in that snippet is load-bearing:
   A scorer that is too narrow misscores a fixture, and without a saved diff the only
   remedy is a rerun.
 
-After a batch, print `jq '.bindings' .omca/state/boulder.json` from the main checkout
-and confirm this session's binding survived.
+After a batch, open `/tasklist` in this session and confirm its task list is unchanged.
 
 The worktree does not contain every side effect. The `planning` fixture asks for a plan
 written to a file, and a run may write it to `~/.claude/plans/` rather than inside the

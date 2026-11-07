@@ -11,26 +11,6 @@
     "untracked": 1,
     "remote": "git@github.com:acme/shop.git"
   },
-  "files": {
-    "width-60/shop/.omca/state/boulder.json": {
-      "plans": {
-        "checkout": {
-          "active_plan": "@ROOT@/width-60/shop/plan.md",
-          "started_at": "2026-10-01T00:00:00Z",
-          "session_ids": [
-            "11111111-2222-3333-4444-555555555555"
-          ]
-        }
-      },
-      "bindings": {
-        "11111111-2222-3333-4444-555555555555": {
-          "plan_name": "checkout",
-          "bound_at": 1786000000
-        }
-      }
-    },
-    "width-60/shop/plan.md": "# Plan\n- [x] 1. Scaffold the checkout module\n- [x] 2. Move the cart totals into it\n- [ ] 3. Wire the order summary panel into the payment step and cover it with a test\n- [ ] 4. Replace the legacy confirmation page\n"
-  },
   "payload": {
     "model": {
       "id": "claude-opus-5-5",

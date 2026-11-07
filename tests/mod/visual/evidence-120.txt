@@ -29,7 +29,7 @@
                                                                   │    13:50  test    just test-mod
                                                                   │    13:25  test    just test-mod
                                                                   │── Wed 2026-09-30 ────────────────────────────────
-                                                                  │    16:10  manual  just visual plan-reader
+                                                                  │    16:10  manual  just visual agent-view
                                                                   │  ↓ 4 more
                                                                   │t: Type  x: Fails  f: Find  c: Copy  r: Rerun
 █████ 6/6                                                     [-] │3/16 · ↑↓ move

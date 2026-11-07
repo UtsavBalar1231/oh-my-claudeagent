@@ -1,27 +1,21 @@
 import type { RenderElement } from "claude-code";
-import { type Band, bandView, BUTTON_GAP, planTally, type Proof, type Span, type Tone } from "../src/core/band-model.ts";
-import { allTasksClosed, allTasksDone } from "../src/core/checkboxes.ts";
+import { type Band, bandView, BUTTON_GAP, type Span, type Tone } from "../src/core/band-model.ts";
 import { ledgerCoversSlot } from "../src/core/evidence.ts";
-import { hasPassingFinalVerification, type NextAction, nextActions } from "../src/core/next-actions.ts";
-import { BOULDER, exitCodeOf, LEDGER, statusPath, verificationOf } from "../src/core/omca-paths.ts";
-import { boardOf, parsePlan } from "../src/core/plan-reader.ts";
-import { proofSummary, shownProof } from "../src/core/proof.ts";
-import { sha256Hex } from "../src/core/sha256.ts";
+import { type NextAction, nextActions } from "../src/core/next-actions.ts";
+import { exitCodeOf, LEDGER, statusPath, verificationOf } from "../src/core/omca-paths.ts";
 import { fitEnd, type GlyphTier, glyphs, oneLine } from "../src/core/ui-kit.ts";
 import { TONE_KEYS } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
-import { boundPlanOf, bytesOf, fillPrompt, type Host, ledgerDocument, ledgerWrittenAt, proofFacts, reason, sessionOf, stampOf, verdictFor } from "./host.ts";
+import { fillPrompt, type Host, ledgerWrittenAt, reason, sessionOf, stampOf } from "./host.ts";
 import { isRemote, type Kit, kitOf, Run, type TextStyle } from "./ui.ts";
 
-type Snapshot = { band: Band; hasFinalVerification: boolean; exitCode: number | null; planPath: string | undefined };
+type Snapshot = { band: Band; exitCode: number | null };
 
 let glyphTier: GlyphTier = "nerd";
 let shownActions = 0;
 let isAgentInView = false;
 let toastedVerificationAt = 0;
-let toastedPlan: { path: string; isClosed: boolean } | undefined;
 let isBaselined = false;
-let planPath: string | undefined;
 let readStamps: string | undefined;
 
 const TOAST_MS = 6000;
@@ -38,84 +32,45 @@ async function readJson(host: Host, path: string): Promise<unknown> {
   return (await host.fs.exists(path)) ? JSON.parse(await host.fs.read(path)) : undefined;
 }
 
-async function readSnapshot(host: Host, within: object): Promise<Snapshot> {
+async function readSnapshot(host: Host): Promise<Snapshot> {
   const [root, sessionId, readAt] = await Promise.all([host.session.root(), host.session.id(), host.clock.now()]);
-  const ledgerPath = `${root}/${LEDGER}`;
-  const errors: string[] = [];
-  async function attempt<T>(what: string, read: () => Promise<T>): Promise<T | null> {
-    try {
-      return await read();
-    } catch (error) {
-      errors.push(`Cannot read ${what}: ${oneLine(reason(error))}`);
-      return null;
-    }
-  }
-
-  const bound = await attempt(BOULDER, async () => (await boundPlanOf(host)) ?? null);
-  const planBytes = bound === null ? null : await attempt(bound.path, () => bytesOf(host, bound.path));
-  const planText = planBytes === null ? null : new TextDecoder().decode(planBytes);
-  const plan = bound === null || planText === null ? null : { ...bound, ...planTally(planText) };
-
   const statusFile = statusPath(root, sessionId);
   let exitCode: number | null = null;
-  const verification =
-    statusFile === undefined
-      ? null
-      : await attempt(`the session status file`, async () => {
-          const status = await readJson(host, statusFile);
-          exitCode = exitCodeOf(status);
-          const slot = verificationOf(status);
-          if (slot === null) return null;
-          return { ...slot, isLogged: ledgerCoversSlot(await ledgerWrittenAt(host, root), slot.at) };
-        });
-
-  const hasFinalVerification =
-    plan !== null &&
-    planBytes !== null &&
-    allTasksClosed(plan) &&
-    (await attempt(LEDGER, async () =>
-      hasPassingFinalVerification(await ledgerDocument(host, ledgerPath), sha256Hex(planBytes)),
-    )) === true;
-
-  const proof = bound === null || planText === null ? null : await attempt(LEDGER, () => proofOfPlan(host, bound.path, planText, within));
-  const band: Band = { plan, verification, ...(proof === null ? {} : { proof }), error: errors[0] ?? null, readAt };
-  return { band, hasFinalVerification, exitCode, planPath: bound?.path };
+  let error: string | null = null;
+  let verification: Band["verification"] = null;
+  if (statusFile !== undefined) {
+    try {
+      const status = await readJson(host, statusFile);
+      exitCode = exitCodeOf(status);
+      const slot = verificationOf(status);
+      if (slot !== null) verification = { ...slot, isLogged: ledgerCoversSlot(await ledgerWrittenAt(host, root), slot.at) };
+    } catch (failure) {
+      error = `Cannot read the session status file: ${oneLine(reason(failure))}`;
+    }
+  }
+  return { band: { verification, error, readAt }, exitCode };
 }
 
-// The plan board's counts: each task's verdict is the newest test, build or lint run since its
-// listed files last changed, counting only changes since the plan's registered start. Null when no
-// task lists a file that changed.
-async function proofOfPlan(host: Host, planPath: string, planText: string, within: object): Promise<Proof | null> {
-  const { cards } = boardOf(parsePlan(planText));
-  const facts = await proofFacts(host, cards.flatMap((card) => card.files), planPath, within);
-  if (facts.ledgerError !== null) throw new Error(facts.ledgerError);
-  const counts = proofSummary(cards.map((card) => shownProof(card.state === "done", verdictFor(facts, card.files)?.proof)));
-  return counts.proven + counts.unproven + counts.failed === 0 ? null : counts;
-}
-
-// What a snapshot is read from, besides the plan's listed files. A same-size edit, such as a
-// `[ ]` to `[x]` flip, inside one mtime tick of a coarse file system (2 s on exFAT) keeps the
-// plan's stamp, so a subagent's turn misses it until the next change; the main turn reads anyway.
+// What a snapshot is read from, so a subagent's turn that moved neither reads nothing.
 async function stampsOf(host: Host): Promise<string> {
   const [root, sessionId] = await Promise.all([host.session.root(), host.session.id()]);
   const status = statusPath(root, sessionId);
-  const paths = [`${root}/${BOULDER}`, `${root}/${LEDGER}`, planPath ?? "", status ?? ""];
+  const paths = [`${root}/${LEDGER}`, status ?? ""];
   return JSON.stringify(await Promise.all(paths.map((path) => (path === "" ? "none" : stampOf(host, path)))));
 }
 
-async function snapshotOf(host: Host, within: object): Promise<Snapshot> {
+async function snapshotOf(host: Host): Promise<Snapshot> {
   const stamps = await stampsOf(host);
-  const snapshot = await readSnapshot(host, within);
-  planPath = snapshot.planPath;
+  const snapshot = await readSnapshot(host);
   readStamps = stamps;
   return snapshot;
 }
 
 // The first read after session.start only records what already happened; later reads toast what changed.
-async function toastChanges(host: Host, { band, exitCode }: Snapshot): Promise<void> {
+function toastChanges(host: Host, { band, exitCode }: Snapshot): void {
   const isBaseline = !isBaselined;
   isBaselined = true;
-  const { plan, verification } = band;
+  const { verification } = band;
   const verifiedAt = verification?.at ?? 0;
   if (!isBaseline && verification !== null && verifiedAt > toastedVerificationAt && exitCode !== null && exitCode !== 0) {
     const { ellipsis } = glyphs(glyphTier);
@@ -124,28 +79,6 @@ async function toastChanges(host: Host, { band, exitCode }: Snapshot): Promise<v
     });
   }
   toastedVerificationAt = Math.max(toastedVerificationAt, verifiedAt);
-  const isClosed = plan !== null && allTasksClosed(plan);
-  if (!isBaseline && plan !== null && isClosed && toastedPlan?.path === plan.path && !toastedPlan.isClosed) {
-    // A plan run is the long unattended case, so its end reaches the person's own notifications.
-    // The transcript's receipt row says the same in the session, with a toast where no row stands.
-    try {
-      const outcome = allTasksDone(plan) ? `Plan complete: ${plan.name} ${plan.done}/${plan.total}` : `Plan closed: ${plan.name} ${plan.done}/${plan.total}, ${plan.blocked} blocked`;
-      await host.ui.notify(outcome, { title: "OMCA" });
-    } catch (error) {
-      host.log(`band: notifying failed: ${reason(error)}`);
-    }
-  }
-  toastedPlan = plan === null ? undefined : { path: plan.path, isClosed };
-}
-
-async function actionsFor(host: Host, { band, hasFinalVerification }: Snapshot): Promise<NextAction[]> {
-  const agents = (await host.state.agents.get()).value ?? {};
-  return nextActions({
-    plan: band.plan,
-    verification: band.verification,
-    isAgentRunning: Object.values(agents).some((agent) => agent.status === "running"),
-    hasFinalVerification,
-  });
 }
 
 async function clearActionsFor(host: Host, text: string): Promise<void> {
@@ -168,28 +101,25 @@ async function writeActions(host: Host, actions: readonly NextAction[]): Promise
 }
 
 const TONES: Record<Tone, TextStyle> = {
-  title: { bold: true },
   plain: {},
   muted: { color: TONE_KEYS.muted },
   ok: { color: TONE_KEYS.ok },
   warn: { color: TONE_KEYS.warn },
   fail: { color: TONE_KEYS.fail },
-  active: { color: TONE_KEYS.active },
 };
 
 const row = (kit: Kit, spans: readonly Span[]): RenderElement =>
-  Run(kit, spans.map(({ text, tone, ...keys }) => ({ style: { ...TONES[tone], ...keys }, text })));
+  Run(kit, spans.map(({ text, tone }) => ({ style: TONES[tone], text })));
 
 export const band: Features = {
   "session.start": {
-    post: async (host, e) => {
+    post: async (host) => {
       glyphTier = (await sessionOf(host)).glyphTier;
       shownActions = ((await host.state.nextActions.get()).value ?? []).length;
-      const snapshot = await snapshotOf(host, e);
+      const snapshot = await snapshotOf(host);
       toastedVerificationAt = 0;
-      toastedPlan = undefined;
       isBaselined = false;
-      await toastChanges(host, snapshot);
+      toastChanges(host, snapshot);
       await writeBand(host, snapshot.band);
       return undefined;
     },
@@ -197,10 +127,10 @@ export const band: Features = {
   "turn.complete": {
     post: async (host, e) => {
       if (e.agentId !== undefined && (await stampsOf(host)) === readStamps) return undefined;
-      const snapshot = await snapshotOf(host, e);
-      await toastChanges(host, snapshot);
+      const snapshot = await snapshotOf(host);
+      toastChanges(host, snapshot);
       await writeBand(host, snapshot.band);
-      if (e.agentId === undefined) await writeActions(host, await actionsFor(host, snapshot));
+      if (e.agentId === undefined) await writeActions(host, nextActions({ verification: snapshot.band.verification }));
       return undefined;
     },
   },

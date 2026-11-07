@@ -10,10 +10,6 @@
 // modes. Events that need a slash command or task tools (UserPromptExpansion, SessionStart on
 // clear or compact, TaskCompleted) are not driven here.
 //
-// The Stop family binds the session to a plan with unchecked tasks. It asserts that the gate
-// keeps the turn going as feedback, so the next model request carries the reason and the client
-// raises no hook-error notice, and that the control, with no plugin, stops after one request.
-//
 // Usage: bun scripts/qa/hook-live-probe.ts
 // Exit: 0 pass, 1 a check failed, 2 the run could not be set up.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -21,14 +17,12 @@ import { join } from "node:path";
 import type { Run } from "../validate/core.ts";
 import {
   type AccessEntry,
-  type BodyEntry,
   CANARY,
   type Checks,
   call,
   guardDenies,
   hookCalls,
   localhostOnly,
-  parseJsonLines,
   pluginDenies,
   type Qa,
   readJsonLines,
@@ -41,39 +35,22 @@ import {
 } from "./lib.ts";
 import type { Script, Turn } from "./mock-model.ts";
 
-const PLAN_DENY_MARKER = "PLAN-CHECKBOX-VERIFY";
-const PLAN_WITHOUT_CHECKBOXES = "## Work Objectives\n\nSome text with no checkboxes.\n";
-const STOP_SESSION = "5c1f0f6e-3a47-4d52-9b0e-7d1a2c8e4b91";
-const STOP_PLAN = "# Plan\n\n## TODOs\n\n- [ ] 1. Write the parser\n- [ ] 2. Write the printer\n";
-const STOP_CONTEXT = "Stop hook additional context: [PLAN CONTINUATION]";
-const STOP_ERROR_KEY = "stop-hook-error";
-
 type Observed = {
   project: string;
   trace: TraceEntry[];
   debug: string;
   clientCalls: number;
-  stdout: string;
-  bodies: BodyEntry[];
 };
 
 type Family = {
   name: string;
   script: (project: string) => Script;
-  sessionId?: string;
-  boundPlan?: boolean;
-  controlServed?: number;
   seed?: (project: string) => void;
   plugin: (checks: Checks, o: Observed, label: string) => void;
   control: (checks: Checks, o: Observed, label: string) => void;
 };
 
 const bash = (command: string): Turn => call("Bash", { command, description: "probe command" });
-
-type Notice = { type?: string; subtype?: string; key?: string };
-
-const hookErrorNotices = (stdout: string): Notice[] =>
-  parseJsonLines<Notice>(stdout).filter((line) => line.type === "system" && line.subtype === "notification" && line.key === STOP_ERROR_KEY);
 
 const sessionStatus = (project: string): string => {
   const dir = join(project, ".omca", "state", "session");
@@ -93,19 +70,6 @@ function noPluginTrace(checks: Checks, o: Observed, label: string): void {
 // bypassPermissions, so a control run could never delete. The guard reads `"$CACHE"/` as a root
 // directory, since the variable could be empty, and the client lets it through.
 const FAMILIES: Family[] = [
-  {
-    name: "PreToolUse deny",
-    script: (project) => ({ main: [call("Write", { file_path: join(project, "plans", "no-checkboxes.md"), content: PLAN_WITHOUT_CHECKBOXES }), say("done")], subagent: [] }),
-    plugin(checks, o, label) {
-      const denied = o.trace.some((e) => e.event === "PreToolUse" && e.tool_name === "Write" && e.output === "deny");
-      checks.check(denied && o.debug.includes(PLAN_DENY_MARKER), `${label}: the plan-write guard denied the zero-checkbox plan write`, `${label}: no ${PLAN_DENY_MARKER} deny in the trace or the debug log`);
-      checks.check(!existsSync(join(o.project, "plans", "no-checkboxes.md")), `${label}: the denied write did not land on disk`, `${label}: plans/no-checkboxes.md exists despite the deny`);
-    },
-    control(checks, o, label) {
-      noPluginTrace(checks, o, label);
-      checks.check(existsSync(join(o.project, "plans", "no-checkboxes.md")), `${label}: the same write lands on disk without the plugin`, `${label}: the write did not land without the plugin, so the scenario proves nothing`);
-    },
-  },
   {
     name: "PostToolUse injection",
     script: (project) => ({ main: [call("Write", { file_path: join(project, "notes.md"), content: "hello\n" }), say("done")], subagent: [] }),
@@ -165,44 +129,6 @@ const FAMILIES: Family[] = [
       noPluginTrace(checks, o, label);
     },
   },
-  {
-    name: "Stop continuation",
-    sessionId: STOP_SESSION,
-    boundPlan: true,
-    controlServed: 1,
-    script: () => ({ main: [say("working on the first task"), say("picked the plan back up")], subagent: [] }),
-    seed(project) {
-      const plan = join(project, "plans", "plan.md");
-      seedFile(project, join("plans", "plan.md"), STOP_PLAN);
-      const registry = {
-        plans: { probe: { active_plan: plan, started_at: "2026-01-01T00:00:00Z", session_ids: [STOP_SESSION] } },
-        bindings: { [STOP_SESSION]: { plan_name: "probe", bound_at: Math.floor(Date.now() / 1000) } },
-      };
-      seedFile(project, join(".omca", "state", "boulder.json"), JSON.stringify(registry));
-    },
-    plugin(checks, o, label) {
-      const main = o.bodies.filter((entry) => entry.queue === "main" && entry.turn !== null);
-      checks.check(
-        main.length === 2 && !main[0]?.body.includes(STOP_CONTEXT) && main[1]?.body.includes(STOP_CONTEXT) === true,
-        `${label}: the second main request carries the plan-continuation reason as Stop hook additional context`,
-        `${label}: ${main.length} main requests, with the reason in ${JSON.stringify(main.map((entry) => entry.body.includes(STOP_CONTEXT)))}`,
-      );
-      const notices = hookErrorNotices(o.stdout);
-      checks.check(
-        o.stdout.includes('"subtype":"init"') && notices.length === 0,
-        `${label}: the stream-json output carries no ${STOP_ERROR_KEY} notification`,
-        `${label}: ${notices.length} ${STOP_ERROR_KEY} notifications in the stream-json output`,
-      );
-      const stops = o.trace.filter((entry) => entry.event === "Stop").map((entry) => entry.output);
-      checks.check(stops.length === 2 && stops[0] === "continue" && stops[1] === "empty", `${label}: the gate fired once, then answered {} on the stop_hook_active retry`, `${label}: Stop trace outputs ${JSON.stringify(stops)}`);
-    },
-    control(checks, o, label) {
-      noPluginTrace(checks, o, label);
-      const main = o.bodies.filter((entry) => entry.queue === "main" && entry.turn !== null);
-      checks.check(main.length === 1 && !o.bodies.some((entry) => entry.body.includes("[PLAN CONTINUATION]")), `${label}: the bound plan keeps nothing going without the plugin`, `${label}: ${main.length} main requests, or the reason reached the model, without the plugin`);
-      checks.check(o.stdout.includes('"subtype":"init"') && hookErrorNotices(o.stdout).length === 0, `${label}: no ${STOP_ERROR_KEY} notification without the plugin`, `${label}: a ${STOP_ERROR_KEY} notification appeared without the plugin`);
-    },
-  },
 ];
 
 async function observe({ scratch, checks }: Qa, family: Family, pluginDir: string | undefined, label: string): Promise<Observed> {
@@ -210,9 +136,8 @@ async function observe({ scratch, checks }: Qa, family: Family, pluginDir: strin
   family.seed?.(project);
   const logDir = scratch.dir("log");
   const script = family.script(project);
-  const expected = pluginDir === undefined ? (family.controlServed ?? script.main.length) : script.main.length;
-  const bodyLog = join(logDir, "bodies.log");
-  const mock = startMock(join(logDir, "access.log"), script, bodyLog);
+  const expected = script.main.length;
+  const mock = startMock(join(logDir, "access.log"), script);
   let result: Run;
   try {
     result = await runClaude({
@@ -223,8 +148,6 @@ async function observe({ scratch, checks }: Qa, family: Family, pluginDir: strin
       configDir: scratch.dir("config"),
       debugFile: join(logDir, "debug.log"),
       hookTrace: true,
-      streamJson: true,
-      ...(family.sessionId === undefined ? {} : { sessionId: family.sessionId }),
     });
   } finally {
     await mock.stop();
@@ -240,16 +163,13 @@ async function observe({ scratch, checks }: Qa, family: Family, pluginDir: strin
     trace: readJsonLines<TraceEntry>(join(project, ".omca", "state", "hook-trace.jsonl")),
     debug,
     clientCalls: hookCalls(debug),
-    stdout: result.stdout,
-    bodies: readJsonLines<BodyEntry>(bodyLog),
   };
 }
 
-function checkSessionEvents(checks: Checks, o: Observed, label: string, boundPlan: boolean): void {
+function checkSessionEvents(checks: Checks, o: Observed, label: string): void {
   const stopGates = o.trace.filter((e) => e.event === "Stop" && e.output === "continue").length;
   checks.check(traceCount(o.trace, "UserPromptSubmit") >= 1, `${label}: UserPromptSubmit reached omca_hook`, `${label}: no UserPromptSubmit entry in the trace`);
-  if (boundPlan) checks.check(traceCount(o.trace, "Stop") >= 1, `${label}: Stop reached omca_hook`, `${label}: no Stop entry in the trace`);
-  else checks.check(traceCount(o.trace, "Stop") >= 1 && stopGates === 0, `${label}: Stop reached omca_hook and did not continue the turn with no bound plan`, `${label}: Stop entries ${traceCount(o.trace, "Stop")}, gate firings ${stopGates}`);
+  checks.check(traceCount(o.trace, "Stop") >= 1 && stopGates === 0, `${label}: Stop reached omca_hook and did not continue the turn with no open task`, `${label}: Stop entries ${traceCount(o.trace, "Stop")}, gate firings ${stopGates}`);
   checks.check(o.clientCalls === o.trace.length && o.clientCalls > 0, `${label}: the client's ${o.clientCalls} mcp_tool calls all reached the server`, `${label}: the client made ${o.clientCalls} mcp_tool calls and the server traced ${o.trace.length}`);
 }
 
@@ -261,7 +181,7 @@ if (import.meta.main) {
       for (const family of FAMILIES) {
         const withPlugin = `${family.name} [plugin]`;
         const o = await observe(qa, family, pluginDir, withPlugin);
-        checkSessionEvents(qa.checks, o, withPlugin, family.boundPlan === true);
+        checkSessionEvents(qa.checks, o, withPlugin);
         family.plugin(qa.checks, o, withPlugin);
 
         const withoutPlugin = `${family.name} [control]`;

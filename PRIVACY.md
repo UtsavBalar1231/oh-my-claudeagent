@@ -23,12 +23,14 @@ Claude Code's OMCA server, mod and status line make no network calls themselves.
 
 OMCA's hooks read the prompt text, the inputs and outputs of Read, Write, Edit, Agent, Bash and
 PowerShell calls, and the tail of the transcript when a session tries to stop. It runs local
-`git` for its drift check. Its mod reads your settings file and a few environment variables, and
-never writes them.
+`git` for its drift check. Its mod reads your settings file, a few environment variables and the
+session's task list under `~/.claude/tasks/`, and writes none of them. It sets two variables for
+the session when nothing has set them: `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` and
+`CLAUDE_CODE_TASK_LIST_ID`, a list named for the checkout.
 
 OMCA keeps its state in the project's `.omca/` directory:
 
-- The plan registry, the evidence ledger and notepads stay until you remove them. The evidence
+- The evidence ledger and notepads stay until you remove them. The evidence
   ledger rotates into monthly archive files once it passes 1 MiB or 1,000 entries.
 - Session status files and mod markers are deleted after a day untouched.
 - Delegation records are deleted after 90 days.

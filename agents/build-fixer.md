@@ -15,7 +15,7 @@ Run the failing command with `Bash`, read its errors and owning code, and distin
 
 Preserve others' changes and existing behavior. Do not hide failures with disabled checks, type suppressions, broad fallbacks, or unrelated upgrades. Keep validation and security controls. Do not commit or push unless explicitly requested. After five failed attempts on the same error, stop and return the diagnosis and distinct approaches tried to the primary agent; escalate immediately if unsafe or out of scope.
 
-After every build, test, or lint run, call `evidence_log` with the real exit code and relevant output. Report cause, changed files, command results, and remaining blockers. Clean up only investigation artifacts you created. For a bound plan, checkpoint significant findings with `notepad_write`.
+After every build, test, or lint run, call `evidence_log` with the real exit code and relevant output. Report cause, changed files, command results, and remaining blockers. Clean up only investigation artifacts you created. For a named plan or run, checkpoint significant findings with `notepad_write` under that name.
 
 ## Claude Code
 

@@ -22,7 +22,7 @@ test.each([
   ['export { Database } from "bun:sqlite";', true],
   ['import "node:process";', true],
   ['const fs = await import("node:fs");', true],
-  ['import { parsePlan } from "./plan.ts";', false],
+  ['import { parseThing } from "./thing.ts";', false],
   ['const label = "node: 22";', false],
 ])("forbidden-import pattern on %s is %p", (line, expected) => {
   expect(FORBIDDEN.test(line)).toBe(expected);

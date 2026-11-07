@@ -1,15 +1,17 @@
-import { afterEach, describe, expect, spyOn, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test";
+import { chmodSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { taskListIdFor } from "../../src/core/native-tasks.ts";
 import { dispatch } from "./registry.ts";
-import { ledgerPath, STAMP_INTERVAL_MS, statusPath } from "./status-file.ts";
+import { ledgerPath, readOpenRun, readTasks, STAMP_INTERVAL_MS, statusPath } from "./status-file.ts";
 
 const NOW = 1_786_000_000_000;
 const NOW_S = NOW / 1000;
 const roots: string[] = [];
 
 afterEach(() => {
+  delete process.env.CLAUDE_CODE_TASK_LIST_ID;
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
@@ -121,5 +123,114 @@ describe("session id validation", () => {
     } finally {
       errors.mockRestore();
     }
+  });
+});
+
+describe("the native task list", () => {
+  const configDir = process.env.CLAUDE_CONFIG_DIR;
+  let config: string;
+
+  beforeEach(() => {
+    config = project();
+    process.env.CLAUDE_CONFIG_DIR = config;
+  });
+
+  afterEach(() => {
+    if (configDir === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+    else process.env.CLAUDE_CONFIG_DIR = configDir;
+  });
+
+  function listFile(listId: string, name: string, content: string): string {
+    process.env.CLAUDE_CODE_TASK_LIST_ID = listId;
+    const path = join(config, "tasks", listId, name);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, content);
+    return path;
+  }
+
+  const stored = (id: string, metadata: Record<string, unknown> = { run: "demo" }) => JSON.stringify({ id, subject: `Task ${id}`, status: "pending", metadata });
+  const ids = (root: string, sessionId: string) => {
+    process.env.CLAUDE_CODE_TASK_LIST_ID = sessionId;
+    return readTasks(root, sessionId).map(({ id }) => id);
+  };
+
+  test("with no marker yet, as on the first prompt after /clear, it reads the list the mod is about to name", () => {
+    const root = project();
+    listFile(taskListIdFor(root), "1.json", stored("1"));
+    delete process.env.CLAUDE_CODE_TASK_LIST_ID;
+    expect(readTasks(root, crypto.randomUUID()).map(({ id }) => id)).toEqual(["1"]);
+    process.env.CLAUDE_CODE_TASK_LIST_ID = "named-at-launch";
+    listFile("named-at-launch", "2.json", stored("2"));
+    expect(readTasks(root, crypto.randomUUID()).map(({ id }) => id)).toEqual(["2"]);
+  });
+
+  test("a missing directory is an empty list", () => {
+    expect(readTasks(project(), crypto.randomUUID())).toEqual([]);
+  });
+
+  test("tasks come back in numeric id order, and each is parsed", () => {
+    const sessionId = crypto.randomUUID();
+    for (const id of ["10", "2", "1"]) listFile(sessionId, `${id}.json`, stored(id));
+    const root = project();
+    expect(ids(root, sessionId)).toEqual(["1", "2", "10"]);
+    expect(readTasks(root, sessionId)[0]).toMatchObject({ id: "1", subject: "Task 1", status: "pending", run: "demo", isFinal: false });
+  });
+
+  test("a malformed file, a directory named like a task and a file that is not JSON are skipped", () => {
+    const sessionId = crypto.randomUUID();
+    listFile(sessionId, "1.json", stored("1"));
+    listFile(sessionId, "2.json", "{torn");
+    listFile(sessionId, "notes.txt", stored("3"));
+    listFile(sessionId, ".highwatermark", "4");
+    mkdirSync(join(config, "tasks", sessionId, "5.json"));
+    expect(ids(project(), sessionId)).toEqual(["1"]);
+  });
+
+  test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("an unreadable file is skipped (skipped on Windows and as root: chmod 000 does not refuse there)", () => {
+    const sessionId = crypto.randomUUID();
+    listFile(sessionId, "1.json", stored("1"));
+    chmodSync(listFile(sessionId, "2.json", stored("2")), 0o000);
+    expect(ids(project(), sessionId)).toEqual(["1"]);
+  });
+
+  test("a task list path that is a file reads as empty", () => {
+    const sessionId = crypto.randomUUID();
+    mkdirSync(join(config, "tasks"), { recursive: true });
+    writeFileSync(join(config, "tasks", sessionId), "not a directory");
+    expect(readTasks(project(), sessionId)).toEqual([]);
+  });
+
+  test("the marker's task_list wins over the session id, and a marker naming none falls back", () => {
+    const root = project();
+    const named = crypto.randomUUID();
+    const unnamed = crypto.randomUUID();
+    listFile("omca-shared", "1.json", stored("1"));
+    listFile(named, "2.json", stored("2"));
+    listFile(unnamed, "3.json", stored("3"));
+    mkdirSync(join(root, ".omca", "state", "mod"), { recursive: true });
+    writeFileSync(join(root, ".omca", "state", "mod", `${named}.json`), JSON.stringify({ written_at: NOW, task_list: "omca-shared" }));
+    writeFileSync(join(root, ".omca", "state", "mod", `${unnamed}.json`), JSON.stringify({ written_at: NOW, task_list: null }));
+    expect(ids(root, named)).toEqual(["1"]);
+    expect(ids(root, unnamed)).toEqual(["3"]);
+  });
+
+  test("an id that could climb out of the tasks directory is cut to a safe name", () => {
+    const root = project();
+    listFile("---escape", "1.json", stored("1"));
+    expect(ids(root, "../escape")).toEqual(["1"]);
+  });
+
+  test("the open run names its count and next task, and is undefined once nothing is open or no task has a run", () => {
+    const root = project();
+    const open = crypto.randomUUID();
+    listFile(open, "1.json", stored("1"));
+    listFile(open, "2.json", stored("2"));
+    expect(readOpenRun(root, open)).toMatchObject({ name: "demo", open: [{ id: "1" }, { id: "2" }], next: { id: "1" } });
+    const closed = crypto.randomUUID();
+    listFile(closed, "1.json", stored("1", { run: "demo", blocked: "no key" }));
+    expect(readOpenRun(root, closed)).toBeUndefined();
+    const adHoc = crypto.randomUUID();
+    listFile(adHoc, "1.json", stored("1", {}));
+    expect(readOpenRun(root, adHoc)).toBeUndefined();
   });
 });

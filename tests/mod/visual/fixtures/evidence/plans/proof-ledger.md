@@ -1,6 +1,6 @@
 # Proof ledger for the Evidence tab
 
-Show the bound plan's final verdict, every verification run grouped by day, and the output
+Show the run's final verdict, every verification run grouped by day, and the output
 of the run under the cursor, with secrets masked.
 
 ## TODOs

@@ -9,7 +9,6 @@ const SERVER = join(import.meta.dir, "..", "omca.ts");
 // runner, which outlasts the 5 s default and leaves the workers writing into a directory being removed.
 const CONCURRENT_TIMEOUT_MS = 60_000;
 const MODULE = join(import.meta.dir, "evidence.ts");
-const PLAN_SHA = "deadbeef".repeat(8);
 const ISO_SECONDS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 
 const roots: string[] = [];
@@ -71,7 +70,7 @@ describe("appendEvidence", () => {
       mkdirSync(join(root, ".omca", "evidence"), { recursive: true });
       writeFileSync(ledgerFile(root), json(document));
     }
-    await log(legacy, { command: "c".repeat(2500), output_snippet: "😀".repeat(2500), verified_by: "executor", plan_sha256: PLAN_SHA });
+    await log(legacy, { command: "c".repeat(2500), output_snippet: "😀".repeat(2500), verified_by: "executor", task_id: "7" });
     const trusted = entries(legacy).at(-1) as EvidenceEntry;
     expect(await appendEvidence(shared, trusted)).toBe(3);
     expect(read(ledgerFile(shared))).toBe(read(ledgerFile(legacy)));
@@ -217,32 +216,38 @@ describe("evidence_log", () => {
     expect(Object.keys(entries(root)[0])).toEqual(["type", "command", "exit_code", "output_snippet", "timestamp"]);
   });
 
-  test("evidence_log with plan_sha256 stores it after verified_by", async () => {
+  test("evidence_log with task_id stores it after verified_by and before the tree stamp", async () => {
     const root = project();
-    await log(root, { evidence_type: "final_verification", verified_by: "orchestrator", plan_sha256: PLAN_SHA });
+    await log(root, { evidence_type: "final_verification", verified_by: "orchestrator", task_id: "7" });
     const [stored] = entries(root);
-    expect(Object.keys(stored)).toEqual(["type", "command", "exit_code", "output_snippet", "timestamp", "verified_by", "plan_sha256", "tree"]);
-    expect(stored.plan_sha256).toBe(PLAN_SHA);
+    expect(Object.keys(stored)).toEqual(["type", "command", "exit_code", "output_snippet", "timestamp", "verified_by", "task_id", "tree"]);
+    expect(stored.task_id).toBe("7");
   });
 
-  test.each([
-    ["a short digest", "deadbeef"],
-    ["an uppercase digest", "DEADBEEF".repeat(8)],
-    ["a 65-digit digest", `${PLAN_SHA}0`],
-    ["a 10,000-character value", "x".repeat(10_000)],
-  ])("evidence_log refuses %s as plan_sha256", async (_name, planSha256) => {
+  test("evidence_log without task_id, or with an empty one, omits the key", async () => {
     const root = project();
-    await expect(log(root, { evidence_type: "final_verification", plan_sha256: planSha256 })).rejects.toThrow(
-      "evidence_log: plan_sha256 must be 64 lowercase hex digits or empty",
-    );
+    await log(root, { evidence_type: "final_verification" });
+    await log(root, { evidence_type: "final_verification", task_id: "" });
+    expect(entries(root).map((e: object) => "task_id" in e)).toEqual([false, false]);
+  });
+
+  test("evidence_log refuses a task_id that is not a string", async () => {
+    const root = project();
+    await expect(log(root, { evidence_type: "final_verification", task_id: 7 })).rejects.toThrow("task_id");
     expect(existsSync(ledgerFile(root))).toBe(false);
   });
 
-  test("evidence_log without plan_sha256, or with an empty one, omits the key", async () => {
+  test("evidence_log caps a long task_id at 200 characters", async () => {
     const root = project();
-    await log(root, { output_snippet: `plan_sha256:${PLAN_SHA}` });
-    await log(root, { plan_sha256: "" });
-    expect(entries(root).map((e: object) => "plan_sha256" in e)).toEqual([false, false]);
+    await log(root, { evidence_type: "final_verification", task_id: "9".repeat(500) });
+    expect(entries(root)[0].task_id).toBe("9".repeat(200));
+  });
+
+  test("the evidence_log schema names task_id for final_verification", () => {
+    const { properties } = tool("evidence_log").inputSchema;
+    expect(properties.task_id).toEqual({ type: "string", default: "", description: "The id of the run's final task this verdict covers. Set it on final_verification entries only." });
+    expect(properties).not.toHaveProperty("plan_sha256");
+    expect(tool("evidence_log").inputSchema.required).toEqual(["evidence_type", "command", "exit_code", "output_snippet"]);
   });
 
   test("evidence_log leaves only the ledger in .omca/evidence", async () => {

@@ -8,10 +8,8 @@ code they cover, such as `servers/`, `src/` and `scripts/`, rather than here; mo
 
 - `fixtures/mcp/`: JSON-RPC requests and the golden `expected-tools.json` baseline,
   which `servers/omca.spec.ts` and the validator's MCP check read.
-- `fixtures/boulder-schemas/`: sample `boulder.json` shapes for registry tests.
-- `fixtures/plans/`, `fixtures/settings/` and `fixtures/statusline/`: a long plan file for the
-  plan reader spec, the settings files status line setup reads, and the recorded payload and
-  output cases of the status line.
+- `fixtures/settings/` and `fixtures/statusline/`: the settings files status line setup reads, and
+  the recorded payload and output cases of the status line.
 - `fixtures/spec-env.ts` and `fixtures/fake-exec.ts`: helpers for specs that spawn a process,
   one for the environment to pass and one for a fake executable that works on Windows.
 - `fixtures/canonical-tmp.ts` and `fixtures/plain-output.ts`: the `bunfig.toml` preloads. The
@@ -30,5 +28,4 @@ code they cover, such as `servers/`, `src/` and `scripts/`, rather than here; mo
 ## Conventions
 
 The state files these tests exercise are written under `.omca/state/` (and
-`.omca/evidence/` for the evidence log). `fixtures/boulder-schemas/` holds the
-`boulder.json` shapes, and `src/core/boulder.ts` is the authority on that schema.
+`.omca/evidence/` for the evidence log).

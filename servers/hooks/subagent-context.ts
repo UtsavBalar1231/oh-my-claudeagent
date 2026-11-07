@@ -1,8 +1,9 @@
 import { omcaAgentName } from "../../src/core/agent-type.ts";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
 import { REFUSAL_RULE } from "../../src/core/refusal.ts";
+import { activeRunLine } from "./guidance.ts";
 import type { Handler } from "./registry.ts";
-import { readBoundPlan, registryPath } from "./status-file.ts";
+import { readOpenRun } from "./status-file.ts";
 
 const HANDOFF = "emit a '## BLOCKING QUESTIONS' block at the end of your final response (Q1., Q2., lettered options A/B/C, Recommended: line) and return.";
 const AUTONOMOUS = `AskUserQuestion is not available here. Make autonomous decisions when possible; if you need user input, ${HANDOFF} The orchestrator will relay.`;
@@ -12,12 +13,12 @@ const OUTPUT_MANDATE =
 const FILE_TOOLS =
   "[FILE TOOLS] Read files with the Read tool, not cat, head, tail, or sed -n in Bash: Read numbers the lines and pages a large file with offset and limit.";
 export const OMCA_TOOLS =
-  "`evidence_log`, `boulder_progress` and `notepad_write` are always available. Load any other omca tool with ToolSearch first, by its full name: `select:mcp__plugin_oh-my-claudeagent_omca__ast_search`. A guessed prefix finds nothing.";
+  "`evidence_log` and `notepad_write` are always available. Load any other omca tool with ToolSearch first, by its full name: `select:mcp__plugin_oh-my-claudeagent_omca__ast_search`. A guessed prefix finds nothing.";
 
 const EDITING_GUIDANCE = [
   "[EDITS] Change an existing file with Edit, which touches only the lines that need it, rather than rewriting it with Write or a shell heredoc. Read the file before you Edit it, so old_string matches its current content.",
-  "[VERIFICATION] Record each build, test, or lint run with evidence_log, including its real exit code. Write .omca/evidence/verification-evidence.json only through that tool, never by hand or through a shell redirect: the Stop and TaskCompleted gates read it as the audit trail.",
-  "[PLAN SHA] When logging a final_verification entry, take plan_sha256 from boulder_progress for the active plan and pass it as evidence_log(..., plan_sha256=<plan_sha256>) so the Stop gate scopes evidence to this plan run.",
+  "[VERIFICATION] Record each build, test, or lint run with evidence_log, including its real exit code. Write .omca/evidence/verification-evidence.json only through that tool, never by hand or through a shell redirect: the TaskCompleted gate reads it as the audit trail.",
+  "[FINAL TASK] A run's final task completes only after a passing final_verification entry names it: evidence_log(..., task_id=<its id>).",
 ];
 const ORCHESTRATING_GUIDANCE = [
   "[ANTI-DUPLICATION] Do not duplicate an active delegate's search. Continue non-overlapping work, then independently check its delivered findings. A background launch acknowledgement is not a result; wait for the actual task notification. Do not poll the child's transcript or send holding messages.",
@@ -31,23 +32,17 @@ const LEAF_WORKER =
 const NEVER_STUB =
   "[NEVER STUB] Your final message is the whole deliverable: put your complete findings in it, never a bare status word or a note that you are waiting.";
 
-function planLines(root: string, sessionId: unknown, canCheckpoint: boolean): string[] {
+function runLines(root: string, sessionId: unknown, canCheckpoint: boolean): string[] {
   if (typeof sessionId !== "string") return [];
-  const read = readBoundPlan(root, sessionId);
-  if (read.kind === "corrupt") console.error(`omca: subagent-context: ${registryPath(root)} is not valid JSON, so no plan context is added`);
-  if (read.kind === "unreadable") console.error(`omca: subagent-context could not read ${read.path} (${read.code}), so no plan context is added`);
-  if (read.kind !== "ok") return [];
-  const { name, path: file } = read;
+  const run = readOpenRun(root, sessionId);
+  if (run === undefined) return [];
   return [
-    ...(read.file !== undefined
-      ? [
-          `[ACTIVE PLAN] Refer to: ${file}`,
-          `The plan file at ${file} is READ-ONLY for you: the orchestrator flips its checkboxes after reviewing your report, so an edit here would record progress nobody verified.`,
-        ]
-      : []),
+    activeRunLine(run),
+    "Read the run's tasks with task_list and task_get, which work in every agent. Load them with ToolSearch: `select:mcp__plugin_oh-my-claudeagent_omca__task_list,mcp__plugin_oh-my-claudeagent_omca__task_get`.",
+    "Task status is the orchestrator's: it completes each task after reviewing the report, so a TaskUpdate to completed from a worker would record progress nobody verified.",
     canCheckpoint
-      ? `[NOTEPAD AVAILABLE] Plan: ${name}. Use notepad_write('${name}', section, content) to record discoveries. Sections: learnings, issues, decisions, problems. Each call appends, so earlier entries stay.`
-      : `[NOTEPAD AVAILABLE] Plan: ${name}. Return discoveries, issues and decisions for the primary to checkpoint; do not call notepad_write from this read-only assignment. Sections: learnings, issues, decisions, problems.`,
+      ? `[NOTEPAD AVAILABLE] Run: ${run.name}. Use notepad_write('${run.name}', section, content) to record discoveries. Sections: learnings, issues, decisions, problems. Each call appends, so earlier entries stay.`
+      : `[NOTEPAD AVAILABLE] Run: ${run.name}. Return discoveries, issues and decisions for the primary to checkpoint; do not call notepad_write from this read-only assignment. Sections: learnings, issues, decisions, problems.`,
   ];
 }
 
@@ -62,7 +57,7 @@ export const handle: Handler = (payload, { root }) => {
     FILE_TOOLS,
     `[REFUSALS] ${REFUSAL_RULE}`,
     `[OMCA TOOLS] ${OMCA_TOOLS}`,
-    ...planLines(root, payload.session_id, EDITING.has(name) || isOrchestrator),
+    ...runLines(root, payload.session_id, EDITING.has(name) || isOrchestrator),
     ...(EDITING.has(name) ? EDITING_GUIDANCE : []),
     ...(isOrchestrator ? ORCHESTRATING_GUIDANCE : [LEAF_WORKER, NEVER_STUB]),
   ].join("\n");

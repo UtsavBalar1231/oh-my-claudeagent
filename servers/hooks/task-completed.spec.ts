@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, spyOn, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, spyOn, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -27,6 +27,8 @@ const INVALID_BLOCK: Output = {
 
 const roots: string[] = [];
 const zone = process.env.TZ;
+const configDir = process.env.CLAUDE_CONFIG_DIR;
+let config: string;
 
 beforeAll(() => {
   process.env.TZ = "UTC";
@@ -37,8 +39,16 @@ afterAll(() => {
   else process.env.TZ = zone;
 });
 
+beforeEach(() => {
+  config = mkdtempSync(join(tmpdir(), "omca-task-completed-config-"));
+  roots.push(config);
+  process.env.CLAUDE_CONFIG_DIR = config;
+});
+
 afterEach(() => {
   delete process.env.OMCA_DISABLED_HOOKS;
+  if (configDir === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+  else process.env.CLAUDE_CONFIG_DIR = configDir;
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
@@ -261,6 +271,138 @@ describe("kill switch", () => {
     await record(root, sessionId);
     process.env.OMCA_DISABLED_HOOKS = "other-hook";
     expect(await complete(root, sessionId)).toEqual(BLOCK);
+  });
+});
+
+describe("a run's final task", () => {
+  const FINAL_BLOCK: Output = {
+    decision: "block",
+    reason:
+      "Task #3 'Review the run' is the final task of run 'test-run', and no passing final verification names it. Review the run, then record the verdict: " +
+      'evidence_log(evidence_type="final_verification", command="<what the review covered>", exit_code=0, output_snippet="<verdict, naming any task closed as blocked>", task_id="3"). ' +
+      "If the review finds a gap, fix it and review again.",
+  };
+
+  const verdict = (fields: Record<string, unknown> = {}): Record<string, unknown> => ({
+    type: "final_verification",
+    command: "reviewer: the whole run",
+    exit_code: 0,
+    output_snippet: "COMPLETE",
+    timestamp: "2026-10-02T12:00:00Z",
+    task_id: "3",
+    ...fields,
+  });
+
+  function listed(listId: string = crypto.randomUUID()): { root: string; sessionId: string } {
+    const dir = join(config, "tasks", listId);
+    mkdirSync(dir, { recursive: true });
+    const base = { description: "", blocks: [], metadata: { run: "test-run" } };
+    writeFileSync(join(dir, "1.json"), JSON.stringify({ ...base, id: "1", subject: "Do the work", status: "completed", blockedBy: [] }));
+    writeFileSync(join(dir, "3.json"), JSON.stringify({ ...base, id: "3", subject: "Review the run", status: "in_progress", blockedBy: ["1"], metadata: { run: "test-run", final: true } }));
+    const root = project();
+    mkdirSync(join(root, ".omca", "state", "mod"), { recursive: true });
+    writeFileSync(join(root, ".omca", "state", "mod", `${listId}.json`), JSON.stringify({ written_at: NOW, task_list: listId }));
+    return { root, sessionId: listId };
+  }
+
+  const closing = (root: string, sessionId: string, taskId = "3") => complete(root, sessionId, NOW, { task_id: taskId });
+
+  function withEntries(root: string, ...entries: readonly Record<string, unknown>[]): void {
+    writeLedger(ledgerPath(root), JSON.stringify({ entries }), NOW_S);
+  }
+
+  test("the final task cannot close without its evidence, and the reason names the exact call", async () => {
+    const { root, sessionId } = listed();
+    expect(await closing(root, sessionId)).toEqual(FINAL_BLOCK);
+  });
+
+  test("the final task closes with a passing final verification logged for its id", async () => {
+    const { root, sessionId } = listed();
+    withEntries(root, verdict());
+    expect(await closing(root, sessionId)).toEqual({});
+  });
+
+  test("a final verification logged for another task id does not count", async () => {
+    const { root, sessionId } = listed();
+    withEntries(root, verdict({ task_id: "2" }));
+    expect(await closing(root, sessionId)).toEqual(FINAL_BLOCK);
+  });
+
+  test("a final verification with no task id does not count", async () => {
+    const { root, sessionId } = listed();
+    const { task_id: _taskId, ...unscoped } = verdict();
+    withEntries(root, unscoped);
+    expect(await closing(root, sessionId)).toEqual(FINAL_BLOCK);
+  });
+
+  test("a failing final verification for its id does not count", async () => {
+    const { root, sessionId } = listed();
+    withEntries(root, verdict({ exit_code: 1 }));
+    expect(await closing(root, sessionId)).toEqual(FINAL_BLOCK);
+  });
+
+  test("another evidence type naming its id does not count", async () => {
+    const { root, sessionId } = listed();
+    withEntries(root, verdict({ type: "test" }));
+    expect(await closing(root, sessionId)).toEqual(FINAL_BLOCK);
+  });
+
+  test("a task that is not final closes with no final verification", async () => {
+    const { root, sessionId } = listed();
+    expect(await closing(root, sessionId, "1")).toEqual({});
+  });
+
+  test("a task id not on the list and a payload with an empty task id close", async () => {
+    const { root, sessionId } = listed();
+    expect(await closing(root, sessionId, "99")).toEqual({});
+    expect(await closing(root, sessionId, "")).toEqual({});
+  });
+
+  test("the list is the one the mod's marker names", async () => {
+    const { root } = listed("omca-shared");
+    const sessionId = crypto.randomUUID();
+    writeLedger(join(root, ".omca", "state", "mod", `${sessionId}.json`), JSON.stringify({ written_at: NOW, task_list: "omca-shared" }), NOW_S);
+    expect(await closing(root, sessionId)).toEqual(FINAL_BLOCK);
+  });
+
+  test("a ledger the reader refuses blocks as invalid", async () => {
+    const { root, sessionId } = listed();
+    writeLedger(ledgerPath(root), "{not json", NOW_S);
+    expect(await closing(root, sessionId)).toEqual(INVALID_BLOCK);
+  });
+
+  test("a malformed entry beside the verdict does not hide it", async () => {
+    const { root, sessionId } = listed();
+    withEntries(root, { type: "test" }, verdict());
+    expect(await closing(root, sessionId)).toEqual({});
+  });
+
+  test("final-verification in OMCA_DISABLED_HOOKS lets the final task close, and the unlogged check still runs", async () => {
+    const { root, sessionId } = listed();
+    process.env.OMCA_DISABLED_HOOKS = "final-verification";
+    expect(await closing(root, sessionId)).toEqual({});
+    await record(root, sessionId);
+    expect(await closing(root, sessionId)).toEqual(BLOCK);
+  });
+
+  test("task-completed in OMCA_DISABLED_HOOKS turns off the final check too", async () => {
+    const { root, sessionId } = listed();
+    process.env.OMCA_DISABLED_HOOKS = "task-completed";
+    expect(await closing(root, sessionId)).toEqual({});
+  });
+
+  test("the final check runs first: an unlogged verification does not change the answer", async () => {
+    const { root, sessionId } = listed();
+    await record(root, sessionId);
+    expect(await closing(root, sessionId)).toEqual(FINAL_BLOCK);
+  });
+
+  test("the proof is read from the ledger, then the unlogged verification check runs", async () => {
+    const { root, sessionId } = listed();
+    withEntries(root, verdict());
+    utimesSync(ledgerPath(root), NOW_S - 600, NOW_S - 600);
+    await record(root, sessionId);
+    expect(await closing(root, sessionId)).toEqual(BLOCK);
   });
 });
 

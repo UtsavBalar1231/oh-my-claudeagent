@@ -3,7 +3,6 @@ import { agentRows } from "./agent-rows.ts";
 import { agentsTracker } from "./agents-tracker.ts";
 import { band } from "./band.ts";
 import { bashGuard } from "./bash-guard.ts";
-import { compact } from "./compact.ts";
 import { completion } from "./completion.ts";
 import { dispatch, dispatchStream, featuresFor } from "./dispatch.ts";
 import { footer } from "./footer.ts";
@@ -14,10 +13,10 @@ import { modMarker } from "./mod-marker.ts";
 import { router } from "./omca-router.ts";
 import { refusalRecovery } from "./refusal-recovery.ts";
 import { pane } from "./pane.ts";
-import { planReceipts } from "./plan-receipts.ts";
 import { groupRows } from "./group-rows.ts";
 import { serverCheck } from "./server-check.ts";
-import { spinner } from "./spinner.ts";
+import { TASK_COMMAND, taskList } from "./task-list.ts";
+import { taskTools } from "./task-tools.ts";
 
 function bindHost($: EngineInterface, options: Options): Host {
   return {
@@ -30,6 +29,9 @@ function bindHost($: EngineInterface, options: Options): Host {
       HOMEDRIVE: () => $.env.get("HOMEDRIVE"),
       HOMEPATH: () => $.env.get("HOMEPATH"),
       CLAUDE_CONFIG_DIR: () => $.env.get("CLAUDE_CONFIG_DIR"),
+      CLAUDE_CODE_TASK_LIST_ID: () => $.env.get("CLAUDE_CODE_TASK_LIST_ID"),
+      CLAUDE_CODE_ENABLE_TODO_TOOLS: () => $.env.get("CLAUDE_CODE_ENABLE_TODO_TOOLS"),
+      CLAUDE_CODE_ENABLE_TASKS: () => $.env.get("CLAUDE_CODE_ENABLE_TASKS"),
       OMCA_GLYPHS: () => $.env.get("OMCA_GLYPHS"),
       OMCA_DISABLED_HOOKS: () => $.env.get("OMCA_DISABLED_HOOKS"),
       CLAUDE_CODE_SUBAGENT_MODEL_FORCE: () => $.env.get("CLAUDE_CODE_SUBAGENT_MODEL_FORCE"),
@@ -43,7 +45,6 @@ function bindHost($: EngineInterface, options: Options): Host {
     },
     fs: {
       read: (path) => $.fs.read(path),
-      readBytes: (path) => $.fs.read(path, { as: "bytes" }),
       write: (path, text) => $.fs.write(path, text),
       stat: (path, options) => $.fs.stat(path, options),
       list: (path) => $.fs.list(path),
@@ -61,10 +62,8 @@ function bindHost($: EngineInterface, options: Options): Host {
       resolve: (e) => $.ui.resolve(e),
       copy: (args) => $.ui.copy(args),
       toast: (text, toastOptions) => $.ui.toast(text, toastOptions),
-      notify: (text, notifyOptions) => $.ui.notify(text, notifyOptions),
       blit: (args) => $.ui.blit(args),
       view: (args) => $.ui.view(args),
-      place: (args) => $.ui.place(args),
       status: (text) => $.ui.status(text),
     },
     session: {
@@ -77,6 +76,9 @@ function bindHost($: EngineInterface, options: Options): Host {
       transcript: (args) => $.session.messages(args),
     },
     settings: { read: (args) => $.settings.read(args) },
+    tool: { list: () => $.tool.list() },
+    enableTaskTools: () => $.env.set("CLAUDE_CODE_ENABLE_TODO_TOOLS", "1"),
+    nameTaskList: (id) => $.env.set("CLAUDE_CODE_TASK_LIST_ID", id),
     agent: { list: () => $.agent.list() },
     command: { register: (spec) => $.command.register(spec) },
     clock: {
@@ -112,13 +114,13 @@ function bindHost($: EngineInterface, options: Options): Host {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "pane" }),
         set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "pane" }, value, setOptions),
       },
+      tasks: {
+        get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "tasks" }),
+        set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "tasks" }, value, setOptions),
+      },
       ledger: {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "ledger" }),
         set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "ledger" }, value, setOptions),
-      },
-      plan: {
-        get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "plan" }),
-        set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "plan" }, value, setOptions),
       },
       stats: {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "stats" }),
@@ -136,10 +138,6 @@ function bindHost($: EngineInterface, options: Options): Host {
       turns: {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "turns" }),
         set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "turns" }, value, setOptions),
-      },
-      receipts: {
-        get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "receipts" }),
-        set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "receipts" }, value, setOptions),
       },
       doctor: {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "doctor" }),
@@ -174,33 +172,33 @@ export const register: Register = (on, pluginOptions) => {
   const options = readOptions(pluginOptions);
   const bash = featuresFor("tool.check", { bashGuard });
   const toolCall = featuresFor("tool.call", { agentsTracker });
-  const sessionStart = featuresFor("session.start", { refusalRecovery, pane, modMarker, band, planReceipts, serverCheck, keywordPaint });
+  const taskCall = featuresFor("tool.call", { taskList });
+  const sessionStart = featuresFor("session.start", { taskTools, refusalRecovery, pane, modMarker, band, serverCheck, keywordPaint, taskList });
   const promptSubmit = featuresFor("prompt.submit", { refusalRecovery, keywordPaint });
   const turnStart = featuresFor("turn.start", { refusalRecovery, footer, modMarker, serverCheck });
   const turnStep = featuresFor("turn.step", { metrics, agentsTracker });
-  const turnComplete = featuresFor("turn.complete", { band, agentsTracker, agentRows, metrics, pane, footer, planReceipts, refusalRecovery });
+  const turnComplete = featuresFor("turn.complete", { band, agentsTracker, agentRows, metrics, pane, footer, refusalRecovery, taskList });
   const agentSpawn = featuresFor("agent.spawn", { agentsTracker, metrics });
   const promptEdit = featuresFor("prompt.edit", { band, refusalRecovery, keywordPaint });
   const promptChange = featuresFor("prompt.change", { band, keywordPaint });
   const promptAutocomplete = featuresFor("prompt.autocomplete", { completion });
-  const paneClose = featuresFor("ui.close", { pane });
-  const paneFocus = featuresFor("ui.focus", { pane });
-  const paneScroll = featuresFor("ui.scroll", { pane });
+  const paneClose = featuresFor("ui.close", { pane, taskList });
+  const paneFocus = featuresFor("ui.focus", { pane, taskList });
+  const paneScroll = featuresFor("ui.scroll", { pane, taskList });
   const omca = featuresFor("command.run", { router });
+  const taskCommand = featuresFor("command.run", { taskList });
   const bandRender = featuresFor("ui.render AbovePrompt", { band });
-  const paneRender = featuresFor("ui.render Pane", { pane });
-  const spinnerRender = featuresFor("ui.render Spinner", { spinner });
+  const paneRender = featuresFor("ui.render Pane", { pane, taskList });
   const turnRender = featuresFor("ui.render TurnDuration", { footer });
   const noticeRender = featuresFor("ui.render UserMessage", { agentRows });
   const launchRender = featuresFor("ui.render ToolUse", { agentRows });
   const groupRender = featuresFor("ui.render ToolGroup", { groupRows });
-  const placedRender = featuresFor("ui.render Placed", { planReceipts });
-  const sessionCompact = featuresFor("session.compact", { compact });
 
   on("tool.check", { tool: /^(?:Bash|PowerShell|Monitor)$/ }, ($, e, next) =>
     dispatch(bindHost($, options), "tool.check", bash, e, next, guardFailed),
   ).catch((_$, _e, next) => guardFailed(next.error.message ?? next.error.kind));
   on("tool.call", { agentId: /./ }, ($, e, next) => dispatch(bindHost($, options), "tool.call", toolCall, e, next)).catch((_$, e, next) => next(e));
+  on("tool.call", { tool: /^Task(?:Create|Update)$/ }, ($, e, next) => dispatch(bindHost($, options), "tool.call", taskCall, e, next)).catch((_$, e, next) => next(e));
   on("session.start", ($, e, next) => dispatch(bindHost($, options), "session.start", sessionStart, e, next));
   on("prompt.submit", ($, e, next) => dispatch(bindHost($, options), "prompt.submit", promptSubmit, e, next));
   on("turn.start", ($, e, next) => dispatch(bindHost($, options), "turn.start", turnStart, e, next));
@@ -220,14 +218,14 @@ export const register: Register = (on, pluginOptions) => {
   on("command.run", { command: "omca" }, ($, e, next) =>
     dispatch(bindHost($, options), "command.run omca", omca, e, next),
   ).catch((_$, e, next) => next(e));
+  on("command.run", { command: TASK_COMMAND }, ($, e, next) =>
+    dispatch(bindHost($, options), "command.run", taskCommand, e, next),
+  ).catch((_$, e, next) => next(e));
   on("ui.render", { component: "AbovePrompt" }, ($, e, next) =>
     dispatch(bindHost($, options), "ui.render AbovePrompt", bandRender, e, next),
   );
   on("ui.render", { component: "Pane" }, ($, e, next) =>
     dispatch(bindHost($, options), "ui.render Pane", paneRender, e, next),
-  );
-  on("ui.render", { component: "Spinner" }, ($, e, next) =>
-    dispatch(bindHost($, options), "ui.render Spinner", spinnerRender, e, next),
   );
   on("ui.render", { component: "TurnDuration" }, ($, e, next) =>
     dispatch(bindHost($, options), "ui.render TurnDuration", turnRender, e, next),
@@ -241,8 +239,4 @@ export const register: Register = (on, pluginOptions) => {
   on("ui.render", { component: "ToolGroup" }, ($, e, next) =>
     dispatch(bindHost($, options), "ui.render ToolGroup", groupRender, e, next),
   );
-  on("ui.render", { component: "Placed", props: { plugin: "oh-my-claudeagent" } }, ($, e, next) =>
-    dispatch(bindHost($, options), "ui.render Placed", placedRender, e, next),
-  );
-  on("session.compact", ($, e, next) => dispatch(bindHost($, options), "session.compact", sessionCompact, e, next)).catch((_$, e, next) => next(e));
 };

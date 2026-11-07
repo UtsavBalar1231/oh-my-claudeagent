@@ -8,12 +8,12 @@
 //
 // Usage: bun scripts/docs/screenshots.ts [<name>... | clips] [--out <dir>]
 // With no name it captures the README shots into .github/assets; clips go to video/public/footage.
-import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { parseArgs } from "node:util";
 import type { Subprocess } from "bun";
+import { taskListIdFor } from "../../src/core/native-tasks.ts";
 import { packageTree } from "../package.ts";
 import { cleanupOnSignal, REPO } from "../qa/lib.ts";
 import { type Script, startServer } from "../qa/mock-model.ts";
@@ -121,7 +121,7 @@ const executor = (description: string, prompt: string) => agent("executor", desc
 // The justfile's watch recipe sleeps, so an agent that reaches it keeps running through the capture.
 const WATCH_SUMMARY = bash("just watch summary", "Run the summary tests in watch mode");
 const TASK_7 = executor("Wire the order summary panel", "Task 7: wire the order summary panel into the payment step.");
-const PLAN_SCRIPT: Script = {
+const TASK_SCRIPT: Script = {
   main: [
     { content: [text("Task 7 is next: tasks 1 and 6 are done. I will hand it to the executor."), TASK_7] },
     { content: [text("The executor is on task 7. Tasks 8, 9 and 11 are open as well.")] },
@@ -133,15 +133,13 @@ const PLAN_SCRIPT: Script = {
   ],
 };
 const NO_SCRIPT: Script = { main: [], subagent: [] };
-const planReady = (screen: string) => screen.includes("executor on 7") && /\d+ proven/.test(screen) && screen.includes("k: Run check");
 const GUARD_SCRIPT: Script = {
   main: [{ content: [bash("rm -rf build", "Remove the build output")] }, { content: [text("The build is clean.")] }],
   subagent: [],
 };
 const guardReady = (screen: string) => /^● Removing/m.test(screen) && screen.includes("OMCA held this command");
 
-// A dock takes at most 45% of the terminal. At 214 columns its body holds the board's split tier and
-// a detail column that fits the task title on one line.
+// A dock takes at most 45% of the terminal. At 214 columns its body holds a task title on one line.
 const CLIP_COLS = 214;
 const CLIP_ROWS = 50;
 // The before-and-after pairs fit the whole terminal in the video window, so Claude Code wraps every
@@ -227,23 +225,6 @@ const FINAL_PLAN = savedCardsPlan(
 );
 
 const EVIDENCE_LOG = "mcp__plugin_oh-my-claudeagent_omca__evidence_log";
-const planSha256 = (project: string) => createHash("sha256").update(readFileSync(join(project, "plans", `${PLAN_NAME}.md`))).digest("hex");
-
-const BOARD_STEPS: readonly Step[] = [
-  { type: "Pick up the next task on the plan" },
-  { key: "Enter" },
-  { until: has("The executor is on task 7"), hold: 1_200 },
-  ...command("/omca plan"),
-  {
-    until: (screen) => planReady(screen) && screen.includes("7. Wire the order summary panel"),
-    mark: "board",
-    targets: { "proven-chip": /\S proven(?= *(?:│|$))/m },
-  },
-  { key: "Up" },
-  { until: has("6. Build the payment step"), mark: "focus-moved", hold: 1_400 },
-  { key: "Enter", gap: 0 },
-  { until: has("b: Board"), mark: "task-open" },
-];
 
 export const CLIPS: readonly Clip[] = [
   {
@@ -392,7 +373,6 @@ export const CLIPS: readonly Clip[] = [
       { until: has("just watch summary", "just watch draft", "just watch flags"), mark: "lanes", hold: 6_000, targets: { "tool-row": /\S Bash just watch \w+/, "lane-head": /executor {2,}\S+ running +\d+s/ } },
     ],
   },
-  { name: "clip-board", format: "clip", cols: CLIP_COLS, rows: CLIP_ROWS, script: PLAN_SCRIPT, steps: BOARD_STEPS },
   {
     name: "clip-guard",
     format: "clip",
@@ -417,23 +397,23 @@ export const CLIPS: readonly Clip[] = [
     fixture: "acme-app-verified",
     env: RUN_GATES,
     allow: [EVIDENCE_LOG],
-    script: (project) => ({
+    script: () => ({
       main: [
-        { content: [text("All 14 tasks are checked. Running the suite for the final verification."), bash("just test", "Run the test suite")] },
+        { content: [text("Tasks 1 to 13 are done. Running the suite for the final verification."), bash("just test", "Run the test suite")] },
         {
           content: [
-            text("The suite passes. Recording the verdict against the plan."),
+            text("The suite passes. Recording the verdict against the final task."),
             tool(EVIDENCE_LOG, {
               evidence_type: "final_verification",
               command: "just test",
               exit_code: 0,
-              output_snippet: "14 of 14 tasks checked; 42 tests passed",
+              output_snippet: "13 of 14 tasks done; 42 tests passed",
               verified_by: "orchestrator",
-              plan_sha256: planSha256(project),
+              task_id: "14",
             }),
           ],
         },
-        { content: [text("The verdict is logged and matches the plan as it is now.")] },
+        { content: [text("The verdict is logged for task 14.")] },
       ],
       subagent: [],
     }),
@@ -442,7 +422,7 @@ export const CLIPS: readonly Clip[] = [
       { type: "/omca" },
       { key: "Enter" },
       { until: has("1: Agents"), hold: 0 },
-      { key: "3" },
+      { key: "2" },
       { until: has("MISSING"), hold: 1_200 },
       { key: "C-x" },
       { key: "Tab", gap: 300 },
@@ -453,13 +433,12 @@ export const CLIPS: readonly Clip[] = [
       {
         until: (screen) => /COMPLETE\s+matches/.test(screen),
         mark: "complete",
-        targets: { "complete-chip": /COMPLETE(?=\s+matches)/, "verdict-line": /COMPLETE\s+matches the current plan · \d\d-\d\d \d\d:\d\d/ },
+        targets: { "complete-chip": /COMPLETE(?=\s+matches)/, "verdict-line": /COMPLETE\s+matches[^\n│]*· \d\d-\d\d \d\d:\d\d/ },
       },
       // The drift guard and the final-verification gate both let this stop through.
       { until: (screen) => !screen.includes("Stop hook"), hold: 1_200 },
     ],
   },
-  { name: "clip-board-light", format: "clip", cols: CLIP_COLS, rows: CLIP_ROWS, theme: "light", script: PLAN_SCRIPT, steps: BOARD_STEPS },
   {
     // The pane's tabs while an executor works, on a project with notes and delegation history,
     // ending on the Stats page.
@@ -468,7 +447,7 @@ export const CLIPS: readonly Clip[] = [
     cols: CLIP_COLS,
     rows: CLIP_ROWS,
     fixture: "acme-app-tour",
-    script: PLAN_SCRIPT,
+    script: TASK_SCRIPT,
     steps: [
       { type: "Pick up the next task on the plan" },
       { key: "Enter" },
@@ -480,10 +459,8 @@ export const CLIPS: readonly Clip[] = [
       ...command("/omca"),
       { until: has("1: Agents", "Wire the order summary panel"), mark: "agents-tab" },
       { key: "2", gap: 0 },
-      { until: (screen) => screen.includes("Ship the checkout redesign") && /\d+ proven/.test(screen), mark: "plan-tab" },
-      { key: "3", gap: 0 },
       { until: has("Final verification"), mark: "evidence-tab" },
-      { key: "4", gap: 0 },
+      { key: "3", gap: 0 },
       { until: has("Learnings · "), mark: "notepad-tab", targets: { "notepad-section": /Learnings · \d+ entr[^\n│]*\d\d:\d\d/ } },
       { key: "Escape", gap: 0 },
       ...command("/omca stats", "stats-typed"),
@@ -499,9 +476,9 @@ export const SHOTS: readonly Still[] = [
     cols: 214,
     rows: 50,
     command: "Pick up the next task on the plan",
-    keys: ["/omca plan", "Enter"],
-    script: PLAN_SCRIPT,
-    ready: (screen) => planReady(screen) && screen.includes("7. Wire the order summary panel"),
+    keys: ["/omca", "Enter"],
+    script: TASK_SCRIPT,
+    ready: has("The executor is on task 7", "1: Agents", "Wire the order summary panel"),
   },
   {
     name: "band",
@@ -553,23 +530,12 @@ export const SHOTS: readonly Still[] = [
       screen.includes("just test · 42 passed") && /explorer {2}Map the validation messages/.test(screen) && /architect {2}Review the checkout flow/.test(screen),
   },
   {
-    name: "plan",
-    format: "png",
-    cols: 214,
-    rows: 44,
-    command: "Pick up the next task on the plan",
-    keys: ["/omca plan", "Enter", "Up"],
-    script: PLAN_SCRIPT,
-    ready: (screen) => planReady(screen) && screen.includes("6. Build the payment step"),
-    crop: "pane",
-  },
-  {
     name: "evidence",
     format: "png",
     cols: 214,
     rows: 32,
     command: "/omca",
-    keys: ["3"],
+    keys: ["2"],
     script: NO_SCRIPT,
     ready: (screen) => screen.includes("MISSING") && screen.includes("‹masked›"),
     crop: "pane",
@@ -687,16 +653,6 @@ export const SHOTS: readonly Still[] = [
     // The context share needs a finished model call, so an agent's row waits on its first reply.
     ready: (screen) => screen.includes(" · Check the lint rules") && (screen.match(/executor · .*\d+% ctx/g) ?? []).length === 2,
   },
-  {
-    name: "pane-tour",
-    format: "gif",
-    cols: 160,
-    rows: 42,
-    command: "Pick up the next task on the plan",
-    keys: ["/omca plan", "Enter", "Down", "Enter", "1", "3", "2"],
-    script: PLAN_SCRIPT,
-    ready: (screen) => screen.includes("8. Add inline validation errors") && screen.includes("b: Board"),
-  },
   { name: "guard-dialog", format: "gif", cols: 120, rows: 26, command: "Clean the build", keys: [], script: GUARD_SCRIPT, ready: guardReady },
 ];
 
@@ -761,10 +717,22 @@ const FILE_AGES: readonly (readonly [age: number, files: readonly string[]])[] =
   [6 * MINUTE, ["src/steps/summary.ts", "src/steps/summary.spec.ts"]],
 ];
 
+// The run's tasks, read from the plan document the fixture holds, in the list the session's checkout shares.
+function writeTasks(project: string, config: string): void {
+  const plan = readFileSync(join(project, "plans", `${PLAN_NAME}.md`), "utf8");
+  const items = [...plan.matchAll(/^- \[([ x])\] (\d+)\. (.+)\n(?:  - .*\n)*?  - Depends: (.+)$/gm)];
+  const dir = join(config, "tasks", taskListIdFor(project));
+  mkdirSync(dir, { recursive: true });
+  items.forEach(([, mark, id = "", subject = "", depends = ""], index) => {
+    const blockedBy = depends.split(",").map((dependency) => dependency.trim()).filter((dependency) => /^\d+$/.test(dependency));
+    const metadata = { run: PLAN_NAME, ...(index === items.length - 1 && { final: true }) };
+    writeFileSync(join(dir, `${id}.json`), JSON.stringify({ id, subject, description: subject, status: mark === "x" ? "completed" : "pending", blocks: [], blockedBy, metadata }));
+  });
+}
+
 function writeProject(project: string, home: string, shot: Shot): void {
   cpSync(FIXTURE, project, { recursive: true });
   if (shot.fixture !== undefined) cpSync(join(FIXTURE, "..", shot.fixture), project, { recursive: true });
-  const plan = join(project, "plans", `${PLAN_NAME}.md`);
   mkdirSync(join(project, ".claude"), { recursive: true });
   mkdirSync(join(project, ".omca", "state"), { recursive: true });
   mkdirSync(join(project, ".omca", "evidence"), { recursive: true });
@@ -775,13 +743,7 @@ function writeProject(project: string, home: string, shot: Shot): void {
       permissions: { defaultMode: "default", allow: ["Bash(just test)", "Bash(just watch *)", "Bash(sleep *)", ...(shot.allow ?? [])] },
     }),
   );
-  writeFileSync(
-    join(project, ".omca", "state", "boulder.json"),
-    JSON.stringify({
-      plans: { [PLAN_NAME]: { active_plan: plan, started_at: "2026-10-02T08:00:00Z", session_ids: [SESSION_ID] } },
-      bindings: { [SESSION_ID]: { plan_name: PLAN_NAME, bound_at: 1790928000 } },
-    }),
-  );
+  writeTasks(project, join(home, ".claude"));
   writeFileSync(join(project, ".gitignore"), ".omca/\n.claude/\n");
   git(project, home, "init", "-q", "-b", "main");
   git(project, home, "config", "user.name", "Acme Dev");

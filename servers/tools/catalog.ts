@@ -1,10 +1,10 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { parseRegistry } from "../../src/core/boulder.ts";
 import { readLedger } from "../../src/core/evidence.ts";
 import { parseFrontmatter } from "../../src/core/frontmatter.ts";
+import { TASK_TOOLS_OFF } from "../../src/core/native-tasks.ts";
 import { findSession, latestSessionId } from "../hooks/session-state.ts";
-import { ledgerPath, markerWrittenAt } from "../hooks/status-file.ts";
+import { latestMarker, ledgerPath } from "../hooks/status-file.ts";
 import { isDirectory, isMissing } from "../io.ts";
 import type { Tool } from "../omca.ts";
 import { pluginRoot } from "../plugin-root.ts";
@@ -13,7 +13,7 @@ import { rootOf, stringArg, WORKING_DIRECTORY } from "./args.ts";
 
 type Runtime =
   | { runtime: "ok" }
-  | { runtime: "hooks_inactive" | "mod_absent"; runtime_reason: string };
+  | { runtime: "hooks_inactive" | "mod_absent" | "task_tools_absent"; runtime_reason: string };
 
 const HOOKS_INACTIVE =
   "No OMCA settings hook has reached the server in this session, so hooks are off: `disableAllHooks` is set, or an organization policy sets `allowManagedHooksOnly`.";
@@ -35,10 +35,10 @@ function runtimeOf(root: string): Runtime {
   const sessionId = latestSessionId();
   if (sessionId === undefined) return { runtime: "hooks_inactive", runtime_reason: HOOKS_INACTIVE };
   const promptAt = findSession(sessionId)?.promptAt ?? 0;
-  const writtenAt = markerWrittenAt(root, sessionId, promptAt);
-  return writtenAt !== undefined && writtenAt > promptAt
-    ? { runtime: "ok" }
-    : { runtime: "mod_absent", runtime_reason: MOD_ABSENT };
+  const marker = latestMarker(root, sessionId, promptAt);
+  const writtenAt = marker?.written_at;
+  if (typeof writtenAt !== "number" || writtenAt <= promptAt) return { runtime: "mod_absent", runtime_reason: MOD_ABSENT };
+  return marker?.task_tools === true ? { runtime: "ok" } : { runtime: "task_tools_absent", runtime_reason: TASK_TOOLS_OFF };
 }
 
 /** The client version the launcher exports to its children as `AI_AGENT=claude-code_<major>-<minor>-<patch>_agent`. */
@@ -75,7 +75,6 @@ function healthCheck(args: Record<string, unknown>): string {
     ast_grep: astGrep(),
     state: {
       dir: isDirectory(stateDir) ? "present" : "absent",
-      "boulder.json": stateFileState(join(stateDir, "boulder.json"), (text) => parseRegistry(text).kind === "ok"),
       "verification-evidence.json": stateFileState(ledgerPath(root), (text) => readLedger(text).kind === "ok"),
     },
   };
@@ -125,7 +124,7 @@ export const tools: Tool[] = [
   {
     name: "health_check",
     description:
-      "Report whether OMCA's runtime is active in this session, plus the client version, the ast-grep binary and the state files. `runtime` is `ok` when this session's settings hooks have reached the server and the OMCA mod has marked the session since the last prompt; otherwise it is `hooks_inactive` or `mod_absent`, and `runtime_reason` names the likely cause. The orchestration skills call this first and stop unless `runtime` is `ok`. `client_version` is null when the client does not export its version. `ast_grep` is `{path}` or `{error}`. `state` gives the state directory as `present` or `absent` and `boulder.json` and `verification-evidence.json` as `absent`, `valid` or `invalid`: invalid is a file the plan registry or evidence ledger reader refuses, which `boulder_write` and `evidence_log` will not replace.",
+      "Report whether OMCA's runtime is active in this session, plus the client version, the ast-grep binary and the state files. `runtime` is `ok` when this session's settings hooks have reached the server and the OMCA mod has marked the session since the last prompt with Claude Code's task tools on; otherwise it is `hooks_inactive`, `mod_absent` or `task_tools_absent`, and `runtime_reason` names the likely cause. The orchestration skills call this first and stop unless `runtime` is `ok`. `client_version` is null when the client does not export its version. `ast_grep` is `{path}` or `{error}`. `state` gives the state directory as `present` or `absent` and `verification-evidence.json` as `absent`, `valid` or `invalid`: invalid is a file the evidence ledger reader refuses, which `evidence_log` will not replace.",
     inputSchema: { type: "object", properties: { working_directory: WORKING_DIRECTORY } },
     annotations: { title: "Check OMCA health", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     _meta: {

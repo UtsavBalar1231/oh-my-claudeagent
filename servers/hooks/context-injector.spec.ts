@@ -500,7 +500,7 @@ describe("kill switch and full hook payloads", () => {
     const file = write(join(root, "Component.tsx"), "");
     process.env.OMCA_DISABLED_HOOKS = "context-injector";
     expect(await session(root)("Read", file)).toBeUndefined();
-    process.env.OMCA_DISABLED_HOOKS = "plan-format-warn";
+    process.env.OMCA_DISABLED_HOOKS = "comment-gate";
     expect(await session(root)("Read", file)).toBe("[Rule: *.tsx]: Use functional components only.");
   });
 

@@ -1,4 +1,4 @@
-export type StopGate = "plan-continuation" | "final-verification" | "drift-guard";
+export type StopGate = "task-continuation" | "drift-guard";
 
 export type StopLedger = Map<StopGate, number>;
 
@@ -16,26 +16,26 @@ export function spendBlock(ledger: StopLedger, gate: StopGate): boolean {
 export type Backoff = {
   readonly consecutiveBlocks: number;
   readonly lastBlockAt: number;
-  readonly lastUnchecked: number;
+  readonly lastOpen: number;
   readonly sameCountRun: number;
   readonly isStagnated: boolean;
 };
 
-export const FRESH_BACKOFF: Backoff = { consecutiveBlocks: 0, lastBlockAt: 0, lastUnchecked: -1, sameCountRun: 0, isStagnated: false };
+export const FRESH_BACKOFF: Backoff = { consecutiveBlocks: 0, lastBlockAt: 0, lastOpen: -1, sameCountRun: 0, isStagnated: false };
 
 const BASE_COOLDOWN_SECONDS = 5;
 const CLEAN_WINDOW_SECONDS = 300;
-// This many blocks in a row at one unchecked count means the nudges are not producing progress.
+// This many blocks in a row at one open-task count means the nudges are not producing progress.
 const STAGNATION_STREAK = 3;
 
 export type BackoffStep = { state: Backoff; isBlocking: boolean; isWindowReset: boolean };
 
 /**
- * The plan-continuation backoff: a cooldown of 5 s doubling per consecutive block, a hard cap
+ * The task-continuation backoff: a cooldown of 5 s doubling per consecutive block, a hard cap
  * of `STOP_BLOCK_CAP` blocks that a 300 s quiet window resets, and a permanent escape once
- * `STAGNATION_STREAK` blocks in a row saw the same unchecked count.
+ * `STAGNATION_STREAK` blocks in a row saw the same open-task count.
  */
-export function stepBackoff(state: Backoff, unchecked: number, nowSeconds: number): BackoffStep {
+export function stepBackoff(state: Backoff, open: number, nowSeconds: number): BackoffStep {
   const hold = { state, isBlocking: false, isWindowReset: false };
   if (state.isStagnated) return hold;
   const sinceLastBlock = nowSeconds - state.lastBlockAt;
@@ -43,7 +43,7 @@ export function stepBackoff(state: Backoff, unchecked: number, nowSeconds: numbe
   if (isWindowReset && sinceLastBlock < CLEAN_WINDOW_SECONDS) return hold;
   const consecutiveBlocks = isWindowReset ? 0 : state.consecutiveBlocks;
   if (sinceLastBlock < BASE_COOLDOWN_SECONDS * 2 ** consecutiveBlocks) return hold;
-  const isSameCount = unchecked === state.lastUnchecked;
+  const isSameCount = open === state.lastOpen;
   if (isSameCount && state.sameCountRun >= STAGNATION_STREAK) {
     return { state: { ...state, consecutiveBlocks, isStagnated: true }, isBlocking: false, isWindowReset };
   }
@@ -51,7 +51,7 @@ export function stepBackoff(state: Backoff, unchecked: number, nowSeconds: numbe
     state: {
       consecutiveBlocks: consecutiveBlocks + 1,
       lastBlockAt: nowSeconds,
-      lastUnchecked: unchecked,
+      lastOpen: open,
       sameCountRun: isSameCount ? state.sameCountRun + 1 : 1,
       isStagnated: false,
     },

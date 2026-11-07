@@ -151,12 +151,12 @@ describe("docs accuracy", () => {
   });
 
   test("scaffold placeholders, bare file names and unknown top-level names are not path claims", async () => {
-    const ctx = fixture({ "README.md": "`agents/name.md` `plugin.json` `state/boulder.json` `elsewhere/file.ts`\n" });
+    const ctx = fixture({ "README.md": "`agents/name.md` `plugin.json` `state/session.json` `elsewhere/file.ts`\n" });
     expect(await runNamed(checks, "docs accuracy", ctx)).toMatchObject({ status: "pass" });
   });
 
   test("a gitignored path is the reader's own state and passes", async () => {
-    const ctx = fixture({ "README.md": "`.omca/state/boulder.json` and `.omca/gone.json`\n", ".gitignore": ".omca/\n" });
+    const ctx = fixture({ "README.md": "`.omca/state/session.json` and `.omca/gone.json`\n", ".gitignore": ".omca/\n" });
     expect(run(["git", "init", "-q"], ctx.root).code).toBe(0);
     expect(await runNamed(checks, "docs accuracy", ctx)).toMatchObject({ status: "pass" });
   });

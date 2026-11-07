@@ -20,6 +20,7 @@ const BASE: Inputs = {
   },
   options: { showBand: false, guardMode: "deny" },
   env: {},
+  hasTaskTools: true,
   userSettings: null,
   isStyleForced: true,
   hasOldMemory: false,
@@ -40,6 +41,7 @@ test("the checks come in a fixed order with their labels, all ok or info on a he
     ["server", "omca server", "ok"],
     ["ast-grep", "ast-grep", "ok"],
     ["options", "Options", "ok"],
+    ["task-tools", "Task tools", "ok"],
     ["model-force", "Agent models", "ok"],
     ["effort", "Effort cap", "ok"],
     ["mods", "Mod policy", "ok"],
@@ -61,7 +63,7 @@ test("an OMCA_GLYPHS value that names no tier warns after the model check; unset
   expect(run({}, "glyphs")).toBeUndefined();
   expect(run({ env: { OMCA_GLYPHS: " Unicode " } }, "glyphs")).toBeUndefined();
   expect(run({ env: { OMCA_GLYPHS: "0" } }, "glyphs")).toEqual({ level: "warn", detail: 'OMCA_GLYPHS="0" is not nerd, unicode or ascii, so Nerd Font glyphs draw' });
-  expect(doctorChecks({ ...BASE, env: { OMCA_GLYPHS: "0" } }).map(({ id }) => id).slice(6, 9)).toEqual(["model-force", "glyphs", "effort"]);
+  expect(doctorChecks({ ...BASE, env: { OMCA_GLYPHS: "0" } }).map(({ id }) => id).slice(7, 10)).toEqual(["model-force", "glyphs", "effort"]);
 });
 
 describe("output style", () => {
@@ -506,4 +508,11 @@ test("old agent memories or an old agent id in the settings warn with the migrat
   const warning = { level: "warn" as const, detail: `Agent memories or settings use agent names from the rename table; run ${MIGRATE_COMMAND}`, prompt: MIGRATE_COMMAND };
   expect(run({ hasOldMemory: true }, "migrate")).toEqual(warning);
   expect(run({ settings: { ...BASE.settings, agent: `oh-my-claudeagent:${OLD}` } }, "migrate")).toEqual(warning);
+});
+
+test("the task tools are a requirement: off fails and names what keeps them off", () => {
+  expect(run({}, "task-tools")).toEqual({ level: "ok", detail: "On, as OMCA requires" });
+  expect(run({ hasTaskTools: false, env: { CLAUDE_CODE_ENABLE_TODO_TOOLS: "0" } }, "task-tools")).toEqual({ level: "fail", detail: "Off, and OMCA requires them: CLAUDE_CODE_ENABLE_TODO_TOOLS=0 keeps them off" });
+  expect(run({ hasTaskTools: false, env: { CLAUDE_CODE_ENABLE_TASKS: "0" } }, "task-tools")).toEqual({ level: "fail", detail: "Off, and OMCA requires them: CLAUDE_CODE_ENABLE_TASKS=0 gives TodoWrite instead" });
+  expect(run({ hasTaskTools: false }, "task-tools")).toEqual({ level: "fail", detail: "Off, and OMCA requires them: a deny rule on TaskCreate or TaskUpdate, or a --tools list without them, keeps them off" });
 });

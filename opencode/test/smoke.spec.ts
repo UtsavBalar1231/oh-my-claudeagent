@@ -100,9 +100,9 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
     const created = await server.api<Session>("POST", "/api/session", a, { title: "OMCA inspection", location: { directory: a } })
     const sessionID = created.body?.data?.id
     expect(sessionID).toBeString()
-    const response = await server.api<{ output?: { sessionID?: string; plan?: unknown; health?: unknown[] } }>("POST", "/api/rpc/omca/snapshot", a, { input: { sessionID } })
+    const response = await server.api<{ output?: { sessionID?: string; run?: unknown; health?: unknown[] } }>("POST", "/api/rpc/omca/snapshot", a, { input: { sessionID } })
     expect(response.status, response.text).toBe(200)
-    expect(response.body?.output).toMatchObject({ sessionID, plan: null })
+    expect(response.body?.output).toMatchObject({ sessionID, run: null })
     expect(response.body?.output?.health?.length).toBeGreaterThan(0)
     expect(existsSync(join(a, ".omca"))).toBe(false)
   }, SLOW)
@@ -134,7 +134,7 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
       async () => {
         const { body } = await server.api<Listing<Named>>("GET", "/api/command", a)
         const omca = (body?.data ?? []).filter((command) => command.name?.startsWith("omca-"))
-        const expected = ["omca-analyzer", "omca-reviewer", "omca-build-fixer", "omca-plan", "omca-start-work", "omca-pause"]
+        const expected = ["omca-analyzer", "omca-reviewer", "omca-build-fixer", "omca-plan", "omca-start-work"]
         return expected.every((name) => omca.some((command) => command.name === name)) ? omca : undefined
       },
       server.last,

@@ -34,9 +34,9 @@
     },
     {
       "type": "manual",
-      "command": "just visual plan-reader",
+      "command": "just visual agent-view",
       "exit_code": 0,
-      "output_snippet": "tests/mod/visual/plan-reader-80.txt\ntests/mod/visual/plan-reader-120.txt\ntests/mod/visual/plan-reader-200.txt",
+      "output_snippet": "tests/mod/visual/agent-view-80.txt\ntests/mod/visual/agent-view-120.txt\ntests/mod/visual/agent-view-200.txt",
       "timestamp": "2026-09-30T10:40:00Z",
       "verified_by": "oh-my-claudeagent:orchestrator"
     },

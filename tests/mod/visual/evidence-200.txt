@@ -26,7 +26,7 @@
                                                                                                               │    13:50  test    just test-mod                                        executor
                                                                                                               │    13:25  test    just test-mod                                        executor
                                                                                                               │── Wed 2026-09-30 ────────────────────────────────────────────────────────────────────
-                                                                                                              │    16:10  manual  just visual plan-reader                              orchestrator
+                                                                                                              │    16:10  manual  just visual agent-view                               orchestrator
                                                                                                               │    14:35  test    bun test src/core                                    executor
                                                                                                               │    14:01  lint    just lint                                            executor
                                                                                                               │    13:55  lint    just lint                                            executor

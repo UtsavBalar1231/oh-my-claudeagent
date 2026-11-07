@@ -15,11 +15,13 @@ teams, `/loop`, `/schedule`, `/goal`, `/code-review` and `/doctor`. OMCA owns it
 skill prompts, the orchestration policy, the evidence discipline, the `omca` MCP server, its
 hooks, its interface (band, pane, doctor, status line) and its state under `.omca/`.
 
-A plan is an ordinary Claude Code plan file. OMCA resolves the plans directory the way Claude
-Code does: the `plansDirectory` setting relative to the project when set, otherwise
+A plan is a free-form Markdown document that nothing parses. OMCA resolves the plans directory
+the way Claude Code does: the `plansDirectory` setting relative to the project when set, otherwise
 `~/.claude/plans`, and an active plan-mode file over both. `<project>/.omca/plans` is the
 second accepted home, for project-local plans, and `plansDirectory: ".omca/plans"` makes it
-the default.
+the default. A run is a set of tasks in Claude Code's own task list: every task carries
+`metadata.run`, the last carries `metadata.final: true`, and `metadata.blocked` closes a task
+without completing it. [File formats](formats.md) specifies them.
 
 Your settings stay the authority. OMCA's hooks never auto-allow a command: they deny, ask or
 advise, and every allow comes from your permission rules. Managed settings sit above OMCA, and
@@ -46,7 +48,7 @@ your provider's model for that family, so the roster never pins a model id. Spaw
 
 | Agent | Tier | Effort | Role | Limits |
 | --- | --- | --- | --- | --- |
-| orchestrator | opus | high | The main-session orchestrator. The plugin's `settings.json` makes it the session agent. It does small work itself and delegates the rest; under `start-work` it runs the plan | Runs at the session's effort as the main agent |
+| orchestrator | opus | high | The main-session orchestrator. The plugin's `settings.json` makes it the session agent. It does small work itself and delegates the rest; under `start-work` it works through the open tasks | Runs at the session's effort as the main agent |
 | planner | opus | high | Interviews you and writes the plan, consulting analyzer and reviewer. Asked to help you understand or research a problem, it returns findings instead of a plan | No Bash |
 | analyzer | opus | high | Gap analysis of a request or draft plan: hidden requirements, scope risks | Read-only, no Bash |
 | reviewer | opus | high | Reviews a plan for clarity, verifiability and completeness; answers OKAY or REJECT | No Bash. Writes or edits a file only when asked to |
@@ -73,8 +75,8 @@ done. With the advisor off, they escalate to architect.
 
 | Skill | Run it with | What it does |
 | --- | --- | --- |
-| plan | `/oh-my-claudeagent:plan <task>` | planner planning, with analyzer and reviewer. It writes the plan and leaves binding it to `start-work`. Only you can start it |
-| start-work | `/oh-my-claudeagent:start-work [plan] [--worktree <path>]` | Runs a plan in the main session, delegating each task. Only you can start it |
+| plan | `/oh-my-claudeagent:plan <task>` | planner planning, with analyzer and reviewer. It writes the plan document and creates the run's tasks. Only you can start it |
+| start-work | `/oh-my-claudeagent:start-work [--worktree <path>]` | Runs the open tasks of a run in the main session, delegating each task. Only you can start it |
 | analyzer | `/oh-my-claudeagent:analyzer` | Runs analyzer on a request or plan, in a forked context |
 | reviewer | `/oh-my-claudeagent:reviewer <plan>` | Runs reviewer on a plan, in a forked context |
 | build-fixer | `/oh-my-claudeagent:build-fixer` | Runs build-fixer on a failing build, in a forked context |
@@ -88,7 +90,7 @@ done. With the advisor off, they escalate to architect.
 | consolidate-memory | `/oh-my-claudeagent:consolidate-memory` | Merges agent memories and notepad learnings |
 | omca-setup | `/oh-my-claudeagent:omca-setup [--uninstall]` | Checks requirements and sets up the status line |
 
-The mod adds its own command: `/omca [plan [name or path] | stats | doctor]` opens the pane.
+The mod adds its own commands: `/omca [stats | doctor]` opens the pane, and `/tasklist` opens the Tasks pane.
 
 ### Keyword triggers
 
@@ -114,7 +116,7 @@ command's own mode banner appears. The client raises `UserPromptSubmit` before
 
 `.mcp.json` starts one server, `omca` (bun, local), and OMCA ships no remote server.
 
-Only `evidence_log`, `boulder_progress` and `notepad_write` load with the first request. Every
+Only `evidence_log` and `notepad_write` load with the first request. Every
 other `omca` tool waits behind tool search and loads with `ToolSearch` and the query
 `select:mcp__plugin_oh-my-claudeagent_omca__<tool>`. Where tool search is off, for example behind
 a gateway that is not a first-party host, every tool loads up front.
@@ -123,11 +125,10 @@ a gateway that is not a first-party host, every tool loads up front.
 | --- | --- |
 | `evidence_log` | Record a build, test, lint, manual or `final_verification` result with its real exit code |
 | `evidence_read` | Read the newest 20 logged entries, oldest first (`limit` sets another count, 0 reads all), under a `[showing N of M entries: pass limit=0 for all]` header when it cuts. Refuses a ledger it cannot parse |
-| `boulder_write` | Register a plan and bind this session to it |
-| `boulder_progress` | Completed and remaining tasks of the bound plan, and the next one |
 | `notepad_write` | Append to a plan notepad section: `learnings`, `issues`, `decisions` or `problems` |
 | `notepad_read`, `notepad_list` | Read a section, or list plans and sections. A read past 40,000 characters returns the newest content under a `[TRUNCATED: older entries omitted: read one section or run notepad_compact]` header |
 | `notepad_compact` | Rewrite one section shorter |
+| `task_list`, `task_get` | Read Claude Code's task list from any agent, background subagents included, with the run, final and blocked marks the client's own tools leave out |
 | `ast_search`, `ast_find_rule`, `ast_test_rule`, `ast_dump_tree` | Structural code search with ast-grep. `ast_search` and `ast_find_rule` return 100 matches by default (`max_results` up to 500) |
 | `ast_replace` | Structural rewrite, with a dry run |
 | `file_read` | Read a file outside the working directories, with paging. Without a limit it returns up to 1,000 lines and stops at the last whole line under 40,000 characters, and the footer names the offset to continue from. Refuses credential files and network paths |
@@ -151,11 +152,10 @@ server's `omca_hook` tool, which dispatches through `servers/hooks/registry.ts`.
 | `tool.check` for Bash, PowerShell and Monitor | The destructive-command guard and its review dialog; a Monitor command is read as bash |
 | `session.start` | Registers `/omca`, writes the session's mod marker, draws the band's first state, and writes a transcript line when the `omca` server is not connected, naming a missing bun or the server's error, with a status line under the prompt until it connects |
 | `prompt.submit` | Tracks user-origin submissions and cancels a pending refusal recovery when new user input arrives; notes which keyword modes have fired so the prompt stops underlining them |
-| `turn.start`, `turn.complete` | The turn's tokens, cost and verification receipt for its closing line, a finished agent's notice, the band and its buttons, the pane's refresh, a plan task's receipt row. At a main turn's start, the mod asks whether the `omca` server is still connected, and one that has stopped gets the same transcript line and status line. A main turn you started in an interactive session that still ends in a `reasoning_extraction` refusal, after Claude Code's own retry, gets at most one follow-up prompt from OMCA; the refusal itself stands |
+| `turn.start`, `turn.complete` | The turn's tokens, cost and verification receipt for its closing line, a finished agent's notice, the band and its buttons, the pane's refresh. At a main turn's start, the mod asks whether the `omca` server is still connected, and one that has stopped gets the same transcript line and status line. A main turn you started in an interactive session that still ends in a `reasoning_extraction` refusal, after Claude Code's own retry, gets at most one follow-up prompt from OMCA; the refusal itself stands |
 | `agent.spawn`, `turn.step` | The Agents tab and delegation records |
 | `tool.call` | A subagent's tool calls, kept for its page on the Agents tab; only a subagent's call reaches the mod, and a main-loop call skips it |
-| `session.compact` | Asks the summarizer to keep the bound plan and its next ten open tasks. It does not run for a user-installed plugin where an organization manages Claude Code; the server's `SessionStart` `compact` handler re-injects the plan context there |
-| `ui.render`, `ui.focus`, `ui.scroll`, `ui.close`, `prompt.edit`, `prompt.change`, `command.run` | The turn line, an agent's launch and finish rows, the receipts and picture previews under tool groups and plan task receipts in the transcript, the band, the pane and the commands, and the underline on a keyword trigger in the prompt |
+| `ui.render`, `ui.focus`, `ui.scroll`, `ui.close`, `prompt.edit`, `prompt.change`, `command.run` | The turn line, an agent's launch and finish rows, the receipts and picture previews under tool groups in the transcript, the band, the pane and the commands, and the underline on a keyword trigger in the prompt |
 
 An observed user submission cancels a follow-up before it is queued. If user input races a
 follow-up already queued, neither competing turn qualifies for another automatic recovery.
@@ -170,19 +170,19 @@ rejects `model.fork`, `http.fetch` and `store.*`.
 
 | Event | Matcher | Handlers |
 | --- | --- | --- |
-| `SessionStart` | `clear`, `compact` | `session-start`: after a compaction, re-injects the guidance and the bound plan's next task; after `/clear`, hands the guidance to the next prompt |
-| `UserPromptSubmit` | any | `mod-notice` (on the launch session's first prompt, a message when the mod is not running), `guidance` (first prompt: guidance, session id, bound plan, and the session title `OMCA: <plan>`), `keyword-detector` |
+| `SessionStart` | `clear`, `compact` | `session-start`: after a compaction, re-injects the guidance and the run's next task; after `/clear`, hands the guidance to the next prompt |
+| `UserPromptSubmit` | any | `mod-notice` (on the launch session's first prompt, a message when the mod is not running), `guidance` (first prompt: guidance, session id, the open run, and the session title `OMCA: <run>`), `keyword-detector` |
 | `UserPromptExpansion` | any | `guidance`, `slash-mode-detector` |
-| `SubagentStart` | any | `subagent-context`: protocol, date, output contract and plan context for each subagent |
-| `PreToolUse` | `Write`, `Edit` | `plan-write-guard` (a plan file needs numbered checkboxes), `comment-gate` |
-| `PostToolUse` | `Read`, `Write`, `Edit`, `Agent`, `SubagentHandback`, `Bash`, `PowerShell` | `verification-recorder`, `context-injector`, `plan-format-warn`, `empty-task-response` |
+| `SubagentStart` | any | `subagent-context`: protocol, date, output contract and run context for each subagent |
+| `PreToolUse` | `Write`, `Edit` | `comment-gate` |
+| `PostToolUse` | `Read`, `Write`, `Edit`, `Agent`, `SubagentHandback`, `Bash`, `PowerShell` | `verification-recorder`, `context-injector`, `empty-task-response` |
 | `PostToolUseFailure` | any | `failure-recovery`: advice on a failed call, and a stuck-loop note from a tool's third failure in five minutes |
-| `Stop` | any | `stop-gates`: plan continuation, final verification, drift guard, in that order |
-| `TaskCompleted` | any | `task-completed`: refuses to complete a task while a recent verification is unlogged |
+| `Stop` | any | `stop-gates`: task continuation (open tasks of a run), final verification, drift guard, in that order |
+| `TaskCompleted` | any | `task-completed`: refuses to complete a task while a recent verification is unlogged, and a run's final task until its `final_verification` is logged |
 
 Each stop gate continues the turn at most five times in a session and gets that budget back once
-its condition clears. `TaskCompleted` fires only where the task tools exist: by default on older
-models up to Opus 4.7 and Sonnet 4.6, and on other models with `CLAUDE_CODE_ENABLE_TODO_TOOLS=1`.
+its condition clears. OMCA requires the task tools and sets `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` at session start when
+nothing has set it, so `TaskCompleted` fires on every model.
 
 Events OMCA leaves unregistered, and why:
 
@@ -190,10 +190,10 @@ Events OMCA leaves unregistered, and why:
 | --- | --- |
 | `PermissionDenied` | Its only lever is telling the model it may retry. Claude Code ignores that on a denial with no classifier verdict and already says whether to retry, so a handler could only invite a retry of a call the classifier judged unsafe |
 | `PermissionRequest` | OMCA never allows, and this event also fires where a call that cannot prompt would be denied, so a handler could only turn a denial into a run. The guard's deny is on `tool.check` |
-| `PreCompact`, `PostCompact` | The mod's `session.compact` feature shapes the summary, and the `SessionStart` compact handler restores context where the model can still see it |
-| `SessionEnd` | Its 1.5 s budget can kill a write halfway. The server unbinds its sessions when it exits |
-| `FileChanged` | The mod re-reads the evidence ledger and plan registry at each turn's end and on the open pane's timer |
-| `StopFailure` | Claude Code discards a handler's output for it, so it cannot resume a plan |
+| `PreCompact`, `PostCompact` | The `SessionStart` compact handler restores context where the model can still see it; tasks persist across compaction |
+| `SessionEnd` | Its 1.5 s budget can kill a write halfway. Nothing the server keeps depends on it |
+| `FileChanged` | The mod re-reads the evidence ledger and the task list at each turn's end and on the open pane's timer |
+| `StopFailure` | Claude Code discards a handler's output for it, so it cannot resume a run |
 | `Setup` | Claude Code runs no `mcp_tool` hook on it, and `/omca doctor` reports the same checks |
 | `SubagentStop`, `TaskCreated`, `TeammateIdle`, `Notification`, `ConfigChange`, `CwdChanged`, `DirectoryAdded`, `WorktreeCreate`, `WorktreeRemove`, `InstructionsLoaded`, `MessageDisplay`, `PostToolBatch`, `PreModelSwitch`, `PostModelSwitch`, `Elicitation`, `ElicitationResult` | No OMCA feature needs them |
 
@@ -206,26 +206,25 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | --- | --- |
 | `bash-guard` | The guard's review and its refusals. The catastrophic-removal deny stays |
 | `refusal-recovery` | The follow-up prompt after a `reasoning_extraction` refusal |
-| `plan-receipts` | The plan task rows in the transcript |
 | `stop-gates` | Every stop gate |
-| `plan-continuation`, `final-verification`, `drift-guard` | One stop gate |
+| `task-continuation`, `final-verification`, `drift-guard` | One stop gate |
 | `task-completed` | The task completion check |
 | `verification-recorder` | Recording verification commands, which the band, the turn line and the task check read |
 | `context-injector` | `AGENTS.md`, `README.md` and rule injection when a file is read or edited |
 | `comment-gate` | The comment check on writes |
-| `plan-write-guard`, `plan-format-warn` | The plan checkbox refusal and warning |
 | `empty-task-response` | The note on an empty or transitional agent report; concise findings need no fixed headers |
 | `failure-recovery` | Advice after a failed tool call |
 | `subagent-context` | The context each subagent gets at start |
 | `keyword-detector`, `slash-mode-detector` | Mode detection from prompts and slash commands. `keyword-detector` also takes the underline off trigger phrases in the prompt |
 | `mod-notice` | The message that the mod is not running |
 | `session-start` | Context restore after compaction and `/clear` |
-| `compact` | The plan note in compaction instructions |
 
 ### Other environment variables
 
 | Variable | Effect |
 | --- | --- |
+| `CLAUDE_CODE_ENABLE_TODO_TOOLS` | Set to `1` by the mod at session start when nothing has set it, which brings `TaskCreate` and `TaskUpdate` to every model. Another value keeps the task tools off, and `health_check` then reports `task_tools_absent` |
+| `CLAUDE_CODE_TASK_LIST_ID` | Set by the mod at session start when nothing has set it, to a list named for the checkout, so a run's tasks outlive `/clear` and a new session in the same checkout. Set it yourself to use another list |
 | `OMCA_COMMENT_GATE` | `advise` (default) lets a write through with a note; `deny` blocks it; `off` skips the check |
 | `OMCA_GLYPHS` | The glyph set of the pane, band, transcript rows, dialog and status line: `nerd` (default, Nerd Font icons; the status line's cache and clock icons and its rings need Nerd Fonts v3), `unicode` (no Nerd Font needed) or `ascii` (plain text) |
 | `CLAUDE_CODE_EFFORT_LEVEL` | Read by the doctor. A level other than `auto` or `unset`, which send no level, runs every agent at it, whatever the agent declares, and the doctor warns |
@@ -297,7 +296,6 @@ OMCA keeps its state in the project's `.omca/` directory, which it gitignores ex
 
 | Path | Written by | Holds |
 | --- | --- | --- |
-| `.omca/state/boulder.json` | `boulder_write` | The plan registry: each plan, and which session is bound to which plan |
 | `.omca/evidence/verification-evidence.json` | `evidence_log` | The append-only evidence log. Older entries move to a monthly archive file when it grows past 1 MiB or 1,000 entries |
 | `.omca/notepads/<plan>/<section>.md` | `notepad_write`, `notepad_compact` | Plan notepads |
 | `.omca/state/session/<session id>.json` | the server | The last hook call and the last verification command |
@@ -306,12 +304,12 @@ OMCA keeps its state in the project's `.omca/` directory, which it gitignores ex
 | `.omca/logs/file-access.jsonl` | `file_read` | One line per call |
 | `.omca/state/hook-trace.jsonl` | the server, with `OMCA_HOOK_TRACE=1` | One line per hook call |
 | `.omca/rules/*.md` | you | Project rules, injected by file name pattern |
-| `.omca/plans/*.md` | the planner | Project-local plans, gitignored with the rest of `.omca/`. The Plan tab picker lists them, the plans directory and every registered plan. The plan-write check covers any file in a directory named `plans` |
+| `.omca/plans/*.md` | the planner | Project-local plan documents, gitignored with the rest of `.omca/` |
 | `~/.claude/omca/statusline.ts` | `omca-setup` | The status line launcher |
 
-Write the registry, ledger and notepads only through the tools; no hook stops a direct edit, and
-a broken file stops the gates that read it. [File formats](formats.md) specifies plan files, the
-ledger, notepads and the registry, and links the JSON Schemas for the ledger and the registry.
+Write the ledger and notepads only through the tools; no hook stops a direct edit, and a broken
+file stops the gates that read it. [File formats](formats.md) specifies the task metadata OMCA
+reads, the ledger and notepads, and links the JSON Schema for the ledger.
 
 ## Where each feature works
 
@@ -323,9 +321,8 @@ ledger, notepads and the registry, and links the JSON Schemas for the ledger and
 | Stop checks, guidance, context injection | Yes | When bun is on the app's `PATH` | Yes | When bun is on the app's `PATH` | Unless `allowManagedHooksOnly` or `disableAllHooks` |
 | Guard decisions | Yes | When the app's Claude Code is 2.1.300 or later | Yes | Yes | Unless `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks` |
 | Guard review dialog | Yes | As guard decisions | No: held commands are decided without you | No: decided as in `-p` | As the guard |
-| Band, pane, plan reader, doctor | Yes | As guard decisions, with [Desktop's differences](usage.md#desktop-and-vs-code) | No | No ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)) | As the guard |
+| Band, pane, Tasks pane, doctor | Yes | As guard decisions, with [Desktop's differences](usage.md#desktop-and-vs-code) | No | No ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)) | As the guard |
 | Turn line, agent rows, receipts and image previews in the transcript | Yes, pictures where the terminal draws them (kitty, Ghostty, iTerm2 3.5 or later, and tmux 3.3 or later with passthrough on) | No: Desktop keeps its own rows, and the turn's figures and receipt arrive as a text row beneath the answer | No | No | As the guard |
-| Plan task receipts in the transcript | Yes, from Claude Code 2.1.314; before it, a toast at the plan's end | Not checked; a toast at the plan's end where the app's Claude Code is older than 2.1.314 | No | No | As the guard |
 | Status line | Yes | Not documented | No | Not documented | Unless `allowManagedHooksOnly` or `disableAllHooks` |
 
 Where the built-in `sec-default` guard loads (a machine whose managed settings set at least one
@@ -403,7 +400,7 @@ OMCA's value, and within 5 ms for times and 0.5 `execve` for process counts.
   the `settings.json` entry Claude Code writes for every install.
 
 The stop gate is a separate note, not a comparison. Only OMCA's run was armed with plugin state,
-a bound plan holding unchecked tasks, so the result says whether each arm stopped in an unarmed
+a run holding open tasks, so the result says whether each arm stopped in an unarmed
 state, not whose gate is better. OMCA's was the only scripted stop that was continued.
 
 ### Measurements

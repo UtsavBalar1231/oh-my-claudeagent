@@ -1,4 +1,0 @@
-{
-  "env": { "OMCA_DISABLED_HOOKS": "stop-gates" },
-  "permissions": { "defaultMode": "default", "allow": ["Bash(sed:*)", "mcp__plugin_oh-my-claudeagent_omca__evidence_log"] }
-}

@@ -13,12 +13,11 @@
 //   mockScript  <root>/scripts/<name>.json, the {main, subagent} turns mock-model.ts serves;
 //               absent or null, every request is answered "ok"
 //   fixture     <root>/fixtures/<name>/, copied as the session's cwd, with "{{cwd}}" in its
-//               files replaced by that cwd; absent or null, an empty directory. A plan its
-//               boulder.json names but does not hold is taken from tests/fixtures/plans/.
+//               files replaced by that cwd; absent or null, an empty directory.
 // Writes <root>/<view>-<cols>.txt for 80x40 (an inline pane), 120x40 and 200x50 (docked), with
 // the scratch directory's random suffix and the live session's own times and costs masked. `--sizes`
 // captures those sizes instead, as <out>/<view>-<cols>x<rows>.txt, out defaulting to root.
-import { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { parseArgs } from "node:util";
@@ -27,9 +26,7 @@ import { envWithout } from "../validate/core.ts";
 import { cleanupOnSignal, REPO } from "./lib.ts";
 import { parseScript, type Script, startServer } from "./mock-model.ts";
 
-const SHARED_PLANS = join(REPO, "tests", "fixtures", "plans");
-// A file's age reads the same in every capture at an hour, and the files still postdate every
-// evidence entry a fixture holds, so a task's proof does not change.
+// A file's age reads the same in every capture at an hour.
 const FIXTURE_AGE_MS = 3_600_000;
 const MKDTEMP_SUFFIX = 6;
 const SESSION_ID = "00000000-0000-4000-8000-000000000001";
@@ -105,16 +102,8 @@ export function parseView(text: string): View {
   return { command, keys, mockScript, fixture };
 }
 
-export function copyFixture(from: string, to: string, sharedPlans: string = SHARED_PLANS): void {
+export function copyFixture(from: string, to: string): void {
   cpSync(from, to, { recursive: true });
-  const boulder = join(from, ".omca", "state", "boulder.json");
-  const named = existsSync(boulder) ? [...readFileSync(boulder, "utf8").matchAll(/\{\{cwd\}\}\/plans\/([\w.-]+\.md)/g)] : [];
-  for (const [, name = ""] of named) {
-    const target = join(to, "plans", name);
-    if (existsSync(target) || !existsSync(join(sharedPlans, name))) continue;
-    mkdirSync(join(to, "plans"), { recursive: true });
-    copyFileSync(join(sharedPlans, name), target);
-  }
   const changed = new Date(Date.now() - FIXTURE_AGE_MS);
   for (const entry of readdirSync(to, { recursive: true, withFileTypes: true })) {
     if (!entry.isFile()) continue;

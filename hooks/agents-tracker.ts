@@ -1,7 +1,6 @@
 import type { AgentInfo, TurnUsage } from "claude-code";
 import { FORK, lookOf } from "../src/core/agent-type.ts";
 import { firstLine, lastLine, toolDetail } from "../src/core/mission.ts";
-import { taskReference } from "../src/core/plan-reader.ts";
 import { estimateCostUsd } from "../src/core/pricing.ts";
 import { fitEnd, glyphs, oneLine } from "../src/core/ui-kit.ts";
 import { redact } from "../src/core/visual.ts";
@@ -166,7 +165,6 @@ export const agentsTracker: Features = {
         return undefined;
       }
       const startedAt = await host.clock.now();
-      const task = taskReference(e.prompt, e.description);
       const forkOf = e.subagentType === FORK ? await forkedFrom(host, e.parentAgentId) : undefined;
       await update(host.state.agents, (agents) => ({
         ...agents,
@@ -183,7 +181,6 @@ export const agentsTracker: Features = {
           costUsd: 0,
           status: "running",
           teammate: e.isTeammate === true,
-          ...(task === undefined ? {} : { task }),
         },
       }));
       const prompt = await masked(host, e.prompt, PROMPT_CELLS);

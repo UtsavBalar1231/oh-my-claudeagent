@@ -77,7 +77,7 @@ function nativeNames(text: string): string {
     .replaceAll("mcp__plugin_oh-my-claudeagent_omca__", "omca_")
     .replaceAll("those go to build-fixer", "those go to omca-build-fixer")
     .replace(/`([A-Za-z]+)`/g, (match, name: string) => TOOLS[name] ? `\`${TOOLS[name]}\`` : match)
-    .replace(/\b(evidence_log|notepad_write|notepad_read|boulder_progress|ast_search|ast_replace)\b/g, "omca_$1");
+    .replace(/\b(evidence_log|notepad_write|notepad_read|ast_search|ast_replace)\b/g, "omca_$1");
 }
 
 // Behavior comes from shared Markdown. Only host-only sections, names, and APIs differ.

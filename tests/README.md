@@ -10,8 +10,6 @@ tests/
   plugin-evals/      # `claude plugin eval` cases for the planning skills; see its README
   fixtures/
     mcp/             # JSON-RPC requests and the expected tool list for the MCP server
-    boulder-schemas/ # sample boulder.json shapes for registry tests
-    plans/           # a long plan file for the plan reader spec
     settings/        # the settings files status line setup reads
     statusline/      # recorded payloads and rendered output for the status line
     spec-env.ts      # the environment a spec passes to a process it spawns

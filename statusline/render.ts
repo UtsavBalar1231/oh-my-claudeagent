@@ -1,9 +1,5 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { parseRegistry, resolveBoundPlan } from "../src/core/boulder.ts";
-import { planTasks, taskCounts } from "../src/core/checkboxes.ts";
 import { baseName, inferPlatform } from "../src/core/path.ts";
-import { AGENT_ICONS, cells, displayWidth, fitEnd, formatDuration, formatTokens, type GlyphTier, glyphTier } from "../src/core/ui-kit.ts";
+import { AGENT_ICONS, cells, displayWidth, formatDuration, formatTokens, type GlyphTier, glyphTier } from "../src/core/ui-kit.ts";
 import type { GitInfo } from "./git.ts";
 
 export type Env = Record<string, string | undefined>;
@@ -95,8 +91,6 @@ const COMPACT_BELOW_COLUMNS = 60;
 const SHORT_TERMINAL_LINES = 20;
 const SHORT_MAX_LINES = 2;
 const MAX_LINES = 4;
-// A next-task label cut to fewer cells than this is a fragment, so the plan segment wraps instead.
-const MIN_LABEL_CELLS = 12;
 const CACHE_EXPIRING_SECONDS = 60;
 const CACHE_MISS_SHOWN_SECONDS = 300;
 
@@ -105,8 +99,6 @@ export const NERD_GLYPHS = {
   filled: "━",
   empty: "─",
   dot: "·",
-  ellipsis: "…",
-  arrow: "→",
   branch: "",
   folder: "",
   model: "",
@@ -116,20 +108,17 @@ export const NERD_GLYPHS = {
   fiveHour: "",
   weekly: "",
   spend: "",
-  tasks: "",
   effort: "",
   cache: "\u{f00e8}",
 };
 
 export type Glyphs = Record<keyof typeof NERD_GLYPHS, string>;
 
-// The Unicode tier is the line without Nerd Font icons; the ASCII tier also trades its bars, dots and ellipsis.
+// The Unicode tier is the line without Nerd Font icons; the ASCII tier also trades its bars and dots.
 export const UNICODE_GLYPHS: Glyphs = {
   filled: "━",
   empty: "─",
   dot: "·",
-  ellipsis: "…",
-  arrow: "->",
   branch: "*",
   folder: ">",
   model: ">",
@@ -139,7 +128,6 @@ export const UNICODE_GLYPHS: Glyphs = {
   fiveHour: "5h",
   weekly: "7d",
   spend: "S:",
-  tasks: "T:",
   effort: "E:",
   cache: "C:",
 };
@@ -148,8 +136,6 @@ export const ASCII_GLYPHS: Glyphs = {
   filled: "#",
   empty: ".",
   dot: "|",
-  ellipsis: "...",
-  arrow: "->",
   branch: "*",
   folder: ">",
   model: ">",
@@ -159,7 +145,6 @@ export const ASCII_GLYPHS: Glyphs = {
   fiveHour: "5h",
   weekly: "7d",
   spend: "S:",
-  tasks: "T:",
   effort: "E:",
   cache: "C:",
 };
@@ -385,46 +370,6 @@ export function composePr(data: Payload, tier: GlyphTier): string {
   return `${CYAN}${pr.url ? osc8(pr.url, number) : number}${RST}${stateSuffix}`;
 }
 
-export interface PlanProgress {
-  done: number;
-  blocked: number;
-  total: number;
-  label: string | null;
-}
-
-export function readPlan(projectDir: string, sessionId: string): PlanProgress | null {
-  try {
-    const parsed = parseRegistry(readFileSync(join(projectDir, ".omca", "state", "boulder.json"), "utf8"));
-    const planPath = parsed.kind === "ok" ? resolveBoundPlan(parsed.registry, sessionId, true)?.active_plan : undefined;
-    if (!planPath) return null;
-    const plan = readFileSync(planPath, "utf8");
-    const tasks = planTasks(plan);
-    const { done, blocked, total } = taskCounts(tasks);
-    if (total === 0 || done === total) return null;
-    return { done, blocked, total, label: tasks.find((task) => task.state === "open")?.label || null };
-  } catch {
-    return null;
-  }
-}
-
-const planCount = ({ done, blocked, total }: PlanProgress, g: Ctx["g"]): string =>
-  `${GREEN}${g.tasks} ${done}/${total}${RST}${blocked === 0 ? "" : `${separator(g.dot)}${YELLOW}${blocked} blocked${RST}`}`;
-
-function planSegment(plan: PlanProgress, { g }: Ctx): Segment {
-  const { label } = plan;
-  const count = planCount(plan, g);
-  if (label === null) return block(count);
-  const head = `${count} ${DIM}${g.arrow} `;
-  const headWidth = textWidth(head);
-  const labelWidth = displayWidth(label);
-  return {
-    min: headWidth + Math.min(labelWidth, MIN_LABEL_CELLS),
-    max: headWidth + labelWidth,
-    grows: false,
-    draw: (width) => `${head}${fitEnd(label, width - headWidth, g.ellipsis)}${RST}`,
-  };
-}
-
 export function agentGlyph(name: string, tier: GlyphTier): string {
   if (tier !== "nerd") return "A:";
   const short = name.replace(/^oh-my-claudeagent:/, "");
@@ -535,7 +480,6 @@ export interface Ranked {
 // terminal keeps its time and 5 hour limit before the workspace row's lines-changed tail.
 const RANK = {
   model: 0,
-  plan: 1,
   context: 2,
   branch: 3,
   cost: 4,
@@ -560,8 +504,6 @@ const lineCount = (row: readonly Ranked[], columns: number): number =>
 function fullRows(c: Ctx, columns: number): Ranked[][] {
   const { data, tier, g } = c;
   const effort = `${data.effort?.level ?? ""}`.trim();
-  const projectDir = projectDirOf(data);
-  const plan = projectDir ? readPlan(projectDir, data.session_id ?? "") : null;
   const worktree = data.worktree;
   const pr = composePr(data, tier);
   const added = data.cost?.total_lines_added ?? 0;
@@ -583,7 +525,6 @@ function fullRows(c: Ctx, columns: number): Ranked[][] {
       ...ranked(RANK.model, block(`${CYAN}${g.model} ${modelName(c)}${RST}${effort ? `${separator(g.dot)}${YELLOW}${g.effort} ${effort}${RST}` : ""}`)),
       ...ranked(RANK.vim, data.vim?.mode ? block(`${YELLOW}${g.vim} ${data.vim.mode[0]}${RST}`) : null),
       ...ranked(RANK.agent, data.agent?.name && data.agent.name !== DEFAULT_MAIN_AGENT ? block(`${MAGENTA}${agentGlyph(data.agent.name, tier)} ${data.agent.name}${RST}`) : null),
-      ...ranked(RANK.plan, plan ? planSegment(plan, c) : null),
     ],
     [
       ...ranked(RANK.context, contextSegment(data, g)),
@@ -620,12 +561,9 @@ export function stackRows(rows: readonly (readonly Ranked[])[], columns: number,
 
 function compactSegments(c: Ctx): Segment[] {
   const { data } = c;
-  const projectDir = projectDirOf(data);
-  const plan = projectDir ? readPlan(projectDir, data.session_id ?? "") : null;
   const branch = branchOf(c);
   return present([
     block(`${CYAN}${c.g.model} ${modelName(c)}${RST}`),
-    plan ? block(planCount(plan, c.g)) : null,
     percentSegment(data, c.tier === "nerd"),
     branch ? block(`${c.g.branch} ${branch}`) : null,
   ]);

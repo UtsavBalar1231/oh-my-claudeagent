@@ -13,4 +13,4 @@ Before deleting a trust-boundary guard or catch, test an adversarial input and p
 
 Apply small cuts, safest first. Delegate independent batches only if the current role permits it; give each worker its exact files and the protection rules. Leaf workers make their own cuts.
 
-Run the relevant project build, lint, and tests after cuts. If the commands are unknown, ask rather than guess. Log real exits with `evidence_log`. Report per file the cuts, what stays and why, and any uncertainty. For a bound plan, record consequential judgment calls with `notepad_write`.
+Run the relevant project build, lint, and tests after cuts. If the commands are unknown, ask rather than guess. Log real exits with `evidence_log`. Report per file the cuts, what stays and why, and any uncertainty. For a named plan or run, record consequential judgment calls with `notepad_write` under that name.
