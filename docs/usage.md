@@ -356,9 +356,8 @@ pane reads the session's list or the one `CLAUDE_CODE_TASK_LIST_ID` names; an ag
 
 ### The proof ledger
 
-The Evidence tab opens on a verdict: **COMPLETE** when a passing final verification was logged
-for the run's final task, **STALE** when a later run saw different code, and **MISSING** when none
-passed. Under it a checklist says whether the newest build, test, lint and manual run each passed.
+The Evidence tab opens on a checklist that says whether the newest build, test, lint and manual
+run each passed.
 
 Below it the runs are grouped by day, newest first, each with its outcome, time, type, command
 and the agent that logged it. Up and Down move the focus, and the focused run opens to show its
