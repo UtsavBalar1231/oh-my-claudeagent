@@ -566,6 +566,7 @@ function cardUnits(view: View, entry: Entry, room: number): Unit[] {
       [{ text: `exit ${entry.exitCode}`, color: entry.exitCode === 0 ? TONE_KEYS.ok : TONE_KEYS.fail }],
       [{ text: `${dayOf(entry.at)} ${clockOf(entry.at, true)}`, color: muted }],
       ...(entry.verifiedBy === null ? [] : [agentMeta(view, entry.verifiedBy)]),
+      ...(entry.type !== "final_verification" ? [] : [entry.taskId === "" ? [{ text: "names no task", color: muted }] : [{ text: `Task #${entry.taskId}` }]]),
       ...(hidden === 0 ? [] : [[{ text: `${words(hidden, "secret")} masked`, color: muted }]]),
     ],
     room,

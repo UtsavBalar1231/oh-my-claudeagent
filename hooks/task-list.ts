@@ -55,13 +55,16 @@ async function readList(host: Host, dir: string): Promise<NativeTask[]> {
  */
 async function sync(host: Host, forgotten?: string): Promise<void> {
   const [{ platform, config }, sessionId, named] = await Promise.all([sessionOf(host), host.session.id(), host.env.CLAUDE_CODE_TASK_LIST_ID()]);
-  if (config === undefined) return;
   let read: NativeTask[] = [];
   let error: string | null = null;
-  try {
-    read = await readList(host, taskListDir(platform, config, named === undefined || named === "" ? sessionId : named));
-  } catch (failure) {
-    error = reason(failure);
+  if (config === undefined) {
+    error = "None of HOME, USERPROFILE or CLAUDE_CONFIG_DIR is set";
+  } else {
+    try {
+      read = await readList(host, taskListDir(platform, config, named === undefined || named === "" ? sessionId : named));
+    } catch (failure) {
+      error = reason(failure);
+    }
   }
   const hasTools = read.length > 0 || (await hasTaskTools(host));
   await update(host.state.tasks, (previous) => {

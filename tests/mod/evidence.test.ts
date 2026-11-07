@@ -203,7 +203,7 @@ test("wide: the list beside a card of the focused entry, which follows the focus
     "── Fri 2026-10-02 ─────────────────────────────────────  ╭",
     "❯ ✓  11:45  final   just ci                              │ ✓ Final verification passed",
     "  ✓  11:00  manual  bun scripts/qa/visual.ts evidence    │ exit 0 · 2026-10-02 11:45:00",
-    "  ✓  10:20  test    curl -H 'Authoriz…/run && just test  │ ◆ orchestrator",
+    "  ✓  10:20  test    curl -H 'Authoriz…/run && just test  │ ◆ orchestrator · names no task",
     "  ✗  10:00  test    just test-mod                        │",
     "── Thu 2026-10-01 ─────────────────────────────────────  │ Command",
     "  ✗  09:30  lint    just lint                            │ │just ci",
@@ -311,6 +311,22 @@ test("the card wraps a long command at its spaces, keeping every character", asy
     ...["bun test src/parser.spec.ts", "--reporter=junit", "--reporter-outfile=report.xml --timeout 5000"].map((source) => ({ source, language: "bash" })),
     { source: "ok" },
   ]);
+  await ui.unmount();
+});
+
+test("a final verification's card names its task, or says it names none; other runs say nothing of tasks", async ($, on) => {
+  const named = { ...evidence("final_verification", "just ci", 0, local(2, 10, 0), "orchestrator", "COMPLETE"), task_id: "7" };
+  const entries = [evidence("test", "just test", 0, local(2, 9, 0), "executor", "ok"), evidence("final_verification", "just ci", 1, local(2, 9, 30), "orchestrator", "FAILED"), named];
+  world(on, { [LEDGER]: JSON.stringify({ entries }) });
+  const ui = await openEvidence($, DOCK_210);
+  const facts = async () => (await body(ui, DOCK_210)).slice(2, 5).map((row) => row.slice(row.indexOf("│") + 2)).join(" ");
+  expect(await facts()).toContain("Task #7");
+  await ui.press({ key: "entry-1" });
+  expect(await facts()).toContain("names no task");
+  await ui.press({ key: "entry-0" });
+  const plain = await facts();
+  expect(plain).not.toContain("Task #");
+  expect(plain).not.toContain("names no task");
   await ui.unmount();
 });
 

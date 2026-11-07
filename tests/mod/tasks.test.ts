@@ -2,7 +2,7 @@ import { type Engine, expect, type Plugin, test } from "claude-code/testing";
 import { displayWidth, usableColumns } from "../../src/core/ui-kit.ts";
 import { joinPath } from "../../src/core/path.ts";
 import { TASK_TOOLS_OFF } from "../../src/core/native-tasks.ts";
-import { bodyColumns, focusRequests, LAYOUTS, pane, POSIX, rows, run, SESSION, type Size, SIZES, spreadRows, world, write } from "./world.ts";
+import { bodyColumns, focusRequests, LAYOUTS, pane, POSIX, rows, run, SESSION, type Size, SIZES, spreadRows, usage, world, write } from "./world.ts";
 
 const DOCK: Size = { columns: 160, rows: 45, placement: "dock" };
 const SHORT: Size = { columns: 160, rows: 16, placement: "dock" };
@@ -306,6 +306,31 @@ for (const layout of LAYOUTS) {
     await ui.unmount();
   });
 }
+
+test("without a home or config directory the pane names what is missing rather than reading forever", async ($, on) => {
+  const w = world(on, {}, {}, {}, { ...POSIX, env: {} });
+  const ui = await open($);
+  const shown = spreadRows(await ui.drawn()).join(" ");
+  expect(shown).toContain("None of HOME, USERPROFILE or CLAUDE_CONFIG_DIR is set");
+  expect(shown).not.toContain("Reading the task list");
+  expect(w.lists).toEqual([]);
+  await ui.unmount();
+});
+
+test("a turn's end reads the list, so tasks finished and deleted while the pane was closed are still listed", async ($, on) => {
+  const w = world(on, filesOf(...WORK));
+  on("turn.complete", (_$, e) => ({ text: e.answer }));
+  const done = WORK.map((task) => ({ ...task, status: "completed" }));
+  for (const task of done) write(w, `${LIST}/${task.id}.json`, stored(task));
+  await $.turn.complete({ answer: "Done.", durationMs: 1000, isAborted: false, turnId: "t-1", reason: "answer", usage: usage(10, 5) });
+  for (const task of done) w.files.delete(`${LIST}/${task.id}.json`);
+  const ui = await open($);
+  const lines = rows(await ui.drawn()).join("\n");
+  expect(lines).toContain("4 of 4 done");
+  expect(lines).toContain("#4 Update the docs");
+  expect(lines).not.toContain("No tasks yet.");
+  await ui.unmount();
+});
 
 test("an empty list says so and reads no files", async ($, on) => {
   const w = world(on);

@@ -151,6 +151,7 @@ function taskToolsCheck(hasTaskTools: boolean, env: DoctorEnv): Check {
   const todo = env.CLAUDE_CODE_ENABLE_TODO_TOOLS;
   if (todo !== undefined && todo !== "" && todo !== "1") return check("task-tools", "Task tools", "fail", `Off, and OMCA requires them: CLAUDE_CODE_ENABLE_TODO_TOOLS=${todo} keeps them off`);
   if (env.CLAUDE_CODE_ENABLE_TASKS === "0") return check("task-tools", "Task tools", "fail", "Off, and OMCA requires them: CLAUDE_CODE_ENABLE_TASKS=0 gives TodoWrite instead");
+  if (todo === undefined || todo === "") return check("task-tools", "Task tools", "fail", "Off, and OMCA requires them: the mod's set of CLAUDE_CODE_ENABLE_TODO_TOOLS=1 was refused, as managed settings hold the variable");
   return check("task-tools", "Task tools", "fail", "Off, and OMCA requires them: a deny rule on TaskCreate or TaskUpdate, or a --tools list without them, keeps them off");
 }
 

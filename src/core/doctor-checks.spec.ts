@@ -514,5 +514,7 @@ test("the task tools are a requirement: off fails and names what keeps them off"
   expect(run({}, "task-tools")).toEqual({ level: "ok", detail: "On, as OMCA requires" });
   expect(run({ hasTaskTools: false, env: { CLAUDE_CODE_ENABLE_TODO_TOOLS: "0" } }, "task-tools")).toEqual({ level: "fail", detail: "Off, and OMCA requires them: CLAUDE_CODE_ENABLE_TODO_TOOLS=0 keeps them off" });
   expect(run({ hasTaskTools: false, env: { CLAUDE_CODE_ENABLE_TASKS: "0" } }, "task-tools")).toEqual({ level: "fail", detail: "Off, and OMCA requires them: CLAUDE_CODE_ENABLE_TASKS=0 gives TodoWrite instead" });
-  expect(run({ hasTaskTools: false }, "task-tools")).toEqual({ level: "fail", detail: "Off, and OMCA requires them: a deny rule on TaskCreate or TaskUpdate, or a --tools list without them, keeps them off" });
+  expect(run({ hasTaskTools: false }, "task-tools")).toEqual({ level: "fail", detail: "Off, and OMCA requires them: the mod's set of CLAUDE_CODE_ENABLE_TODO_TOOLS=1 was refused, as managed settings hold the variable" });
+  expect(run({ hasTaskTools: false, env: { CLAUDE_CODE_ENABLE_TODO_TOOLS: "" } }, "task-tools")?.detail).toContain("was refused");
+  expect(run({ hasTaskTools: false, env: { CLAUDE_CODE_ENABLE_TODO_TOOLS: "1" } }, "task-tools")).toEqual({ level: "fail", detail: "Off, and OMCA requires them: a deny rule on TaskCreate or TaskUpdate, or a --tools list without them, keeps them off" });
 });
