@@ -169,7 +169,7 @@ declare module 'claude-code' {
       /** Max matches to return (default 10, hard max 50). */
       limit?: number
     }
-    /** Read one task of Claude Code's task list as JSON, from any agent: its subject, description, status, owner, links, run, final and blocked marks, and other metadata. blockedBy names every link and openBlockers the ones still holding it: a task completed or closed as blocked holds nothing back. A task closed as blocked keeps status pending, with its reason in blockedReason. Read-only: the main session changes the list. */
+    /** Read one task of Claude Code's task list as JSON, from any agent: its subject, description, status, owner, links, run, final and blocked marks, and other metadata. blockedBy names every link and openBlockers the ones still holding it: a task completed or closed as blocked holds nothing back. A task closed as blocked keeps its last status (pending or in_progress), with its reason in blockedReason. Read-only: the main session changes the list. */
     "mcp__plugin_oh-my-claudeagent_omca__task_get": {
       /** The task's id, as task_list prints it without the # */
       taskId: string
