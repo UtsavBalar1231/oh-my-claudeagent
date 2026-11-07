@@ -73,8 +73,9 @@ Claude reads shows as a picture where the terminal draws them.
 
 <img src=".github/assets/transcript.png" width="900" alt="A Claude Code turn on the checkout project: under Ran 1 shell command, a receipt reads just test, 42 passed. Two background agents start, and each reports as it finishes: the explorer on Map the validation messages and the architect on Review the checkout flow, each with its duration, tool calls and tokens flush right and the first line of its reply beneath. The dim line that closes each turn names the agents still running, then the turn's tokens and cost.">
 
-The band above the prompt warns when a verification run has no logged evidence. The numbered
-button fills the prompt with the step that logs it.
+The band above the prompt warns when a verification run has no logged evidence, and while a run has
+open tasks it shows the run's progress. The numbered buttons fill the prompt with the step that logs
+the evidence and with `/tasklist`.
 
 <img src=".github/assets/band.png" width="680" alt="The band above the prompt warns that the evidence for just test was not logged, with the button 1: Log evidence below it. Above it, the receipt under the shell command reads just test, 42 passed, and the turn line ends with just test not logged.">
 

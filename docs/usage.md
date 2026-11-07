@@ -245,19 +245,29 @@ the work happens:
   OMCA says so in the transcript when tmux holds them back. A group of more than three pictures
   previews three and names the rest, and the pictures in one group share 2 MiB: past that, and in
   tmux and iTerm2, a picture drawn from its file keeps the name row alone.
+- **A turn that changed a run.** Claude Code draws nothing for its task tools, so under the turn
+  line of a turn that created or updated a run's tasks OMCA adds one row: the run's name, done of
+  total, then only that turn's changes, each with its mark: `+26 tasks`, `✓ #5` completed,
+  `◐ #6 #7` started, `⊗ #8 blocked` closed as blocked and `◆ final done`, then `/tasklist`. A list
+  names three ids, then how many more. As the window narrows, whole parts leave from the end; the
+  run's name and the ids are never cut. A subagent's turn adds no row.
 Running agents are listed by Claude Code itself, under the prompt. A session without a terminal
 gets the turn's figures as one text row beneath the answer instead.
 
 ### The band
 
 The band sits above the prompt. It shows a verification command whose evidence was not logged,
-and a line when the session status file cannot be read. With neither, it draws nothing.
+and a line when the session status file cannot be read. While a run has open tasks, a line under
+it names the run with a short progress bar, done of total, the running tasks and how many were
+closed as blocked, as in `◆ dotman-rewrite ━━━━────────── 5/27 · ◐ #6 #7 · ⊗ 1`. As the band
+narrows, that line drops the bar, then the running tasks, then the blocked count. With none of
+these, the band draws nothing.
 
-Below it, a numbered button offers the next step: log the evidence. Press the button's digit in
-an empty prompt, or click it, to fill the prompt with that step; nothing runs until you send it.
-Typing anything else clears the button, and so does filling the prompt from history, an undo or
-another plugin. The button is held while an agent's transcript is in the main view and returns
-with the main conversation.
+Below them, numbered buttons offer the next steps: log the evidence, which stays first, and open the
+task list while a run is open. Press a button's digit in an empty prompt, or click it, to fill the
+prompt with that step; nothing runs until you send it. Typing anything else clears the buttons, and
+so does filling the prompt from history, an undo or another plugin. The buttons are held while an
+agent's transcript is in the main view and return with the main conversation.
 
 Claude Code has one band for every mod, and a band another mod draws stays beneath OMCA's rows.
 Set the `showBand` option to `false` to hide OMCA's.
@@ -342,11 +352,42 @@ URL like `postgres://user:pass@host`, are drawn as `‹masked›`, and your home
 
 `/tasklist` opens the Tasks pane, separate from the OMCA pane. It shows Claude's own task list,
 the one Ctrl+T toggles under the prompt, whole. That checklist stops at five rows and drops
-finished ones; the pane lists every task in the order the work runs (Now, Next, Waiting, Done),
-each with what it does and what holds it back, and it updates while Claude works. Enter or a click
-opens a task's page: its description, the tasks it waits on and holds up, and its metadata; `b`
-goes back. Claude Code deletes a list seconds after its last task completes, and the pane keeps
-the finished tasks until `/clear`.
+finished ones; the pane lists every task and updates while Claude works. Claude Code deletes a list
+seconds after its last task completes, and the pane keeps the finished tasks until `/clear`.
+
+The top of the pane names the run with work left and how many of its tasks are done, then a
+progress bar and a count of each state. The tasks follow in the order the work runs, each section
+under its own rule:
+
+| Section | Mark | Holds |
+| --- | --- | --- |
+| Running | `◐` | Tasks in progress, with the agent that owns each |
+| Ready | `○` | Tasks nothing holds back |
+| Blocked | `⊗` | Tasks closed as blocked, with the reason on the row below |
+| Waiting | `·` | Tasks that wait on another, with the first open one (`← #6 +1`) |
+| Done | `✓` | Finished tasks, folded to one row with their count |
+
+The final task carries `◆` and sits last in its section; while it waits, it shows how many tasks
+are still open. Done opens by itself once nothing else is left. Other runs, and tasks that belong
+to no run, fold to one row each under the open run; a click opens one. The marks follow
+`OMCA_GLYPHS`, so the Nerd Font and ASCII tiers draw their own. When the pane is short, the blank
+rows between sections go first, then the count row, and a list still too long scrolls under
+`↑ n more` and `↓ n more`.
+
+Enter or a click opens a task's page: its state and owner, the full reason a blocked task was given
+up, the tasks it waits on and holds up, then its description and metadata. Each linked task is a
+row you can open. The final task's page also shows the newest `final_verification` entry that names
+it, passed or failed, with its exit code, time and first line of output.
+
+| Key | Where | Action |
+| --- | --- | --- |
+| Up, Down | List | Move between tasks |
+| Enter | List | Open the task's page |
+| `d` | List | Show or hide the done tasks |
+| `b` | Page | Back to the list, on that task's row |
+| `n`, `p` | Page | The next or previous task, in list order |
+| Up, Down, wheel | Page | Scroll the page |
+| Esc | Both | Close the pane |
 
 A subagent running in the background has no task tools, so only the main session and foreground
 subagents change the list. Every agent can read it with OMCA's `task_list` and `task_get` tools. The
@@ -519,7 +560,7 @@ On Desktop the mod draws differently:
 - Mascots are still images: Desktop rebuilds every drawing on each change, which would restart an
   animation ([#99211](https://github.com/anthropics/claude-code/issues/99211)). The same rebuild
   can drop a click; click again.
-- A button that fills the prompt, such as the band's Start work or the Evidence tab's Rerun, shows
+- A button that fills the prompt, such as the band's Task list or the Evidence tab's Rerun, shows
   the text in a toast when Desktop's prompt box does not take it.
 - The pane scrolls the way Desktop's own panes do, and each tab draws whole, with none of the
   terminal's scrolling windows inside it. The Evidence tab shows 40 runs at a time, with `n` and

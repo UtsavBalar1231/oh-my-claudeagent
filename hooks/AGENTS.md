@@ -18,14 +18,15 @@ event is unregistered on purpose; `docs/references.md` carries the per-event rea
 try/catch. `host.ts` defines the `Host` closures a feature receives in place of `$`, so a
 feature module takes `host` and never `$`. The features are `bash-guard`, `server-check`,
 `mod-marker`, `agents-tracker`, `agent-rows`, `metrics`, `band`, `pane` with its `tabs/`, `footer`,
-`group-rows`, `keyword-paint`, `completion`, `refusal-recovery`, `omca-router`, `task-tools` and
-`task-list`. `doctor.ts` runs the Doctor page's checks and fixes for `tabs/doctor.ts`; it registers
+`group-rows`, `keyword-paint`, `completion`, `refusal-recovery`, `omca-router`, `task-tools`,
+`task-list` and `task-rows`. `doctor.ts` runs the Doctor page's checks and fixes for `tabs/doctor.ts`; it registers
 no event. Pure logic lives in `src/core/`.
 
 The mod's only view of planned work is Claude Code's native task list. State is the task files under
 `<config dir>/tasks/<list id>/`; the mod has no plan file format, parser or registry, and it keeps
-OMCA's task view in one pane. The band, the spinner and the transcript carry no task facts, since the
-native panel and spinner show them.
+OMCA's task view in one pane. The band shows a run line while a run has open tasks, and `task-rows`
+writes one transcript row per main turn that changed a run, since Claude Code draws nothing for the task
+tools' calls. The spinner carries no task facts.
 
 `task-tools` turns the task tools on and names the checkout's list at `session.start`, each only
 where nothing has set its variable, and the marker reports the list id as `task_list`.
@@ -33,9 +34,13 @@ where nothing has set its variable, and the marker reports the list id as `task_
 `task-list` is its own pane, `tasklist`, opened by `/tasklist`, apart from the `omca` pane. The list
 reads into the `tasks` atom at `session.start`, after each `TaskCreate` and `TaskUpdate`, at each main
 `turn.complete`, and from a 2 s timer while the pane is open. It keeps finished tasks whose files
-Claude Code deleted. Rows group as Now, Next, Waiting and Done, and Enter opens a task's page. A row's
-aside is why a task was closed as blocked; otherwise `final` for a final task, then what it waits on
-or its owner. The head row names the run beside the counts when the list has one. Closing the pane
+Claude Code deleted. The head names the run, its done count and a progress bar. Rows group as
+Running, Ready, Blocked, Waiting and Done under labeled rules, each with its state mark; the final
+task sits last in its group. A running row's aside is its owner and a waiting row's is its first open
+blocker; a blocked task's reason gets its own row. Done, other runs and run-less tasks fold to one row
+each. Enter or a click opens a task's page, which lists its links, each with its mark, before the
+description; the final task's page shows the newest verdict naming it, read from the ledger as the
+page opens. Blank rows go first and then the counts row when the pane runs short. Closing the pane
 stops the timer and forgets its place without touching the `omca` pane.
 
 Three features redraw Claude Code's own transcript rows on the terminal, and every other surface
@@ -70,6 +75,12 @@ atoms written once per turn or per finished agent, since a row subscribes to eve
   draw bytes and not a file, and a refusal carrying `fix: "tmux-passthrough"` writes one transcript
   line naming tmux's `allow-passthrough` and `focus-events`.
   An expanded group is left as drawn.
+
+`task-rows` places one row with `$.ui.place` under the turn line of a main turn that changed a run's
+tasks, found by comparing the `tasks` atom at that turn's `turn.start` with the atom at its
+`turn.complete`, after `task-list` has read the list. A subagent's turn places none. The row's facts are
+fixed when it is placed and kept in the module, not an atom, since the list is written every 2 s while
+the pane is open; a module reload leaves earlier rows empty. A row that does not stand drops its facts.
 
 `keyword-paint` underlines what the server's `keyword-detector` would match in the draft, from the
 same `keywordSpans` reader in `src/core/keywords.ts`, only with `enableKeywordTriggers` on and that
