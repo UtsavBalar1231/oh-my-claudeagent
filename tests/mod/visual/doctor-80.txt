@@ -1,7 +1,7 @@
 
  ▐▛███▛█   Claude Code v2.1.316
 ▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · /…/omca-visual-80x40-XXXXXX/cwd
 
 
 
@@ -20,8 +20,8 @@
 
 
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
-│ 1: Agents  2: Plan  3: Evidence  4: Notepad  Doctor                          │
-│ r: Run again    3 warn   1 info   9 ok  checked HH:MM                     │
+│ 1: Agents  2: Evidence  3: Notepad  Doctor                                   │
+│ r: Run again    3 warn   1 info   10 ok  checked HH:MM                    │
 │   WARN  omca server   No hook has reached the server in this session yet    │
 │                        m: Use /mcp                                           │
 │   WARN  Effort cap    maxEffortLevel high holds the architect below the     │

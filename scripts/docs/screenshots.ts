@@ -537,7 +537,7 @@ export const SHOTS: readonly Still[] = [
     command: "/omca",
     keys: ["2"],
     script: NO_SCRIPT,
-    ready: (screen) => screen.includes("MISSING") && screen.includes("‹masked›"),
+    ready: (screen) => screen.includes("latest runs") && screen.includes("‹masked›"),
     crop: "pane",
   },
   {

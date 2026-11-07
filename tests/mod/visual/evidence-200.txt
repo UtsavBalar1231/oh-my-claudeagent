@@ -1,11 +1,7 @@
                                                                                                               │                                                                                       ✕
- ▐▛███▛█   Claude Code v2.1.316                                                                               │1: Agents  2: Plan  3: Evidence  4: Notepad
+ ▐▛███▛█   Claude Code v2.1.316                                                                               │1: Agents  2: Evidence  3: Notepad
 ▝▜██████▀  Opus 5.5 · API Usage Billing                                                                       │──────────────────────────────────────────────────────────────────────────────────────
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                       │╭────────────────────────────────────────────────────────────────────────────────────╮
-                                                                                                              ││ Final verification · proof-ledger                                                  │
-                                                                                                              ││  COMPLETE  matches the current plan · 10-02 13:35                                  │
-                                                                                                              ││  build   test   lint   manual                                                  │
-                                                                                                              │╰────────────────────────────────────────────────────────────────────────────────────╯
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · /home/utsav/.cache/tmp/omca-visual-200x50-XXXXXX/cwd             │latest runs   build   test   lint   manual
                                                                                                               │── Fri 2026-10-02 ────────────────────────────────────────────────────────────────────
                                                                                                               │    13:35  final   just ci && just visual evidence                      orchestrator
                                                                                                               │    13:00  test    just test-mod                                        executor
@@ -42,7 +38,11 @@
                                                                                                               │
                                                                                                               │
                                                                                                               │
-█████ 6/6                                                                                                 [-] │t: Type  x: Fails  f: Find  c: Copy  r: Rerun  3/16 · ↑↓ move
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │
+                                                                                                              │t: Type  x: Fails  f: Find  c: Copy  r: Rerun  3/16 · ↑↓ move
                                                                                           ◐ medium · /effort  │
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 

@@ -76,15 +76,15 @@ Claude reads shows as a picture where the terminal draws them.
 The band above the prompt warns when a verification run has no logged evidence. The numbered
 button fills the prompt with the step that logs it.
 
-<img src=".github/assets/band.png" width="680" alt="The band above the prompt reads 6/14, next 7 Wire the order summary panel, and warns that the evidence for just test was not logged, with the button 1: Log evidence below it. Above it, the receipt under the shell command reads just test, 42 passed, and the turn line ends with just test not logged.">
+<img src=".github/assets/band.png" width="680" alt="The band above the prompt warns that the evidence for just test was not logged, with the button 1: Log evidence below it. Above it, the receipt under the shell command reads just test, 42 passed, and the turn line ends with just test not logged.">
 
 `/tasklist` opens the Tasks pane: Claude's own task list whole, in the order the work runs, each
 task with what it does and what holds it back.
 
-The Evidence tab is the proof ledger: a verdict on the run's final verification, then every
-logged run grouped by day.
+The Evidence tab is the proof ledger: the newest run of each type, then every logged run grouped
+by day.
 
-<img src=".github/assets/evidence.png" width="680" alt="The Evidence tab opens on one line: the final verification for checkout-redesign is MISSING, and build, test, lint and manual each passed on their newest runs. Below it, fourteen runs are grouped under three days, each with its outcome, time, type and command. The focused run, a manual payment smoke test, is open in a card beside the list titled Manual run passed, with its exit code, time and agent, one secret masked, and its command and output wrapped under their own labels.">
+<img src=".github/assets/evidence.png" width="680" alt="The Evidence tab opens on one line, latest runs, where build, test, lint and manual each passed on their newest runs. Below it, fourteen runs are grouped under three days, each with its outcome, time, type and command. The focused run, a manual payment smoke test, is open in a card beside the list titled Manual run passed, with its exit code, time and agent, one secret masked, and its command and output wrapped under their own labels.">
 
 The Agents tab gives each subagent a lane led by its mascot, with its task, current tool call,
 model, effort and tokens. The last wave's finished agents keep their lanes with their results,
@@ -105,7 +105,7 @@ The guard holds a destructive shell command for your review and shows what it wo
 change how OMCA runs. A check with a known fix offers a key that fills the prompt with it, and
 the passing checks fold into one line that `o` opens.
 
-<img src=".github/assets/doctor.png" width="680" alt="The Doctor page, named after the tabs in the tab bar, counts 1 warning, 1 info row and 11 passing checks. The warning says maxEffortLevel high holds the architect below the xhigh it declares, the info row offers a: Use /advisor fable, and one line beside o: Show passing folds the passing checks, naming OMCA, Claude Code, bun, the omca server, ast-grep and the options before it is cut.">
+<img src=".github/assets/doctor.png" width="680" alt="The Doctor page, named after the tabs in the tab bar, counts 1 warning, 1 info row and 12 passing checks. The warning says maxEffortLevel high holds the architect below the xhigh it declares, the info row offers a: Use /advisor fable, and one line beside o: Show passing folds the passing checks, naming OMCA, Claude Code, bun, the omca server, ast-grep and the options and the task tools before it is cut.">
 
 The status line shows the session (model, effort and agent), the workspace
 (context window and git state) and usage (duration, usage limits, and cost for accounts billed
