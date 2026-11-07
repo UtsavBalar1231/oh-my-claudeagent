@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/UtsavBalar1231/oh-my-claudeagent/actions/workflows/ci.yml/badge.svg)](https://github.com/UtsavBalar1231/oh-my-claudeagent/actions/workflows/ci.yml)
 
-<img src=".github/assets/hero.png" width="1000" alt="A Claude Code session on the left hands task 7 of the checkout run to the executor, while the OMCA pane on the right shows the Agents tab with the executor's lane on Wire the order summary panel.">
+<img src=".github/assets/hero.png" width="1000" alt="A Claude Code session on the left hands task 7 of the checkout run to the executor, while the OMCA pane on the right shows the Agents tab with the executor's lane on Wire the order summary panel. Above the prompt, the band shows the checkout-redesign run at 6 of 14.">
 
 oh-my-claudeagent (OMCA) coordinates specialist agents, plans and verification evidence in
 Claude Code and OpenCode V2. Both adapters share state formats, safety checks and durable
@@ -77,7 +77,7 @@ The band above the prompt warns when a verification run has no logged evidence, 
 open tasks it shows the run's progress. The numbered buttons fill the prompt with the step that logs
 the evidence and with `/tasklist`.
 
-<img src=".github/assets/band.png" width="680" alt="The band above the prompt warns that the evidence for just test was not logged, with the button 1: Log evidence below it. Above it, the receipt under the shell command reads just test, 42 passed, and the turn line ends with just test not logged.">
+<img src=".github/assets/band.png" width="680" alt="The band above the prompt warns that the evidence for just test was not logged, then shows the checkout-redesign run with its progress bar at 6 of 14, with the buttons 1: Log evidence and 2: Task list below. Above it, the receipt under the shell command reads just test, 42 passed, and the turn line ends with just test not logged.">
 
 `/tasklist` opens the Tasks pane: Claude's own task list whole, in the order the work runs, each
 task with what it does and what holds it back.
