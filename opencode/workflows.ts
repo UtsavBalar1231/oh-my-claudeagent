@@ -29,8 +29,8 @@ export const EXECUTION = `The user ran /omca-start-work and approved it. This me
 Execute the plan: the document named at the end if there is one, otherwise the plan agreed in this conversation.
 Read omca_task_list first. An open run on the list is the work to continue, whichever session planned it.
 With no open run, create one. Call omca_task_create once per task with metadata {"run": "<short run name>"}, a description saying what done means and how to check it, then omca_task_update with addBlockedBy for each dependency. Add a last task with subject "Final verification" and metadata {"run": "<name>", "final": true}, blocked by every other task.
-Delegate scoped tasks to omca-executor and escalate research, architecture, or build failures to the matching specialist. Children do not change the task list: set each task in_progress when it starts and close it yourself after checking its work.
-Run independent work in parallel only when the files and dependencies do not overlap.
+Delegate every task of the run that changes files to omca-executor, however small, and escalate research, architecture, or build failures to the matching specialist; during a run you review, verify and close tasks rather than implement them. Children do not change the task list: set each task in_progress when it starts and close it yourself after checking its work.
+Run independent tasks in parallel, one omca-executor each in the same turn, when their files and dependencies do not overlap.
 Verify each task's observable behavior and record its actual command exit code using omca_evidence_log before completing it.
 Do not rewrite the approved scope. Ask before a substantive plan change, moving the session, or creating a worktree.
 A task that cannot finish closes with omca_task_update and metadata {"blocked": "<the gap>"}. It is not done and work that needs it cannot go ahead, so close its dependents the same way, carry on with the independent tasks, and name every blocked task in your report.
