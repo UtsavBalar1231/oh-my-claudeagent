@@ -126,7 +126,7 @@ One reader parses every ledger. It refuses text that is not JSON, not an object,
 
 ### Rotation
 
-When the server starts, it checks the live ledger. If the file is over 1 MiB or holds more than 1,000 entries, all but the newest 500 entries move to `verification-evidence.<yyyymm>.json` in the same directory, named for the current UTC month. The archive is written first, so a crash duplicates entries and never loses one. An archive has the same format as the ledger, with `version` first, and a month's later rotations append to it. The gates and `evidence_read` read the live file only.
+When the server starts, and in OpenCode before each `omca_evidence_log` append, the live ledger is checked. If the file is over 1 MiB or holds more than 1,000 entries, all but the newest 500 entries move to `verification-evidence.<yyyymm>.json` in the same directory, named for the current UTC month. The archive is written first, so a crash duplicates entries and never loses one. An archive has the same format as the ledger, with `version` first, and a month's later rotations append to it. The gates and `evidence_read` read the live file only.
 
 ### What the gates accept
 

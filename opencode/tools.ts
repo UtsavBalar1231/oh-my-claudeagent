@@ -14,7 +14,7 @@ import type { ToolContext as SharedContext } from "../servers/progress.ts";
 import { argReader, isoTimestamp } from "../servers/tools/args.ts";
 import { tools as astTools } from "../servers/tools/ast.ts";
 import { workingTreeStamp } from "../servers/tree-stamp.ts";
-import { appendEvidence, COMMAND_MAX_CHARS, SNIPPET_MAX_CHARS, TASK_ID_MAX_CHARS, tools as evidenceTools, VERIFIED_BY_MAX_CHARS } from "../servers/tools/evidence.ts";
+import { appendEvidence, COMMAND_MAX_CHARS, rotateLedger, SNIPPET_MAX_CHARS, TASK_ID_MAX_CHARS, tools as evidenceTools, VERIFIED_BY_MAX_CHARS } from "../servers/tools/evidence.ts";
 import { tools as filesystemTools } from "../servers/tools/filesystem.ts";
 import { appendNotepad, compactNotepad, formatNotepadList, type NotepadListing, tools as notepadTools } from "../servers/tools/notepad.ts";
 import { canonicalPath, checkPath, ownedPath, requestScope, type RequestScope, within } from "./permissions.ts";
@@ -94,6 +94,9 @@ async function evidenceLog(args: Record<string, unknown>, scope: RequestScope, c
   await scope.current();
   const recordID = createHash("sha256").update(JSON.stringify([context.sessionID, context.messageID, context.id])).digest("hex");
   const tree = await workingTreeStamp(scope.root);
+  // OpenCode never starts the omca server, whose start-up rotation keeps the ledger under its cap.
+  ownedPath(scope.root, path);
+  await rotateLedger(scope.root);
   const total = await appendEvidence(scope.root, {
     type, command, exit_code: exitCode, output_snippet: output, timestamp: isoTimestamp(),
     ...(verifiedBy && { verified_by: verifiedBy }), ...(taskId && { task_id: taskId }), ...stamp, ...(tree !== null && { tree }),

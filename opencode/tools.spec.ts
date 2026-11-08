@@ -1,7 +1,7 @@
 import type { Plugin } from "@opencode/plugin";
 import type { Info, ToolContext, ToolEditor } from "@opencode/plugin/promise/tool";
 import { afterEach, expect, spyOn, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { tools as astTools } from "../servers/tools/ast.ts";
@@ -291,6 +291,19 @@ test("evidence validates integer exits, deduplicates call retries, and preserves
   writeFileSync(ledger(f.a), "broken");
   await expect(f.call("evidence_log", evidence)).rejects.toThrow(`${ledger(f.a)} is not an evidence ledger ({"entries": [...]}); move it aside to keep logging evidence`);
   expect(readFileSync(ledger(f.a), "utf8")).toBe("broken");
+});
+
+test("logging evidence rotates a ledger past its cap, as the omca server does at start", async () => {
+  const f = await fake();
+  await f.call("evidence_log", evidence);
+  const [first] = JSON.parse(readFileSync(ledger(f.a), "utf8")).entries;
+  writeFileSync(ledger(f.a), JSON.stringify({ version: 1, entries: Array.from({ length: 1001 }, (_, i) => ({ ...first, command: `cmd-${i}` })) }));
+  await f.call("evidence_log", { ...evidence, command: "after" });
+  const live = JSON.parse(readFileSync(ledger(f.a), "utf8")).entries;
+  expect(live.map((entry: { command: string }) => entry.command)).toEqual([...Array.from({ length: 500 }, (_, i) => `cmd-${i + 501}`), "after"]);
+  const archives = readdirSync(dirname(ledger(f.a))).filter((name) => /^verification-evidence\.\d{6}\.json$/.test(name));
+  expect(archives).toHaveLength(1);
+  expect(JSON.parse(readFileSync(join(dirname(ledger(f.a)), archives[0] ?? ""), "utf8")).entries).toHaveLength(501);
 });
 
 test("evidence deduplication includes the native message identity", async () => {
