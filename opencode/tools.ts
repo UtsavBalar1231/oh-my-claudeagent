@@ -77,12 +77,15 @@ async function evidenceLog(args: Record<string, unknown>, scope: RequestScope, c
   const output = cap(a.string("output_snippet"), SNIPPET_MAX_CHARS);
   const verifiedBy = cap(a.string("verified_by", ""), VERIFIED_BY_MAX_CHARS);
   const taskId = cap(a.string("task_id", ""), TASK_ID_MAX_CHARS);
-  const finalTask = async () => {
-    if (!readTaskFiles(scope.root).tasks.some((task) => task.id === taskId && task.isFinal)) throw new Error("final_verification requires the task_id of a run's final task");
+  const finalTask = () => {
+    const task = readTaskFiles(scope.root).tasks.find((each) => each.id === taskId && each.isFinal);
+    if (task === undefined) throw new Error("final_verification requires the task_id of a run's final task");
+    return task;
   };
+  let stamp = {};
   if (type === "final_verification") {
     await scope.paths("read", [join(scope.root, TASKS_DIR)], true);
-    await finalTask();
+    stamp = { run: finalTask().run, task_list: TASKS_DIR };
   }
   const path = join(scope.root, LEDGER);
   await scope.paths("read", [path, `${path}.lock`], true);
@@ -93,14 +96,14 @@ async function evidenceLog(args: Record<string, unknown>, scope: RequestScope, c
   const tree = await workingTreeStamp(scope.root);
   const total = await appendEvidence(scope.root, {
     type, command, exit_code: exitCode, output_snippet: output, timestamp: isoTimestamp(),
-    ...(verifiedBy && { verified_by: verifiedBy }), ...(taskId && { task_id: taskId }), ...(tree !== null && { tree }),
+    ...(verifiedBy && { verified_by: verifiedBy }), ...(taskId && { task_id: taskId }), ...stamp, ...(tree !== null && { tree }),
     origin: "attested", record_id: recordID,
     provenance: { adapter: "opencode", session_id: context.sessionID, message_id: context.messageID, call_id: context.id },
   }, async () => {
     await initializeState();
     await scope.current();
     ownedPath(scope.root, path);
-    if (type === "final_verification") await finalTask();
+    if (type === "final_verification") finalTask();
   });
   return `Attested evidence recorded: ${type} (exit ${exitCode}), ${total} total entries`;
 }

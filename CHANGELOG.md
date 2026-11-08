@@ -13,7 +13,8 @@ task list and find it empty. `start-work` then reports that no run is open and n
 when you pass the old plan file. OpenCode's `/omca-start-work <path>` turns that document into
 tasks. Nothing reads `.omca/state/boulder.json` any more and nothing deletes it, so delete it by
 hand. `.omca/plans/*.md` stay on disk as documents that nothing reads. Evidence entries keep
-working, but `plan_sha256` is ignored and an entry with no `task_id` proves no task. Notepads are
+working, but `plan_sha256` is ignored and an entry without `task_id`, `run` and `task_list` proves
+no task. Notepads are
 unchanged. Allow rules that name `boulder_*` match nothing and do no harm. The task tools now turn on
 in every session, which brings Claude Code's `todo_reminder` nudge, and each checkout gets one
 shared task list. `OMCA_DISABLED_HOOKS=plan-continuation` is now `task-continuation`;
@@ -33,7 +34,10 @@ shared task list. `OMCA_DISABLED_HOOKS=plan-continuation` is now `task-continuat
   back, and a page for its full description, dependencies and metadata. Finished tasks stay after
   Claude Code deletes the list, until `/clear`.
 - **`task_id` on evidence entries:** the evidence ledger schema allows `task_id`, the id of the task
-  a `final_verification` entry closes.
+  a `final_verification` entry closes. `evidence_log` adds that task's `run` and `task_list` and
+  refuses a `task_id` that is not a final task on the session's list, and the final task accepts
+  only a verdict whose id, run and list all match, so an id that repeats on another list, such as
+  OpenCode's beside Claude Code's, closes nothing.
 - **Task list for every agent:** `task_list` and `task_get` read a run's tasks from any agent,
   including the background subagents that have none of Claude Code's task tools, and show the run,
   final and blocked marks those tools leave out. The reviewer, the analyzer and the architect's

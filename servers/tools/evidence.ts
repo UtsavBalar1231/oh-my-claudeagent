@@ -3,7 +3,7 @@ import { entriesOf, EVIDENCE_TYPES, type EvidenceType, readLedger } from "../../
 import { STATE_VERSION } from "../../src/core/state-version.ts";
 import { isRecord } from "../../src/core/tool-input.ts";
 import { latestSessionId, touchSession } from "../hooks/session-state.ts";
-import { ledgerPath, writeStatus } from "../hooks/status-file.ts";
+import { ledgerPath, readTaskList, writeStatus } from "../hooks/status-file.ts";
 import { ensureStateDir, readOrNull, withLock, writeFileAtomic } from "../io.ts";
 import type { Tool } from "../omca.ts";
 import { workingTreeStamp } from "../tree-stamp.ts";
@@ -78,6 +78,14 @@ function updateStatus(root: string): void {
   }
 }
 
+/** The run and list of the final task a verdict names, so a verdict for one list's task #N never closes another list's. */
+function verdictStamp(root: string, taskId: string): { run: string; task_list: string } {
+  const list = readTaskList(root, latestSessionId() ?? process.env.CLAUDE_CODE_SESSION_ID ?? "");
+  const task = list.tasks.find(({ id }) => id === taskId);
+  if (task?.isFinal !== true) throw new Error(`evidence_log: task #${taskId} is not a final task on this session's task list; name the run's final task in task_id`);
+  return { run: task.run, task_list: list.id };
+}
+
 async function evidenceLog(args: Record<string, unknown>): Promise<string> {
   const arg = argReader(args, "evidence_log").string;
   const type = arg("evidence_type");
@@ -89,8 +97,9 @@ async function evidenceLog(args: Record<string, unknown>): Promise<string> {
   if (typeof exitCode !== "number" || !Number.isInteger(exitCode)) throw new Error("evidence_log: exit_code must be an integer");
   const snippet = arg("output_snippet");
   const verifiedBy = arg("verified_by", "");
-  const taskId = arg("task_id", "");
+  const taskId = capped(arg("task_id", ""), TASK_ID_MAX_CHARS);
   const root = rootOf(arg("working_directory", ""));
+  const stamp = type === "final_verification" && taskId !== "" ? verdictStamp(root, taskId) : {};
   const tree = await workingTreeStamp(root);
 
   const entry = {
@@ -100,7 +109,8 @@ async function evidenceLog(args: Record<string, unknown>): Promise<string> {
     output_snippet: capped(snippet, SNIPPET_MAX_CHARS),
     timestamp: isoTimestamp(),
     ...(verifiedBy && { verified_by: capped(verifiedBy, VERIFIED_BY_MAX_CHARS) }),
-    ...(taskId && { task_id: capped(taskId, TASK_ID_MAX_CHARS) }),
+    ...(taskId && { task_id: taskId }),
+    ...stamp,
     ...(tree !== null && { tree }),
   };
   ensureStateDir(root);

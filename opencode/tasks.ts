@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { provesTask, readLedger } from "../src/core/evidence.ts";
+import { namesTask, provesTask, readLedger } from "../src/core/evidence.ts";
 import { isHookDisabled } from "../src/core/kill-switch.ts";
 import { isOpen, type NativeTask, parseTask } from "../src/core/native-tasks.ts";
 import { LEDGER } from "../src/core/omca-paths.ts";
@@ -90,11 +90,12 @@ function verdictRefusal(root: string, task: NativeTask, change: TaskChange): str
   const ledger = readLedger(readLocal(root, join(root, LEDGER))?.toString("utf8") ?? "{}");
   if (ledger.kind === "refused") return INVALID_LEDGER_REASON;
   const log = `omca_evidence_log(evidence_type="final_verification", command="<what the review covered>", output_snippet="<the verdict>", task_id="${task.id}"`;
+  const ref = { list: TASKS_DIR, run: task.run, id: task.id };
   if (change.status === "completed") {
-    if (ledger.entries.some((entry) => provesTask(entry, task.id))) return undefined;
+    if (ledger.entries.some((entry) => provesTask(entry, ref))) return undefined;
     return `Task #${task.id} '${task.subject}' is the final task of run '${task.run}', and no passing final verification names it. Review the run, then record the verdict: ${log}, exit_code=0). If the review finds a gap, fix it and review again.`;
   }
-  if (ledger.entries.some((entry) => entry.type === "final_verification" && entry.taskId === task.id)) return undefined;
+  if (ledger.entries.some((entry) => namesTask(entry, ref))) return undefined;
   return `Task #${task.id} is the final task of run '${task.run}', and no final verification names it. Record the verdict first: ${log}, exit_code=<0 for COMPLETE, 1 for INCOMPLETE>).`;
 }
 

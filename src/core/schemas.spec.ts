@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { tools as evidenceTools } from "../../servers/tools/evidence.ts";
@@ -52,9 +52,24 @@ function validate(schema: Schema, value: unknown, path = "$"): string[] {
 }
 
 const roots: string[] = [];
+const { CLAUDE_CONFIG_DIR, CLAUDE_CODE_TASK_LIST_ID } = process.env;
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+  for (const [name, value] of Object.entries({ CLAUDE_CONFIG_DIR, CLAUDE_CODE_TASK_LIST_ID })) {
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
 });
+
+/** A run's final task #3 on the list the session reads, so a final verification can name it. */
+function finalTaskListed(): void {
+  const config = mkdtempSync(join(tmpdir(), "omca-schemas-config-"));
+  roots.push(config);
+  process.env.CLAUDE_CONFIG_DIR = config;
+  process.env.CLAUDE_CODE_TASK_LIST_ID = "omca-schemas";
+  mkdirSync(join(config, "tasks", "omca-schemas"), { recursive: true });
+  writeFileSync(join(config, "tasks", "omca-schemas", "3.json"), JSON.stringify({ id: "3", subject: "Final verification", status: "pending", metadata: { run: "docs", final: true } }));
+}
 
 function project(): string {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "omca-schemas-")));
@@ -71,6 +86,7 @@ const callTool = async (tools: { name: string; call: (args: Record<string, unkno
 
 async function writtenLedger(): Promise<Json> {
   const root = project();
+  finalTaskListed();
   const base = { evidence_type: "test", command: "just test", exit_code: 0, output_snippet: "5 passed", working_directory: root };
   await callTool(evidenceTools, "evidence_log", base);
   await callTool(evidenceTools, "evidence_log", { ...base, evidence_type: "final_verification", verified_by: "executor", task_id: "3" });
@@ -97,7 +113,7 @@ describe("evidence ledger schema", () => {
     const entries = ledger["entries"] as Json[];
     expect(entries).toHaveLength(2);
     expectMatches(LEDGER.properties?.["entries"]?.items ?? {}, entries, { optional: ["tree"] });
-    expect(entries.map((entry) => Object.keys(entry).length)).toEqual([6, 8]);
+    expect(entries.map((entry) => Object.keys(entry).length)).toEqual([6, 10]);
   });
 
   test("holds the writer's version and entry types", () => {

@@ -38,10 +38,10 @@ afterEach(() => {
 const update = (input: Record<string, unknown>) => dispatch({ event: "PreToolUse", session_id: SESSION, tool_name: "TaskUpdate", tool_input: input }, root, NOW);
 const isDenied = (output: unknown): boolean => JSON.stringify(output).includes('"permissionDecision":"deny"');
 
-function logVerdict(exitCode: number, taskId: string): void {
+function logVerdict(exitCode: number, taskId: string, stamp: Record<string, string> = { run: "demo", task_list: "demo-list" }): void {
   const path = ledgerPath(root);
   mkdirSync(join(root, ".omca", "evidence"), { recursive: true });
-  writeFileSync(path, JSON.stringify({ version: 1, entries: [{ type: "final_verification", command: "review", exit_code: exitCode, output_snippet: "verdict", timestamp: "2026-10-02T12:05:00Z", task_id: taskId }] }));
+  writeFileSync(path, JSON.stringify({ version: 1, entries: [{ type: "final_verification", command: "review", exit_code: exitCode, output_snippet: "verdict", timestamp: "2026-10-02T12:05:00Z", task_id: taskId, ...stamp }] }));
 }
 
 describe("the final task", () => {
@@ -62,6 +62,13 @@ describe("the final task", () => {
 
   test("a verdict for another task does not count", async () => {
     logVerdict(0, "9");
+    expect(isDenied(await update({ taskId: "2", status: "deleted" }))).toBe(true);
+  });
+
+  test("a verdict for the same id on another list or in another run does not count", async () => {
+    logVerdict(0, "2", { run: "demo", task_list: ".omca/state/tasks" });
+    expect(isDenied(await update({ taskId: "2", status: "deleted" }))).toBe(true);
+    logVerdict(0, "2", { run: "other", task_list: "demo-list" });
     expect(isDenied(await update({ taskId: "2", status: "deleted" }))).toBe(true);
   });
 

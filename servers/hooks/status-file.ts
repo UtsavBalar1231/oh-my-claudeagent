@@ -82,20 +82,23 @@ function taskListIdOf(root: string, sessionId: string, atPrompt: boolean): strin
   return typeof named === "string" && named !== "" ? named : sessionId;
 }
 
+export type TaskList = { id: string; tasks: NativeTask[] };
+
 /**
- * The session's native task list in id order, as `runState` needs it. The client deletes a finished
- * list on its own, so a missing directory is an empty list and a file gone or torn mid-read is skipped.
+ * The session's native task list and its tasks in id order, as `runState` needs them. The client deletes a
+ * finished list on its own, so a missing directory is an empty list and a file gone or torn mid-read is skipped.
  */
-export function readTasks(root: string, sessionId: string, { atPrompt = false }: ReadOptions = {}): NativeTask[] {
+export function readTaskList(root: string, sessionId: string, { atPrompt = false }: ReadOptions = {}): TaskList {
+  const id = taskListIdOf(root, sessionId, atPrompt);
   const config = configDir(process.env);
-  if (config === undefined) return [];
-  const dir = taskListDir(toPlatform(process.platform), config, taskListIdOf(root, sessionId, atPrompt));
+  if (config === undefined) return { id, tasks: [] };
+  const dir = taskListDir(toPlatform(process.platform), config, id);
   let names: string[];
   try {
     names = readdirSync(dir);
   } catch (error) {
     if (!isMissing(error)) console.error(`omca: could not list the tasks in ${dir}:`, error);
-    return [];
+    return { id, tasks: [] };
   }
   const tasks = names
     .filter((name) => name.endsWith(".json") && !name.startsWith("."))
@@ -106,8 +109,10 @@ export function readTasks(root: string, sessionId: string, { atPrompt = false }:
         return [];
       }
     });
-  return withHistory([], tasks);
+  return { id, tasks: withHistory([], tasks) };
 }
+
+export const readTasks = (root: string, sessionId: string, options: ReadOptions = {}): NativeTask[] => readTaskList(root, sessionId, options).tasks;
 
 export type OpenRun = { name: string; open: readonly NativeTask[]; next: NativeTask };
 

@@ -1,11 +1,11 @@
-import { readLedger } from "../../src/core/evidence.ts";
+import { namesTask, readLedger } from "../../src/core/evidence.ts";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
 import { field, inputText, isRecord } from "../../src/core/tool-input.ts";
 import { INVALID_LEDGER_REASON } from "../../src/core/verification.ts";
 import { readOrNull } from "../io.ts";
 import { preToolUseDeny } from "./deny.ts";
 import type { Handler } from "./registry.ts";
-import { ledgerPath, readTasks } from "./status-file.ts";
+import { ledgerPath, readTaskList } from "./status-file.ts";
 
 // Completing the final task needs a passing verdict, which `TaskCompleted` enforces. Marking it blocked
 // or deleting it fires no such event, so either needs a verdict of any outcome: a run can be abandoned, not dodged.
@@ -18,7 +18,8 @@ export const handle: Handler = (payload, { root }) => {
   if (!unmarks && !hides && inputText(payload.tool_input, "status") !== "deleted" && (typeof blocked !== "string" || blocked === "")) return;
   const rawId = field(payload.tool_input, "taskId");
   const taskId = typeof rawId === "number" && Number.isFinite(rawId) ? String(rawId) : inputText(payload.tool_input, "taskId");
-  const task = readTasks(root, payload.session_id).find(({ id }) => id === taskId);
+  const list = readTaskList(root, payload.session_id);
+  const task = list.tasks.find(({ id }) => id === taskId);
   if (task?.isFinal !== true) return;
   if (unmarks) return preToolUseDeny(`Task #${taskId} is the final task of run '${task.run}', and it stays final.`);
   if (hides) return preToolUseDeny(`Task #${taskId} is the final task of run '${task.run}', and it stays final: an internal task drops out of the run.`);
@@ -31,7 +32,7 @@ export const handle: Handler = (payload, { root }) => {
   }
   const ledger = readLedger(text ?? "{}");
   if (ledger.kind === "refused") return preToolUseDeny(INVALID_LEDGER_REASON);
-  if (ledger.entries.some((entry) => entry.type === "final_verification" && entry.taskId === taskId)) return;
+  if (ledger.entries.some((entry) => namesTask(entry, { list: list.id, run: task.run, id: taskId }))) return;
   return preToolUseDeny(
     `Task #${taskId} is the final task of run '${task.run}', and no final verification names it. Record the verdict first: evidence_log(evidence_type="final_verification", command="<what the review covered>", exit_code=<0 for COMPLETE, 1 for INCOMPLETE>, output_snippet="<verdict, and why the run stops here>", task_id="${taskId}").`,
   );

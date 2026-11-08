@@ -283,13 +283,15 @@ describe("a run's final task", () => {
       "If the review finds a gap, fix it and review again.",
   };
 
-  const verdict = (fields: Record<string, unknown> = {}): Record<string, unknown> => ({
+  const verdict = (list: string, fields: Record<string, unknown> = {}): Record<string, unknown> => ({
     type: "final_verification",
     command: "reviewer: the whole run",
     exit_code: 0,
     output_snippet: "COMPLETE",
     timestamp: "2026-10-02T12:00:00Z",
     task_id: "3",
+    run: "test-run",
+    task_list: list,
     ...fields,
   });
 
@@ -318,32 +320,45 @@ describe("a run's final task", () => {
 
   test("the final task closes with a passing final verification logged for its id", async () => {
     const { root, sessionId } = listed();
-    withEntries(root, verdict());
+    withEntries(root, verdict(sessionId));
     expect(await closing(root, sessionId)).toEqual({});
   });
 
   test("a final verification logged for another task id does not count", async () => {
     const { root, sessionId } = listed();
-    withEntries(root, verdict({ task_id: "2" }));
+    withEntries(root, verdict(sessionId, { task_id: "2" }));
+    expect(await closing(root, sessionId)).toEqual(FINAL_BLOCK);
+  });
+
+  test("a passing verdict for the same id on another list, or in another run, does not count", async () => {
+    const { root, sessionId } = listed();
+    withEntries(root, verdict(".omca/state/tasks"), verdict("omca-other-checkout-1a2b3c4d"), verdict(sessionId, { run: "earlier-run" }));
+    expect(await closing(root, sessionId)).toEqual(FINAL_BLOCK);
+  });
+
+  test("a passing verdict logged without its run and list does not count", async () => {
+    const { root, sessionId } = listed();
+    const { run: _run, task_list: _list, ...unstamped } = verdict(sessionId);
+    withEntries(root, unstamped);
     expect(await closing(root, sessionId)).toEqual(FINAL_BLOCK);
   });
 
   test("a final verification with no task id does not count", async () => {
     const { root, sessionId } = listed();
-    const { task_id: _taskId, ...unscoped } = verdict();
+    const { task_id: _taskId, ...unscoped } = verdict(sessionId);
     withEntries(root, unscoped);
     expect(await closing(root, sessionId)).toEqual(FINAL_BLOCK);
   });
 
   test("a failing final verification for its id does not count", async () => {
     const { root, sessionId } = listed();
-    withEntries(root, verdict({ exit_code: 1 }));
+    withEntries(root, verdict(sessionId, { exit_code: 1 }));
     expect(await closing(root, sessionId)).toEqual(FINAL_BLOCK);
   });
 
   test("another evidence type naming its id does not count", async () => {
     const { root, sessionId } = listed();
-    withEntries(root, verdict({ type: "test" }));
+    withEntries(root, verdict(sessionId, { type: "test" }));
     expect(await closing(root, sessionId)).toEqual(FINAL_BLOCK);
   });
 
@@ -379,7 +394,7 @@ describe("a run's final task", () => {
 
   test.skipIf(process.platform === "win32" || process.getuid?.() === 0)("a ledger with no read permission blocks as invalid", async () => {
     const { root, sessionId } = listed();
-    withEntries(root, verdict());
+    withEntries(root, verdict(sessionId));
     chmodSync(ledgerPath(root), 0o000);
     expect(await closing(root, sessionId)).toEqual(INVALID_BLOCK);
   });
@@ -398,7 +413,7 @@ describe("a run's final task", () => {
 
   test("a malformed entry beside the verdict does not hide it", async () => {
     const { root, sessionId } = listed();
-    withEntries(root, { type: "test" }, verdict());
+    withEntries(root, { type: "test" }, verdict(sessionId));
     expect(await closing(root, sessionId)).toEqual({});
   });
 
@@ -424,7 +439,7 @@ describe("a run's final task", () => {
 
   test("the proof is read from the ledger, then the unlogged verification check runs", async () => {
     const { root, sessionId } = listed();
-    withEntries(root, verdict());
+    withEntries(root, verdict(sessionId));
     utimesSync(ledgerPath(root), NOW_S - 600, NOW_S - 600);
     await record(root, sessionId);
     expect(await closing(root, sessionId)).toEqual(BLOCK);

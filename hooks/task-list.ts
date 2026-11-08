@@ -1,4 +1,5 @@
 import type { CommandRunResult, RenderElement, Timer } from "claude-code";
+import { namesTask } from "../src/core/evidence.ts";
 import { windowEnd } from "../src/core/list-window.ts";
 import { groupTasks, isOpen, type NativeTask, openBlockers, parseTask, runState, TASK_TOOLS_OFF, type TaskGroup, taskListDir, withHistory } from "../src/core/native-tasks.ts";
 import { arrange, COLUMN_GAP, displayWidth, fitEnd, formatWhen, type Glyphs, glyphs, KEYS, oneLine, padStart, usableColumns, wrapText } from "../src/core/ui-kit.ts";
@@ -69,13 +70,14 @@ async function readList(host: Host, dir: string): Promise<NativeTask[]> {
  */
 async function sync(host: Host, forgotten?: string): Promise<void> {
   const [{ platform, config }, sessionId, named] = await Promise.all([sessionOf(host), host.session.id(), host.env.CLAUDE_CODE_TASK_LIST_ID()]);
+  const list = named === undefined || named === "" ? sessionId : named;
   let read: NativeTask[] = [];
   let error: string | null = null;
   if (config === undefined) {
     error = "None of HOME, USERPROFILE or CLAUDE_CONFIG_DIR is set";
   } else {
     try {
-      read = await readList(host, taskListDir(platform, config, named === undefined || named === "" ? sessionId : named));
+      read = await readList(host, taskListDir(platform, config, list));
     } catch (failure) {
       error = reason(failure);
     }
@@ -83,7 +85,7 @@ async function sync(host: Host, forgotten?: string): Promise<void> {
   const hasTools = read.length > 0 || (await hasTaskTools(host));
   await update(host.state.tasks, (previous) => {
     const tasks = withHistory(previous?.tasks ?? [], read, forgotten);
-    const next = { tasks, hasTools, isCleared: read.length === 0 && tasks.length > 0, error };
+    const next = { tasks, hasTools, isCleared: read.length === 0 && tasks.length > 0, error, list };
     return JSON.stringify(previous) === JSON.stringify(next) ? previous : next;
   });
 }
@@ -532,13 +534,13 @@ function linkUnits(host: Host, view: View, name: string, ids: readonly string[],
   return [{ element: Line(kit, rulePieces(view, [label(name)], tail)), rows: 1 }, ...rows];
 }
 
-function verdictUnits(view: View, task: NativeTask, ledger: Ledger | undefined): Unit[] {
+function verdictUnits(view: View, task: NativeTask, list: string, ledger: Ledger | undefined): Unit[] {
   const { kit, g, width } = view;
   const one = (pieces: readonly Piece[]): Unit => ({ element: Line(kit, fitPieces(pieces, width, g.ellipsis)), rows: 1 });
   const head = { element: Line(kit, rulePieces(view, [label("Verdict")])), rows: 1 };
   if (ledger === undefined) return [head, one([muted("The evidence ledger has not been read yet.")])];
   if (ledger.error !== null) return [head, ...wrapPieces([{ text: shownText(view, ledger.error), color: TONE_KEYS.fail }], width).map(one)];
-  const entry = ledger.entries.findLast((each) => each.type === "final_verification" && each.taskId === task.id);
+  const entry = ledger.entries.findLast((each) => namesTask(each, { list, run: task.run, id: task.id }));
   if (entry === undefined) return [head, one([muted(`No verdict names #${task.id} yet`)])];
   const isPass = entry.exitCode === 0;
   const outcome: Piece[] = [
@@ -550,7 +552,7 @@ function verdictUnits(view: View, task: NativeTask, ledger: Ledger | undefined):
   return [head, one(outcome), ...(said === "" ? [] : [one([muted(said)])])];
 }
 
-async function page(host: Host, view: View, task: NativeTask, tasks: readonly NativeTask[]): Promise<RenderElement[]> {
+async function page(host: Host, view: View, task: NativeTask, tasks: readonly NativeTask[], list: string): Promise<RenderElement[]> {
   const { kit, g, width } = view;
   const group = groupOf(task, tasks);
   const mark = markOf(g, group, task);
@@ -574,7 +576,7 @@ async function page(host: Host, view: View, task: NativeTask, tasks: readonly Na
   }));
   const units: Unit[] = [
     ...(task.blockedReason === "" ? [] : why),
-    ...(task.isFinal ? section(verdictUnits(view, task, ledger)) : []),
+    ...(task.isFinal ? section(verdictUnits(view, task, list, ledger)) : []),
     ...section(linkUnits(host, view, "Waits on", task.blockedBy, task, tasks)),
     ...section(linkUnits(host, view, "Holds up", task.blocks, task, tasks)),
     ...section(description.length === 0 ? [] : [{ element: Line(kit, rulePieces(view, [label("Description")])), rows: 1 }, ...description]),
@@ -629,7 +631,7 @@ const content = async (host: Host, view: View): Promise<readonly RenderElement[]
   const shown = tasks.find((task) => task.id === opened);
   if (shown !== undefined) {
     laid = undefined;
-    return page(host, view, shown, tasks);
+    return page(host, view, shown, tasks, snapshot.list);
   }
   opened = undefined;
   return list(host, view, tasks, snapshot.isCleared);

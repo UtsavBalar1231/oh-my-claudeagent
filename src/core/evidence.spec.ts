@@ -8,6 +8,7 @@ import {
   ledgerCoversSlot,
   MAX_SLOT_AGE_SECONDS,
   MTIME_SLACK_SECONDS,
+  namesTask,
   nextTypeFilter,
   parseLedger,
   placeEntries,
@@ -117,6 +118,8 @@ const run = (overrides: Partial<Evidence>): Evidence => ({
   snippet: "",
   verifiedBy: "executor",
   taskId: "",
+  run: "",
+  taskList: "",
   tree: "",
   ...overrides,
 });
@@ -130,7 +133,7 @@ describe("parseLedger", () => {
         { type: "lint", command: "just lint", exit_code: "0", timestamp: "2026-10-02T12:07:00Z" },
         { type: "lint", command: "just lint", exit_code: 0, timestamp: "not a time" },
         null,
-        { type: "final_verification", command: "just ci", exit_code: 1, timestamp: "2026-10-02T12:08:00Z", verified_by: "", plan_sha256: "ab", task_id: "7" },
+        { type: "final_verification", command: "just ci", exit_code: 1, timestamp: "2026-10-02T12:08:00Z", verified_by: "", plan_sha256: "ab", task_id: "7", run: "docs", task_list: "omca-repo-1a2b3c4d" },
       ],
     });
     expect(parseLedger(text)).toEqual([
@@ -141,10 +144,12 @@ describe("parseLedger", () => {
         at: at("2026-10-02T12:05:00Z"),
         snippet: "10 passed",
         verifiedBy: "oh-my-claudeagent:executor",
-  taskId: "",
+        taskId: "",
+        run: "",
+        taskList: "",
         tree: "",
       },
-      { type: "final_verification", command: "just ci", exitCode: 1, at: at("2026-10-02T12:08:00Z"), snippet: "", verifiedBy: null, taskId: "7", tree: "" },
+      { type: "final_verification", command: "just ci", exitCode: 1, at: at("2026-10-02T12:08:00Z"), snippet: "", verifiedBy: null, taskId: "7", run: "docs", taskList: "omca-repo-1a2b3c4d", tree: "" },
     ]);
   });
 
@@ -321,11 +326,30 @@ describe("treeMovedSince", () => {
   });
 });
 
-test("provesTask holds only for a passing final verification logged for that task", () => {
-  const entry = (fields: Record<string, unknown>) => ({ type: "final_verification", exitCode: 0, command: "review", at: 0, snippet: "", verifiedBy: null, taskId: "7", tree: "", ...fields }) as Evidence;
-  expect(provesTask(entry({}), "7")).toBe(true);
-  expect(provesTask(entry({}), "8")).toBe(false);
-  expect(provesTask(entry({ exitCode: 1 }), "7")).toBe(false);
-  expect(provesTask(entry({ type: "test" }), "7")).toBe(false);
-  expect(provesTask(entry({ taskId: "" }), "7")).toBe(false);
+describe("a verdict names one task of one run on one list", () => {
+  const task = { list: "omca-repo-1a2b3c4d", run: "docs", id: "7" };
+  const verdict = (overrides: Partial<Evidence>) => run({ type: "final_verification", taskId: "7", run: "docs", taskList: "omca-repo-1a2b3c4d", ...overrides });
+
+  test("provesTask holds only for a passing verdict with the task's id, run and list", () => {
+    expect(provesTask(verdict({}), task)).toBe(true);
+    expect(provesTask(verdict({ exitCode: 1 }), task)).toBe(false);
+    expect(provesTask(verdict({ type: "test" }), task)).toBe(false);
+  });
+
+  test("the same id on another list, or in another run, proves nothing", () => {
+    expect(provesTask(verdict({ taskList: ".omca/state/tasks" }), task)).toBe(false);
+    expect(provesTask(verdict({ run: "release" }), task)).toBe(false);
+    expect(provesTask(verdict({ taskId: "8" }), task)).toBe(false);
+  });
+
+  test("a verdict logged without its run and list proves nothing, even for a task whose list or run reads empty", () => {
+    expect(provesTask(verdict({ run: "", taskList: "" }), task)).toBe(false);
+    expect(provesTask(verdict({ taskList: "" }), { ...task, list: "" })).toBe(false);
+    expect(provesTask(verdict({ taskId: "" }), task)).toBe(false);
+  });
+
+  test("namesTask ignores the outcome, so a failing verdict still names its task", () => {
+    expect(namesTask(verdict({ exitCode: 1 }), task)).toBe(true);
+    expect(namesTask(verdict({ exitCode: 1, taskList: "other" }), task)).toBe(false);
+  });
 });

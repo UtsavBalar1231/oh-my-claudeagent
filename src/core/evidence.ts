@@ -30,9 +30,15 @@ export type Evidence = {
   snippet: string;
   verifiedBy: string | null;
   taskId: string;
+  /** The run and the list of the task a final verification names, stamped when it was logged; empty on other entries. */
+  run: string;
+  taskList: string;
   /** The working tree the server stamped when the entry was logged; empty when it could not. */
   tree: string;
 };
+
+/** A task as a verdict names it. Ids restart on each task list, and lists share one ledger per checkout. */
+export type TaskRef = { list: string; run: string; id: string };
 
 const isType = (value: unknown): value is EvidenceType => EVIDENCE_TYPES.some((type) => type === value);
 
@@ -44,7 +50,7 @@ export function entriesOf(data: unknown): unknown[] | undefined {
 
 function toEvidence(raw: unknown): Evidence[] {
   if (!isRecord(raw)) return [];
-  const { type, command, exit_code: exitCode, timestamp, output_snippet: snippet, verified_by: verifiedBy, task_id: taskId, tree } = raw;
+  const { type, command, exit_code: exitCode, timestamp, output_snippet: snippet, verified_by: verifiedBy, task_id: taskId, run, task_list: taskList, tree } = raw;
   const at = typeof timestamp === "string" ? Date.parse(timestamp) : Number.NaN;
   if (!isType(type) || typeof command !== "string" || typeof exitCode !== "number" || Number.isNaN(at)) return [];
   return [
@@ -56,6 +62,8 @@ function toEvidence(raw: unknown): Evidence[] {
       snippet: typeof snippet === "string" ? snippet : "",
       verifiedBy: typeof verifiedBy === "string" && verifiedBy !== "" ? verifiedBy : null,
       taskId: typeof taskId === "string" ? taskId : "",
+      run: typeof run === "string" ? run : "",
+      taskList: typeof taskList === "string" ? taskList : "",
       tree: typeof tree === "string" ? tree : "",
     },
   ];
@@ -86,8 +94,12 @@ export function parseLedger(text: string): Evidence[] {
   return read.entries;
 }
 
-/** Whether a passing final verification was logged for this task of a run. */
-export const provesTask = (entry: Evidence, taskId: string): boolean => entry.type === "final_verification" && entry.exitCode === 0 && entry.taskId === taskId;
+/** Whether the entry is a final verification logged for this task: the same id, run and list. */
+export const namesTask = (entry: Evidence, task: TaskRef): boolean =>
+  entry.type === "final_verification" && entry.taskList !== "" && entry.taskList === task.list && entry.run === task.run && entry.taskId === task.id;
+
+/** Whether a passing final verification was logged for this task. */
+export const provesTask = (entry: Evidence, task: TaskRef): boolean => namesTask(entry, task) && entry.exitCode === 0;
 
 /** Whether a later entry saw a different working tree, so the code moved after this entry ran. */
 export function treeMovedSince(entries: readonly Evidence[], entry: Evidence): boolean {

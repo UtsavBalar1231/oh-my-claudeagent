@@ -13,6 +13,8 @@ const ISO_SECONDS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 
 const roots: string[] = [];
 const servers: Bun.Subprocess[] = [];
+const { CLAUDE_CONFIG_DIR, CLAUDE_CODE_TASK_LIST_ID } = process.env;
+const LIST = "omca-evidence-spec";
 
 // A killed process keeps its working directory open on Windows until it has exited, so the directory is removed only after the exit.
 afterEach(async () => {
@@ -21,7 +23,21 @@ afterEach(async () => {
     await server.exited;
   }
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+  for (const [name, value] of Object.entries({ CLAUDE_CONFIG_DIR, CLAUDE_CODE_TASK_LIST_ID })) {
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
 });
+
+/** Puts a run's task on the list the session reads: `CLAUDE_CODE_TASK_LIST_ID` under a scratch config directory. */
+function onList(id: string, metadata: Record<string, unknown>): void {
+  const config = mkdtempSync(join(tmpdir(), "omca-evidence-config-"));
+  roots.push(config);
+  process.env.CLAUDE_CONFIG_DIR = config;
+  process.env.CLAUDE_CODE_TASK_LIST_ID = LIST;
+  mkdirSync(join(config, "tasks", LIST), { recursive: true });
+  writeFileSync(join(config, "tasks", LIST, `${id}.json`), JSON.stringify({ id, subject: "Final verification", description: "", status: "pending", blocks: [], blockedBy: [], metadata }));
+}
 
 function project(): string {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "omca-evidence-")));
@@ -216,12 +232,29 @@ describe("evidence_log", () => {
     expect(Object.keys(entries(root)[0])).toEqual(["type", "command", "exit_code", "output_snippet", "timestamp"]);
   });
 
-  test("evidence_log with task_id stores it after verified_by and before the tree stamp", async () => {
+  test("a final verification stores task_id, then the task's run and list, after verified_by and before the tree stamp", async () => {
     const root = project();
+    onList("7", { run: "docs", final: true });
     await log(root, { evidence_type: "final_verification", verified_by: "orchestrator", task_id: "7" });
     const [stored] = entries(root);
-    expect(Object.keys(stored)).toEqual(["type", "command", "exit_code", "output_snippet", "timestamp", "verified_by", "task_id", "tree"]);
-    expect(stored.task_id).toBe("7");
+    expect(Object.keys(stored)).toEqual(["type", "command", "exit_code", "output_snippet", "timestamp", "verified_by", "task_id", "run", "task_list", "tree"]);
+    expect([stored.task_id, stored.run, stored.task_list]).toEqual(["7", "docs", LIST]);
+  });
+
+  test("a final verification naming a task that is not a final task on the list is refused, and nothing is written", async () => {
+    const root = project();
+    onList("7", { run: "docs" });
+    for (const taskId of ["7", "8"]) {
+      await expect(log(root, { evidence_type: "final_verification", task_id: taskId })).rejects.toThrow(`task #${taskId} is not a final task on this session's task list`);
+    }
+    expect(existsSync(ledgerFile(root))).toBe(false);
+  });
+
+  test("another evidence type keeps its task_id and is not stamped", async () => {
+    const root = project();
+    onList("7", { run: "docs", final: true });
+    await log(root, { task_id: "7" });
+    expect(entries(root)[0]).not.toHaveProperty("task_list");
   });
 
   test("evidence_log without task_id, or with an empty one, omits the key", async () => {
@@ -239,7 +272,7 @@ describe("evidence_log", () => {
 
   test("evidence_log caps a long task_id at 200 characters", async () => {
     const root = project();
-    await log(root, { evidence_type: "final_verification", task_id: "9".repeat(500) });
+    await log(root, { task_id: "9".repeat(500) });
     expect(entries(root)[0].task_id).toBe("9".repeat(200));
   });
 

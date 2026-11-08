@@ -360,7 +360,7 @@ test("final verification must name a run's final task; health remains historical
   await f.call("evidence_log", { ...final, task_id: "2" });
   expect(JSON.parse(String((await f.call("health_check")).content)).verification).toBe("historical");
   const [entry] = JSON.parse(readFileSync(ledger(f.a), "utf8")).entries;
-  expect(entry).toMatchObject({ origin: "attested", task_id: "2" });
+  expect(entry).toMatchObject({ origin: "attested", task_id: "2", run: "work", task_list: ".omca/state/tasks" });
   expect(entry).not.toHaveProperty("plan_sha256");
 });
 

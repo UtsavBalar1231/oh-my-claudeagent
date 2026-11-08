@@ -193,7 +193,8 @@ session.
 Marking a task complete is also refused while a verification command under an hour old has not
 been logged, and the run's final task cannot close until
 `evidence_log(evidence_type="final_verification", ..., exit_code=0, task_id="<id>")` is logged for
-it.
+it. `evidence_log` records the task's run and list with the verdict, so a verdict for task `#3` of
+one list never closes task `#3` of another.
 
 ### Hand off a long session
 

@@ -1,7 +1,7 @@
 import { closeSync, constants, fstatSync, lstatSync, openSync, readdirSync, readSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
-import { entriesOf, readLedger, treeMovedSince, type Evidence } from "../src/core/evidence.ts";
+import { entriesOf, namesTask, readLedger, treeMovedSince, type Evidence } from "../src/core/evidence.ts";
 import { type NativeTask, parseTask, runState } from "../src/core/native-tasks.ts";
 import { NOTEPAD_SECTIONS, parseEntries, toPlanName } from "../src/core/notepad.ts";
 import { LEDGER } from "../src/core/omca-paths.ts";
@@ -128,8 +128,9 @@ export function currentRun(tasks: readonly NativeTask[]): Run | null {
 function evidenceVerdict(entries: Evidence[], run: Run | null): Snapshot["evidence"]["verdict"] {
   const final = run?.tasks.find((task) => task.isFinal);
   if (final === undefined) return "missing";
+  const ref = { list: TASKS_DIR, run: final.run, id: final.id };
   const finals = entries.filter((entry) => entry.type === "final_verification" && entry.taskId !== "");
-  const latest = finals.findLast((entry) => entry.taskId === final.id);
+  const latest = finals.findLast((entry) => namesTask(entry, ref));
   if (latest === undefined) return finals.length === 0 ? "missing" : "stale";
   if (latest.exitCode !== 0 || treeMovedSince(entries, latest)) return "stale";
   const lastFinal = entries.lastIndexOf(latest);

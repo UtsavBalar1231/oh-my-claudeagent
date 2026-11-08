@@ -29,7 +29,7 @@ const list = () => readTaskFiles(root).tasks;
 
 function ledger(...entries: Record<string, unknown>[]): void {
   mkdirSync(join(root, ".omca", "evidence"), { recursive: true });
-  writeFileSync(join(root, LEDGER), JSON.stringify({ version: 1, entries: entries.map((entry) => ({ type: "final_verification", command: "review", exit_code: 0, output_snippet: "ok", timestamp: "2026-11-05T10:00:00Z", ...entry })) }));
+  writeFileSync(join(root, LEDGER), JSON.stringify({ version: 1, entries: entries.map((entry) => ({ type: "final_verification", command: "review", exit_code: 0, output_snippet: "ok", timestamp: "2026-11-05T10:00:00Z", run: "work", task_list: TASKS_DIR, ...entry })) }));
 }
 
 async function finalRun() {
@@ -181,6 +181,9 @@ describe("the final task", () => {
     ["a verdict for another task", { task_id: "1" }],
     ["a verdict naming no task", {}],
     ["a passing check of another type", { type: "test", task_id: "2" }],
+    ["a verdict for the same id on Claude Code's list", { task_id: "2", task_list: "omca-checkout-1a2b3c4d" }],
+    ["a verdict for the same id in another run", { task_id: "2", run: "earlier" }],
+    ["a verdict logged without its run and list", { task_id: "2", run: undefined, task_list: undefined }],
   ])("%s does not close it", async (_name, entry) => {
     await finalRun();
     ledger(entry);

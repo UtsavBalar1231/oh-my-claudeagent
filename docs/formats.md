@@ -45,7 +45,7 @@ A task is open when its `status` is not `completed` and it has no `metadata.bloc
 
 ### The final task
 
-The last task of a run carries `metadata.final: true`. Marking it completed is refused until the ledger holds a `final_verification` entry with `exit_code` 0 and `task_id` equal to its id. A run is closed when it has a task and none is open. While the final task is open, the task-continuation gate holds the stop, and the gate stays silent for a closed run.
+The last task of a run carries `metadata.final: true`. Marking it completed is refused until the ledger holds a `final_verification` entry with `exit_code` 0 that names it: `task_id` equal to its id, `run` equal to its run and `task_list` equal to its list. Task ids start again on each list, and Claude Code and OpenCode share one ledger in a checkout, so an id alone could name another list's task. A run is closed when it has a task and none is open. While the final task is open, the task-continuation gate holds the stop, and the gate stays silent for a closed run.
 
 ### Example
 
@@ -112,6 +112,8 @@ The writer keeps any other top-level key it finds and writes `version` first.
 | `timestamp` | string | always | UTC at seconds precision, for example `2026-10-02T12:05:00Z` |
 | `verified_by` | string | only when not empty | The agent or person that verified, cut to 200 characters |
 | `task_id` | string | only when not empty | The id of the task a `final_verification` entry closes |
+| `run` | string | on a `final_verification` with `task_id` | The run of that task. `evidence_log` reads it from the task list and refuses a `task_id` that is not a final task there |
+| `task_list` | string | on a `final_verification` with `task_id` | The list that holds that task: Claude Code's list id, or `.omca/state/tasks` for OpenCode |
 | `tree` | string | when git can produce it | The tree hash of the working directory as `git add -A` would record it, computed by the server with a scratch index, object directory and git-lfs storage. Claude Code's `.claude/worktrees` directory does not count. It is absent outside a git repository, or when git is missing, fails, or a git call takes over 3 seconds. A caller cannot supply it |
 
 Lengths are counted in characters, not bytes. `evidence_log` rejects an unknown `type` and a non-integer `exit_code`.
@@ -153,7 +155,9 @@ When the server starts, it checks the live ledger. If the file is over 1 MiB or 
       "output_snippet": "418 pass, 0 fail",
       "timestamp": "2026-10-02T12:40:00Z",
       "verified_by": "orchestrator",
-      "task_id": "3"
+      "task_id": "3",
+      "run": "checkout-flow",
+      "task_list": "omca-shop-1a2b3c4d"
     }
   ]
 }

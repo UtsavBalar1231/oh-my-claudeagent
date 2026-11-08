@@ -67,6 +67,7 @@ declare module "claude-code" {
         hasTools: boolean;
         isCleared: boolean;
         error: string | null;
+        list: string;
       };
       ledger: {
         entries: readonly {
@@ -77,6 +78,8 @@ declare module "claude-code" {
           snippet: string;
           verifiedBy: string | null;
           taskId: string;
+          run: string;
+          taskList: string;
           tree: string;
         }[];
         error: string | null;

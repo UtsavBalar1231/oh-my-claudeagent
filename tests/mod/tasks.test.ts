@@ -520,10 +520,10 @@ const FINAL_RUN: readonly Fields[] = [
   { id: "2", subject: "Verify", blockedBy: ["1"], metadata: { ...RUN, final: true } },
 ];
 
-const verdict = (taskId: string, exitCode: number, snippet: string) => ({ type: "final_verification", command: "just ci", exit_code: exitCode, output_snippet: snippet, timestamp: "2026-11-07T10:05:00Z", task_id: taskId });
+const verdict = (taskId: string, exitCode: number, snippet: string, stamp: Record<string, string> = { run: RUN.run, task_list: SESSION }) => ({ type: "final_verification", command: "just ci", exit_code: exitCode, output_snippet: snippet, timestamp: "2026-11-07T10:05:00Z", task_id: taskId, ...stamp });
 
 test("the final task's page shows the newest verdict naming it, read from the ledger as the page opens", async ($, on) => {
-  world(on, { ...filesOf(...FINAL_RUN), [LEDGER]: JSON.stringify({ entries: [verdict("2", 1, "2 failed"), verdict("9", 0, "other run"), verdict("2", 0, "all 412 passed\nmore")] }) });
+  world(on, { ...filesOf(...FINAL_RUN), [LEDGER]: JSON.stringify({ entries: [verdict("2", 1, "2 failed"), verdict("9", 0, "other run"), verdict("2", 0, "all 412 passed\nmore"), verdict("2", 1, "another list", { run: RUN.run, task_list: ".omca/state/tasks" })] }) });
   const ui = await open($);
   await ui.press({ key: "task-2" });
   const lines = spreadRows(await ui.drawn()).map(norm);
@@ -534,8 +534,8 @@ test("the final task's page shows the newest verdict naming it, read from the le
   await ui.unmount();
 });
 
-test("a final task no verdict names says so", async ($, on) => {
-  world(on, filesOf(...FINAL_RUN));
+test("a final task no verdict names says so, and a verdict for its id on another list or in another run does not name it", async ($, on) => {
+  world(on, { ...filesOf(...FINAL_RUN), [LEDGER]: JSON.stringify({ entries: [verdict("2", 0, "other list", { run: RUN.run, task_list: "omca-other-1a2b3c4d" }), verdict("2", 0, "other run", { run: "earlier", task_list: SESSION })] }) });
   const ui = await open($);
   await ui.press({ key: "task-2" });
   expect(spreadRows(await ui.drawn()).map(norm)).toContain("No verdict names #2 yet");

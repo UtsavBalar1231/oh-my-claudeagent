@@ -4,11 +4,12 @@ import { isHookDisabled } from "../../src/core/kill-switch.ts";
 import { INVALID_LEDGER_REASON, unloggedReason } from "../../src/core/verification.ts";
 import { readOrNull } from "../io.ts";
 import type { Handler, Output, Payload } from "./registry.ts";
-import { ledgerMtimeSeconds, ledgerPath, readTasks, seconds } from "./status-file.ts";
+import { ledgerMtimeSeconds, ledgerPath, readTaskList, seconds } from "./status-file.ts";
 
 function finalTaskBlock({ task_id: taskId, session_id: sessionId }: Payload, root: string): Output | undefined {
   if (typeof taskId !== "string" || taskId === "" || typeof sessionId !== "string" || isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "final-verification")) return undefined;
-  const task = readTasks(root, sessionId).find(({ id }) => id === taskId);
+  const list = readTaskList(root, sessionId);
+  const task = list.tasks.find(({ id }) => id === taskId);
   if (task?.isFinal !== true) return undefined;
   let text: string | null;
   try {
@@ -19,7 +20,7 @@ function finalTaskBlock({ task_id: taskId, session_id: sessionId }: Payload, roo
   }
   const ledger = readLedger(text ?? "{}");
   if (ledger.kind === "refused") return { decision: "block", reason: INVALID_LEDGER_REASON };
-  if (ledger.entries.some((entry) => provesTask(entry, taskId))) return undefined;
+  if (ledger.entries.some((entry) => provesTask(entry, { list: list.id, run: task.run, id: taskId }))) return undefined;
   return {
     decision: "block",
     reason: `Task #${taskId} '${task.subject}' is the final task of run '${task.run}', and no passing final verification names it. Review the run, then record the verdict: evidence_log(evidence_type="final_verification", command="<what the review covered>", exit_code=0, output_snippet="<verdict, naming any task closed as blocked>", task_id="${taskId}"). If the review finds a gap, fix it and review again.`,

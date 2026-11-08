@@ -16,7 +16,7 @@
         "type": "object",
         "properties": {
           "type": {
-            "description": "The kind of run. Only a final_verification entry with a task_id can close a run's final task.",
+            "description": "The kind of run. Only a final_verification entry with a task_id, run and task_list can close a run's final task.",
             "type": "string",
             "enum": ["build", "test", "lint", "manual", "final_verification"]
           },
@@ -46,6 +46,14 @@
           },
           "task_id": {
             "description": "The id of the native task a final_verification entry closes. Absent when logged empty.",
+            "type": "string"
+          },
+          "run": {
+            "description": "On a final_verification with a task_id: that task's run, read by the writer from the task list.",
+            "type": "string"
+          },
+          "task_list": {
+            "description": "On a final_verification with a task_id: the list holding that task, Claude Code's list id or .omca/state/tasks for OpenCode. A verdict closes a final task only when task_id, run and task_list all match it.",
             "type": "string"
           },
           "tree": {

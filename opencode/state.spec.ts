@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { readSnapshot, STATE_FILE_BYTE_LIMIT, TASK_FILE_BYTE_LIMIT, TASK_LIMIT } from "./state.ts";
+import { readSnapshot, STATE_FILE_BYTE_LIMIT, TASK_FILE_BYTE_LIMIT, TASK_LIMIT, TASKS_DIR } from "./state.ts";
 
 let directory: string;
 let checkout: string;
@@ -25,7 +25,7 @@ const run = (): void => {
 const ledgerPath = (): string => join(checkout, ".omca", "evidence", "verification-evidence.json");
 const ledger = (entries: unknown[]): void => { put(ledgerPath(), JSON.stringify({ version: 1, entries })); };
 const evidence = (taskId: string, overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
-  type: "final_verification", command: "bun test", exit_code: 0, timestamp: "2026-10-15T10:00:00Z", output_snippet: "Passed", ...(taskId && { task_id: taskId }), ...overrides,
+  type: "final_verification", command: "bun test", exit_code: 0, timestamp: "2026-10-15T10:00:00Z", output_snippet: "Passed", ...(taskId && { task_id: taskId, run: "work", task_list: TASKS_DIR }), ...overrides,
 });
 
 beforeEach(() => {
@@ -164,6 +164,12 @@ describe("native input limits", () => {
 });
 
 describe("evidence and notepads", () => {
+  test("a passing verdict for the same id on Claude Code's list or in another run does not count for this run", () => {
+    run();
+    ledger([evidence(FINAL_ID, { task_list: "omca-checkout-1a2b3c4d" }), evidence(FINAL_ID, { run: "earlier" })]);
+    expect(readSnapshot(checkout, "ses_one").evidence.verdict).toBe("stale");
+  });
+
   test("a verdict naming the final task is only historical; one naming no task proves nothing", () => {
     run();
     ledger([evidence("")]);
