@@ -1,8 +1,8 @@
 import type { NativeTask } from "../src/core/native-tasks.ts";
-import { changeRow, hasChanges, type RunSummary, runSummary, type TaskChanges, taskChanges } from "../src/core/run-line.ts";
+import { changeRow, hasChanges, runSummary, taskChanges } from "../src/core/run-line.ts";
 import { glyphs } from "../src/core/ui-kit.ts";
 import type { Features } from "./dispatch.ts";
-import { type Host, reason, resolvedSession } from "./host.ts";
+import { type Host, reason, resolvedSession, update } from "./host.ts";
 import { isRemote, kitOf, Line } from "./ui.ts";
 
 // The engine draws the turn line's mark in a column this wide, and the row starts under the line's words.
@@ -11,13 +11,11 @@ const MARK_CELLS = 2;
 const UNCUT_COLUMNS = 10_000;
 const ROW_PREFIX = "omca-tasks-";
 
-type Row = { summary: RunSummary; changes: TaskChanges };
-
-// The list as the main turn started. A row's facts are fixed when it is placed and kept here, not in
-// an atom, since a placed row redraws on every write to an atom it reads and the list is written every 2 s.
+// The list as the main turn started. A row's facts are fixed when it is placed and held in the
+// placedRows atom, written only then, so a placed row redraws when one is placed and not on the
+// tasks atom's 2 s writes. A resumed session brings no placed row back, so nothing outlives the session.
 let before: readonly NativeTask[] | undefined;
 let placed = 0;
-const rows = new Map<string, Row>();
 
 async function listOf(host: Host): Promise<readonly NativeTask[] | undefined> {
   const { value } = await host.state.tasks.get();
@@ -34,7 +32,7 @@ async function place(host: Host, id: string): Promise<void> {
   } catch (error) {
     host.log(`task-rows: placing a row failed: ${reason(error)}`);
   }
-  rows.delete(id);
+  await update(host.state.placedRows, (rows = {}) => Object.fromEntries(Object.entries(rows).filter(([key]) => key !== id)));
 }
 
 export const taskRows: Features = {
@@ -57,14 +55,15 @@ export const taskRows: Features = {
       if (!hasChanges(changes)) return undefined;
       placed += 1;
       const id = `${ROW_PREFIX}${now}-${placed}`;
-      rows.set(id, { summary, changes });
+      await update(host.state.placedRows, (rows = {}) => ({ ...rows, [id]: { summary, changes } }));
       await place(host, id);
       return undefined;
     },
   },
   "ui.render Placed": {
-    pre(host, e) {
-      const row = rows.get(e.props.id);
+    async pre(host, e) {
+      const { value: rows = {} } = await host.state.placedRows.get();
+      const row = rows[e.props.id];
       if (row === undefined) return undefined;
       const kit = kitOf(host.ui.resolve(e), e.surface);
       const indent = isRemote(kit) ? 0 : MARK_CELLS;

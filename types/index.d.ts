@@ -69,6 +69,25 @@ declare module "claude-code" {
         error: string | null;
         list: string;
       };
+      placedRows: {
+        readonly [id: string]: {
+          summary: {
+            name: string;
+            done: number;
+            total: number;
+            running: readonly string[];
+            blocked: readonly string[];
+            isOpen: boolean;
+          };
+          changes: {
+            created: number;
+            completed: readonly string[];
+            started: readonly string[];
+            blocked: readonly string[];
+            isFinalDone: boolean;
+          };
+        };
+      };
       ledger: {
         entries: readonly {
           type: "build" | "test" | "lint" | "manual" | "final_verification";

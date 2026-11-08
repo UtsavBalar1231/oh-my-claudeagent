@@ -14,6 +14,7 @@ const ATOMS = [
   "notices",
   "pages",
   "pane",
+  "placedRows",
   "stats",
   "tasks",
   "turns",

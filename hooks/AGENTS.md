@@ -79,8 +79,9 @@ atoms written once per turn or per finished agent, since a row subscribes to eve
 `task-rows` places one row with `$.ui.place` under the turn line of a main turn that changed a run's
 tasks, found by comparing the `tasks` atom at that turn's `turn.start` with the atom at its
 `turn.complete`, after `task-list` has read the list. A subagent's turn places none. The row's facts are
-fixed when it is placed and kept in the module, not an atom, since the list is written every 2 s while
-the pane is open; a module reload leaves earlier rows empty. A row that does not stand drops its facts.
+fixed when it is placed and held in the `placedRows` atom, which survives a module reload and is written only
+when a row is placed, so rows do not redraw on the `tasks` atom's 2 s writes. A row that does not stand drops
+its facts.
 
 `keyword-paint` underlines what the server's `keyword-detector` would match in the draft, from the
 same `keywordSpans` reader in `src/core/keywords.ts`, only with `enableKeywordTriggers` on and that

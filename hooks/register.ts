@@ -120,6 +120,10 @@ function bindHost($: EngineInterface, options: Options): Host {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "tasks" }),
         set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "tasks" }, value, setOptions),
       },
+      placedRows: {
+        get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "placedRows" }),
+        set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "placedRows" }, value, setOptions),
+      },
       ledger: {
         get: () => $.state.get({ plugin: "oh-my-claudeagent", key: "ledger" }),
         set: (value, setOptions) => $.state.set({ plugin: "oh-my-claudeagent", key: "ledger" }, value, setOptions),

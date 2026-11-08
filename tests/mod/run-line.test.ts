@@ -1,7 +1,7 @@
 import type { On } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
 import { displayWidth } from "../../src/core/ui-kit.ts";
-import { PLUGIN, POSIX, spreadRows, textOf, world, write, type World } from "./world.ts";
+import { PLUGIN, POSIX, resettableState, spreadRows, textOf, world, write, type World } from "./world.ts";
 
 const LIST = `${POSIX.home}/.claude/tasks/run-list`;
 const RUN = "dotman-rewrite";
@@ -135,6 +135,18 @@ test("a row past the engine's cap does not stand and keeps no facts, and one wai
   placing.answer = { isPlaced: false, requestId: "later", reason: "no surface" };
   await turn($, () => put(w, { id: "2" }));
   expect(await rowOf($, placing.placed[1] ?? "")).toEqual(["◆ dotman-rewrite  0/2 · +1 task · /tasklist"]);
+});
+
+test("a placed row draws from the placedRows atom, not from the module's own memory", async ($, on) => {
+  const atoms = resettableState(on);
+  const { w, placing } = setup(on);
+  await start($);
+  await turn($, () => put(w, { id: "1" }));
+  const id = placing.placed[0] ?? "";
+  expect(await rowOf($, id)).toEqual(["◆ dotman-rewrite  0/1 · +1 task · /tasklist"]);
+
+  atoms.reset("placedRows");
+  expect(await rowOf($, id)).toEqual(["engine Placed"]);
 });
 
 test("while a run is open the band shows its line and a button that fills the prompt with /tasklist", async ($, on) => {
