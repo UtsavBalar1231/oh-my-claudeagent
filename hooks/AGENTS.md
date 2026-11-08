@@ -20,7 +20,9 @@ feature module takes `host` and never `$`. The features are `bash-guard`, `serve
 `mod-marker`, `agents-tracker`, `agent-rows`, `metrics`, `band`, `pane` with its `tabs/`, `footer`,
 `group-rows`, `keyword-paint`, `completion`, `refusal-recovery`, `omca-router`, `task-tools`,
 `task-list` and `task-rows`. `doctor.ts` runs the Doctor page's checks and fixes for `tabs/doctor.ts`; it registers
-no event. Pure logic lives in `src/core/`.
+no event. `project-root.ts` gives `host.session.root()` the repository top level of the engine's
+root, as the `omca` server names its root, so a launch from a subdirectory reads and writes the same
+`.omca/`. Pure logic lives in `src/core/`.
 
 The mod's only view of planned work is Claude Code's native task list. State is the task files under
 `<config dir>/tasks/<list id>/`; the mod has no plan file format, parser or registry, and it keeps

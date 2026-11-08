@@ -146,6 +146,9 @@ export function world(
   };
   mock.env(on, { OMCA_GLYPHS: "unicode", ...layout.env, ...env });
   on("session.root", () => ({ value: layout.root }));
+  on("process.run", { argv: ["git", "rev-parse", "--show-toplevel"] }, () => ({
+    value: { exitCode: 0, stdout: `${layout.root.replaceAll("\\", "/")}\n`, stderr: "", isStdoutTruncated: false, isStderrTruncated: false },
+  }));
   on("session.id", () => ({ value: w.sessionId }));
   on("settings.read", (_$, e) => ({ value: (e.source === undefined ? undefined : w.sources[e.source]) ?? w.settings }));
   on("agent.list", () => ({ value: w.agents }));

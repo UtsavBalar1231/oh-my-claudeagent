@@ -13,6 +13,7 @@ import { modMarker } from "./mod-marker.ts";
 import { router } from "./omca-router.ts";
 import { refusalRecovery } from "./refusal-recovery.ts";
 import { pane } from "./pane.ts";
+import { projectRoot } from "./project-root.ts";
 import { groupRows } from "./group-rows.ts";
 import { serverCheck } from "./server-check.ts";
 import { TASK_COMMAND, taskList } from "./task-list.ts";
@@ -70,7 +71,8 @@ function bindHost($: EngineInterface, options: Options): Host {
     },
     session: {
       id: () => $.session.id(),
-      root: () => $.session.root(),
+      // The omca server names its root by `git rev-parse --show-toplevel`; a launch from a subdirectory must find the same `.omca/`.
+      root: () => $.session.root().then((started) => projectRoot(started, (argv, init) => $.process.run(argv, init))),
       cwd: () => $.session.cwd(),
       surfaces: () => $.session.surfaces(),
       usage: (args) => $.session.usage(args),

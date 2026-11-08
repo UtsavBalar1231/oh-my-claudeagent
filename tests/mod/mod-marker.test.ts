@@ -1,7 +1,7 @@
 import type { On } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
 import { taskListIdFor } from "../../src/core/native-tasks.ts";
-import { ROOT, SESSION, type World, world, write } from "./world.ts";
+import { type Layout, POSIX, ROOT, SESSION, WINDOWS, type World, world, write } from "./world.ts";
 
 const MARKER = `${ROOT}/.omca/state/mod/${SESSION}.json`;
 const STARTED_MS = Date.UTC(2026, 9, 2, 12, 0, 0);
@@ -67,6 +67,83 @@ test("the marker carries the plugin option that turns keyword triggers on", { op
   const w = engine(on);
   await start($);
   expect(marker(w)).toMatchObject({ options: { enableKeywordTriggers: true } });
+});
+
+type Git = { stdout: string } | { exitCode: number; stderr: string } | { deny: string };
+
+// The session starts in `layout.root`, and git answers `git` there ahead of `world`'s own answer.
+function launched(on: On, layout: Layout, git: Git): { w: World; runs: { argv: string[]; cwd: string | undefined }[]; lists: (string | undefined)[]; writes: string[] } {
+  const writes: string[] = [];
+  const runs: { argv: string[]; cwd: string | undefined }[] = [];
+  const lists: (string | undefined)[] = [];
+  on("process.run", (_$, e, next) => {
+    if (e.argv.join(" ") !== "git rev-parse --show-toplevel") return next(e);
+    runs.push({ argv: [...e.argv], cwd: e.init?.cwd });
+    if ("deny" in git) return { deny: git.deny };
+    const result = "stdout" in git ? { exitCode: 0, stdout: git.stdout, stderr: "" } : { ...git, stdout: "" };
+    return { value: { ...result, isStdoutTruncated: false, isStderrTruncated: false } };
+  });
+  const w = world(on, {}, {}, {}, layout);
+  on("session.start", (_$, e) => ({ cwd: e.cwd }));
+  on("turn.start", (_$, e) => ({ turnId: e.turnId }));
+  on("session.usage", () => ({ value: { startedAt: 0, context: { window: 200_000 }, rateLimits: [] } }));
+  on("command.register", (_$, e) => ({ value: { command: e.name } }));
+  on("fs.write", (_$, e) => (writes.push(e.path), write(w, e.path, e.text), { value: undefined }));
+  on("env.set", (_$, e) => (e.name === "CLAUDE_CODE_TASK_LIST_ID" && lists.push(e.value), { value: {} }));
+  return { w, runs, lists, writes };
+}
+
+const at = (root: string, base: Layout = POSIX): Layout => ({ ...base, root });
+const markers = (w: World): string[] => [...w.files.keys()].filter((path) => path.includes("/.omca/state/mod/"));
+
+test("a launch from a subdirectory writes the marker and names the task list at the repository's top level", async ($, on) => {
+  const { w, runs, lists } = launched(on, at("/work/sub/deeper"), { stdout: "/work\n" });
+  await $.session.start({ cwd: "/work/sub/deeper", surface: "terminal", isInteractive: true });
+  expect(runs).toEqual([{ argv: ["git", "rev-parse", "--show-toplevel"], cwd: "/work/sub/deeper" }]);
+  expect(markers(w)).toEqual([MARKER]);
+  expect(lists).toEqual([taskListIdFor("/work")]);
+});
+
+test("a launch inside a worktree resolves to the worktree's top level", async ($, on) => {
+  const top = "/work/.claude/worktrees/wt";
+  const { w, lists } = launched(on, at(`${top}/src`), { stdout: `${top}\n` });
+  await $.session.start({ cwd: `${top}/src`, surface: "terminal", isInteractive: true });
+  expect(markers(w)).toEqual([`${top}/.omca/state/mod/${SESSION}.json`]);
+  expect(lists).toEqual([taskListIdFor(top)]);
+});
+
+test("outside a repository the session's own root stays the root", async ($, on) => {
+  const { w, lists } = launched(on, at("/scratch"), { exitCode: 128, stderr: "fatal: not a git repository (or any of the parent directories): .git" });
+  await $.session.start({ cwd: "/scratch", surface: "terminal", isInteractive: true });
+  expect(markers(w)).toEqual([`/scratch/.omca/state/mod/${SESSION}.json`]);
+  expect(lists).toEqual([taskListIdFor("/scratch")]);
+});
+
+test("git that cannot run leaves the session's own root", async ($, on) => {
+  const { w } = launched(on, at("/elsewhere"), { deny: "spawn git ENOENT" });
+  await $.session.start({ cwd: "/elsewhere", surface: "terminal", isInteractive: true });
+  expect(markers(w)).toEqual([`/elsewhere/.omca/state/mod/${SESSION}.json`]);
+});
+
+test("git runs once per session root and again after the root moves", async ($, on) => {
+  const layout = at("/work/sub");
+  const { w, runs } = launched(on, layout, { stdout: "/work\n" });
+  await $.session.start({ cwd: layout.root, surface: "terminal", isInteractive: true });
+  await w.clock.advance(1_000);
+  await $.turn.start({ text: "go", turnId: "t-1" });
+  expect(runs.map((run) => run.cwd)).toEqual(["/work/sub"]);
+  layout.root = "/work/other";
+  await w.clock.advance(1_000);
+  await $.turn.start({ text: "go", turnId: "t-2" });
+  expect(runs.map((run) => run.cwd)).toEqual(["/work/sub", "/work/other"]);
+});
+
+test("on Windows git's forward-slash top level takes the engine's backslashes", async ($, on) => {
+  const { w, lists, writes } = launched(on, at("C:\\work\\sub", WINDOWS), { stdout: "C:/work\n" });
+  await $.session.start({ cwd: "C:\\work\\sub", surface: "terminal", isInteractive: true });
+  expect(markers(w)).toEqual([`C:/work/.omca/state/mod/${SESSION}.json`]);
+  expect(writes.filter((path) => path.includes("/.omca/state/mod/")).map((path) => path.slice(path.indexOf("C:")))).toEqual([`C:\\work/.omca/state/mod/${SESSION}.json`]);
+  expect(lists).toEqual([taskListIdFor("C:\\work")]);
 });
 
 const LIST_ID = taskListIdFor(ROOT);
