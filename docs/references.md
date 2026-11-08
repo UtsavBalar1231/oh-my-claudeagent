@@ -281,7 +281,13 @@ The plugin applies none of these.
 | `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` | Default 10. A wider parallel group runs in series |
 
 Do not add `Write(<path>)`, `NotebookEdit(<path>)` or `Glob(<path>)` rules: they never match.
-`Edit(<path>)` covers every file-editing tool.
+`Edit(<path>)` covers every file-editing tool, the file commands Claude Code recognizes in Bash
+(`sed`, `tee` and the like) and redirection targets such as `> file`. It does not cover a script
+that opens the file itself, such as `python3 -c "open(...)"`, so a deny rule alone does not keep an
+agent off a path. To do that, turn on Claude Code's sandbox (`sandbox.enabled`), which adds `Edit`
+deny rules to the write denials the operating system enforces on every command and its child
+processes. In `bypassPermissions` mode also set `sandbox.allowUnsandboxedCommands` to `false`, since
+there a command that fails in the sandbox retries outside it without a prompt.
 
 ## State files
 
