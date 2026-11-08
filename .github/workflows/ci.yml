@@ -16,6 +16,9 @@ concurrency:
 env:
   CLAUDE_CODE_VERSION: 2.1.316
 
+# A macOS minute costs ten Linux minutes and a Windows minute two, so pull requests and pushes to
+# main run on Linux. A release tag and a manual run (`gh workflow run ci.yml --ref <branch>`) add
+# macOS and Windows.
 defaults:
   run:
     shell: bash
@@ -24,11 +27,11 @@ jobs:
   validate:
     name: Validate Plugin (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: ${{ fromJSON((github.event_name == 'workflow_dispatch' || github.ref_type == 'tag') && '["ubuntu-latest", "macos-latest", "windows-latest"]' || '["ubuntu-latest"]') }}
     permissions:
       contents: read
     steps:
@@ -55,15 +58,15 @@ jobs:
             echo "The plugin manifest, a hook definition, the mod's registrations or the repository layout is malformed or out of sync. Run \`just validate\` locally to see the exact failure."
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # OpenCode ships a native build for each of these runners, so its specs run on all three.
+  # OpenCode ships a native build for each runner, so a full run tests the adapter on all three.
   test-opencode:
     name: OpenCode Adapter (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: ${{ fromJSON((github.event_name == 'workflow_dispatch' || github.ref_type == 'tag') && '["ubuntu-latest", "macos-latest", "windows-latest"]' || '["ubuntu-latest"]') }}
     permissions:
       contents: read
     steps:
@@ -118,11 +121,11 @@ jobs:
   typescript:
     name: TypeScript Checks (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: ${{ fromJSON((github.event_name == 'workflow_dispatch' || github.ref_type == 'tag') && '["ubuntu-latest", "macos-latest", "windows-latest"]' || '["ubuntu-latest"]') }}
     permissions:
       contents: read
     env:
@@ -205,11 +208,11 @@ jobs:
   mod:
     name: Mod Tests and Smoke (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: ${{ fromJSON((github.event_name == 'workflow_dispatch' || github.ref_type == 'tag') && '["ubuntu-latest", "macos-latest", "windows-latest"]' || '["ubuntu-latest"]') }}
     permissions:
       contents: read
     env:
@@ -265,8 +268,8 @@ jobs:
             echo "A failing mod test, a manifest or hooks-module validation error, or the plugin did not load in a real session on this OS, or its guard did not run. Run the matching \`just\` recipe locally with Claude Code $CLAUDE_CODE_VERSION on PATH; the smoke check quotes the debug log it reads."
           } >> "$GITHUB_STEP_SUMMARY"
 
-  # The manifest checks read local files, so one runner is enough; the mod job runs them on every
-  # OS with the pinned client. This job installs the latest published client instead, to catch
+  # The manifest checks read local files, so one runner is enough; the mod job runs them on each
+  # OS of the run with the pinned client. This job installs the latest published client instead, to catch
   # a manifest the newest platform schema rejects. The validator needs no authentication.
   validate-manifest:
     name: Manifest Validation

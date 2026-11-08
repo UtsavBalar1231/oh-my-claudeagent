@@ -7,7 +7,7 @@ const read = (path: string): string => readFileSync(join(REPO, path), "utf8");
 const JUSTFILE = read("justfile");
 
 type Step = { name?: string; uses?: string; run?: string; if?: string; with?: Record<string, unknown> };
-type Job = { "runs-on": string; strategy?: { "fail-fast": boolean; matrix: { os: string[] } }; env?: Record<string, string>; steps: Step[] };
+type Job = { "runs-on": string; "timeout-minutes"?: number; strategy?: { "fail-fast": boolean; matrix: { os: string } }; env?: Record<string, string>; steps: Step[] };
 type Workflow = { on: Record<string, unknown>; jobs: Record<string, Job> };
 
 const parse = <T>(path: string): T => Bun.YAML.parse(read(path)) as T;
@@ -107,12 +107,17 @@ describe("workflow contract", () => {
     expect(steps.filter((step) => step.with?.["no-cache"] !== true)).toEqual([]);
   });
 
-  test("every job but the latest-client manifest check runs on linux, macOS and windows without failing fast", () => {
+  test("every job but the latest-client manifest check adds macOS and windows only on a release tag or a manual run, without failing fast", () => {
+    const os = `\${{ fromJSON((github.event_name == 'workflow_dispatch' || github.ref_type == 'tag') && '["ubuntu-latest", "macos-latest", "windows-latest"]' || '["ubuntu-latest"]') }}`;
     for (const name of Object.keys(CI.jobs).filter((name) => name !== "validate-manifest")) {
-      expect(job(name).strategy).toEqual({ "fail-fast": false, matrix: { os: ["ubuntu-latest", "macos-latest", "windows-latest"] } });
+      expect(job(name).strategy).toEqual({ "fail-fast": false, matrix: { os } });
       expect(job(name)["runs-on"]).toBe("${{ matrix.os }}");
     }
     expect(job("validate-manifest")["runs-on"]).toBe("ubuntu-latest");
+  });
+
+  test("no job may run past 15 minutes, which the slowest job's longest run fits twice over", () => {
+    expect(Object.entries(CI.jobs).filter(([, ci]) => (ci["timeout-minutes"] ?? 360) > 15).map(([name]) => name)).toEqual([]);
   });
 
   test("ast-grep comes from the local action, which pins an archive digest for each OS", () => {

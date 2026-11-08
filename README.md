@@ -20,7 +20,7 @@ workflow.
   the status line run on bun.
 - `ast-grep` (or `sg`), optional. Only the structural code search tools need it.
 
-CI runs on Linux, macOS and Windows.
+CI runs on Linux for every change, and on macOS and Windows for each release.
 
 ## Install
 

@@ -56,6 +56,8 @@ shared task list. `OMCA_DISABLED_HOOKS=plan-continuation` is now `task-continuat
   creates the run's tasks. `start-work` runs the open tasks and no longer registers or binds a
   plan. The stop gates read the run from the task list.
 - **The pane's tabs:** Agents, Evidence and Notepad, on keys `1`, `2` and `3`.
+- **CI:** pull requests and pushes to `main` run on Linux only. A release tag and a manual run add
+  macOS and Windows. Each job stops at 15 minutes, and Dependabot checks monthly.
 
 ### Removed
 

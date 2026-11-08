@@ -88,6 +88,11 @@ CI runs each recipe's commands directly, `bun scripts/validate.ts` for `just val
 example, not through `just`. `scripts/validate/workflow.spec.ts` checks that CI runs every
 command of the `just ci` recipes and nothing else without a stated reason.
 
+Pull requests and pushes to `main` run CI on Linux only, because a macOS minute costs ten Linux
+minutes and a Windows minute two. A release tag runs it on all three, and so does a manual run:
+`gh workflow run ci.yml --ref <branch>`. Start one before merging a change to paths, shells or
+process handling.
+
 After changing the OpenCode UI or its RPC contract, run `just build-opencode`.
 The package exports the compiled TUI because installed JSX is not transformed by
 the host. The artifact is generated from the shared TypeScript sources with host
@@ -161,6 +166,10 @@ The script never pushes. It prints one atomic push of both branches and both tag
 `git push --atomic origin main plugin v<version> plugin-v<version>`, so the stamped SHA never
 names a commit the remote lacks. The packaged tag is named `plugin-v<version>` because
 `release.yml` runs on `v*.*.*`. Add the CHANGELOG entry for the version first.
+
+Before the push, run CI on all three systems with `gh workflow run ci.yml --ref main` and wait
+for it to pass. The tag's own run gates only the GitHub release: the atomic push has already
+published the `plugin` branch that installs read.
 
 Prefer the recipe over hand-editing the three version fields, which must stay identical.
 
