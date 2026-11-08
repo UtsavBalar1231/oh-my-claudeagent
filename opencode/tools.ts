@@ -96,7 +96,11 @@ async function evidenceLog(args: Record<string, unknown>, scope: RequestScope, c
   const tree = await workingTreeStamp(scope.root);
   // OpenCode never starts the omca server, whose start-up rotation keeps the ledger under its cap.
   ownedPath(scope.root, path);
-  await rotateLedger(scope.root);
+  try {
+    await rotateLedger(scope.root);
+  } catch (error) {
+    console.error("omca: the evidence ledger was not rotated; the entry is still logged", error);
+  }
   const total = await appendEvidence(scope.root, {
     type, command, exit_code: exitCode, output_snippet: output, timestamp: isoTimestamp(),
     ...(verifiedBy && { verified_by: verifiedBy }), ...(taskId && { task_id: taskId }), ...stamp, ...(tree !== null && { tree }),

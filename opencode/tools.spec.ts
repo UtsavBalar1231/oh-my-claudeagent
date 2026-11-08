@@ -306,6 +306,25 @@ test("logging evidence rotates a ledger past its cap, as the omca server does at
   expect(JSON.parse(readFileSync(join(dirname(ledger(f.a)), archives[0] ?? ""), "utf8")).entries).toHaveLength(501);
 });
 
+test("a month's archive the reader refuses stops the rotation, not the logging", async () => {
+  const f = await fake();
+  await f.call("evidence_log", evidence);
+  const [first] = JSON.parse(readFileSync(ledger(f.a), "utf8")).entries;
+  writeFileSync(ledger(f.a), JSON.stringify({ version: 1, entries: Array.from({ length: 1001 }, () => first) }));
+  const now = new Date();
+  const archive = join(dirname(ledger(f.a)), `verification-evidence.${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}.json`);
+  writeFileSync(archive, "torn");
+  const logged = spyOn(console, "error").mockImplementation(() => undefined);
+  try {
+    await f.call("evidence_log", { ...evidence, command: "after" });
+    expect(logged).toHaveBeenCalledTimes(1);
+  } finally {
+    logged.mockRestore();
+  }
+  expect(JSON.parse(readFileSync(ledger(f.a), "utf8")).entries).toHaveLength(1002);
+  expect(readFileSync(archive, "utf8")).toBe("torn");
+});
+
 test("evidence deduplication includes the native message identity", async () => {
   const f = await fake();
   const signal = new AbortController().signal;
