@@ -112,7 +112,7 @@ The writer keeps any other top-level key it finds and writes `version` first.
 | `timestamp` | string | always | UTC at seconds precision, for example `2026-10-02T12:05:00Z` |
 | `verified_by` | string | only when not empty | The agent or person that verified, cut to 200 characters |
 | `task_id` | string | only when not empty | The id of the task a `final_verification` entry closes |
-| `run` | string | on a `final_verification` with `task_id` | The run of that task. `evidence_log` reads it from the task list and refuses a `task_id` that is not a final task there |
+| `run` | string | on a `final_verification` with `task_id` | The run of that task. `evidence_log` reads it from the task list, and refuses a `final_verification` without a `task_id` or with one that is not a final task there |
 | `task_list` | string | on a `final_verification` with `task_id` | The list that holds that task: Claude Code's list id, or `.omca/state/tasks` for OpenCode |
 | `tree` | string | when git can produce it | The tree hash of the working directory as `git add -A` would record it, computed by the server with a scratch index, object directory and git-lfs storage. Claude Code's `.claude/worktrees` directory does not count. It is absent outside a git repository, or when git is missing, fails, or a git call takes over 3 seconds. A caller cannot supply it |
 

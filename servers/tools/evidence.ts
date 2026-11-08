@@ -80,6 +80,7 @@ function updateStatus(root: string): void {
 
 /** The run and list of the final task a verdict names, so a verdict for one list's task #N never closes another list's. */
 function verdictStamp(root: string, taskId: string): { run: string; task_list: string } {
+  if (taskId === "") throw new Error("evidence_log: a final_verification names the run's final task in task_id");
   const list = readTaskList(root, latestSessionId() ?? process.env.CLAUDE_CODE_SESSION_ID ?? "");
   const task = list.tasks.find(({ id }) => id === taskId);
   if (task?.isFinal !== true) throw new Error(`evidence_log: task #${taskId} is not a final task on this session's task list; name the run's final task in task_id`);
@@ -99,7 +100,7 @@ async function evidenceLog(args: Record<string, unknown>): Promise<string> {
   const verifiedBy = arg("verified_by", "");
   const taskId = capped(arg("task_id", ""), TASK_ID_MAX_CHARS);
   const root = rootOf(arg("working_directory", ""));
-  const stamp = type === "final_verification" && taskId !== "" ? verdictStamp(root, taskId) : {};
+  const stamp = type === "final_verification" ? verdictStamp(root, taskId) : {};
   const tree = await workingTreeStamp(root);
 
   const entry = {

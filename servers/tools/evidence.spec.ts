@@ -259,9 +259,18 @@ describe("evidence_log", () => {
 
   test("evidence_log without task_id, or with an empty one, omits the key", async () => {
     const root = project();
-    await log(root, { evidence_type: "final_verification" });
-    await log(root, { evidence_type: "final_verification", task_id: "" });
+    await log(root);
+    await log(root, { task_id: "" });
     expect(entries(root).map((e: object) => "task_id" in e)).toEqual([false, false]);
+  });
+
+  test("a final verification without a task_id is refused, and nothing is written", async () => {
+    const root = project();
+    onList("7", { run: "docs", final: true });
+    for (const extra of [{}, { task_id: "" }]) {
+      await expect(log(root, { evidence_type: "final_verification", ...extra })).rejects.toThrow("a final_verification names the run's final task in task_id");
+    }
+    expect(existsSync(ledgerFile(root))).toBe(false);
   });
 
   test("evidence_log refuses a task_id that is not a string", async () => {
