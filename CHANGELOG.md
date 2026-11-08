@@ -78,6 +78,16 @@ shared task list. `OMCA_DISABLED_HOOKS=plan-continuation` is now `task-continuat
 - **The plan board:** the Plan tab, `/omca plan`, the proof marks the board and the band drew from
   a task's `File:` lines, the transcript's plan task receipts and the spinner's task position.
 
+### Fixed
+
+- **A launch from a subdirectory:** the mod takes the repository's top level as its root, as the
+  `omca` server does, so both read and write the same `.omca/` and name the same task list. Before,
+  the server found no mod marker there and `health_check` refused.
+- **The guard's dialog** names an operation that a command runs twice, such as `git stash` and
+  `git stash pop`, once.
+- **OpenCode's evidence log** moves older entries to a monthly archive past 1 MiB or 1,000 entries,
+  as the `omca` server does at start.
+
 ## [3.5.1] - 2026-11-03
 
 ### Fixed
