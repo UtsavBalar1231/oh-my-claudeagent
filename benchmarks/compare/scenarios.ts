@@ -60,21 +60,18 @@ export const guardScript = (command: string, retry: boolean): Script => ({
 
 const STOP_PLAN = "# Plan\n\n- [ ] 1. Write the code\n- [ ] 2. Run the tests\n";
 
+const STOP_RUN = "stop-gate-probe";
+
+const stopRun = (): Turn[] => [
+  tool("TaskCreate", { subject: "Write the code", description: "Write the code in the plan.", metadata: { run: STOP_RUN } }),
+  tool("TaskCreate", { subject: "Run the tests", description: "Run the tests and log the result.", metadata: { run: STOP_RUN, final: true } }),
+  tool("TaskUpdate", { taskId: "2", addBlockedBy: ["1"] }),
+  tool("TaskUpdate", { taskId: "1", status: "in_progress" }),
+];
+
 export const stopScript = (armId: string): Script => ({
-  main: [
-    tool("Write", { file_path: STOP_PLAN_PATH, content: STOP_PLAN }),
-    ...(armId === "omca"
-      ? [
-          tool("mcp__plugin_oh-my-claudeagent_omca__boulder_write", {
-            active_plan: STOP_PLAN_PATH,
-            plan_name: "stop-gate-probe",
-            session_id: STOP_SESSION_ID,
-          }),
-        ]
-      : []),
-    text("done"),
-  ],
+  main: [tool("Write", { file_path: STOP_PLAN_PATH, content: STOP_PLAN }), ...(armId === "omca" ? stopRun() : []), text("done")],
   subagent: [],
 });
 
-export const stopExpectedRequests = (armId: string): number => (armId === "omca" ? 3 : 2);
+export const stopExpectedRequests = (armId: string): number => (armId === "omca" ? 6 : 2);

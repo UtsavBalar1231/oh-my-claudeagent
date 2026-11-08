@@ -551,7 +551,7 @@ export function renderMarkdown(raw: RawResults): { results: Record<string, unkno
     body: [
       table(["Arm", "Plan file written", "Model requests", "Outcome of the scripted `done` end turn", "Continuation text"], stopRows),
       "",
-      `The script writes a plan file with two unchecked numbered tasks, then ends the turn. For OMCA it also calls \`boulder_write\` through the mock to bind the session to that plan, the supported way to arm its plan gate. The other arms run the same script with no plugin-specific setup, so a \`stopped\` there says only that nothing blocked a stop in this state, not that the arm has no gate; their gates need state this harness does not create. A continuation is counted only when a main-thread request (same system prompt as the first) follows the scripted \`done\` reply; requests with another system prompt add to the request count only.${unwritten.length === 0 ? "" : ` The plan file was not written for ${list(unwritten.map((s) => `${labelOf(s.arm)} (the Write call's result: "${s.tool_results.replace(/\s+/g, " ").slice(0, 120)}")`))}, so the outcome there is n/a: the mock does not act on a gate's denial and goes on to its next scripted turn.`}`,
+      `The script writes a plan file with two unchecked numbered tasks, then ends the turn. For OMCA it also creates a two-task run on Claude Code's native task list through the mock (the last task final and blocked by the first) and starts the first task, which is what arms its task-continuation gate. The other arms run the same script with no plugin-specific setup, so a \`stopped\` there says only that nothing blocked a stop in this state, not that the arm has no gate; their gates need state this harness does not create. A continuation is counted only when a main-thread request (same system prompt as the first) follows the scripted \`done\` reply; requests with another system prompt add to the request count only.${unwritten.length === 0 ? "" : ` The plan file was not written for ${list(unwritten.map((s) => `${labelOf(s.arm)} (the Write call's result: "${s.tool_results.replace(/\s+/g, " ").slice(0, 120)}")`))}, so the outcome there is n/a: the mock does not act on a gate's denial and goes on to its next scripted turn.`}`,
     ].join("\n"),
   });
 
@@ -596,7 +596,7 @@ export function renderMarkdown(raw: RawResults): { results: Record<string, unkno
     const lost = raw.noBun.mcp_tools === 0 || !raw.noBun.stop_forced;
     place(
       lost,
-      `**Without bun.** The probe in section 9 hid bun: the first request carried ${f0(raw.noBun.mcp_tools)} MCP tools and ${f0(raw.noBun.hook_context_tokens)} hook-context tokens, the stop gate ${raw.noBun.stop_forced ? "still continued" : "did not continue"} a plan-bound session, and the Bash guard ${raw.noBun.guards.every((g) => !g.ran) ? "still blocked" : "let through"} ${list(raw.noBun.guards.map((g) => code(raw.guards.find((x) => x.id === g.id)?.command ?? g.id)))}.`,
+      `**Without bun.** The probe in section 9 hid bun: the first request carried ${f0(raw.noBun.mcp_tools)} MCP tools and ${f0(raw.noBun.hook_context_tokens)} hook-context tokens, the stop gate ${raw.noBun.stop_forced ? "still continued" : "did not continue"} a session with an open run, and the Bash guard ${raw.noBun.guards.every((g) => !g.ran) ? "still blocked" : "let through"} ${list(raw.noBun.guards.map((g) => code(raw.guards.find((x) => x.id === g.id)?.command ?? g.id)))}.`,
     );
   }
   if (omcaInstall?.online) {
@@ -654,7 +654,7 @@ export function renderMarkdown(raw: RawResults): { results: Record<string, unkno
       "",
       ...(notWorse.length === 0 ? ["- nothing in this run"] : notWorse.map((w) => `- ${w}`)),
       "",
-      `Stop gate, not a comparison: only OMCA's run was armed with plugin state (a bound plan holding unchecked tasks), so section 8 says whether each arm stopped in an unarmed state, not whose gate is better. Arms whose scripted stop was continued: ${list(continued) || "none"}.${stopOmca === undefined ? " OMCA has no stop record." : ""}`,
+      `Stop gate, not a comparison: only OMCA's run was armed with plugin state (an open run on the native task list), so section 8 says whether each arm stopped in an unarmed state, not whose gate is better. Arms whose scripted stop was continued: ${list(continued) || "none"}.${stopOmca === undefined ? " OMCA has no stop record." : ""}`,
     ].join("\n"),
   });
 
@@ -679,7 +679,7 @@ export function renderMarkdown(raw: RawResults): { results: Record<string, unkno
             ["Injected hook-context tokens, turn 1", f0(turn1Omca === null ? null : tokens(turn1Omca.hook_context)), f0(noBun.hook_context_tokens)],
             ["Estimated tokens in the first request", f0(turn1Omca === null ? null : tokens(totalOf(turn1Omca))), f0(noBun.first_request_tokens)],
             [`Bash guard (${guardNames})`, noBun.guards.map((g) => withBunGuard(g.id)).join(", "), noBun.guards.map((g) => (g.ran ? "RAN" : "blocked")).join(", ")],
-            ["Stop gate continued a plan-bound session", stopOmca === undefined ? "n/a" : stopOmca.forced_continue ? "yes" : "no", noBun.stop_forced ? "yes" : "no"],
+            ["Stop gate continued a session with an open run", stopOmca === undefined ? "n/a" : stopOmca.forced_continue ? "yes" : "no", noBun.stop_forced ? "yes" : "no"],
           ],
         ),
         "",
