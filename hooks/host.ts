@@ -125,13 +125,21 @@ export async function pluginVersion(host: Host): Promise<string | null> {
   }
 }
 
-export type Session = { env: PathEnv; platform: Platform; home: string; config: string | undefined; glyphTier: GlyphTier };
+export type Session = {
+  env: PathEnv;
+  platform: Platform;
+  home: string;
+  config: string | undefined;
+  glyphTier: GlyphTier;
+  disabledHooks: string | undefined;
+};
 
-const UNRESOLVED: Session = { env: {}, platform: "linux", home: "", config: undefined, glyphTier: "nerd" };
+// Every drawing behind a kill switch stays off until the pane's `session.start` resolves the session.
+const UNRESOLVED: Session = { env: {}, platform: "linux", home: "", config: undefined, glyphTier: "nerd", disabledHooks: "all" };
 let session: Session | undefined;
 
 async function resolveSession(host: Host): Promise<Session> {
-  const [root, HOME, USERPROFILE, HOMEDRIVE, HOMEPATH, CLAUDE_CONFIG_DIR, glyphs] = await Promise.all([
+  const [root, HOME, USERPROFILE, HOMEDRIVE, HOMEPATH, CLAUDE_CONFIG_DIR, glyphs, disabledHooks] = await Promise.all([
     host.session.root(),
     host.env.HOME(),
     host.env.USERPROFILE(),
@@ -139,11 +147,12 @@ async function resolveSession(host: Host): Promise<Session> {
     host.env.HOMEPATH(),
     host.env.CLAUDE_CONFIG_DIR(),
     host.env.OMCA_GLYPHS(),
+    host.env.OMCA_DISABLED_HOOKS(),
   ]);
   const env = { HOME, USERPROFILE, HOMEDRIVE, HOMEPATH, CLAUDE_CONFIG_DIR };
   const home = homeDir(env) ?? "";
   const config = configDir(env);
-  return { env, platform: inferPlatform(root, home, config ?? ""), home, config, glyphTier: glyphTier(glyphs) };
+  return { env, platform: inferPlatform(root, home, config ?? ""), home, config, glyphTier: glyphTier(glyphs), disabledHooks };
 }
 
 // The environment holds for the life of the session, so it is read once, outside any drawing.
