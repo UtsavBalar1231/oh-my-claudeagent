@@ -198,7 +198,10 @@ function slopFindings(lines: readonly string[], syntax: Syntax): Slop[] {
 }
 
 // Without the list of what to keep, a deny invites stripping every comment.
-const KEEP_NOTICE = `The convention: names, types, and structure carry the what, so a comment earns its place only by carrying something the code cannot state, the non-obvious why, an invariant, a constraint, or the derivation of a magic number. A correct fix deletes the quoted comment, or rewrites it as the reason the code is the way it is. A clearer name beats a comment that restates the line below it. Do NOT remove other comments while fixing this: file headers, non-obvious function contracts, invariant notes, and magic-number derivation comments may be required by the project's own convention. Resubmit the same code change with only the quoted comments fixed. Genuine exceptions: put @allow on a comment line to exempt that line from the slop checks, or put ${DISABLE_FILE_MARKER} in the first ${DISABLE_FILE_WINDOW} lines of the hunk.`;
+export const KEEP_NOTICE = `The convention: names, types, and structure carry the what, so a comment earns its place only by carrying something the code cannot state, the non-obvious why, an invariant, a constraint, or the derivation of a magic number. A correct fix deletes the quoted comment, or rewrites it as the reason the code is the way it is. A clearer name beats a comment that restates the line below it. Do NOT remove other comments while fixing this: file headers, non-obvious function contracts, invariant notes, and magic-number derivation comments may be required by the project's own convention. Resubmit the same code change with only the quoted comments fixed. Genuine exceptions: put @allow on a comment line to exempt that line from the slop checks, or put ${DISABLE_FILE_MARKER} in the first ${DISABLE_FILE_WINDOW} lines of the hunk.`;
+
+export const COMMENT_ATTRIBUTION_HEAD = "Blocked: AI-attribution or placeholder comment.";
+export const COMMENT_SLOP_HEAD = "Blocked: comment slop.";
 
 /**
  * Judges the comments a Write or Edit adds. Tier-1 findings (attribution, placeholder) deny in
@@ -223,7 +226,7 @@ export function judgeWrite(mode: "advise" | "deny", input: unknown, slot: DenyOn
   const text = ["[COMMENT CHECK] Detected AI slop comment patterns. Remove the quoted comments with a follow-up Edit unless they encode a non-obvious why.", ...attribution, ...sentences, ...aggregate].join(" ");
   const advise = (wouldDeny: "tier1" | "tier2" | undefined): Verdict => ({ kind: "advise", text, wouldDeny });
   if (mode !== "deny") return advise(attribution.length > 0 ? "tier1" : slop.length > 0 ? "tier2" : undefined);
-  if (attribution.length > 0) return { kind: "deny", reason: `Blocked: AI-attribution or placeholder comment. ${attribution.join(" ")} ${KEEP_NOTICE}` };
+  if (attribution.length > 0) return { kind: "deny", reason: `${COMMENT_ATTRIBUTION_HEAD} ${attribution.join(" ")} ${KEEP_NOTICE}` };
   if (slop.length === 0 || slot === undefined) return advise(undefined);
 
   const signature = slop.map(({ quoted }) => quoted).join("\n");
@@ -232,5 +235,5 @@ export function judgeWrite(mode: "advise" | "deny", input: unknown, slot: DenyOn
     return advise(undefined);
   }
   slot.set(filePath, signature);
-  return { kind: "deny", reason: `Blocked: comment slop. ${sentences.join(" ")} ${KEEP_NOTICE}` };
+  return { kind: "deny", reason: `${COMMENT_SLOP_HEAD} ${sentences.join(" ")} ${KEEP_NOTICE}` };
 }

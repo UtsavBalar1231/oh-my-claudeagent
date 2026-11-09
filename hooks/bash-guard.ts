@@ -1,5 +1,5 @@
 import type { EventResult } from "claude-code";
-import { type Context, classify, type GitFinding, type Reviewable, reasonFor } from "../src/core/destructive.ts";
+import { type Context, classify, type GitFinding, gitTitle, type Reviewable, reasonFor } from "../src/core/destructive.ts";
 import { isHookDisabled } from "../src/core/kill-switch.ts";
 import { joinPath, toPosix } from "../src/core/path.ts";
 import { homeRest, platformOf } from "../src/core/targets.ts";
@@ -104,12 +104,12 @@ async function removalSection(host: Host, targets: readonly string[], g: Glyphs,
 }
 
 const TREE_EFFECT: Record<Exclude<GitFinding["operation"], "reset --hard" | "push --force">, string> = {
-  stash: "git stash moves uncommitted changes out of the working tree.",
-  clean: "git clean deletes untracked files.",
-  restore: "git restore discards changes to the files it names.",
-  "rm -r": "git rm -r deletes tracked files from the working tree.",
-  "checkout --": "git checkout -- discards changes to the paths it names.",
-  "commit --no-verify": "git commit --no-verify skips the repository's pre-commit and commit-msg hooks.",
+  stash: `${gitTitle("stash")} moves uncommitted changes out of the working tree.`,
+  clean: `${gitTitle("clean")} deletes untracked files.`,
+  restore: `${gitTitle("restore")} discards changes to the files it names.`,
+  "rm -r": `${gitTitle("rm -r")} deletes tracked files from the working tree.`,
+  "checkout --": `${gitTitle("checkout --")} discards changes to the paths it names.`,
+  "commit --no-verify": `${gitTitle("commit --no-verify")} skips the repository's pre-commit and commit-msg hooks.`,
 };
 
 async function resetSection(host: Host): Promise<Section> {

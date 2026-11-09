@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { isSlotRecent, ledgerCoversSlot, provesTask, readLedger } from "../../src/core/evidence.ts";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
+import { noPassingVerdictReason } from "../../src/core/refusals.ts";
 import { INVALID_LEDGER_REASON, unloggedReason } from "../../src/core/verification.ts";
 import { readOrNull } from "../io.ts";
 import type { Handler, Output, Payload } from "./registry.ts";
@@ -21,10 +22,7 @@ function finalTaskBlock({ task_id: taskId, session_id: sessionId }: Payload, roo
   const ledger = readLedger(text ?? "{}");
   if (ledger.kind === "refused") return { decision: "block", reason: INVALID_LEDGER_REASON };
   if (ledger.entries.some((entry) => provesTask(entry, { list: list.id, run: task.run, id: taskId }))) return undefined;
-  return {
-    decision: "block",
-    reason: `Task #${taskId} '${task.subject}' is the final task of run '${task.run}', and no passing final verification names it. Review the run, then record the verdict: evidence_log(evidence_type="final_verification", command="<what the review covered>", exit_code=0, output_snippet="<verdict, naming any task closed as blocked>", task_id="${taskId}"). If the review finds a gap, fix it and review again.`,
-  };
+  return { decision: "block", reason: noPassingVerdictReason(taskId, task.subject, task.run) };
 }
 
 // The payload names the task, not what it did, so the verdict comes from causal order: a
