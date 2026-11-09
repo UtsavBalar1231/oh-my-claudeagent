@@ -159,10 +159,10 @@ server's `omca_hook` tool, which dispatches through `servers/hooks/registry.ts`.
 | `tool.check` for Bash, PowerShell and Monitor | The destructive-command guard and its review dialog; a Monitor command is read as bash |
 | `session.start` | Registers `/omca`, writes the session's mod marker, draws the band's first state, and writes a transcript line when the `omca` server is not connected, naming a missing bun or the server's error, with a status line under the prompt until it connects |
 | `prompt.submit` | Tracks user-origin submissions and cancels a pending refusal recovery when new user input arrives; notes which keyword modes have fired so the prompt stops underlining them |
-| `turn.start`, `turn.complete` | The turn's tokens, cost and verification receipt for its closing line, a finished agent's notice, the band and its buttons, the pane's refresh. At a main turn's start, the mod asks whether the `omca` server is still connected, and one that has stopped gets the same transcript line and status line. A main turn you started in an interactive session that still ends in a `reasoning_extraction` refusal, after Claude Code's own retry, gets at most one follow-up prompt from OMCA; the refusal itself stands |
+| `turn.start`, `turn.complete` | The turn's tokens, cost and verification receipt for its closing line, a finished agent's notice, the band and its Task list button, the pane's refresh. At a main turn's start, the mod asks whether the `omca` server is still connected, and one that has stopped gets the same transcript line and status line. A main turn you started in an interactive session that still ends in a `reasoning_extraction` refusal, after Claude Code's own retry, gets at most one follow-up prompt from OMCA; the refusal itself stands |
 | `agent.spawn`, `turn.step` | The Agents tab and delegation records |
 | `tool.call` | A subagent's tool calls, kept for its page on the Agents tab; only a subagent's call reaches the mod, and a main-loop call skips it |
-| `ui.render`, `ui.focus`, `ui.scroll`, `ui.close`, `prompt.edit`, `prompt.change`, `command.run` | The turn line, an agent's launch and finish rows, the receipts and picture previews under tool groups in the transcript, the band, the pane and the commands, and the underline on a keyword trigger in the prompt |
+| `ui.render`, `ui.focus`, `ui.scroll`, `ui.close`, `prompt.edit`, `prompt.change`, `command.run` | The turn line, an agent's launch and finish rows, the receipts and picture previews under tool groups in the transcript, OMCA's rows for the refusals and held completions it issues in place of the engine's error text, the band, the pane and the commands, and the underline on a keyword trigger in the prompt |
 
 An observed user submission cancels a follow-up before it is queued. If user input races a
 follow-up already queued, neither competing turn qualifies for another automatic recovery.
@@ -212,13 +212,14 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | Name | Turns off |
 | --- | --- |
 | `bash-guard` | The guard's review and its refusals. The catastrophic-removal deny stays |
+| `blocker-rows` | OMCA's rows for its own refusals and held completions in the transcript; the engine's error text shows instead |
 | `refusal-recovery` | The follow-up prompt after a `reasoning_extraction` refusal |
 | `stop-gates` | Every stop gate |
 | `task-continuation`, `drift-guard` | One stop gate |
 | `final-verification` | The final task's refusals: completing it without a passing verdict, and marking it blocked, deleting it or unmarking it without any verdict |
 | `final-task-guard` | The refusals on updates that mark the final task blocked, delete it or unmark it, leaving the completion check on |
 | `task-completed` | The task completion check |
-| `verification-recorder` | Recording each agent's verification commands and its own `evidence_log` calls, which the band, the turn line and the task check read |
+| `verification-recorder` | Recording each agent's verification commands and its own `evidence_log` calls, which the turn line, the Stats page and the task check read |
 | `context-injector` | `AGENTS.md`, `README.md` and rule injection when a file is read or edited |
 | `comment-gate` | The comment check on writes |
 | `empty-task-response` | The note on an empty or transitional agent report; concise findings need no fixed headers |

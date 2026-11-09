@@ -18,7 +18,7 @@ event is unregistered on purpose; `docs/references.md` carries the per-event rea
 try/catch. `host.ts` defines the `Host` closures a feature receives in place of `$`, so a
 feature module takes `host` and never `$`. The features are `bash-guard`, `server-check`,
 `mod-marker`, `agents-tracker`, `agent-rows`, `metrics`, `band`, `pane` with its `tabs/`, `footer`,
-`group-rows`, `keyword-paint`, `completion`, `refusal-recovery`, `omca-router`, `task-tools`,
+`group-rows`, `blocker-rows`, `keyword-paint`, `completion`, `refusal-recovery`, `omca-router`, `task-tools`,
 `task-list` and `task-rows`. `doctor.ts` runs the Doctor page's checks and fixes for `tabs/doctor.ts`; it registers
 no event. `project-root.ts` gives `host.session.root()` the repository top level of the engine's
 root, as the `omca` server names its root, so a launch from a subdirectory reads and writes the same
@@ -26,7 +26,8 @@ root, as the `omca` server names its root, so a launch from a subdirectory reads
 
 The mod's only view of planned work is Claude Code's native task list. State is the task files under
 `<config dir>/tasks/<list id>/`; the mod has no plan file format, parser or registry, and it keeps
-OMCA's task view in one pane. The band shows a run line while a run has open tasks, and `task-rows`
+OMCA's task view in one pane. The band shows a run line and its Task list button while a run has open
+tasks, with a status file error and nothing else: it carries no verification row. `task-rows`
 writes one transcript row per main turn that changed a run, since Claude Code draws nothing for the task
 tools' calls. The spinner carries no task facts.
 
@@ -79,6 +80,15 @@ atoms written once per turn or per finished agent, since a row subscribes to eve
   A TaskUpdate call whose completion OMCA held gets OMCA's refusal row appended, and a group whose
   every call is a guard refusal draws each call's header and refusal rows in its place. Those two follow
   `blocker-rows` in `OMCA_DISABLED_HOOKS`. An expanded group is left as drawn.
+- `blocker-rows` replaces the `ToolResult` row of a standalone refused call, in the normal view only
+  (`isExpanded` false), with OMCA's two-line row. `refusalOf` in `src/core/refusals.ts` reads the
+  refusal back from the reason text OMCA wrote, only where the engine puts a refusal: at the start of
+  the text, after one of its wrappers, or, for the comment check's two heads, after a bare `Error: `
+  that Claude Code 2.1.319 gives a refused Write or Edit. A failed command that only quotes a reason
+  matches nothing. The task subject comes from the `tasks` atom's last sync, not a read in the
+  drawing. A missing prop, an expanded view, a remote surface or `OMCA_DISABLED_HOOKS=blocker-rows`
+  leaves the engine's row. The Stop-hook holds and the comment gate's advice draw no row: no render
+  component carries them.
 
 `task-rows` places one row with `$.ui.place` under the turn line of a main turn that changed a run's
 tasks, found by comparing the `tasks` atom at that turn's `turn.start` with the atom at its
@@ -221,3 +231,7 @@ overflowing region, a row, a page (`bodyRows`) or an end (`contentRows`) at a ti
 - Claude Code owns the hook lifecycle. OMCA supplies the mod's module and the
   `type: mcp_tool` handlers whose `tool` is `omca_hook`, and every registered handler is of that
   type. Start-up pruning runs in the server process, outside any hook.
+- Engine surfaces the mod declines, so a later sync does not raise them again. `$.theme` (its
+  `set` backdrop) is decoration for desktop and mobile with no OMCA state to show. The `effort` on
+  `$.model.fork` has no use because the mod never forks a model call, and the engine validator
+  asserts the mod's `calls:` line holds no `model.fork`.

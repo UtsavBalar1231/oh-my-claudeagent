@@ -73,11 +73,10 @@ Claude reads shows as a picture where the terminal draws them.
 
 <img src=".github/assets/transcript.png" width="900" alt="A Claude Code turn on the checkout project: under Ran 1 shell command, a receipt reads just test, 42 passed. Two background agents start, and each reports as it finishes: the explorer on Map the validation messages and the architect on Review the checkout flow, each with its duration, tool calls and tokens flush right and the first line of its reply beneath. The dim line that closes each turn names the agents still running, then the turn's tokens and cost.">
 
-The band above the prompt warns when a verification run has no logged evidence, and while a run has
-open tasks it shows the run's progress. The numbered buttons fill the prompt with the step that logs
-the evidence and with `/tasklist`.
+While a run has open tasks, the band above the prompt shows the run's progress, and its Task list
+button fills the prompt with `/tasklist`.
 
-<img src=".github/assets/band.png" width="680" alt="The band above the prompt warns that the evidence for just test was not logged, then shows the checkout-redesign run with its progress bar at 6 of 14, with the buttons 1: Log evidence and 2: Task list below. Above it, the receipt under the shell command reads just test, 42 passed, and the turn line ends with just test not logged.">
+<img src=".github/assets/band.png" width="680" alt="A Claude Code session on the checkout project. The receipt under Ran 1 shell command reads just test, 42 passed, and an executor starts in the background on Wire the order summary panel. The turn line reads Waiting for executor, with the turn's tokens and cost, and ends with just test not logged. Below it, the band shows the checkout-redesign run with its progress bar at 6 of 14 and a button, 1: Task list.">
 
 `/tasklist` opens the Tasks pane: Claude's own task list whole, in the order the work runs, each
 task with what it does and what holds it back.

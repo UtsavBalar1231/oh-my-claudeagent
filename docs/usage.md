@@ -256,21 +256,39 @@ the work happens:
   `◐ #6 #7` started, `⊗ #8 blocked` closed as blocked and `◆ final done`, then `/tasklist`. A list
   names three ids, then how many more. As the window narrows, whole parts leave from the end; the
   run's name and the ids are never cut. A subagent's turn adds no row.
+- **A call OMCA refused or held.** In the normal view, a refusal OMCA issues draws as a row of its
+  own in place of Claude Code's error text, which names every plugin with a check hook:
+  - `OMCA guard refused · <title>`, with what to do instead beneath it, for a command the guard
+    refused.
+  - `you refused this in the OMCA guard`, then `Claude asks how to proceed`, after you pick Refuse
+    in the review dialog.
+  - `#<id> <subject> · stays the run's final task` or `· final task has no logged verdict` when
+    the final-task guard refuses to delete, block or unmark it.
+  - `#<id> <subject> · completion held: no passing verdict names it`, or `· completion held: a
+    verification ran and is not logged`, when a task's completion is held. A folded group draws
+    this row under the `TaskUpdate` call, where Claude Code draws nothing.
+  - `evidence ledger invalid` when the ledger cannot be read.
+  - `OMCA comment check held this write · <first quoted comment>` when the comment check refuses
+    a Write or Edit with `OMCA_COMMENT_GATE=deny`.
+
+  A folded group made only of refused commands draws each command's header with its rows. `ctrl+o`,
+  a client that does not report which view it draws, and a remote surface keep Claude Code's own
+  text. The Stop-hook holds and the comment gate's advice have no row. `OMCA_DISABLED_HOOKS=blocker-rows`
+  turns the rows off.
 Running agents are listed by Claude Code itself, under the prompt. A session without a terminal
 gets the turn's figures as one text row beneath the answer instead.
 
 ### The band
 
-The band sits above the prompt. It shows a verification command whose evidence was not logged,
-and a line when the session status file cannot be read. While a run has open tasks, a line under
-it names the run with a short progress bar, done of total, the running tasks and how many were
-closed as blocked, as in `◆ dotman-rewrite ━━━━────────── 5/27 · ◐ #6 #7 · ⊗ 1`. As the band
-narrows, that line drops the bar, then the running tasks, then the blocked count. With none of
-these, the band draws nothing.
+The band sits above the prompt. While a run has open tasks, its line names the run with a short
+progress bar, done of total, the running tasks and how many were closed as blocked, as in
+`◆ dotman-rewrite ━━━━────────── 5/27 · ◐ #6 #7 · ⊗ 1`. As the band narrows, that line drops the
+bar, then the running tasks, then the blocked count. A line also appears when the session status
+file cannot be read. With neither, the band draws nothing. A verification run's logged or unlogged
+state shows in the turn line, not in the band.
 
-Below them, numbered buttons offer the next steps: log the evidence, which stays first, and open the
-task list while a run is open. Press a button's digit in an empty prompt, or click it, to fill the
-prompt with that step; nothing runs until you send it. Typing anything else clears the buttons, and
+Below the line, a Task list button opens the task list while a run is open. Press its digit in an
+empty prompt, or click it, to fill the prompt with `/tasklist`; nothing runs until you send it. Typing anything else clears the buttons, and
 so does filling the prompt from history, an undo or another plugin. The buttons are held while an
 agent's transcript is in the main view and return with the main conversation.
 
@@ -454,7 +472,9 @@ entry count, the uncommitted changes a hard reset discards, or the commits a for
 from the remote. The command wraps onto up to four rows, and each list ends in `and N more` where
 it would push the dialog past a 24-row terminal. Choose **Run it** to hand the command back to the
 normal permission checks.
-**Refuse**, a dismissed dialog, or a failed one refuses it, and Claude is told not to retry.
+**Refuse**, a dismissed dialog, or a failed one refuses it, and Claude is told not to retry. After
+Refuse, Claude reads that you refused the command and asks how to proceed, and text you type under
+Other reaches it as your own words.
 
 The dialog shows in the terminal and the Desktop app. In `claude -p`, the Agent SDK and the VS
 Code chat panel nothing can show it, so a held command is decided without you, as above.
