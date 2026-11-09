@@ -6,6 +6,7 @@ const ENGINE = { decision: "ask", reason: "Bash(rm:*) asks", rule: "Bash(rm:*)" 
 const RM_CATASTROPHIC =
   "Destructive rm -rf blocked: the target is the filesystem root, home, the working directory, or a directory directly under root or home. Name a deeper path explicitly.";
 const REFUSED = "The user refused this command in OMCA's review. Do not retry it; ask the user how to proceed.";
+const refusedAs = (title: string) => `${REFUSED} OMCA held it as: ${title}.`;
 const GIT =
   "Destructive git command blocked. If the working tree is dirty, REPORT and STOP. Never modify history. Set OMCA_DISABLED_HOOKS=bash-guard to turn this check off for testing.";
 const FORCE_PUSH =
@@ -135,7 +136,7 @@ test("a catastrophic removal is denied with no dialog, even with OMCA_DISABLED_H
 test("a reviewable removal asks with every target's kind and entry count, Refuse first", async ($, on) => {
   const { asked, checked } = world(on, BUILD_WORLD);
 
-  expect(await check($, BUILD_COMMAND)).toEqual({ decision: "deny", reason: REFUSED });
+  expect(await check($, BUILD_COMMAND)).toEqual({ decision: "deny", reason: refusedAs("recursive removal") });
   expect(asked).toEqual([{ question: BUILD_QUESTION, header: "OMCA guard", options: ["Refuse", "Run it"] }]);
   expect(checked).toEqual([]);
 });
@@ -177,7 +178,10 @@ test("a dialog that fails denies", async ($, on) => {
 test("an answer typed under Other denies", async ($, on) => {
   const { checked } = world(on, { ...BUILD_WORLD, answer: "run it please" });
 
-  expect(await check($, BUILD_COMMAND)).toEqual({ decision: "deny", reason: REFUSED });
+  expect(await check($, BUILD_COMMAND)).toEqual({
+    decision: "deny",
+    reason: `${refusedAs("recursive removal")} The user wrote: run it please`,
+  });
   expect(checked).toEqual([]);
 });
 
@@ -213,7 +217,7 @@ test("guardMode deny decides without asking: blocking and catastrophic matches d
 test("a gatherer that throws still asks, with a one-line reason in place of the targets", async ($, on) => {
   const { asked } = world(on, { ...BUILD_WORLD, failExists: "notes.txt" });
 
-  expect(await check($, "rm -rf build notes.txt")).toEqual({ decision: "deny", reason: REFUSED });
+  expect(await check($, "rm -rf build notes.txt")).toEqual({ decision: "deny", reason: refusedAs("recursive removal") });
   expect(asked.map((a) => a.question)).toEqual([
     [
       "OMCA held this command for your review:",
@@ -234,7 +238,7 @@ test("a hard reset shows its tracked change count and the diff stat", async ($, 
     },
   });
 
-  expect(await check($, "git reset --hard")).toEqual({ decision: "deny", reason: GIT });
+  expect(await check($, "git reset --hard")).toEqual({ decision: "deny", reason: refusedAs("git reset --hard") });
   expect(asked.map((a) => a.question)).toEqual([
     [
       "OMCA held this command for your review:",
@@ -418,7 +422,7 @@ test("a force push lists the first 7 commits it drops with a count of the rest",
     git: { ...branches("dev"), "git log --oneline origin/dev --not HEAD": { stdout: `${commits.join("\n")}\n` } },
   });
 
-  expect(await check($, "git push --force origin dev")).toEqual({ decision: "deny", reason: REFUSED });
+  expect(await check($, "git push --force origin dev")).toEqual({ decision: "deny", reason: refusedAs("force push to dev") });
   expect(asked.map((a) => a.question)).toEqual([
     [
       "OMCA held this command for your review:",
@@ -436,7 +440,10 @@ test("a force push to the default branch asks the same way, and a refusal names 
     git: { ...branches("dev"), "git log --oneline origin/main --not HEAD": { stdout: "c000001 lost\n" } },
   });
 
-  expect(await check($, "git push --force origin main")).toEqual({ decision: "deny", reason: FORCE_PUSH });
+  expect(await check($, "git push --force origin main")).toEqual({
+    decision: "deny",
+    reason: refusedAs("force push to the default branch"),
+  });
   expect(asked.map((a) => a.question)).toEqual([
     [
       "OMCA held this command for your review:",
@@ -478,7 +485,10 @@ test("when git cannot read the branches, main and master are the default by name
 test("a commit that skips its hooks asks with its effect, and a refusal names the skipped hooks", async ($, on) => {
   const { asked } = world(on);
 
-  expect(await check($, "git commit --no-verify -m wip")).toEqual({ decision: "deny", reason: NO_VERIFY });
+  expect(await check($, "git commit --no-verify -m wip")).toEqual({
+    decision: "deny",
+    reason: refusedAs("git commit --no-verify"),
+  });
   expect(asked.map((a) => a.question)).toEqual([
     [
       "OMCA held this command for your review:",
@@ -724,7 +734,7 @@ test("a PowerShell advisory removal asks with its targets, and the engine's verd
 
 test("a refused PowerShell removal is denied", async ($, on) => {
   const refusing = world(on, BUILD_WORLD);
-  expect(await powershell($, "Remove-Item -Recurse build")).toEqual({ decision: "deny", reason: REFUSED });
+  expect(await powershell($, "Remove-Item -Recurse build")).toEqual({ decision: "deny", reason: refusedAs("recursive removal") });
   expect(refusing.checked).toEqual([]);
 });
 
@@ -763,7 +773,7 @@ test("a Monitor command is held like a Bash command, and a WebSocket monitor rea
   const monitor = (input: Record<string, unknown>) => $.tool.check({ tool: "Monitor", input: { description: "watch", timeout_ms: 60_000, ...input } });
 
   expect(await monitor({ command: "rm -rf ~" })).toEqual({ decision: "deny", reason: RM_CATASTROPHIC });
-  expect(await monitor({ command: BUILD_COMMAND })).toEqual({ decision: "deny", reason: REFUSED });
+  expect(await monitor({ command: BUILD_COMMAND })).toEqual({ decision: "deny", reason: refusedAs("recursive removal") });
   expect(asked.map((a) => a.question)).toEqual([BUILD_QUESTION]);
   expect(await monitor({ ws: { url: "wss://feed.example.test/events" } })).toEqual(ENGINE);
   expect(await monitor({ command: "tail -f build.log" })).toEqual(ENGINE);
@@ -958,7 +968,7 @@ test("on Windows a PowerShell removal lists its drive-spelled targets", async ($
 test("the dialog asks when the session draws on Desktop only", async ($, on) => {
   const { asked, checked } = world(on, { ...BUILD_WORLD, surfaces: ["desktop"] });
 
-  expect(await check($, BUILD_COMMAND)).toEqual({ decision: "deny", reason: REFUSED });
+  expect(await check($, BUILD_COMMAND)).toEqual({ decision: "deny", reason: refusedAs("recursive removal") });
   expect(asked).toEqual([{ question: BUILD_QUESTION, header: "OMCA guard", options: ["Refuse", "Run it"] }]);
   expect(checked).toEqual([]);
 });

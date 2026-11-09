@@ -1,5 +1,5 @@
 import type { EventResult } from "claude-code";
-import { type Context, classify, type GitFinding, gitTitle, type Reviewable, reasonFor } from "../src/core/destructive.ts";
+import { type Context, classify, type GitFinding, gitTitle, REVIEW_REFUSED_REASON, type Reviewable, reasonFor, titleFor } from "../src/core/destructive.ts";
 import { isHookDisabled } from "../src/core/kill-switch.ts";
 import { joinPath, toPosix } from "../src/core/path.ts";
 import { homeRest, platformOf } from "../src/core/targets.ts";
@@ -253,7 +253,10 @@ export const bashGuard: Features = {
       const g = glyphs((await sessionOf(host)).glyphTier);
       const text = await question(host, command, finding, g, ctx);
       const answer = await host.ui.ask(text, { header: "OMCA guard", options: [REFUSE, RUN] }).catch(() => undefined);
-      return answer === RUN ? undefined : deny(refusal);
+      if (answer === RUN) return undefined;
+      if (answer === undefined) return deny(refusal);
+      const refused = `${REVIEW_REFUSED_REASON} OMCA held it as: ${titleFor(finding)}.`;
+      return deny(answer === REFUSE ? refused : `${refused} The user wrote: ${answer}`);
     },
   },
 };
