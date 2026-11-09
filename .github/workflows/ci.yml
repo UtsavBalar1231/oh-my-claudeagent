@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CLAUDE_CODE_VERSION: 2.1.316
+  CLAUDE_CODE_VERSION: 2.1.319
 
 # A macOS minute costs ten Linux minutes and a Windows minute two, so pull requests and pushes to
 # main run on Linux. A release tag and a manual run (`gh workflow run ci.yml --ref <branch>`) add

@@ -142,7 +142,7 @@ export function world(
     said: [],
     clock: mock.clock(on, { now: Date.UTC(2026, 9, 2, 12, 0, 0) }),
     style: OUTPUT_STYLE,
-    version: "2.1.316",
+    version: "2.1.319",
   };
   mock.env(on, { OMCA_GLYPHS: "unicode", ...layout.env, ...env });
   on("session.root", () => ({ value: layout.root }));

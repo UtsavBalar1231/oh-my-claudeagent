@@ -350,6 +350,8 @@ function recording() {
     Box: draw("Box"),
     Text: draw("Text"),
     Button: draw("Button"),
+    Input: draw("Input"),
+    Select: draw("Select"),
     Svg: draw("Svg"),
     Link: draw("Link"),
     Code: draw("Code"),
