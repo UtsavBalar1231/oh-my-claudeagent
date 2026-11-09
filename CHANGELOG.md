@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-11-09
+
 **Upgrading from 3.5.x:** finish or abandon an open run before you update, or run `plan` again on
 the old document afterward. An open run is released without a warning, because the gates read the
 task list and find it empty. `start-work` then reports that no run is open and names `plan`, even
@@ -3348,6 +3350,7 @@ for multi-agent orchestration.
 - Shellcheck fixes applied across all hook scripts
 - Ruff fixes applied to Python MCP servers
 
+[4.0.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.5.1...v4.0.0
 [3.5.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.5.0...v3.5.1
 [3.5.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.4.0...v3.5.0
 [3.4.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.3.2...v3.4.0
