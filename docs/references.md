@@ -63,6 +63,13 @@ Only orchestrator and planner can spawn further agents. `servers/categories.json
 work to tiers for delegation: `quick`, `standard` and `readonly` to `sonnet`, `deep` to `opus`,
 `hardest` to `fable`.
 
+No agent sets `background: true`. A probe on Claude Code 2.1.319 against a mock model found that an
+agent spawned from the main session already runs in the background in `claude -p` and in an
+interactive session with fork mode on or off, and its result arrives in a `<task-notification>`
+before `-p` exits. The flag only overrides an explicit request to wait, and in `claude -p` a
+subagent that spawns a flagged agent finishes before that agent's result arrives, which then goes
+to the main session. The probe measures delivery, not model behavior.
+
 The roster's tier and effort hold unless something overrides them: a `model` passed on one call,
 `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`, which puts every agent on one model, or a `maxEffortLevel`
 cap, which clamps every declared effort. The doctor reports the last two.
