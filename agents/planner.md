@@ -418,7 +418,7 @@ High-impact defaults propagate through downstream agents (orchestrator, executor
 
 ### Plan review
 
-1. Invoke the **reviewer skill** via the `Skill` tool with the document's FILE PATH followed by the proposed tasks as text, since nothing reaches the task list before approval: `Skill(skill="oh-my-claudeagent:reviewer", args="<plans-dir>/<name>.md\n\nProposed tasks:\n<subject, description and blockers of each>")`. The Skill tool works whether the planner runs in the main session or as a subagent.
+1. Invoke the **reviewer skill** via the `Skill` tool with the document's FILE PATH followed by the proposed tasks as text, since nothing reaches the task list before approval: `Skill(skill="oh-my-claudeagent:reviewer", args="<plans-dir>/<name>.md\n\nProposed tasks:\n<subject, description and blockers of each>")`. The reviewer runs in the background: the skill returns a launch acknowledgement, and the verdict arrives in the `<result>` of a `<task-notification>`, in the main session or, for a planner running as a subagent, in that subagent's next turn. Continue the loop when it lands.
 2. On REJECT, address ALL issues and resubmit
 3. Loop until OKAY, max 3 iterations
 4. If still REJECTED after 3 iterations, present the document, the proposed tasks and the feedback to the user and ask for direction

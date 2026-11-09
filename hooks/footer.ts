@@ -1,12 +1,11 @@
 import type { RenderElement, RenderInput } from "claude-code";
-import { ledgerCoversSlot } from "../src/core/evidence.ts";
 import { footerLine } from "../src/core/footer.ts";
 import { statusPath, verificationOf } from "../src/core/omca-paths.ts";
 import { turnFacts, type TurnRecord, turnLine } from "../src/core/turn-line.ts";
 import { glyphs, type Glyphs } from "../src/core/ui-kit.ts";
 import type { Piece } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
-import { type Host, ledgerWrittenAt, reason, resolvedSession, sessionOf, update } from "./host.ts";
+import { type Host, reason, resolvedSession, sessionOf, update } from "./host.ts";
 import { type Kit, kitOf, Line } from "./ui.ts";
 
 type Receipt = NonNullable<TurnRecord["receipt"]>;
@@ -40,7 +39,7 @@ async function receiptSince(host: Host, startMs: number, earlier: readonly TurnR
   const slot = verificationOf(JSON.parse(await host.fs.read(statusFile)));
   if (slot === null || slot.at < Math.floor(startMs / 1000)) return null;
   if (earlier.some(({ receipt }) => receipt?.at === slot.at && receipt.command === slot.command)) return null;
-  return { command: slot.command, at: slot.at, isLogged: ledgerCoversSlot(await ledgerWrittenAt(host, root), slot.at) };
+  return slot;
 }
 
 function turnIdOf(requestId: string, now: number): string | undefined {

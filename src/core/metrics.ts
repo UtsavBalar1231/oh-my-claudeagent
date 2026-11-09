@@ -1,4 +1,3 @@
-import { parseLedger } from "./evidence.ts";
 import { isSafeId } from "./session-id.ts";
 import { isRecord } from "./tool-input.ts";
 
@@ -45,10 +44,6 @@ export function outcomeOf(turn: { isAborted: boolean; answer: string }): Exclude
   if (turn.isAborted) return "aborted";
   return turn.answer.trim() === "" ? "empty" : "completed";
 }
-
-/** True when any readable evidence entry's timestamp falls inside [startMs, endMs], both ends included. */
-export const isEvidenceLogged = (ledgerText: string, startMs: number, endMs: number): boolean =>
-  parseLedger(ledgerText).some((entry) => entry.at >= startMs && entry.at <= endMs);
 
 const isCount = (value: unknown) => typeof value === "number" && Number.isInteger(value) && value >= 0;
 const isTime = (value: unknown) => typeof value === "string" && !Number.isNaN(Date.parse(value));

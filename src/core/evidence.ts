@@ -188,11 +188,3 @@ export const MAX_SLOT_AGE_SECONDS = 3600;
 export function isSlotRecent(nowSeconds: number, slotAt: number): boolean {
   return nowSeconds - slotAt <= MAX_SLOT_AGE_SECONDS;
 }
-
-// exFAT stores modification times to 2 s, and an SMB or NFS server's clock can lag the client's.
-export const MTIME_SLACK_SECONDS = 2;
-
-/** True when the ledger was written at or after the verification command finished, give or take the mtime slack. */
-export function ledgerCoversSlot(ledgerMtimeSeconds: number, slotAt: number): boolean {
-  return ledgerMtimeSeconds + MTIME_SLACK_SECONDS >= slotAt;
-}

@@ -259,9 +259,9 @@ the same launcher with `--subagent`, which setup writes beside `statusLine`:
 }
 ```
 
-A plugin `settings.json` does keep `subagentStatusLine`, but Claude Code neither substitutes
-`${CLAUDE_PLUGIN_ROOT}` in its command nor sets that variable for it (measured), so a
-plugin-relative command cannot find its script.
+A plugin `settings.json` does keep `subagentStatusLine`. From Claude Code 2.1.319 it substitutes
+`${CLAUDE_PLUGIN_ROOT}` in that command, so a plugin-relative command finds its script there. Setup
+keeps writing the user setting while the supported floor is below 2.1.319.
 
 **Input** (stdin): one JSON object with a `tasks` array (each task carries `id`, `name`, `type`,
 `agentType`, `status`, `description`, `label`, `startTime`, `model`, `effort`,

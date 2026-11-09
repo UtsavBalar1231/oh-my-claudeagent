@@ -43,6 +43,10 @@ let laid: { ids: readonly string[]; itemOf: (id: string) => number; stopFrom: (f
 let isDoneShown = false;
 let unfolded = new Set<string>();
 let revealing: readonly string[] = [];
+// The list as the last successful sync read it, for a row that must not redraw on each write to the tasks atom.
+let synced: readonly NativeTask[] = [];
+
+export const taskSubject = (id: string): string | undefined => synced.find((task) => task.id === id)?.subject;
 
 const reset = (): void => {
   opened = undefined;
@@ -85,6 +89,7 @@ async function sync(host: Host, forgotten?: string): Promise<void> {
   const hasTools = read.length > 0 || (await hasTaskTools(host));
   await update(host.state.tasks, (previous) => {
     const tasks = withHistory(previous?.tasks ?? [], read, forgotten);
+    if (error === null) synced = tasks;
     const next = { tasks, hasTools, isCleared: read.length === 0 && tasks.length > 0, error, list };
     return JSON.stringify(previous) === JSON.stringify(next) ? previous : next;
   });

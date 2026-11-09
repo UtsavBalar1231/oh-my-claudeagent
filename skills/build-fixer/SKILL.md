@@ -2,7 +2,6 @@
 name: build-fixer
 description: "Use when a build, type check or dependency install fails, or the user pastes a compiler error or says \"fix build\". Runs the build-fixer agent."
 context: fork
-background: false
 agent: oh-my-claudeagent:build-fixer
 user-invocable: true
 argument-hint: "[build command or error description]"

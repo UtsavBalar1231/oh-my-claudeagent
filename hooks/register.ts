@@ -3,6 +3,7 @@ import { agentRows } from "./agent-rows.ts";
 import { agentsTracker } from "./agents-tracker.ts";
 import { band } from "./band.ts";
 import { bashGuard } from "./bash-guard.ts";
+import { blockerRows } from "./blocker-rows.ts";
 import { completion } from "./completion.ts";
 import { dispatch, dispatchStream, featuresFor } from "./dispatch.ts";
 import { footer } from "./footer.ts";
@@ -200,6 +201,7 @@ export const register: Register = (on, pluginOptions) => {
   const turnRender = featuresFor("ui.render TurnDuration", { footer });
   const noticeRender = featuresFor("ui.render UserMessage", { agentRows });
   const launchRender = featuresFor("ui.render ToolUse", { agentRows });
+  const resultRender = featuresFor("ui.render ToolResult", { blockerRows });
   const groupRender = featuresFor("ui.render ToolGroup", { groupRows });
   const placedRender = featuresFor("ui.render Placed", { taskRows });
 
@@ -244,6 +246,9 @@ export const register: Register = (on, pluginOptions) => {
   );
   on("ui.render", { component: "ToolUse", props: { tool: "Agent" } }, ($, e, next) =>
     dispatch(bindHost($, options), "ui.render ToolUse", launchRender, e, next),
+  );
+  on("ui.render", { component: "ToolResult", props: { tool: /^(?:Bash|PowerShell|Monitor|TaskUpdate|Write|Edit)$/ } }, ($, e, next) =>
+    dispatch(bindHost($, options), "ui.render ToolResult", resultRender, e, next),
   );
   on("ui.render", { component: "ToolGroup" }, ($, e, next) =>
     dispatch(bindHost($, options), "ui.render ToolGroup", groupRender, e, next),

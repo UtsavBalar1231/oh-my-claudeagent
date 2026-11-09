@@ -1,16 +1,15 @@
 import type { RenderElement } from "claude-code";
 import { type Band, bandView, BUTTON_GAP, type Span, type Tone } from "../src/core/band-model.ts";
-import { ledgerCoversSlot } from "../src/core/evidence.ts";
 import { type NextAction, nextActions } from "../src/core/next-actions.ts";
-import { exitCodeOf, LEDGER, statusPath, verificationOf } from "../src/core/omca-paths.ts";
+import { exitCodeOf, statusPath, verificationOf } from "../src/core/omca-paths.ts";
 import { type RunSummary, runSummary } from "../src/core/run-line.ts";
 import { fitEnd, type GlyphTier, glyphs, oneLine } from "../src/core/ui-kit.ts";
 import { TONE_KEYS } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
-import { fillPrompt, type Host, ledgerWrittenAt, reason, sessionOf, stampOf } from "./host.ts";
+import { fillPrompt, type Host, reason, sessionOf, stampOf } from "./host.ts";
 import { isRemote, type Kit, kitOf, Line, Run, type TextStyle } from "./ui.ts";
 
-type Snapshot = { band: Band; exitCode: number | null };
+type Snapshot = { band: Band; verification: ReturnType<typeof verificationOf>; exitCode: number | null };
 
 let glyphTier: GlyphTier = "nerd";
 let shownActions = 0;
@@ -38,26 +37,24 @@ async function readSnapshot(host: Host): Promise<Snapshot> {
   const statusFile = statusPath(root, sessionId);
   let exitCode: number | null = null;
   let error: string | null = null;
-  let verification: Band["verification"] = null;
+  let verification: Snapshot["verification"] = null;
   if (statusFile !== undefined) {
     try {
       const status = await readJson(host, statusFile);
       exitCode = exitCodeOf(status);
-      const slot = verificationOf(status);
-      if (slot !== null) verification = { ...slot, isLogged: ledgerCoversSlot(await ledgerWrittenAt(host, root), slot.at) };
+      verification = verificationOf(status);
     } catch (failure) {
       error = `Cannot read the session status file: ${oneLine(reason(failure))}`;
     }
   }
-  return { band: { verification, error, readAt }, exitCode };
+  return { band: { error, readAt }, verification, exitCode };
 }
 
-// What a snapshot is read from, so a subagent's turn that moved neither reads nothing.
+// What a snapshot is read from, so a subagent's turn that did not move it reads nothing.
 async function stampsOf(host: Host): Promise<string> {
   const [root, sessionId] = await Promise.all([host.session.root(), host.session.id()]);
   const status = statusPath(root, sessionId);
-  const paths = [`${root}/${LEDGER}`, status ?? ""];
-  return JSON.stringify(await Promise.all(paths.map((path) => (path === "" ? "none" : stampOf(host, path)))));
+  return status === undefined ? "none" : stampOf(host, status);
 }
 
 async function snapshotOf(host: Host): Promise<Snapshot> {
@@ -68,10 +65,9 @@ async function snapshotOf(host: Host): Promise<Snapshot> {
 }
 
 // The first read after session.start only records what already happened; later reads toast what changed.
-function toastChanges(host: Host, { band, exitCode }: Snapshot): void {
+function toastChanges(host: Host, { verification, exitCode }: Snapshot): void {
   const isBaseline = !isBaselined;
   isBaselined = true;
-  const { verification } = band;
   const verifiedAt = verification?.at ?? 0;
   if (!isBaseline && verification !== null && verifiedAt > toastedVerificationAt && exitCode !== null && exitCode !== 0) {
     const { ellipsis } = glyphs(glyphTier);
@@ -137,7 +133,7 @@ export const band: Features = {
       const snapshot = await snapshotOf(host);
       toastChanges(host, snapshot);
       await writeBand(host, snapshot.band);
-      if (e.agentId === undefined) await writeActions(host, nextActions({ verification: snapshot.band.verification, isRunOpen: (await openRun(host)) !== undefined }));
+      if (e.agentId === undefined) await writeActions(host, nextActions({ isRunOpen: (await openRun(host)) !== undefined }));
       return undefined;
     },
   },

@@ -1,11 +1,16 @@
-import type { ImageSource, RenderElement } from "claude-code";
+import type { ImageSource, RenderElement, ToolGroupCall } from "claude-code";
+import { isHookDisabled } from "../src/core/kill-switch.ts";
 import { isAbsolutePath, joinPath } from "../src/core/path.ts";
 import { type ImagePreview, imagePreview, previewBox, previewCaption } from "../src/core/preview.ts";
 import { glyphTestLine, glyphTestRow, receiptRow, shellReceipt } from "../src/core/receipt.ts";
-import { glyphs } from "../src/core/ui-kit.ts";
+import { type Refusal, refusalOf } from "../src/core/refusals.ts";
+import { field, inputText } from "../src/core/tool-input.ts";
+import { fitEnd, type Glyphs, glyphs } from "../src/core/ui-kit.ts";
+import { fitPieces, type Piece, piecesWidth, TONE_KEYS } from "../src/core/visual.ts";
+import { blockerLines, COMPLETION_KINDS } from "./blocker-rows.ts";
 import type { Features, Input } from "./dispatch.ts";
 import { type Host, reason, resolvedSession } from "./host.ts";
-import { type Kit, kitOf, Line } from "./ui.ts";
+import { isRemote, type Kit, kitOf, Line } from "./ui.ts";
 
 // A cell kept free at the row's end, as the transcript's other OMCA rows keep it.
 const GUTTER = 1;
@@ -91,15 +96,62 @@ async function previewRows(host: Host, kit: Kit, e: Input<"ui.render ToolGroup">
   });
 }
 
+function guardRefusalOf(call: ToolGroupCall): Refusal | undefined {
+  if (!call.isErrored || typeof call.output !== "string") return undefined;
+  const refusal = refusalOf(call.output);
+  return refusal?.kind === "guard" || refusal?.kind === "review-refused" ? refusal : undefined;
+}
+
+// The header the engine draws over a standalone call: its tool and the command's first line.
+function headerOf(call: ToolGroupCall, g: Glyphs, columns: number): Piece[] {
+  const head: Piece[] = [{ text: g.running, color: TONE_KEYS.fail }, { text: " " }, { text: call.tool, bold: true }];
+  const command = inputText(call.input, "command").split("\n")[0] ?? "";
+  if (command === "") return fitPieces(head, columns, g.ellipsis);
+  const shown = fitEnd(command, columns - piecesWidth(head) - 2, g.ellipsis);
+  return fitPieces([...head, { text: `(${shown})` }], columns, g.ellipsis);
+}
+
+function heldLines(call: ToolGroupCall, g: Glyphs, columns: number): Piece[][] {
+  const error = field(call.output, "error");
+  if (call.tool !== "TaskUpdate" || call.isErrored || field(call.output, "success") !== false || typeof error !== "string") return [];
+  const refusal = refusalOf(error);
+  if (refusal === undefined || !(COMPLETION_KINDS.has(refusal.kind) || refusal.kind === "ledger-invalid")) return [];
+  const taskId = refusal.taskId ?? (inputText(call.input, "taskId") || undefined);
+  return blockerLines(refusal, taskId, g, columns) ?? [];
+}
+
+// A folded group of nothing but OMCA's guard refusals draws each call as its header and OMCA's rows,
+// where the engine draws a count and the reason cut at two lines. A refused call never ran, so it has
+// no receipt, glyph test or preview to keep. A hook-timing row in such a group shows under ctrl+o only.
+//
 // Below a folded tool group: one row per verification run in it, read from the run's own output,
 // the line a glyph test printed, so the user's font draws it where the folded group hides it,
 // and a preview of each PNG a Read call returned, so the row never waits on a file or a state
-// write. An unfolded group draws each call itself, and a group with neither is left as drawn.
+// write, and a row for each completion OMCA held, which the engine draws nothing for. An unfolded
+// group draws each call itself, and a group with none of these is left as drawn.
 export const groupRows: Features = {
   "ui.render ToolGroup": {
+    pre(host, e) {
+      const { calls, isExpanded } = e.props;
+      if (isExpanded !== false || calls.length === 0) return undefined;
+      const { glyphTier, disabledHooks } = resolvedSession();
+      if (isHookDisabled(disabledHooks, "blocker-rows")) return undefined;
+      const kit = kitOf(host.ui.resolve(e), e.surface);
+      if (isRemote(kit)) return undefined;
+      const refused = calls.flatMap((call) => {
+        const refusal = guardRefusalOf(call);
+        return refusal === undefined ? [] : [{ call, refusal }];
+      });
+      if (refused.length !== calls.length) return undefined;
+      const g = glyphs(glyphTier);
+      const columns = (e.viewport?.columns ?? 80) - GUTTER;
+      const rows = refused.flatMap(({ call, refusal }) => [headerOf(call, g, columns), ...(blockerLines(refusal, undefined, g, columns) ?? [])]);
+      return { answer: kit.Box({ key: "omca-group-refusals", flexDirection: "column", marginTop: 1, children: rows.map((pieces) => Line(kit, pieces)) }) };
+    },
     async post(host, e, result) {
       if (e.surface !== "terminal" || e.props.isExpanded) return undefined;
-      const g = glyphs(resolvedSession().glyphTier);
+      const { glyphTier, disabledHooks } = resolvedSession();
+      const g = glyphs(glyphTier);
       const kit = kitOf(host.ui.resolve(e), e.surface);
       const columns = (e.viewport?.columns ?? 80) - GUTTER;
       const receipts = e.props.calls.flatMap((call) => {
@@ -111,8 +163,9 @@ export const groupRows: Features = {
         return line === null ? [] : [Line(kit, glyphTestRow(line, g, columns))];
       });
       const previews = await previewRows(host, kit, e, columns);
-      if (receipts.length === 0 && glyphTests.length === 0 && previews.length === 0) return undefined;
-      return kit.Box({ key: "omca-group-rows", flexDirection: "column", children: [result, ...receipts, ...glyphTests, ...previews] });
+      const held = isHookDisabled(disabledHooks, "blocker-rows") ? [] : e.props.calls.flatMap((call) => heldLines(call, g, columns).map((pieces) => Line(kit, pieces)));
+      if (receipts.length === 0 && glyphTests.length === 0 && previews.length === 0 && held.length === 0) return undefined;
+      return kit.Box({ key: "omca-group-rows", flexDirection: "column", children: [result, ...receipts, ...glyphTests, ...previews, ...held] });
     },
   },
 };

@@ -7,11 +7,11 @@ export const LEDGER = ".omca/evidence/verification-evidence.json";
 export const statusPath = (root: string, sessionId: string): string | undefined =>
   isSafeId(sessionId) ? `${root}/.omca/state/session/${sessionId}.json` : undefined;
 
-export function verificationOf(status: unknown): { command: string; at: number } | null {
+export function verificationOf(status: unknown): { command: string; at: number; isLogged: boolean } | null {
   const verification = isRecord(status) ? status["verification"] : undefined;
   if (!isRecord(verification)) return null;
   const { command, at } = verification;
-  return typeof command === "string" && typeof at === "number" ? { command, at } : null;
+  return typeof command === "string" && typeof at === "number" ? { command, at, isLogged: verification["evidence_logged"] === true } : null;
 }
 
 export function exitCodeOf(status: unknown): number | null {
