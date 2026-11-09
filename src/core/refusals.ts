@@ -59,6 +59,15 @@ function commentDetail(afterHead: string): string | undefined {
   return /\("(.*?)"\): /.exec(end < 0 ? afterHead : afterHead.slice(0, end))?.[1];
 }
 
+function commentHeadAt(text: string): Refusal | undefined {
+  for (const [head, title] of COMMENT_TITLES) {
+    if (!text.startsWith(head)) continue;
+    const detail = commentDetail(text.slice(head.length));
+    return { kind: "comment", title, remedy: COMMENT_REMEDY, ...(detail !== undefined && { detail }) };
+  }
+  return undefined;
+}
+
 function headAt(text: string): Refusal | undefined {
   for (const { reason, title, remedy } of GUARD_REASONS) {
     if (text.startsWith(reason)) return { kind: "guard", title, remedy };
@@ -66,11 +75,8 @@ function headAt(text: string): Refusal | undefined {
   if (text.startsWith(REVIEW_REFUSED_REASON)) {
     return { kind: "review-refused", title: "the user refused this command", remedy: REVIEW_REFUSED_REMEDY };
   }
-  for (const [head, title] of COMMENT_TITLES) {
-    if (!text.startsWith(head)) continue;
-    const detail = commentDetail(text.slice(head.length));
-    return { kind: "comment", title, remedy: COMMENT_REMEDY, ...(detail !== undefined && { detail }) };
-  }
+  const comment = commentHeadAt(text);
+  if (comment !== undefined) return comment;
   if (text.startsWith(INVALID_LEDGER_REASON)) {
     return { kind: "ledger-invalid", title: "evidence ledger invalid", remedy: "log with the evidence_log tool, not manual file writes" };
   }
@@ -89,12 +95,13 @@ function headAt(text: string): Refusal | undefined {
 
 /**
  * The refusal OMCA wrote that `text` carries, or undefined. A head counts only right after one of
- * the engine's wrappers, so a failing command whose output quotes a reason is not a refusal. When
+ * the engine's wrappers, so a failing command whose output quotes a reason is not a refusal. The
+ * comment check's heads also count right after a bare `Error: `, the form Write and Edit use. When
  * another hook's text sits between the wrapper and OMCA's, the first head at a line start counts.
  */
 export function refusalOf(text: string): Refusal | undefined {
   const wrapper = WRAPPER.exec(text);
-  if (wrapper === null) return undefined;
+  if (wrapper === null) return text.startsWith("Error: ") ? commentHeadAt(text.slice("Error: ".length)) : undefined;
   let offset = wrapper[0].length;
   for (;;) {
     const found = headAt(text.slice(offset));

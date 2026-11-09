@@ -100,6 +100,18 @@ describe("refusalOf", () => {
     }
   }
 
+  test("a comment head right after a bare Error: is a refusal, and no other head is", () => {
+    expect(refusalOf(`Error: ${reasonOf(slop)}`)).toEqual({
+      kind: "comment",
+      title: "comment slop",
+      remedy: "delete the quoted comment, or rewrite it as the reason the code is the way it is",
+      detail: "obviously the user name",
+    });
+    expect(refusalOf(`Error: ${reasonOf(attribution)}`)).toMatchObject({ kind: "comment", title: "AI-attribution or placeholder comment" });
+    expect(refusalOf(`Error: Exit code 1\n${reasonOf(slop)}`)).toBeUndefined();
+    expect(refusalOf(`Error: ${FORCE_PUSH_REASON}`)).toBeUndefined();
+  });
+
   test("the comment reasons start with the exported heads", () => {
     expect(reasonOf(slop).startsWith(COMMENT_SLOP_HEAD)).toBe(true);
     expect(reasonOf(attribution).startsWith(COMMENT_ATTRIBUTION_HEAD)).toBe(true);

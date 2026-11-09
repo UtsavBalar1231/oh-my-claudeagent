@@ -92,6 +92,12 @@ const ROWS: readonly { name: string; result: Result; at80: string[]; at120?: str
     at120: ["  !  OMCA comment check held this write · obviously the user name", REMEDY_AT_120],
   },
   {
+    name: "a comment check deny in the bare Error form",
+    result: { tool: "Write", output: `Error: ${slopReason}` },
+    at80: ["  !  OMCA comment check held this write · obviously the user name", REMEDY_AT_80],
+    at120: ["  !  OMCA comment check held this write · obviously the user name", REMEDY_AT_120],
+  },
+  {
     name: "a guard deny of a Monitor command",
     result: { tool: "Monitor", output: `${DENIED("Monitor")}${GIT_REASON}` },
     at80: ["  ⊗  OMCA guard refused · destructive git command", "     if the working tree is dirty, report and stop"],
