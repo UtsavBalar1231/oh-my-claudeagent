@@ -214,6 +214,10 @@ about an hour idle, in the terminal, the Desktop app and VS Code (`idleCompactio
 Type `@agent-oh-my-claudeagent:<name>` to send a request to one agent, for example
 `@agent-oh-my-claudeagent:architect what is the right shape for this cache?`.
 
+The analyzer, reviewer and build-fixer skills (`/oh-my-claudeagent:analyzer`, `/oh-my-claudeagent:reviewer`,
+`/oh-my-claudeagent:build-fixer`) fork into a background subagent and its result arrives in the conversation
+when it finishes. `/rewind` does not undo the build-fixer's edits, as with executors, so revert them with git.
+
 ## The transcript, the band and the pane
 
 ### In the transcript

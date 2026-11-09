@@ -77,9 +77,9 @@ done. With the advisor off, they escalate to architect.
 | --- | --- | --- |
 | plan | `/oh-my-claudeagent:plan <task>` | planner planning, with analyzer and reviewer. It writes the plan document and creates the run's tasks. Only you can start it |
 | start-work | `/oh-my-claudeagent:start-work [run name] [--worktree <path>]` | Runs the open tasks of a run in the main session, delegating each task. The run name picks one of several open runs. Only you can start it |
-| analyzer | `/oh-my-claudeagent:analyzer` | Runs analyzer on a request or plan, in a forked context |
-| reviewer | `/oh-my-claudeagent:reviewer <plan>` | Runs reviewer on a plan, in a forked context |
-| build-fixer | `/oh-my-claudeagent:build-fixer` | Runs build-fixer on a failing build, in a forked context |
+| analyzer | `/oh-my-claudeagent:analyzer` | Runs analyzer on a request or plan, in a forked background context |
+| reviewer | `/oh-my-claudeagent:reviewer <plan>` | Runs reviewer on a plan, in a forked background context |
+| build-fixer | `/oh-my-claudeagent:build-fixer` | Runs build-fixer on a failing build, in a forked background context |
 | handoff | `/oh-my-claudeagent:handoff` | Writes a context block for a new session. Only you can start it |
 | debugging | `/oh-my-claudeagent:debugging` | Reproduce, rank hypotheses, instrument, fix, verify |
 | refactor | `/oh-my-claudeagent:refactor <target>` | Maps the code and its tests, plans, then refactors step by step |

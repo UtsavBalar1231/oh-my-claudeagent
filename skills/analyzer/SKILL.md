@@ -2,7 +2,6 @@
 name: analyzer
 description: Pre-planning analysis via the analyzer. Catches gaps, identifies risks, surfaces hidden requirements.
 context: fork
-background: false
 agent: oh-my-claudeagent:analyzer
 user-invocable: true
 argument-hint: "[plan file path or request to analyze]"
