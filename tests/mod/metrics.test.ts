@@ -1,6 +1,7 @@
 import type { Args, On } from "claude-code";
-import { expect, test } from "claude-code/testing";
+import { type Engine, expect, test } from "claude-code/testing";
 import type { MetricsRecord } from "../../src/core/metrics.ts";
+import { EVIDENCE_LOG_TOOL } from "../../src/core/verification.ts";
 import { drain, LEDGER, pane, ROOT, run, spreadRows, usage, type World, world, write } from "./world.ts";
 
 const METRICS = `${ROOT}/.omca/metrics`;
@@ -20,9 +21,15 @@ const spawn = (subagentType: string, description: string): Args<"agent.spawn"> =
 const complete = (agentId: string, fields: Partial<Args<"turn.complete">>): Args<"turn.complete"> =>
   ({ answer: "", durationMs: 0, isAborted: false, turnId: `t-${agentId}`, reason: "answer", agentId, ...fields }) as Args<"turn.complete">;
 
-function engine(on: On, files: Readonly<Record<string, string>> = {}): { w: World; writes: [string, unknown][] } {
+// The engine's types drop `agentId` from a tool call's input; its loop carries it, and so does the test engine.
+const logEvidence = ($: Engine, agentId: string) =>
+  $.tool.call({ tool: EVIDENCE_LOG_TOOL, evidence_type: "test", command: "just test", exit_code: 0, output_snippet: "ok", agentId } as never);
+
+function engine(on: On, files: Readonly<Record<string, string>> = {}): { w: World; writes: [string, unknown][]; tool: { isError: boolean } } {
   const w = world(on, files);
   const writes: [string, unknown][] = [];
+  const tool = { isError: false };
+  on("tool.call", () => ({ result: {}, text: tool.isError ? "refused" : "logged", ...(tool.isError && { isError: true }) }) as never);
   on("fs.write", (_$, e) => {
     writes.push([w.spelled(e.path), JSON.parse(e.text)]);
     write(w, e.path, e.text);
@@ -42,14 +49,14 @@ function engine(on: On, files: Readonly<Record<string, string>> = {}): { w: Worl
     return { turnId: e.turnId, index: e.index, answer: "", toolUses: [], stopReason: "end_turn", usage: counted };
   });
   on("turn.complete", (_$, e) => ({ text: e.answer }));
-  return { w, writes };
+  return { w, writes, tool };
 }
 
-const evidenceAt = (...timestamps: string[]) =>
-  JSON.stringify({ entries: timestamps.map((timestamp) => ({ type: "test", command: "just test", exit_code: 0, output_snippet: "ok", timestamp })) });
+// An entry inside every delegation's window, as another agent's evidence_log call leaves it.
+const OTHERS_EVIDENCE = { [LEDGER]: JSON.stringify({ entries: [{ type: "test", command: "just test", exit_code: 0, output_snippet: "ok", timestamp: "2026-10-02T12:00:45Z" }] }) };
 
-test("each delegation is written running at spawn and overwritten once when its turn completes or aborts", async ($, on) => {
-  const { w, writes } = engine(on, { [LEDGER]: evidenceAt("2026-10-02T12:00:15Z") });
+test("each delegation is written running at spawn and overwritten once when its turn completes or aborts, with only its own evidence", async ($, on) => {
+  const { w, writes } = engine(on, OTHERS_EVIDENCE);
   w.surfaces = [];
 
   await $.agent.spawn(spawn("oh-my-claudeagent:executor", "Fix the parser"));
@@ -84,6 +91,7 @@ test("each delegation is written running at spawn and overwritten once when its 
 
   await drain($.turn.step({ turnId: "t-a-1", index: 0, model: "claude-sonnet-5-5", effort: "high", messageCount: 1, agentId: "a-1" }));
   await drain($.turn.step({ turnId: "t-a-2", index: 0, model: "claude-haiku-4-5", messageCount: 1, agentId: "a-2" }));
+  await logEvidence($, "a-1");
   await w.clock.advance(60_000);
   await $.turn.complete(complete("a-1", { answer: "Fixed the parser.", durationMs: 90_000, usage: usage(2000, 500, "claude-sonnet-5-5", 10_000, 1000) }));
   await w.clock.advance(15_000);
@@ -159,14 +167,15 @@ test("a turn that reports no usage after its steps counted tokens leaves the cos
   });
 });
 
-test("a ledger that does not parse records evidence_logged as unknown, and says why", async ($, on) => {
-  const { w, writes } = engine(on, { [LEDGER]: "{ not json" });
+test("an evidence_log call that returned an error records no evidence", async ($, on) => {
+  const { w, writes, tool } = engine(on, OTHERS_EVIDENCE);
   await $.agent.spawn(spawn("oh-my-claudeagent:executor", "Fix the parser"));
-  await w.clock.advance(1_000);
+  tool.isError = true;
+  await logEvidence($, "a-1");
+  await w.clock.advance(60_000);
   await $.turn.complete(complete("a-1", { answer: "Fixed." }));
 
-  expect(writes.at(-1)?.[1]).toMatchObject({ outcome: "completed", evidence_logged: null });
-  expect(w.logs.filter((line) => line.startsWith("metrics: could not read"))).toHaveLength(1);
+  expect(writes.at(-1)?.[1]).toMatchObject({ agent_id: "a-1", outcome: "completed", evidence_logged: false });
 });
 
 test("an unsafe agent id names no file and writes nothing", async ($, on) => {

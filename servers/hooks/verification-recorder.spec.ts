@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { EVIDENCE_LOG_TOOL } from "../../src/core/verification.ts";
 import { dispatch, type Payload } from "./registry.ts";
 import { touchSession } from "./session-state.ts";
-import { ledgerPath, statusPath } from "./status-file.ts";
+import { statusPath } from "./status-file.ts";
 
 const NOW = 1_786_000_000_000;
 const NOW_S = NOW / 1000;
@@ -44,15 +45,40 @@ const bash = (sessionId: string, fields: Record<string, unknown>): Payload => ({
   ...fields,
 });
 
-const record = (root: string, sessionId: string, command: string, now = NOW) =>
-  dispatch(bash(sessionId, { tool_input: { command } }), root, now);
+const record = (root: string, sessionId: string, command: string, now = NOW, agentId = "") =>
+  dispatch(bash(sessionId, { tool_input: { command }, agent_id: agentId }), root, now);
+
+const logEvidence = (root: string, sessionId: string, now = NOW, agentId = "", event = "PostToolUse") =>
+  dispatch(
+    {
+      event,
+      session_id: sessionId,
+      agent_id: agentId,
+      tool_name: EVIDENCE_LOG_TOOL,
+      tool_input: { evidence_type: "test", command: "just test", exit_code: 0, output_snippet: "10 passed" },
+      ...(event === "PostToolUse" ? { tool_response: [{ type: "text", text: "Evidence recorded: test (exit 0), 1 total entries" }] } : { error: "evidence_log: the ledger could not be read" }),
+    },
+    root,
+    now,
+  );
+
+const failed = (sessionId: string, command: string, error: string, agentId = ""): Payload => ({
+  event: "PostToolUseFailure",
+  session_id: sessionId,
+  agent_id: agentId,
+  tool_name: "Bash",
+  tool_input: { command },
+  error,
+});
+
+const slotOf = (sessionId: string, agentId: string) => touchSession(sessionId).verifications?.get(agentId);
 
 const slot = (root: string, sessionId: string): unknown =>
   JSON.parse(readFileSync(statusPath(root, sessionId), "utf8")).verification;
 
 const nothingRecorded = (root: string, sessionId: string) => {
   expect(slot(root, sessionId)).toBeNull();
-  expect(touchSession(sessionId).verification).toBeUndefined();
+  expect(touchSession(sessionId).verifications?.get("")).toBeUndefined();
 };
 
 describe("recognised runners", () => {
@@ -65,7 +91,7 @@ describe("recognised runners", () => {
       last_hook_at: NOW_S,
       verification: { command: "just test", at: NOW_S, exit_code: null, evidence_logged: false },
     });
-    expect(touchSession(sessionId).verification).toEqual({ command: "just test", at: NOW_S, exit_code: null });
+    expect(touchSession(sessionId).verifications?.get("")).toEqual({ command: "just test", at: NOW_S, exit_code: null, evidence_logged: false });
   });
 
   test("recorder: a runner after && is anchored and records", async () => {
@@ -120,7 +146,7 @@ describe("PowerShell and Windows runner names", () => {
       last_hook_at: NOW_S,
       verification: { command: "npm.cmd test", at: NOW_S, exit_code: 1, evidence_logged: false },
     });
-    expect(touchSession(sessionId).verification).toEqual({ command: "npm.cmd test", at: NOW_S, exit_code: 1 });
+    expect(touchSession(sessionId).verifications?.get("")).toEqual({ command: "npm.cmd test", at: NOW_S, exit_code: 1, evidence_logged: false });
   });
 
   test("recorder: a PowerShell call that is not a verification records nothing", async () => {
@@ -240,9 +266,7 @@ describe("single-slot overwrite policy", () => {
     const root = project();
     const sessionId = crypto.randomUUID();
     await record(root, sessionId, "just test");
-    mkdirSync(join(root, ".omca", "evidence"), { recursive: true });
-    writeFileSync(ledgerPath(root), '{"entries":[]}');
-    utimesSync(ledgerPath(root), NOW_S + 60, NOW_S + 60);
+    await logEvidence(root, sessionId, NOW + 60_000);
     await record(root, sessionId, "just lint", NOW + 120_000);
     expect(slot(root, sessionId)).toEqual({ command: "just lint", at: NOW_S + 120, exit_code: null, evidence_logged: false });
   });
@@ -257,6 +281,97 @@ describe("single-slot overwrite policy", () => {
       { command: "just test", at: NOW_S, exit_code: null, evidence_logged: false },
       { command: "just lint", at: NOW_S, exit_code: null, evidence_logged: false },
     ]);
+  });
+});
+
+describe("a verification belongs to the agent that ran it", () => {
+  test("a subagent's verification is kept under its agent id and leaves the status file's slot empty", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    expect(await record(root, sessionId, "bun run build", NOW, "a54ee4c474f89151b")).toEqual(NOTE);
+    expect(slotOf(sessionId, "a54ee4c474f89151b")).toEqual({ command: "bun run build", at: NOW_S, exit_code: null, evidence_logged: false });
+    expect(slotOf(sessionId, "")).toBeUndefined();
+  });
+
+  test("the main conversation's own evidence_log marks its slot logged in the session and the status file", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    await record(root, sessionId, "just test");
+    expect(await logEvidence(root, sessionId, NOW + 5_000)).toEqual({});
+    expect(slotOf(sessionId, "")?.evidence_logged).toBe(true);
+    expect(slot(root, sessionId)).toEqual({ command: "just test", at: NOW_S, exit_code: null, evidence_logged: true });
+  });
+
+  test("a subagent's evidence_log leaves the main conversation's slot unlogged", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    await record(root, sessionId, "just test");
+    await logEvidence(root, sessionId, NOW + 5_000, "a79f8f1889e2d7984");
+    expect(slotOf(sessionId, "")?.evidence_logged).toBe(false);
+    expect(slot(root, sessionId)).toMatchObject({ evidence_logged: false });
+  });
+
+  test("a subagent's evidence_log marks that subagent's own slot", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    await record(root, sessionId, "bun test", NOW, "a79f8f1889e2d7984");
+    await logEvidence(root, sessionId, NOW + 5_000, "a79f8f1889e2d7984");
+    expect(slotOf(sessionId, "a79f8f1889e2d7984")?.evidence_logged).toBe(true);
+  });
+
+  test("an evidence_log call the server refused marks nothing", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    await record(root, sessionId, "just test");
+    await logEvidence(root, sessionId, NOW + 5_000, "", "PostToolUseFailure");
+    expect(slotOf(sessionId, "")?.evidence_logged).toBe(false);
+  });
+
+  test("an evidence_log with no recorded verification creates no slot", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    await logEvidence(root, sessionId);
+    expect(touchSession(sessionId).verifications).toBeUndefined();
+  });
+
+  test("a new verification drops other agents' slots older than an hour", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    await record(root, sessionId, "just test", NOW, "early-agent");
+    await record(root, sessionId, "just lint", NOW + 3_601_000);
+    expect([...(touchSession(sessionId).verifications?.keys() ?? [])]).toEqual([""]);
+  });
+});
+
+describe("a failed verification is recorded too", () => {
+  test("a run that exited non-zero records its exit code and answers no note", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    const error = "Exit code 1\nbun test v1.4.2 (744846f84)\nerror: 0 test files matching **{.test,.spec}.{js,ts}";
+    expect(await dispatch(failed(sessionId, "bun test", error), root, NOW)).toEqual({});
+    expect(slot(root, sessionId)).toEqual({ command: "bun test", at: NOW_S, exit_code: 1, evidence_logged: false });
+  });
+
+  test("a failed run under a subagent is that subagent's", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    await dispatch(failed(sessionId, "cargo test", "Exit code 101\nerror: test failed", "a54ee4c474f89151b"), root, NOW);
+    expect(slotOf(sessionId, "a54ee4c474f89151b")).toEqual({ command: "cargo test", at: NOW_S, exit_code: 101, evidence_logged: false });
+    expect(slotOf(sessionId, "")).toBeUndefined();
+  });
+
+  test("a failure with no exit code line means the command never ran and records nothing", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    await dispatch(failed(sessionId, "just test", "spawn /bin/bash ENOENT"), root, NOW);
+    expect(touchSession(sessionId).verifications).toBeUndefined();
+  });
+
+  test("a failed command that is not a verification records nothing", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    await dispatch(failed(sessionId, "ls missing-dir", "Exit code 2\nls: cannot access 'missing-dir'"), root, NOW);
+    expect(touchSession(sessionId).verifications).toBeUndefined();
   });
 });
 
@@ -331,10 +446,10 @@ describe("a full hook payload", () => {
   });
 });
 
-test("hooks.json sends Bash and PowerShell results to the recorder, and registers nothing on PermissionRequest", () => {
+test("hooks.json sends shell results, failures and evidence_log calls to the recorder, and registers nothing on PermissionRequest", () => {
   const hooks = JSON.parse(readFileSync(join(import.meta.dir, "..", "..", "hooks", "hooks.json"), "utf8")).hooks;
   const tools = hooks.PostToolUse.flatMap((group: { matcher: string }) => group.matcher.split("|"));
-  expect(tools).toContain("Bash");
-  expect(tools).toContain("PowerShell");
+  expect(tools).toEqual(expect.arrayContaining(["Bash", "PowerShell", EVIDENCE_LOG_TOOL]));
+  expect(hooks.PostToolUseFailure.map((group: { matcher?: string }) => group.matcher)).toEqual([undefined]);
   expect(hooks.PermissionRequest).toBeUndefined();
 });

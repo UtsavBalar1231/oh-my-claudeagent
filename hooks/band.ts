@@ -1,13 +1,12 @@
 import type { RenderElement } from "claude-code";
 import { type Band, bandView, BUTTON_GAP, type Span, type Tone } from "../src/core/band-model.ts";
-import { ledgerCoversSlot } from "../src/core/evidence.ts";
 import { type NextAction, nextActions } from "../src/core/next-actions.ts";
-import { exitCodeOf, LEDGER, statusPath, verificationOf } from "../src/core/omca-paths.ts";
+import { exitCodeOf, statusPath, verificationOf } from "../src/core/omca-paths.ts";
 import { type RunSummary, runSummary } from "../src/core/run-line.ts";
 import { fitEnd, type GlyphTier, glyphs, oneLine } from "../src/core/ui-kit.ts";
 import { TONE_KEYS } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
-import { fillPrompt, type Host, ledgerWrittenAt, reason, sessionOf, stampOf } from "./host.ts";
+import { fillPrompt, type Host, reason, sessionOf, stampOf } from "./host.ts";
 import { isRemote, type Kit, kitOf, Line, Run, type TextStyle } from "./ui.ts";
 
 type Snapshot = { band: Band; exitCode: number | null };
@@ -43,8 +42,7 @@ async function readSnapshot(host: Host): Promise<Snapshot> {
     try {
       const status = await readJson(host, statusFile);
       exitCode = exitCodeOf(status);
-      const slot = verificationOf(status);
-      if (slot !== null) verification = { ...slot, isLogged: ledgerCoversSlot(await ledgerWrittenAt(host, root), slot.at) };
+      verification = verificationOf(status);
     } catch (failure) {
       error = `Cannot read the session status file: ${oneLine(reason(failure))}`;
     }
@@ -52,12 +50,11 @@ async function readSnapshot(host: Host): Promise<Snapshot> {
   return { band: { verification, error, readAt }, exitCode };
 }
 
-// What a snapshot is read from, so a subagent's turn that moved neither reads nothing.
+// What a snapshot is read from, so a subagent's turn that did not move it reads nothing.
 async function stampsOf(host: Host): Promise<string> {
   const [root, sessionId] = await Promise.all([host.session.root(), host.session.id()]);
   const status = statusPath(root, sessionId);
-  const paths = [`${root}/${LEDGER}`, status ?? ""];
-  return JSON.stringify(await Promise.all(paths.map((path) => (path === "" ? "none" : stampOf(host, path)))));
+  return status === undefined ? "none" : stampOf(host, status);
 }
 
 async function snapshotOf(host: Host): Promise<Snapshot> {

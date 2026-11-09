@@ -1,13 +1,12 @@
-import { readdirSync, readFileSync, statSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { ledgerCoversSlot } from "../../src/core/evidence.ts";
 import { type NativeTask, parseTask, runState, taskListDir, taskListIdFor, withHistory } from "../../src/core/native-tasks.ts";
 import { LEDGER, statusPath as sessionStatusPath } from "../../src/core/omca-paths.ts";
 import { configDir, toPlatform } from "../../src/core/path.ts";
 import { isSafeId } from "../../src/core/session-id.ts";
 import { isRecord } from "../../src/core/tool-input.ts";
-import { gitWorktreeRoots, hasCode, isMissing, writeFileAtomic } from "../io.ts";
-import type { Session } from "./session-state.ts";
+import { gitWorktreeRoots, isMissing, writeFileAtomic } from "../io.ts";
+import { MAIN_THREAD, type Session } from "./session-state.ts";
 
 export const STAMP_INTERVAL_MS = 5_000;
 
@@ -125,24 +124,12 @@ export function readOpenRun(root: string, sessionId: string, options: ReadOption
 
 export const seconds = (ms: number): number => Math.floor(ms / 1000);
 
-export function ledgerMtimeSeconds(root: string): number {
-  try {
-    return seconds(statSync(ledgerPath(root)).mtimeMs);
-  } catch (error) {
-    if (hasCode(error, "ENOENT")) return 0;
-    throw error;
-  }
-}
-
+/** The status file shows the main conversation's own slot: a subagent's run is that subagent's to log. */
 export function writeStatus(root: string, session: Session, now: number): void {
-  const { verification } = session;
   const status = {
     session_id: session.id,
     last_hook_at: seconds(now),
-    verification:
-      verification === undefined
-        ? null
-        : { ...verification, evidence_logged: ledgerCoversSlot(ledgerMtimeSeconds(root), verification.at) },
+    verification: session.verifications?.get(MAIN_THREAD) ?? null,
   };
   writeFileAtomic(statusPath(root, session.id), `${JSON.stringify(status)}\n`);
   session.stampedAt = now;

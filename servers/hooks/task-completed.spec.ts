@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, spyOn, te
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { EVIDENCE_LOG_TOOL } from "../../src/core/verification.ts";
 import { dispatch, type Output } from "./registry.ts";
 import { ledgerPath } from "./status-file.ts";
 
@@ -58,15 +59,34 @@ function project(): string {
   return root;
 }
 
-const record = (root: string, sessionId: string, now = NOW, toolResponse: unknown = undefined) =>
+const SUBAGENT = "a54ee4c474f89151b";
+
+const record = (root: string, sessionId: string, now = NOW, agentId = "") =>
+  dispatch({ event: "PostToolUse", session_id: sessionId, agent_id: agentId, tool_name: "Bash", tool_input: { command: "just test" } }, root, now);
+
+const recordFailure = (root: string, sessionId: string, now = NOW) =>
   dispatch(
-    { event: "PostToolUse", session_id: sessionId, tool_name: "Bash", tool_input: { command: "just test" }, tool_response: toolResponse },
+    { event: "PostToolUseFailure", session_id: sessionId, agent_id: "", tool_name: "Bash", tool_input: { command: "just test" }, error: "Exit code 1\n1 failed" },
+    root,
+    now,
+  );
+
+const logEvidence = (root: string, sessionId: string, now = NOW, agentId = "") =>
+  dispatch(
+    {
+      event: "PostToolUse",
+      session_id: sessionId,
+      agent_id: agentId,
+      tool_name: EVIDENCE_LOG_TOOL,
+      tool_input: { evidence_type: "test", command: "just test", exit_code: 0, output_snippet: "10 passed" },
+      tool_response: [{ type: "text", text: "Evidence recorded: test (exit 0), 1 total entries" }],
+    },
     root,
     now,
   );
 
 const complete = (root: string, sessionId: string, now = NOW, task: Record<string, unknown> = { task_description: "anything" }) =>
-  dispatch({ event: "TaskCompleted", session_id: sessionId, ...task }, root, now);
+  dispatch({ event: "TaskCompleted", session_id: sessionId, agent_id: "", ...task }, root, now);
 
 function writeLedger(path: string, content: string, mtimeSeconds: number): void {
   mkdirSync(dirname(path), { recursive: true });
@@ -107,24 +127,55 @@ describe("evidence logged after the verification allows", () => {
     const root = project();
     const sessionId = crypto.randomUUID();
     await record(root, sessionId, NOW - 60 * SECOND);
-    writeLedger(ledgerPath(root), LEDGER, NOW_S);
+    await logEvidence(root, sessionId, NOW - 30 * SECOND);
     expect(await complete(root, sessionId)).toEqual({});
   });
 
-  test("slot ordering: evidence logged after the verification allows", async () => {
-    const root = project();
-    const sessionId = crypto.randomUUID();
-    await record(root, sessionId, NOW - 60 * SECOND);
-    writeLedger(ledgerPath(root), LEDGER, NOW_S - 30);
-    expect(await complete(root, sessionId)).toEqual({});
-  });
-
-  test("evidence written in the same second as the verification allows", async () => {
+  test("evidence logged in the same second as the verification allows", async () => {
     const root = project();
     const sessionId = crypto.randomUUID();
     await record(root, sessionId);
-    writeLedger(ledgerPath(root), LEDGER, NOW_S);
+    await logEvidence(root, sessionId);
     expect(await complete(root, sessionId)).toEqual({});
+  });
+});
+
+describe("the completing agent answers for its own runs only", () => {
+  test("a subagent's unlogged run does not block the main conversation's completion", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    await record(root, sessionId, NOW - 10 * SECOND, SUBAGENT);
+    expect(await complete(root, sessionId)).toEqual({});
+  });
+
+  test("the main conversation's unlogged run blocks even after a subagent logs evidence", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    await record(root, sessionId, NOW - 20 * SECOND);
+    await logEvidence(root, sessionId, NOW - 10 * SECOND, SUBAGENT);
+    expect(await complete(root, sessionId)).toEqual(BLOCK);
+  });
+
+  test("a ledger written after the run by anything but this agent's evidence_log does not count", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    await record(root, sessionId, NOW - 20 * SECOND);
+    writeLedger(ledgerPath(root), LEDGER, NOW_S);
+    expect(await complete(root, sessionId)).toEqual(BLOCK);
+  });
+
+  test("a teammate completing a task is held to its own unlogged run", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    await record(root, sessionId, NOW - 10 * SECOND, SUBAGENT);
+    expect(await complete(root, sessionId, NOW, { agent_id: SUBAGENT })).toEqual(BLOCK);
+  });
+
+  test("a teammate completing a task is not held to the main conversation's run", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    await record(root, sessionId, NOW - 10 * SECOND);
+    expect(await complete(root, sessionId, NOW, { agent_id: SUBAGENT })).toEqual({});
   });
 });
 
@@ -157,19 +208,21 @@ describe("a verification with no evidence after it blocks", () => {
     expect(await complete(root, sessionId, NOW + 30 * SECOND, { task_description: "anything at all" })).toEqual(BLOCK);
   });
 
-  test("evidence older than the slot: blocks", async () => {
+  test("evidence logged before the run does not cover it: blocks", async () => {
     const root = project();
     const sessionId = crypto.randomUUID();
-    writeLedger(ledgerPath(root), LEDGER, NOW_S - 600);
+    await record(root, sessionId, NOW - 600 * SECOND);
+    await logEvidence(root, sessionId, NOW - 590 * SECOND);
     await record(root, sessionId);
     expect(await complete(root, sessionId)).toEqual(BLOCK);
   });
 
-  test("true positive: a failing verification with stale evidence still blocks", async () => {
+  test("true positive: a failing verification after logged evidence blocks", async () => {
     const root = project();
     const sessionId = crypto.randomUUID();
-    writeLedger(ledgerPath(root), LEDGER, NOW_S - 120);
-    await record(root, sessionId, NOW, { exitCode: 1 });
+    await record(root, sessionId, NOW - 120 * SECOND);
+    await logEvidence(root, sessionId, NOW - 110 * SECOND);
+    await recordFailure(root, sessionId);
     expect(await complete(root, sessionId)).toEqual(BLOCK);
   });
 
@@ -182,45 +235,6 @@ describe("a verification with no evidence after it blocks", () => {
 
   test("a payload carrying no task fields allows when nothing was recorded", async () => {
     expect(await complete(project(), crypto.randomUUID(), NOW, {})).toEqual({});
-  });
-});
-
-describe("an evidence ledger the gate cannot trust blocks", () => {
-  test("slot ordering: evidence postdating the slot but schema-invalid blocks", async () => {
-    const root = project();
-    const sessionId = crypto.randomUUID();
-    await record(root, sessionId, NOW - 60 * SECOND);
-    writeLedger(ledgerPath(root), '{"entries":[{"type":"test"}]}', NOW_S);
-    expect(await complete(root, sessionId)).toEqual(INVALID_BLOCK);
-  });
-
-  test("a ledger with one malformed entry beside a well-formed one allows", async () => {
-    const root = project();
-    const sessionId = crypto.randomUUID();
-    await record(root, sessionId, NOW - 60 * SECOND);
-    writeLedger(ledgerPath(root), JSON.stringify({ entries: [JSON.parse(LEDGER).entries[0], { type: "test" }, null] }), NOW_S);
-    expect(await complete(root, sessionId)).toEqual({});
-  });
-
-  test.each([
-    ["a ledger of another version", '{"version":2,"entries":[{"type":"test","command":"x","exit_code":0,"output_snippet":"","timestamp":"2026-10-02T12:00:00Z"}]}'],
-    ["an empty entries list", '{"entries":[]}'],
-    ["an entries value that is not a list", '{"entries":{}}'],
-    ["a JSON value that is not an object", "[]"],
-  ])("%s blocks as invalid", async (_label, text) => {
-    const root = project();
-    const sessionId = crypto.randomUUID();
-    await record(root, sessionId, NOW - 60 * SECOND);
-    writeLedger(ledgerPath(root), text, NOW_S);
-    expect(await complete(root, sessionId)).toEqual(INVALID_BLOCK);
-  });
-
-  test("an unparseable ledger postdating the slot blocks as invalid", async () => {
-    const root = project();
-    const sessionId = crypto.randomUUID();
-    await record(root, sessionId, NOW - 60 * SECOND);
-    writeLedger(ledgerPath(root), "{not json", NOW_S);
-    expect(await complete(root, sessionId)).toEqual(INVALID_BLOCK);
   });
 });
 
@@ -440,7 +454,6 @@ describe("a run's final task", () => {
   test("the proof is read from the ledger, then the unlogged verification check runs", async () => {
     const { root, sessionId } = listed();
     withEntries(root, verdict(sessionId));
-    utimesSync(ledgerPath(root), NOW_S - 600, NOW_S - 600);
     await record(root, sessionId);
     expect(await closing(root, sessionId)).toEqual(BLOCK);
   });

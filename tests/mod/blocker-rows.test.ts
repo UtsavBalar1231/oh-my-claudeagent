@@ -206,7 +206,7 @@ test("a held completion appends OMCA's row under the group, after a receipt the 
 test("a held completion whose reason names no task takes the id from the call's input", async ($, on) => {
   setup(on);
   await start($);
-  expect((await groupOf($, [held("7", unloggedReason({ command: "just test", at: 1_700_000_000, exit_code: 0 }))])).rows).toEqual([
+  expect((await groupOf($, [held("7", unloggedReason({ command: "just test", at: 1_700_000_000, exit_code: 0, evidence_logged: false }))])).rows).toEqual([
     ENGINE_ROW,
     "  ✗  #7 Review the run and record the final verification verdi… · completion held: a verification ran and is not logged",
     "     log the real result with evidence_log, including a non-zero exit_code if it failed",

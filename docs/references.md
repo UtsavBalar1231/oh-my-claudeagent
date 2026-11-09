@@ -175,10 +175,10 @@ rejects `model.fork`, `http.fetch` and `store.*`.
 | `UserPromptExpansion` | any | `guidance`, `slash-mode-detector` |
 | `SubagentStart` | any | `subagent-context`: protocol, date, output contract and run context for each subagent |
 | `PreToolUse` | `Write`, `Edit`, `TaskUpdate` | `final-task-guard` (on `TaskUpdate`), `comment-gate` |
-| `PostToolUse` | `Read`, `Write`, `Edit`, `Agent`, `SubagentHandback`, `Bash`, `PowerShell` | `verification-recorder`, `context-injector`, `empty-task-response` |
-| `PostToolUseFailure` | any | `failure-recovery`: advice on a failed call, and a stuck-loop note from a tool's third failure in five minutes |
+| `PostToolUse` | `Read`, `Write`, `Edit`, `Agent`, `SubagentHandback`, `Bash`, `PowerShell`, `TaskCreate`, `TaskUpdate`, `evidence_log` | `verification-recorder`, `context-injector`, `task-touch`, `empty-task-response` |
+| `PostToolUseFailure` | any | `failure-recovery`: advice on a failed call, and a stuck-loop note from a tool's third failure in five minutes; `verification-recorder`, for a verification that ran and exited non-zero |
 | `Stop` | any | `stop-gates`: task continuation (open tasks of a run), drift guard, in that order |
-| `TaskCompleted` | any | `task-completed`: refuses to complete a task while a recent verification is unlogged, and a run's final task until its `final_verification` is logged |
+| `TaskCompleted` | any | `task-completed`: refuses to complete a task while the completing agent's own recent verification has no `evidence_log` call from that agent after it, and a run's final task until its `final_verification` is logged |
 
 Each stop gate continues the turn at most five times in a session and gets that budget back once
 its condition clears. OMCA requires the task tools and sets `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` at session start when
@@ -211,7 +211,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | `final-verification` | The final task's refusals: completing it without a passing verdict, and marking it blocked, deleting it or unmarking it without any verdict |
 | `final-task-guard` | The refusals on updates that mark the final task blocked, delete it or unmark it, leaving the completion check on |
 | `task-completed` | The task completion check |
-| `verification-recorder` | Recording verification commands, which the band, the turn line and the task check read |
+| `verification-recorder` | Recording each agent's verification commands and its own `evidence_log` calls, which the band, the turn line and the task check read |
 | `context-injector` | `AGENTS.md`, `README.md` and rule injection when a file is read or edited |
 | `comment-gate` | The comment check on writes |
 | `empty-task-response` | The note on an empty or transitional agent report; concise findings need no fixed headers |
@@ -306,7 +306,7 @@ OMCA keeps its state in the project's `.omca/` directory, which it gitignores ex
 | --- | --- | --- |
 | `.omca/evidence/verification-evidence.json` | `evidence_log` | The append-only evidence log. Older entries move to a monthly archive file when it grows past 1 MiB or 1,000 entries |
 | `.omca/notepads/<plan>/<section>.md` | `notepad_write`, `notepad_compact` | Plan notepads |
-| `.omca/state/session/<session id>.json` | the server | The last hook call and the last verification command |
+| `.omca/state/session/<session id>.json` | the server | The last hook call and the main conversation's last verification command, with whether it logged evidence for it |
 | `.omca/state/mod/<session id>.json` | the mod | Proof the mod ran this session, and its options. `health_check` and the first-prompt notice read it from any worktree of the repository |
 | `.omca/metrics/<session id>/<agent id>.json` | the mod | One record per delegation, read by the Stats page |
 | `.omca/logs/file-access.jsonl` | `file_read` | One line per call |

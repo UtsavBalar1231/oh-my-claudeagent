@@ -37,8 +37,8 @@ function engine(on: On, files: Readonly<Record<string, string>> = {}, env: Reado
   return { w, meter };
 }
 
-const statusFile = (command: string, at: number) =>
-  JSON.stringify({ session_id: SESSION, last_hook_at: at, verification: { command, at, exit_code: 0, evidence_logged: false } });
+const statusFile = (command: string, at: number, isLogged = false) =>
+  JSON.stringify({ session_id: SESSION, last_hook_at: at, verification: { command, at, exit_code: 0, evidence_logged: isLogged } });
 
 function ledgerAt(w: World, seconds: number): void {
   w.files.set(LEDGER, { text: JSON.stringify({ entries: [] }), mtimeMs: seconds * 1000 });
@@ -83,9 +83,8 @@ test("a gateway's spend limit alone keeps the cost", async ($, on) => {
   expect(await turn($, w, meter, 0.2812)).toEqual({ text: `4s · 12.3k${B}in${B}845${B}out · $0.0312${B}engine${B}cost` });
 });
 
-test("a verification this turn that the ledger has not caught up with is named in the footer", async ($, on) => {
+test("a verification this turn that the status file calls unlogged is named in the footer", async ($, on) => {
   const { w, meter } = engine(on, { [STATUS]: statusFile("just test", STARTED_S + 2) });
-  ledgerAt(w, STARTED_S - 600);
   await $.turn.start({ text: "Run the tests", turnId: "t-1" });
 
   expect(await turn($, w, meter, 0.2812)).toEqual({
@@ -93,9 +92,18 @@ test("a verification this turn that the ledger has not caught up with is named i
   });
 });
 
-test("a verification logged after it ran raises no warning", async ($, on) => {
+test("a ledger written after the run by someone else does not make a run the status file calls unlogged read logged", async ($, on) => {
   const { w, meter } = engine(on, { [STATUS]: statusFile("just test", STARTED_S + 2) });
   ledgerAt(w, STARTED_S + 3);
+  await $.turn.start({ text: "Run the tests", turnId: "t-1" });
+
+  expect(await turn($, w, meter, 0.2812)).toEqual({
+    text: `4s · 12.3k${B}in${B}845${B}out · !${B}no${B}evidence:${B}just${B}test`,
+  });
+});
+
+test("a verification the status file calls logged raises no warning, with no ledger at all", async ($, on) => {
+  const { w, meter } = engine(on, { [STATUS]: statusFile("just test", STARTED_S + 2, true) });
   await $.turn.start({ text: "Run the tests", turnId: "t-1" });
 
   expect(await turn($, w, meter, 0.2812)).toEqual({ text: `4s · 12.3k${B}in${B}845${B}out · $0.0312${B}engine${B}cost` });
@@ -103,7 +111,6 @@ test("a verification logged after it ran raises no warning", async ($, on) => {
 
 test("a verification from before the turn started raises no warning", async ($, on) => {
   const { w, meter } = engine(on, { [STATUS]: statusFile("just test", STARTED_S - 1) });
-  ledgerAt(w, STARTED_S - 600);
   await $.turn.start({ text: "Run the tests", turnId: "t-1" });
 
   expect(await turn($, w, meter, 0.2812)).toEqual({ text: `4s · 12.3k${B}in${B}845${B}out · $0.0312${B}engine${B}cost` });
@@ -195,7 +202,6 @@ const clock = (ms: number) => new Date(ms).toLocaleTimeString([], { hour: "numer
 
 test("on a terminal the turn's facts move into the line that closes it, and no text row follows the answer", async ($, on) => {
   const { w, meter } = terminal(on, { [STATUS]: statusFile("just test", STARTED_S + 2) });
-  ledgerAt(w, STARTED_S - 600);
   await $.turn.start({ text: "Run the tests", turnId: "t-1" });
   expect(await turn($, w, meter, 0.2812)).toEqual({ text: "The tests ran." });
 
@@ -213,13 +219,21 @@ test("with room, the line also says when the turn was done", async ($, on) => {
   expect((await line($, "turn-1"))[1]).toBe(`Cooked for 4s · done ${clock(NOW + 4_200)} · 12.3k in 845 out · $0.0312`);
 });
 
-test("a logged verification reads logged on the line", async ($, on) => {
+test("a verification the status file calls logged reads logged on the line, with no ledger at all", async ($, on) => {
+  const { w, meter } = terminal(on, { [STATUS]: statusFile("bun test", STARTED_S + 2, true) });
+  await $.turn.start({ text: "Run the tests", turnId: "t-1" });
+  await turn($, w, meter, 0.2812);
+
+  expect((await line($, "turn-1"))[1]).toEndWith("· ✓ bun test logged");
+});
+
+test("a ledger written after the run by someone else leaves the line's receipt unlogged", async ($, on) => {
   const { w, meter } = terminal(on, { [STATUS]: statusFile("bun test", STARTED_S + 2) });
   ledgerAt(w, STARTED_S + 3);
   await $.turn.start({ text: "Run the tests", turnId: "t-1" });
   await turn($, w, meter, 0.2812);
 
-  expect((await line($, "turn-1"))[1]).toEndWith("· ✓ bun test logged");
+  expect((await line($, "turn-1"))[1]).toEndWith("· ! bun test not logged");
 });
 
 test("a line drawn before its turn's facts land keeps the engine's line, and takes them once they do", async ($, on) => {
@@ -320,7 +334,6 @@ test("the expanded transcript keeps the engine's line, with the facts on a row b
 
 test("a run already on one turn's line is not repeated on the next, which starts in the same second", async ($, on) => {
   const { w } = terminal(on, { [STATUS]: statusFile("just test", STARTED_S) });
-  ledgerAt(w, STARTED_S - 600);
   await $.turn.start({ text: "Run the tests", turnId: "t-1" });
   expect(await line($, "line-1")).toEqual([ENGINE_LINE]);
   await $.turn.complete({ answer: "ok", durationMs: 100, isAborted: false, turnId: "t-1", reason: "answer", usage: USAGE });

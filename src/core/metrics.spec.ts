@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import {
   aggregate,
-  isEvidenceLogged,
   type MetricsRecord,
   median,
   outcomeOf,
@@ -9,9 +8,6 @@ import {
   parseRecords,
   recordPath,
 } from "./metrics.ts";
-
-const START = Date.parse("2026-10-02T12:00:00.000Z");
-const END = Date.parse("2026-10-02T12:05:00.000Z");
 
 function record(fields: Partial<MetricsRecord> = {}): MetricsRecord {
   return {
@@ -32,9 +28,6 @@ function record(fields: Partial<MetricsRecord> = {}): MetricsRecord {
   };
 }
 
-const ledger = (...timestamps: unknown[]) =>
-  JSON.stringify({ entries: timestamps.map((timestamp) => ({ type: "test", command: "just test", exit_code: 0, timestamp })) });
-
 describe("outcomeOf", () => {
   test.each([
     [{ isAborted: false, answer: "Fixed the parser." }, "completed"],
@@ -44,34 +37,6 @@ describe("outcomeOf", () => {
     [{ isAborted: false, answer: " \n\t" }, "empty"],
   ] as const)("%j is %s", (turn, outcome) => {
     expect(outcomeOf(turn)).toBe(outcome);
-  });
-});
-
-describe("isEvidenceLogged", () => {
-  test.each([
-    ["exactly at the start", "2026-10-02T12:00:00.000Z", true],
-    ["exactly at the end", "2026-10-02T12:05:00.000Z", true],
-    ["inside", "2026-10-02T12:02:30Z", true],
-    ["a millisecond before the start", "2026-10-02T11:59:59.999Z", false],
-    ["a millisecond after the end", "2026-10-02T12:05:00.001Z", false],
-  ])("an entry %s: %p", (_, timestamp, expected) => {
-    expect(isEvidenceLogged(ledger(timestamp), START, END)).toBe(expected);
-  });
-
-  test("an entry without a parseable timestamp never counts, and one inside does", () => {
-    expect(isEvidenceLogged(ledger("yesterday", null, 12), START, END)).toBe(false);
-    expect(isEvidenceLogged(ledger("yesterday", "2026-10-02T12:01:00Z"), START, END)).toBe(true);
-  });
-
-  test("an entry the evidence parser cannot read never counts, even inside the window", () => {
-    const text = JSON.stringify({ entries: [{ type: "deploy", command: "x", exit_code: 0, timestamp: "2026-10-02T12:01:00Z" }] });
-    expect(isEvidenceLogged(text, START, END)).toBe(false);
-  });
-
-  test("an empty ledger is no evidence, and a ledger without an entries list throws", () => {
-    expect(isEvidenceLogged(ledger(), START, END)).toBe(false);
-    expect(() => isEvidenceLogged("{}", START, END)).toThrow("it holds no entries list");
-    expect(() => isEvidenceLogged("{", START, END)).toThrow();
   });
 });
 

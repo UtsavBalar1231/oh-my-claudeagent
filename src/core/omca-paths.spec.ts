@@ -9,8 +9,14 @@ test("the status path is under the root's session directory for a safe id and ab
 });
 
 test("a verification needs a string command and a numeric time", () => {
-  expect(verificationOf({ verification: { command: "just ci", at: 5, exit_code: 0 } })).toEqual({ command: "just ci", at: 5 });
+  expect(verificationOf({ verification: { command: "just ci", at: 5, exit_code: 0 } })).toEqual({ command: "just ci", at: 5, isLogged: false });
   for (const status of [null, "x", {}, { verification: null }, { verification: { command: "x" } }, { verification: { command: 1, at: 5 } }, { verification: { command: "x", at: "5" } }]) {
     expect(verificationOf(status), JSON.stringify(status)).toBeNull();
   }
+});
+
+test("a verification reads as logged only when the status file's evidence_logged is true", () => {
+  const isLogged = (evidenceLogged: unknown) => verificationOf({ verification: { command: "just ci", at: 5, evidence_logged: evidenceLogged } })?.isLogged;
+  expect(isLogged(true)).toBe(true);
+  for (const value of [false, undefined, null, "true", 1]) expect(isLogged(value), JSON.stringify(value)).toBe(false);
 });

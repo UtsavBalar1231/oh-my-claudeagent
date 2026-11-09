@@ -15,6 +15,7 @@ declare module "claude-code" {
           costUsd: number | null;
           status: "running" | "idle" | "waiting" | "pending" | "answer" | "aborted" | "refusal" | "error" | "gone";
           teammate: boolean;
+          evidenceLogged: boolean;
         };
       };
       lanes: {

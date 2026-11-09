@@ -62,7 +62,7 @@ const cases: readonly [string, string, Refusal][] = [
   ],
   [
     "unlogged",
-    unloggedReason({ command: "bun test\nbun lint", at: 1_700_000_000, exit_code: 1 }),
+    unloggedReason({ command: "bun test\nbun lint", at: 1_700_000_000, exit_code: 1, evidence_logged: false }),
     {
       kind: "verification-unlogged",
       title: "completion held: a verification ran and is not logged",

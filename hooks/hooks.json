@@ -95,7 +95,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Read|Write|Edit|Agent|SubagentHandback|Bash|PowerShell|TaskCreate|TaskUpdate",
+        "matcher": "Read|Write|Edit|Agent|SubagentHandback|Bash|PowerShell|TaskCreate|TaskUpdate|mcp__plugin_oh-my-claudeagent_omca__evidence_log",
         "hooks": [
           {
             "type": "mcp_tool",
@@ -167,6 +167,7 @@
             "input": {
               "event": "TaskCompleted",
               "session_id": "${session_id}",
+              "agent_id": "${agent_id}",
               "task_id": "${task_id}"
             }
           }

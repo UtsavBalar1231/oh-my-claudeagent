@@ -42,7 +42,10 @@ export const REGISTRY: Readonly<Record<string, readonly (readonly [string, Handl
     ["task-touch", taskTouch],
     ["empty-task-response", emptyTaskResponse],
   ],
-  PostToolUseFailure: [["failure-recovery", failureRecovery]],
+  PostToolUseFailure: [
+    ["failure-recovery", failureRecovery],
+    ["verification-recorder", verificationRecorder],
+  ],
   UserPromptSubmit: [
     ["mod-notice", modNotice],
     ["guidance", guidance],

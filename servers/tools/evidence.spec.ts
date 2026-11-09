@@ -528,27 +528,28 @@ describe("through the server", () => {
     expect(existsSync(join(root, ".omca", "state", "session"))).toBe(false);
   });
 
-  test("evidence_log updates the status file of the latest hook session", async () => {
+  test("the run counts as logged once the client reports this agent's evidence_log call, not when the ledger changes", async () => {
     const root = project();
     const callTool = startServer(root, {});
     const sessionId = crypto.randomUUID();
     const statusFile = join(root, ".omca", "state", "session", `${sessionId}.json`);
-    const hook = { event: "PostToolUse", session_id: sessionId, tool_name: "Bash", tool_input: JSON.stringify({ command: "just test" }) };
+    const hook = { event: "PostToolUse", session_id: sessionId, agent_id: "", tool_name: "Bash", tool_input: JSON.stringify({ command: "just test" }) };
     expect(await callTool("omca_hook", hook)).toContain("PostToolUse");
     const recorded = JSON.parse(read(statusFile));
     expect(recorded.verification).toEqual({ command: "just test", at: recorded.last_hook_at, exit_code: null, evidence_logged: false });
 
-    const before = Math.floor(Date.now() / 1000);
     expect(await callTool("evidence_log", testEvidence)).toBe("Evidence recorded: test (exit 0), 1 total entries");
-    const after = Math.floor(Date.now() / 1000);
-    const updated = JSON.parse(read(statusFile));
-    expect(updated.last_hook_at >= before && updated.last_hook_at <= after).toBe(true);
-    expect(read(statusFile)).toBe(
-      `${JSON.stringify({
-        session_id: sessionId,
-        last_hook_at: updated.last_hook_at,
-        verification: { ...recorded.verification, evidence_logged: true },
-      })}\n`,
-    );
+    expect(JSON.parse(read(statusFile)).verification).toEqual(recorded.verification);
+
+    const logged = {
+      event: "PostToolUse",
+      session_id: sessionId,
+      agent_id: "",
+      tool_name: "mcp__plugin_oh-my-claudeagent_omca__evidence_log",
+      tool_input: JSON.stringify(testEvidence),
+      tool_response: JSON.stringify([{ type: "text", text: "Evidence recorded: test (exit 0), 1 total entries" }]),
+    };
+    expect(await callTool("omca_hook", logged)).toBe("{}");
+    expect(JSON.parse(read(statusFile)).verification).toEqual({ ...recorded.verification, evidence_logged: true });
   });
 });

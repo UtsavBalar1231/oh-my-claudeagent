@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A task completion is held only for the completing agent's own verification. A background
+  subagent's unlogged test run no longer blocks the main conversation's `TaskUpdate`, which used
+  to leave it logging evidence for a result it never saw.
+- A verification counts as logged only when the agent that ran it calls `evidence_log`
+  successfully. A ledger write by anything else, a subagent's evidence included, used to cover the
+  main conversation's unlogged run.
+- A verification that exits non-zero is recorded. Failed runs arrive on `PostToolUseFailure`,
+  which the recorder never read, so the gate, the band and the turn line saw only passing runs.
+- The Stats page credits evidence to the delegation that logged it. Two delegations running at
+  once used to share any evidence entry timestamped inside both windows.
+
 ## [4.0.0] - 2026-11-09
 
 **Upgrading from 3.5.x:** finish or abandon an open run before you update, or run `plan` again on

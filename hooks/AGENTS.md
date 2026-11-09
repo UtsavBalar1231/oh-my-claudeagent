@@ -113,7 +113,9 @@ An `agent.spawn` carrying `resume` whose agent already has a row reopens that ro
 of building new ones: the row goes back to running with no end time and keeps its start, tokens and
 cost, the lane keeps its prompt and call count and clears its tool, output and result, and a
 module-level map holds the row's tokens so the next completion adds its usage to them. `metrics`
-rewrites that agent's record as running with the same tokens.
+rewrites that agent's record as running with the same tokens. A record's `evidence_logged` comes
+from the row's `evidenceLogged`, which `agents-tracker` sets when that agent's own `evidence_log`
+call succeeds on `tool.call`, and a reopened row keeps it.
 
 `mascot-player` animates the mascots of `src/core/mascots.ts`: the 15 by 4 mini that leads each
 relaxed lane on the Agents tab, drawn when the body holds every running lane, a row after each, the

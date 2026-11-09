@@ -1,5 +1,4 @@
 import type { EngineInterface, PluginState, SessionMessage, Settings, SettingsReadArgs, StateRead, StateSetOptions, StateSetResult } from "claude-code";
-import { LEDGER } from "../src/core/omca-paths.ts";
 import { configDir, type Env as PathEnv, homeDir, inferPlatform, type Platform } from "../src/core/path.ts";
 import { type GlyphTier, glyphTier } from "../src/core/ui-kit.ts";
 
@@ -172,12 +171,6 @@ export async function fillPrompt(host: Host, text: string): Promise<void> {
   const { isFilled, refusal } = await host.prompt.fill({ text });
   if (isFilled) return;
   host.ui.toast(refusal === "dialog" ? `Close the open dialog, then type: ${text}` : `The prompt box cannot be filled here. Type: ${text}`);
-}
-
-/** The evidence ledger's modification time in whole seconds, 0 when there is none. */
-export async function ledgerWrittenAt(host: Host, root: string): Promise<number> {
-  const path = `${root}/${LEDGER}`;
-  return (await host.fs.exists(path)) ? Math.floor((await host.fs.stat(path)).mtimeMs / 1000) : 0;
 }
 
 /** `mtimeMs:size`, or `absent` when the file cannot be stated. */

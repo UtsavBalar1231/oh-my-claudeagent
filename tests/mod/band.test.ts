@@ -23,11 +23,11 @@ type Kit = Elements[keyof Elements];
 
 const engineBand = ({ Text }: Kit): RenderElement => Text({ children: ["engine band"] });
 
-const statusFile = (command: string) =>
+const statusFile = (command: string, isLogged = false) =>
   JSON.stringify({
     session_id: SESSION,
     last_hook_at: RAN_AT,
-    verification: { command, at: RAN_AT, exit_code: 0, evidence_logged: false },
+    verification: { command, at: RAN_AT, exit_code: 0, evidence_logged: isLogged },
   });
 
 const ledger = (entries: readonly object[]) => JSON.stringify({ entries });
@@ -185,14 +185,25 @@ test("an unlogged verification shows as not logged and offers to log it", async 
   });
 });
 
-test("a ledger written after the run counts as logged, whatever the status file says, and offers nothing", async ($, on) => {
-  world(on, files({ [STATUS]: statusFile("just test"), [LEDGER]: { text: ledger([]), mtimeMs: AFTER_RUN_MS } }));
+test("a status file that says the evidence was logged reads logged with no ledger at all, and offers nothing", async ($, on) => {
+  world(on, files({ [STATUS]: statusFile("just test", true) }));
   await start($);
   await turn($);
 
   await onEachSurface($, async (band) => {
     expect(await statusRow(band)).toBe("✓ just test evidence logged");
     expect(await buttons(band)).toEqual([]);
+  });
+});
+
+test("a ledger written after the run by someone else leaves a run the status file calls unlogged unlogged", async ($, on) => {
+  world(on, files({ [STATUS]: statusFile("just test"), [LEDGER]: { text: ledger([]), mtimeMs: AFTER_RUN_MS } }));
+  await start($);
+  await turn($);
+
+  await onEachSurface($, async (band) => {
+    expect(await statusRow(band)).toBe(UNLOGGED_ROW);
+    expect(await buttons(band)).toEqual([LOG_BUTTON]);
   });
 });
 
