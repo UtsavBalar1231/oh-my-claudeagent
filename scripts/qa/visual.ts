@@ -14,6 +14,15 @@
 //               absent or null, every request is answered "ok"
 //   fixture     <root>/fixtures/<name>/, copied as the session's cwd, with "{{cwd}}" in its
 //               files replaced by that cwd; absent or null, an empty directory.
+//   env         {NAME: "value"} set in the session beside the mock's variables
+//   options     the plugin's user options, written as pluginConfigs["oh-my-claudeagent@inline"].options,
+//               the key a --plugin-dir load reads
+//   settings    an object merged into the session's settings.json
+//   gitRemote   true makes the session's cwd its own git repository, one commit on main pushed to a
+//               local bare origin
+//   startDelayMs  milliseconds to wait after the prompt shows, before the first key
+// `--inline` drops the fullscreen setting and names the captures <view>-inline-<cols>.txt, or
+// <view>-inline-<cols>x<rows>.txt with --sizes.
 // Writes <root>/<view>-<cols>.txt for 80x40 (an inline pane), 120x40 and 200x50 (docked), with
 // the scratch directory's random suffix and the live session's own times and costs masked. `--sizes`
 // captures those sizes instead, as <out>/<view>-<cols>x<rows>.txt, out defaulting to root.
@@ -50,7 +59,19 @@ const TRUST = "Yes, I trust this folder";
 const TRUST_SELECTED = /❯\s*Yes, I trust this folder/;
 const TRUST_UNSELECTED = /❯\s*No, exit/;
 
-export type View = { command: string; keys: string[]; mockScript: string | null; fixture: string | null };
+export type View = {
+  command: string;
+  keys: string[];
+  mockScript: string | null;
+  fixture: string | null;
+  env?: Record<string, string>;
+  options?: Record<string, unknown>;
+  settings?: Record<string, unknown>;
+  gitRemote?: true;
+  startDelayMs?: number;
+};
+
+export const INLINE_PLUGIN_KEY = "oh-my-claudeagent@inline";
 
 const MOUSE = /^(wheel-up|wheel-down|click)(?:\*(\d+))?@(.+?)(?::([+-]\d+),([+-]\d+))?$/;
 
@@ -99,7 +120,70 @@ export function parseView(text: string): View {
   }
   if (mockScript !== null && !isName(mockScript)) throw new Error('"mockScript" must be a file name or null');
   if (fixture !== null && !isName(fixture)) throw new Error('"fixture" must be a directory name or null');
-  return { command, keys, mockScript, fixture };
+  const env = fields.get("env");
+  const options = fields.get("options");
+  const settings = fields.get("settings");
+  const gitRemote = fields.get("gitRemote");
+  const startDelayMs = fields.get("startDelayMs");
+  const view: View = { command, keys, mockScript, fixture };
+  if (env !== undefined) {
+    if (!isObject(env) || !Object.entries(env).every(([name, value]) => /^[A-Za-z_]\w*$/.test(name) && typeof value === "string")) {
+      throw new Error('"env" must be an object of string values named like variables');
+    }
+    view.env = env as Record<string, string>;
+  }
+  if (options !== undefined) {
+    if (!isObject(options)) throw new Error('"options" must be an object');
+    view.options = options;
+  }
+  if (settings !== undefined) {
+    if (!isObject(settings)) throw new Error('"settings" must be an object');
+    view.settings = settings;
+  }
+  if (gitRemote !== undefined) {
+    if (typeof gitRemote !== "boolean") throw new Error('"gitRemote" must be a boolean');
+    if (gitRemote) view.gitRemote = true;
+  }
+  if (startDelayMs !== undefined) {
+    if (typeof startDelayMs !== "number" || !Number.isInteger(startDelayMs) || startDelayMs < 0) {
+      throw new Error('"startDelayMs" must be a non-negative integer');
+    }
+    view.startDelayMs = startDelayMs;
+  }
+  return view;
+}
+
+const isObject = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+
+export function sessionSettings(view: View, inline: boolean): Record<string, unknown> {
+  return {
+    ...(inline ? {} : { tui: "fullscreen" }),
+    prefersReducedMotion: true,
+    ...view.settings,
+    ...(view.options === undefined ? {} : { pluginConfigs: { [INLINE_PLUGIN_KEY]: { options: view.options } } }),
+  };
+}
+
+export const captureName = (name: string, cols: number, rows: number, sized: boolean, inline: boolean): string =>
+  `${name}${inline ? "-inline" : ""}-${cols}${sized ? `x${rows}` : ""}.txt`;
+
+/** Makes `cwd` its own repository with one commit on main, pushed to a bare `origin` beside it in `scratch`. */
+export function addGitRemote(cwd: string, scratch: string): void {
+  const remote = join(scratch, "remote.git");
+  const git = (dir: string, ...args: string[]): void => {
+    const { exitCode, stderr } = Bun.spawnSync(
+      ["git", "-c", "user.name=visual", "-c", "user.email=visual@example.invalid", "-c", "commit.gpgsign=false", "-C", dir, ...args],
+      { env: sessionEnv(), stdout: "pipe", stderr: "pipe" },
+    );
+    if (exitCode !== 0) throw new Error(`git ${args.join(" ")} exited ${exitCode}: ${stderr.toString().trim()}`);
+  };
+  mkdirSync(remote);
+  git(remote, "init", "-q", "--bare");
+  git(cwd, "init", "-q", "-b", "main");
+  git(cwd, "add", "-A");
+  git(cwd, "commit", "-q", "--allow-empty", "-m", "first");
+  git(cwd, "remote", "add", "origin", remote);
+  git(cwd, "push", "-q", "-u", "origin", "main");
 }
 
 export function copyFixture(from: string, to: string): void {
@@ -301,7 +385,7 @@ export async function reachPrompt(tmux: Tmux): Promise<void> {
   await tmux.settle(tmux.screen());
 }
 
-async function captureAt(view: View, root: string, cols: number, rows: number): Promise<string> {
+async function captureAt(view: View, root: string, cols: number, rows: number, inline: boolean): Promise<string> {
   const scratch = mkdtempSync(join(tmpdir(), `omca-visual-${cols}x${rows}-`));
   const cwd = join(scratch, "cwd");
   const config = join(scratch, "config");
@@ -323,9 +407,10 @@ async function captureAt(view: View, root: string, cols: number, rows: number): 
   try {
     if (view.fixture === null) mkdirSync(cwd);
     else copyFixture(join(root, "fixtures", view.fixture), cwd);
+    if (view.gitRemote) addGitRemote(cwd, scratch);
     mkdirSync(config);
     writeFileSync(join(config, ".claude.json"), JSON.stringify({ hasCompletedOnboarding: true }));
-    writeFileSync(join(config, "settings.json"), JSON.stringify({ tui: "fullscreen", prefersReducedMotion: true }));
+    writeFileSync(join(config, "settings.json"), JSON.stringify(sessionSettings(view, inline)));
     const claude = `claude --plugin-dir ${quote(REPO)} --session-id ${SESSION_ID} --permission-mode default`;
     tmux.run([
       ...TERMINAL_OPTIONS,
@@ -333,10 +418,12 @@ async function captureAt(view: View, root: string, cols: number, rows: number): 
       "-e", `CLAUDE_CONFIG_DIR=${config}`,
       ...TRUECOLOR_ENV,
       ...mockSessionEnv(mock.port),
+      ...Object.entries(view.env ?? {}).flatMap(([name, value]) => ["-e", `${name}=${value}`]),
       claude,
     ]);
     claudePid = Number(tmux.run(["display-message", "-p", "-t", tmux.target, "#{pane_pid}"]).trim());
     await reachPrompt(tmux);
+    if (view.startDelayMs !== undefined) await Bun.sleep(view.startDelayMs);
 
     tmux.send("-l", view.command);
     const typed = await tmux.waitFor(
@@ -369,11 +456,12 @@ if (import.meta.main) {
       root: { type: "string", default: join(REPO, "tests", "mod", "visual") },
       sizes: { type: "string" },
       out: { type: "string" },
+      inline: { type: "boolean", default: false },
     },
   });
   const [name] = positionals;
   if (name === undefined || !isName(name)) {
-    console.error("usage: bun scripts/qa/visual.ts <view> [--root <dir>] [--sizes 80x24,160x30] [--out <dir>]");
+    console.error("usage: bun scripts/qa/visual.ts <view> [--root <dir>] [--sizes 80x24,160x30] [--out <dir>] [--inline]");
     process.exit(2);
   }
   const view = parseView(readFileSync(join(values.root, `${name}.json`), "utf8"));
@@ -381,8 +469,8 @@ if (import.meta.main) {
   const dir = values.out ?? values.root;
   mkdirSync(dir, { recursive: true });
   for (const [cols, rows] of sizes) {
-    const out = join(dir, values.sizes === undefined ? `${name}-${cols}.txt` : `${name}-${cols}x${rows}.txt`);
-    writeFileSync(out, await captureAt(view, values.root, cols, rows));
+    const out = join(dir, captureName(name, cols, rows, values.sizes !== undefined, values.inline));
+    writeFileSync(out, await captureAt(view, values.root, cols, rows, values.inline));
     console.log(out);
   }
 }

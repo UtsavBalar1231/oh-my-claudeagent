@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { copyFixture, maskLive, maskScratch, mouseReports, parseSizes, parseView, teardown, withoutBlink } from "./visual.ts";
+import { addGitRemote, captureName, copyFixture, INLINE_PLUGIN_KEY, maskLive, maskScratch, mouseReports, parseSizes, parseView, sessionSettings, teardown, withoutBlink } from "./visual.ts";
 
 const VISUAL = join(import.meta.dir, "visual.ts");
 const temps: string[] = [];
@@ -32,8 +32,36 @@ describe("parseView", () => {
     });
   });
 
+  test("reads env, options, settings, gitRemote and startDelayMs when present", () => {
+    expect(
+      parseView(
+        '{"command":"x","env":{"A_B":"1"},"options":{"guardMode":"deny"},"settings":{"permissions":{"allow":["Bash"]}},"gitRemote":true,"startDelayMs":4000}',
+      ),
+    ).toEqual({
+      command: "x",
+      keys: [],
+      mockScript: null,
+      fixture: null,
+      env: { A_B: "1" },
+      options: { guardMode: "deny" },
+      settings: { permissions: { allow: ["Bash"] } },
+      gitRemote: true,
+      startDelayMs: 4000,
+    });
+    expect(Object.keys(parseView('{"command":"x","gitRemote":false,"startDelayMs":0}'))).not.toContain("gitRemote");
+  });
+
   test.each([
     ["[]", "a view must be a JSON object"],
+    ['{"command":"x","env":{"A":1}}', '"env" must be an object of string values named like variables'],
+    ['{"command":"x","env":{"A B":"1"}}', '"env" must be an object of string values named like variables'],
+    ['{"command":"x","env":[]}', '"env" must be an object of string values named like variables'],
+    ['{"command":"x","options":[]}', '"options" must be an object'],
+    ['{"command":"x","settings":"s"}', '"settings" must be an object'],
+    ['{"command":"x","gitRemote":"yes"}', '"gitRemote" must be a boolean'],
+    ['{"command":"x","startDelayMs":-1}', '"startDelayMs" must be a non-negative integer'],
+    ['{"command":"x","startDelayMs":1.5}', '"startDelayMs" must be a non-negative integer'],
+    ['{"command":"x","startDelayMs":"5"}', '"startDelayMs" must be a non-negative integer'],
     ["{}", '"command" must be a non-empty string'],
     ['{"command":""}', '"command" must be a non-empty string'],
     ['{"command":"x","keys":"n"}', '"keys" must be an array of non-empty strings'],
@@ -43,6 +71,46 @@ describe("parseView", () => {
   ])("rejects %s", (text, message) => {
     expect(() => parseView(text)).toThrow(message);
   });
+});
+
+describe("sessionSettings", () => {
+  const base = parseView('{"command":"x"}');
+
+  test("a plain view keeps the fullscreen settings, and --inline drops tui only", () => {
+    expect(sessionSettings(base, false)).toEqual({ tui: "fullscreen", prefersReducedMotion: true });
+    expect(sessionSettings(base, true)).toEqual({ prefersReducedMotion: true });
+  });
+
+  test("options go under the --plugin-dir key and settings merge in", () => {
+    expect(INLINE_PLUGIN_KEY).toBe("oh-my-claudeagent@inline");
+    const view = parseView('{"command":"x","options":{"guardMode":"deny"},"settings":{"permissions":{"allow":["Bash"]}}}');
+    expect(sessionSettings(view, false)).toEqual({
+      tui: "fullscreen",
+      prefersReducedMotion: true,
+      permissions: { allow: ["Bash"] },
+      pluginConfigs: { "oh-my-claudeagent@inline": { options: { guardMode: "deny" } } },
+    });
+  });
+});
+
+test("captureName keeps the default names and marks an inline capture", () => {
+  expect(captureName("footer", 120, 40, false, false)).toBe("footer-120.txt");
+  expect(captureName("footer", 120, 40, true, false)).toBe("footer-120x40.txt");
+  expect(captureName("footer", 120, 40, false, true)).toBe("footer-inline-120.txt");
+  expect(captureName("footer", 120, 40, true, true)).toBe("footer-inline-120x40.txt");
+});
+
+test.skipIf(Bun.which("git") === null)("addGitRemote makes the cwd its own repository with one commit on main pushed to a bare origin", () => {
+  const scratch = temp("omca-visual-git-");
+  const cwd = join(scratch, "cwd");
+  mkdirSync(cwd);
+  writeFileSync(join(cwd, "a.txt"), "a\n");
+  addGitRemote(cwd, scratch);
+  const git = (dir: string, ...args: string[]) => Bun.spawnSync(["git", "-C", dir, ...args], { stdout: "pipe" }).stdout.toString().trim();
+  expect(realpathSync(git(cwd, "rev-parse", "--show-toplevel"))).toBe(realpathSync(cwd));
+  expect(git(cwd, "rev-list", "--count", "HEAD")).toBe("1");
+  expect(git(cwd, "rev-parse", "HEAD")).toBe(git(join(scratch, "remote.git"), "rev-parse", "main"));
+  expect(git(cwd, "status", "--porcelain")).toBe("");
 });
 
 describe("mouseReports", () => {
