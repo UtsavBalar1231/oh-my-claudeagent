@@ -76,7 +76,9 @@ atoms written once per turn or per finished agent, since a row subscribes to eve
   text, and every later preview of that kind is the name row alone. tmux and iTerm2 3.5 and later
   draw bytes and not a file, and a refusal carrying `fix: "tmux-passthrough"` writes one transcript
   line naming tmux's `allow-passthrough` and `focus-events`.
-  An expanded group is left as drawn.
+  A TaskUpdate call whose completion OMCA held gets OMCA's refusal row appended, and a group whose
+  every call is a guard refusal draws each call's header and refusal rows in its place. Those two follow
+  `blocker-rows` in `OMCA_DISABLED_HOOKS`. An expanded group is left as drawn.
 
 `task-rows` places one row with `$.ui.place` under the turn line of a main turn that changed a run's
 tasks, found by comparing the `tasks` atom at that turn's `turn.start` with the atom at its

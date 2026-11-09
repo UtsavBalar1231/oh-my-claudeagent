@@ -1,5 +1,5 @@
 import { isHookDisabled } from "../src/core/kill-switch.ts";
-import { type Refusal, refusalOf } from "../src/core/refusals.ts";
+import { type Refusal, type RefusalKind, refusalOf } from "../src/core/refusals.ts";
 import { fitEnd, type Glyphs, glyphs } from "../src/core/ui-kit.ts";
 import { fitPieces, type Piece, piecesWidth, TONE_KEYS } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
@@ -13,9 +13,12 @@ const GUTTER = 1;
 const MARK_INDENT = "  ";
 const TEXT_INDENT = "     ";
 
+// A held completion reaches the transcript as a TaskUpdate call that did not error, in a folded group.
+export const COMPLETION_KINDS: ReadonlySet<RefusalKind> = new Set(["completion-held", "verification-unlogged"]);
+
 type Shape = { mark: string; head: Piece[]; note: string | undefined };
 
-function shapeOf(refusal: Refusal, subject: string | undefined, g: Glyphs, columns: number): Shape | undefined {
+function shapeOf(refusal: Refusal, taskId: string | undefined, g: Glyphs, columns: number): Shape | undefined {
   const dot: Piece = { text: ` ${g.dot} `, color: TONE_KEYS.muted };
   switch (refusal.kind) {
     case "guard":
@@ -23,11 +26,14 @@ function shapeOf(refusal: Refusal, subject: string | undefined, g: Glyphs, colum
     case "review-refused":
       return { mark: g.blocked, head: [{ text: "you refused this in the OMCA guard" }], note: "Claude asks how to proceed" };
     case "final-kept":
-    case "final-unlogged": {
-      if (refusal.taskId === undefined) return undefined;
-      const id: Piece = { text: `#${refusal.taskId}` };
+    case "final-unlogged":
+    case "completion-held":
+    case "verification-unlogged": {
+      if (taskId === undefined) return undefined;
+      const id: Piece = { text: `#${taskId}` };
       const tail: Piece[] = [dot, { text: refusal.title }];
       const room = columns - TEXT_INDENT.length - piecesWidth([id, ...tail]) - 1;
+      const subject = taskSubject(taskId);
       const shown = subject === undefined ? "" : fitEnd(subject, room, g.ellipsis);
       return { mark: g.cross, head: [id, ...(shown === "" ? [] : [{ text: ` ${shown}` }]), ...tail], note: refusal.remedy };
     }
@@ -35,14 +41,12 @@ function shapeOf(refusal: Refusal, subject: string | undefined, g: Glyphs, colum
       return { mark: g.cross, head: [{ text: refusal.title }], note: refusal.remedy };
     case "comment":
       return { mark: g.warn, head: [{ text: "OMCA comment check held this write" }, dot, { text: refusal.detail ?? refusal.title }], note: refusal.remedy };
-    case "completion-held":
-    case "verification-unlogged":
-      return undefined;
   }
 }
 
-function blockerLines(refusal: Refusal, subject: string | undefined, g: Glyphs, columns: number): Piece[][] | undefined {
-  const shape = shapeOf(refusal, subject, g, columns);
+/** OMCA's rows for `refusal`, the task named by `taskId`; undefined for a task refusal without one. */
+export function blockerLines(refusal: Refusal, taskId: string | undefined, g: Glyphs, columns: number): Piece[][] | undefined {
+  const shape = shapeOf(refusal, taskId, g, columns);
   if (shape === undefined) return undefined;
   const first: Piece[] = [{ text: MARK_INDENT }, { text: shape.mark, color: TONE_KEYS.fail }, { text: MARK_INDENT }, ...shape.head];
   const second: Piece[][] = shape.note === undefined ? [] : [[{ text: TEXT_INDENT }, { text: shape.note, color: TONE_KEYS.muted }]];
@@ -62,9 +66,8 @@ export const blockerRows: Features = {
       const kit = kitOf(host.ui.resolve(e), e.surface);
       if (isRemote(kit)) return undefined;
       const refusal = refusalOf(output);
-      if (refusal === undefined) return undefined;
-      const subject = refusal.taskId === undefined ? undefined : taskSubject(refusal.taskId);
-      const lines = blockerLines(refusal, subject, glyphs(glyphTier), (e.viewport?.columns ?? 80) - GUTTER);
+      if (refusal === undefined || COMPLETION_KINDS.has(refusal.kind)) return undefined;
+      const lines = blockerLines(refusal, refusal.taskId, glyphs(glyphTier), (e.viewport?.columns ?? 80) - GUTTER);
       if (lines === undefined) return undefined;
       return { answer: kit.Box({ key: "omca-blocker-rows", flexDirection: "column", children: lines.map((pieces) => Line(kit, pieces)) }) };
     },

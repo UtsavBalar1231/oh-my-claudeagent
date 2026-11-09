@@ -1,8 +1,9 @@
-import type { On, RenderSurface } from "claude-code";
+import type { On, RenderSurface, ToolGroupCall } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
 import { judgeWrite } from "../../src/core/comments.ts";
 import { FORCE_PUSH_REASON, GIT_REASON, REVIEW_REFUSED_REASON } from "../../src/core/destructive.ts";
 import { noPassingVerdictReason, noVerdictReason, stayFinalReason } from "../../src/core/refusals.ts";
+import { unloggedReason } from "../../src/core/verification.ts";
 import { INVALID_LEDGER_REASON } from "../../src/core/verification.ts";
 import { PLUGIN, POSIX, SESSION, spreadRows, world } from "./world.ts";
 
@@ -147,4 +148,84 @@ test("another hook's name in OMCA_DISABLED_HOOKS leaves the rows on", async ($, 
     "  ⊗  OMCA guard refused · force push to the default branch",
     "     push to another branch, or ask the user to push",
   ]);
+});
+
+const call = (tool: string, input: unknown, output: unknown, isErrored = false): ToolGroupCall => ({
+  tool_use_id: `toolu_${tool}`,
+  tool,
+  input,
+  isRunning: false,
+  isErrored,
+  isInterrupted: false,
+  output,
+});
+
+const pushRefused = call("Bash", { command: "git push --force origin main\necho done" }, `${DENIED("Bash")}${FORCE_PUSH_REASON}`, true);
+const held = (taskId: string, error: string) => call("TaskUpdate", { taskId, status: "completed" }, { success: false, taskId, updatedFields: [], error: `TaskCompleted hook feedback:\n${error}` });
+
+async function groupOf($: Engine, calls: ToolGroupCall[], { columns = 120, surface = "terminal", isExpanded = false }: { columns?: number; surface?: RenderSurface; isExpanded?: boolean } = {}) {
+  const mounted = await $.ui.mount({ plugin: PLUGIN, surface, component: "ToolGroup", requestId: "group-1", viewport: { columns, rows: 40 }, props: { calls, isActive: false, isExpanded } });
+  const tree = await mounted.drawn();
+  await mounted.unmount();
+  return { rows: spreadRows(tree), tree };
+}
+
+const REFUSED_ROWS = ["  ⊗  OMCA guard refused · force push to the default branch", "     push to another branch, or ask the user to push"];
+
+test("a folded group of guard refusals draws each call's header and OMCA's rows, with the engine's top margin, at 80 and 120 columns", async ($, on) => {
+  setup(on);
+  await start($);
+  const at80 = await groupOf($, [pushRefused], { columns: 80 });
+  expect(at80.rows).toEqual(["● Bash(git push --force origin main)", ...REFUSED_ROWS]);
+  expect((at80.tree as { props?: Record<string, unknown> }).props?.["marginTop"]).toBe(1);
+  expect((await groupOf($, [pushRefused], { columns: 120 })).rows).toEqual(["● Bash(git push --force origin main)", ...REFUSED_ROWS]);
+  const long = call("Bash", { command: `git push --force origin ${"a".repeat(80)}` }, `${DENIED("Bash")}${FORCE_PUSH_REASON}`, true);
+  expect((await groupOf($, [long], { columns: 40 })).rows[0]).toBe("● Bash(git push --force origin aaaaaa…)");
+});
+
+test("a group with a call OMCA did not refuse keeps the engine's drawing", async ($, on) => {
+  setup(on);
+  await start($);
+  const read = call("Read", { file_path: "/work/src/a.ts" }, { type: "text", file: { filePath: "/work/src/a.ts", content: "x", numLines: 1, startLine: 1, totalLines: 1 } });
+  expect((await groupOf($, [pushRefused, read])).rows).toEqual([ENGINE_ROW]);
+  expect((await groupOf($, [call("Bash", { command: "false" }, "Error: Exit code 1", true)])).rows).toEqual([ENGINE_ROW]);
+});
+
+test("a held completion appends OMCA's row under the group, after a receipt the group already draws", async ($, on) => {
+  setup(on);
+  await start($);
+  const passed = call("Bash", { command: "just test" }, { stdout: "12 pass, 0 fail\n", stderr: "", interrupted: false, isImage: false });
+  expect((await groupOf($, [passed, held("1", noPassingVerdictReason("1", "Review the probe run", "probe-run"))])).rows).toEqual([
+    ENGINE_ROW,
+    "  ⎿  ✓ just test · 12 pass, 0 fail",
+    "  ✗  #1 Review the probe run · completion held: no passing verdict names it",
+    "     review the run, then record the verdict with evidence_log",
+  ]);
+});
+
+test("a held completion whose reason names no task takes the id from the call's input", async ($, on) => {
+  setup(on);
+  await start($);
+  expect((await groupOf($, [held("7", unloggedReason({ command: "just test", at: 1_700_000_000, exit_code: 0 }))])).rows).toEqual([
+    ENGINE_ROW,
+    "  ✗  #7 Review the run and record the final verification verdi… · completion held: a verification ran and is not logged",
+    "     log the real result with evidence_log, including a non-zero exit_code if it failed",
+  ]);
+});
+
+test("an unfolded group and a remote surface keep the engine's drawing", async ($, on) => {
+  setup(on);
+  await start($);
+  const holding = held("1", noPassingVerdictReason("1", "Review the probe run", "probe-run"));
+  expect((await groupOf($, [pushRefused], { isExpanded: true })).rows).toEqual([ENGINE_ROW]);
+  expect((await groupOf($, [holding], { isExpanded: true })).rows).toEqual([ENGINE_ROW]);
+  expect((await groupOf($, [pushRefused], { surface: "desktop" })).rows).toEqual([ENGINE_ROW]);
+  expect((await groupOf($, [holding], { surface: "desktop" })).rows).toEqual([ENGINE_ROW]);
+});
+
+test("OMCA_DISABLED_HOOKS=blocker-rows keeps the engine's group drawing", async ($, on) => {
+  setup(on, { OMCA_DISABLED_HOOKS: "blocker-rows" });
+  await start($);
+  expect((await groupOf($, [pushRefused])).rows).toEqual([ENGINE_ROW]);
+  expect((await groupOf($, [held("1", noPassingVerdictReason("1", "Review the probe run", "probe-run"))])).rows).toEqual([ENGINE_ROW]);
 });
