@@ -21,6 +21,8 @@
 //   gitRemote   true makes the session's cwd its own git repository, one commit on main pushed to a
 //               local bare origin
 //   startDelayMs  milliseconds to wait after the prompt shows, before the first key
+//   waitFor     a string or an array of strings that must all show on the screen, after the keys, before the
+//               capture; the capture fails naming the one that never showed
 // `--inline` drops the fullscreen setting and names the captures <view>-inline-<cols>.txt, or
 // <view>-inline-<cols>x<rows>.txt with --sizes.
 // Writes <root>/<view>-<cols>.txt for 80x40 (an inline pane), 120x40 and 200x50 (docked), with
@@ -51,6 +53,7 @@ const CHANGE_TIMEOUT_MS = 3_000;
 const SETTLE_TIMEOUT_MS = 30_000;
 // The trust dialog is drawn before it takes keys, so a Down sent at once can be lost.
 const RESEND_MS = 1_000;
+const WAIT_FOR_TIMEOUT_MS = 15_000;
 const EXIT_TIMEOUT_MS = 10_000;
 // The input box: its top rule, then the prompt line. The trust dialog's pointer follows no rule,
 // and the engine draws a no-break space after each pointer.
@@ -69,6 +72,7 @@ export type View = {
   settings?: Record<string, unknown>;
   gitRemote?: true;
   startDelayMs?: number;
+  waitFor?: string[];
 };
 
 export const INLINE_PLUGIN_KEY = "oh-my-claudeagent@inline";
@@ -125,6 +129,7 @@ export function parseView(text: string): View {
   const settings = fields.get("settings");
   const gitRemote = fields.get("gitRemote");
   const startDelayMs = fields.get("startDelayMs");
+  const waitFor = fields.get("waitFor");
   const view: View = { command, keys, mockScript, fixture };
   if (env !== undefined) {
     if (!isObject(env) || !Object.entries(env).every(([name, value]) => /^[A-Za-z_]\w*$/.test(name) && typeof value === "string")) {
@@ -149,6 +154,13 @@ export function parseView(text: string): View {
       throw new Error('"startDelayMs" must be a non-negative integer');
     }
     view.startDelayMs = startDelayMs;
+  }
+  if (waitFor !== undefined) {
+    const texts = Array.isArray(waitFor) ? waitFor : [waitFor];
+    if (texts.length === 0 || !texts.every((text) => typeof text === "string" && text !== "")) {
+      throw new Error('"waitFor" must be a non-empty string or an array of non-empty strings');
+    }
+    view.waitFor = texts as string[];
   }
   return view;
 }
@@ -228,15 +240,16 @@ function maskTurnLine(line: string): string {
  * lines, the spinner's verb, which Claude Code picks at random, an agent page's start time and its
  * tool calls' durations, a subagent's token count, whose requests
  * vary by a few hundred tokens from run to run, and a turn line's tokens, which the mock sizes
- * from the request and so move with every change to a prompt the plugin sends.
+ * from the request and so move with every change to a prompt the plugin sends, a turn line's cost
+ * when a wrap leaves it on its own line, and the clock the expanded view draws before a model name.
  */
 export const maskLive = (screen: string): string =>
   screen
-    .replace(/([A-Z][a-z]+… \()(\d+s · ↓ [\d.]+[kM]? tokens\))( *)/g, (_match: string, verb: string, counts: string, spaces: string) =>
+    .replace(/([A-Z][a-z]+… \()(\d+s · [↑↓] [\d.]+[kM]? tokens\))( *)/g, (_match: string, verb: string, counts: string, spaces: string) =>
       `Working… (${counts}${spaces === "" ? "" : " ".repeat(Math.max(1, spaces.length + verb.length - "Working… (".length))}`,
     )
     .replace(/\b((?:running|low|medium|high|xhigh|max) +)(\d+s)\b/g, (_match: string, lead: string, took: string) => `${lead}${digitsOut(took)}`)
-    .replace(/\b\d+s · ↓/g, digitsOut)
+    .replace(/\b\d+s · [↑↓]/g, digitsOut)
     .replace(/\brunning · \d+s\b/g, digitsOut)
     .replace(/· \d+s…/g, digitsOut)
     .replace(/\(\d+s\)/g, digitsOut)
@@ -245,6 +258,8 @@ export const maskLive = (screen: string): string =>
     .split("\n")
     .map(maskTurnLine)
     .join("\n")
+    .replace(/( out · )\$\d+\.\d+/g, "$1$X.XX")
+    .replace(/\b\d{1,2}:\d{2} [AP]M(?= [a-z][\w.]*-[\w.-]+$)/gm, (match: string) => `${" ".repeat(match.length - 5)}HH:MM`)
     .replace(/checked \d\d:\d\d/g, "checked HH:MM")
     .replace(/started \d\d:\d\d/g, "started HH:MM")
     .replace(/ +\d+ms\b/g, (match: string) => `${" ".repeat(match.length - 3)}Nms`);
@@ -309,6 +324,18 @@ export class Tmux {
       const screen = this.screen();
       if (isReady(screen)) return screen;
       if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}; the screen was:\n${screen}`);
+      await Bun.sleep(POLL_MS);
+    }
+  }
+
+  /** The screen once it holds every text, or an error naming the first one missing after `timeoutMs`. */
+  async waitForText(texts: readonly string[], timeoutMs: number): Promise<string> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const screen = this.screen();
+      const missing = texts.find((text) => !screen.includes(text));
+      if (missing === undefined) return screen;
+      if (Date.now() > deadline) throw new Error(`timed out waiting for "${missing}" to show; the screen was:\n${screen}`);
       await Bun.sleep(POLL_MS);
     }
   }
@@ -440,6 +467,10 @@ async function captureAt(view: View, root: string, cols: number, rows: number, i
       }
       if (MOUSE.test(key)) continue;
       tmux.send(key);
+      screen = await tmux.settle(screen);
+    }
+    if (view.waitFor !== undefined) {
+      await tmux.waitForText(view.waitFor, WAIT_FOR_TIMEOUT_MS);
       screen = await tmux.settle(screen);
     }
     return maskLive(maskScratch(screen, scratch));

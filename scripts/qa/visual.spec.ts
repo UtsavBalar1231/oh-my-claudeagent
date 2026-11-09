@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { addGitRemote, captureName, copyFixture, INLINE_PLUGIN_KEY, maskLive, maskScratch, mouseReports, parseSizes, parseView, sessionSettings, teardown, withoutBlink } from "./visual.ts";
+import { addGitRemote, captureName, copyFixture, INLINE_PLUGIN_KEY, maskLive, maskScratch, mouseReports, parseSizes, parseView, sessionSettings, teardown, Tmux, withoutBlink } from "./visual.ts";
 
 const VISUAL = join(import.meta.dir, "visual.ts");
 const temps: string[] = [];
@@ -51,8 +51,18 @@ describe("parseView", () => {
     expect(Object.keys(parseView('{"command":"x","gitRemote":false,"startDelayMs":0}'))).not.toContain("gitRemote");
   });
 
+  test("reads waitFor as a list, from a string or an array", () => {
+    expect(parseView('{"command":"x","waitFor":"OMCA guard"}').waitFor).toEqual(["OMCA guard"]);
+    expect(parseView('{"command":"x","waitFor":["a","b"]}').waitFor).toEqual(["a", "b"]);
+    expect(parseView('{"command":"x"}')).not.toHaveProperty("waitFor");
+  });
+
   test.each([
     ["[]", "a view must be a JSON object"],
+    ['{"command":"x","waitFor":""}', '"waitFor" must be a non-empty string or an array of non-empty strings'],
+    ['{"command":"x","waitFor":[]}', '"waitFor" must be a non-empty string or an array of non-empty strings'],
+    ['{"command":"x","waitFor":["a",1]}', '"waitFor" must be a non-empty string or an array of non-empty strings'],
+    ['{"command":"x","waitFor":5}', '"waitFor" must be a non-empty string or an array of non-empty strings'],
     ['{"command":"x","env":{"A":1}}', '"env" must be an object of string values named like variables'],
     ['{"command":"x","env":{"A B":"1"}}', '"env" must be an object of string values named like variables'],
     ['{"command":"x","env":[]}', '"env" must be an object of string values named like variables'],
@@ -222,6 +232,53 @@ test("maskLive fixes an agent page's running seconds, a tool line's timers and t
     "│      ▀        ▄  started HH:MM",
     "│ Bash ls plans                                   Nms",
     "│ Read src/a.ts                                   Nms",
+  ]);
+});
+
+describe("Tmux.waitForText", () => {
+  class Scripted extends Tmux {
+    shown: string[];
+    constructor(...shown: string[]) {
+      super("unused");
+      this.shown = shown;
+    }
+    override screen(): string {
+      return this.shown.length > 1 ? (this.shown.shift() ?? "") : (this.shown[0] ?? "");
+    }
+  }
+
+  test("returns the screen once every text shows", async () => {
+    const tmux = new Scripted("Waiting for permission…", "Waiting for permission…\nOMCA guard\nAllow?");
+    expect(await tmux.waitForText(["OMCA guard", "Allow?"], 5_000)).toContain("OMCA guard");
+  });
+
+  test("fails naming the text that never showed", async () => {
+    const tmux = new Scripted("Waiting for permission…");
+    await expect(tmux.waitForText(["OMCA guard"], 200)).rejects.toThrow(
+      'timed out waiting for "OMCA guard" to show; the screen was:\nWaiting for permission…',
+    );
+  });
+});
+
+test("maskLive fixes the expanded view's clock, a wrapped cost and the spinner's up-arrow count, and leaves what is not live", () => {
+  const screen = [
+    "                                        05:26 PM claude-mock",
+    "  Tue 13:35  FINAL  ✓  0  just ci   5:26 PM standup",
+    "  NN.Nk in NN out · $0.6005",
+    "  38.2k in 13 out",
+    "  $12.40 engine cost",
+    "● Shimmying… (35s · ↑ 15.3k tokens)",
+    "  Smooshing… (5s · ↑ 1.2k tokens)",
+  ].join("\n");
+
+  expect(maskLive(screen).split("\n")).toEqual([
+    "                                           HH:MM claude-mock",
+    "  Tue 13:35  FINAL  ✓  0  just ci   5:26 PM standup",
+    "  NN.Nk in NN out · $X.XX",
+    "  NN.Nk in NN out",
+    "  $12.40 engine cost",
+    "● Working… (NNs · ↑ NN.Nk tokens)",
+    "  Working… (Ns · ↑ N.Nk tokens)",
   ]);
 });
 
