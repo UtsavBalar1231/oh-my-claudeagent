@@ -1,7 +1,7 @@
 
- ▐▛███▛█   Claude Code v2.1.316
+ ▐▛███▛█   Claude Code v2.1.319
 ▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · /home/utsav/.cache/tmp/omca-visual-200x50-XXXXXX/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd
 
 
 ❯ Run the tests
@@ -38,8 +38,8 @@
 
 
 
- just test evidence not logged                                                                                                                                                                     [-]
-1: Log evidence
+
+
                                                                                                                                                                                     ◐ medium · /effort
 ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 

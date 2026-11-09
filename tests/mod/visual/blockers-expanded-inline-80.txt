@@ -1,0 +1,39 @@
+     code cannot state, the non-obvious why, an invariant, a constraint, or the
+     derivation of a magic number. A correct fix deletes the quoted comment, or
+     rewrites it as the reason the code is the way it is. A clearer name beats
+     a comment that restates the line below it. Do NOT remove other comments
+     while fixing this: file headers, non-obvious function contracts, invariant
+     notes, and magic-number derivation comments may be required by the
+     project's own convention. Resubmit the same code change with only the
+     quoted comments fixed. Genuine exceptions: put @allow on a comment line to
+     exempt that line from the slop checks, or put comment-gate-disable-file in
+     the first 5 lines of the hunk.
+
+● TaskCreate
+  ⎿  Error: PreToolUse:TaskUpdate hook error: Task #1 is the final task of run
+     'sum-run', and no final verification names it. Record the verdict first:
+     evidence_log(evidence_type="final_verification", command="<what the review
+     covered>", exit_code=<0 for COMPLETE, 1 for INCOMPLETE>,
+     output_snippet="<verdict, and why the run stops here>", task_id="1").
+
+● TaskUpdate
+
+                                                       HH:MM claude-mock
+● The review task is held. Pushing the branch next.
+
+● Bash(git push --force origin main)
+  ⎿  Error: Permission to use Bash denied by plugins oh-my-claudeagent,
+     cc-plugin-privacy: Force push to the default branch blocked: it rewrites
+     history everyone else has pulled. Push to another branch, or ask the user
+     to push. Set OMCA_DISABLED_HOOKS=bash-guard to turn this check off for
+     testing.
+
+                                                       HH:MM claude-mock
+● The sum helper is set up and the push was refused.
+
+✻ Worked for 0s · done HH:MM
+  NN.Nk in NN out · $X.XX
+   sum-run  0/1 · +1 task · /tasklist
+
+────────────────────────────────────────────────────────────────────────────────
+  Showing detailed transcript · ctrl+o to toggle · ctrl+e to show all   verbose

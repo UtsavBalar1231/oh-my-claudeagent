@@ -1,14 +1,14 @@
                                                                   │                                                   ✕
- ▐▛███▛█   Claude Code v2.1.316                                   │1: Agents  2: Evidence  3: Notepad
+ ▐▛███▛█   Claude Code v2.1.319                                   │1: Agents  2: Evidence  3: Notepad
 ▝▜██████▀  Sonnet 5.5 with high effort · API Usage Billing        │──────────────────────────────────────────────────
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · /…/cwd               │                   explorer · Map the router cal…
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd              │                   explorer · Map the router cal…
                                                                   │      ▄▄▄▄         running · Ns · NN.Nk tokens
                                                                   │     ▀▀▀▀▀▀       sonnet-5-5 · high
-❯ Find every caller of the shared router and say which ones       │   ▀▀▀▀▀▀▀▀▀▀     3 tool calls
-  bypass the harness.                                             │      ▀        ▄  started HH:MM
-                                                                  │      ▀   ▀▀▀▀▀
-  Searched for 2 patterns, listed 1 directory                     │    ▀  ▀▀  ▀
-                                                                  │    ▀▀▀▀▀▀▀▀
+› From main                                                       │   ▀▀▀▀▀▀▀▀▀▀     3 tool calls
+❯ Find every caller of the shared router and say which ones       │      ▀        ▄  started HH:MM
+  bypass the harness.                                             │      ▀   ▀▀▀▀▀
+                                                                  │    ▀  ▀▀  ▀
+  Searched for 2 patterns, listed 1 directory                     │    ▀▀▀▀▀▀▀▀
                                                                   │Brief
                                                                   │Find every caller of the shared router and say
                                                                   │which ones bypass the harness.
@@ -26,7 +26,7 @@
                                                                   │
                                                                   │
                                                                   │
-● Sautéing… (3s · ↑ N.Nk tokens)                                  │
+● Working… (Ns · ↑ N.Nk tokens)                                   │
   ⎿  Tip: Start with small features or bug fixes, tell Claude to  │
      propose a plan, and verify its suggested edits               │
                                               ◐ medium · /effort  │

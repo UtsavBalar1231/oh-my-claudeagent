@@ -1,7 +1,7 @@
                                                                                                               │                                                                                       ✕
- ▐▛███▛█   Claude Code v2.1.316                                                                               │1: Agents  2: Evidence  3: Notepad
+ ▐▛███▛█   Claude Code v2.1.319                                                                               │1: Agents  2: Evidence  3: Notepad
 ▝▜██████▀  Opus 5.5 · API Usage Billing                                                                       │──────────────────────────────────────────────────────────────────────────────────────
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · /home/utsav/.cache/tmp/omca-visual-200x50-XXXXXX/cwd             │   ▄▄▀▀▀▀▀▀▄▄     explorer                                            running      Ns
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                       │   ▄▄▀▀▀▀▀▀▄▄     explorer                                            running      Ns
                                                                                                               │     ▀▀  ▀▀ ▀▄▄▀  Map the router callers
                                                                                                               │    ▀▀▀▀▀▀▀▀   ▀  ✻ Bash ls plans                                              3 calls
 ❯ Fix the parser with the executor                                                                            │    ▀▀▀▀▀▀▀▀      sonnet-5-5 · high · NN.Nk tokens
@@ -15,7 +15,7 @@
                                                                                                               │ ▀   ▀▀   ▀       Fix the heading parser
 ✻ Waiting for executor, explorer, architect · NN.Nk in NN out · $X.XX                                         │ ▀  ▀ ▀▀▀▀ ▀ ▀    Fenced lines are skipped now, and the heading tests pass.
                                                                                                               │    ▀▀▀▀▀▀▀▀      sonnet-5-5 · high · N.Nk tokens
- executor  Fix the heading parser                                           1s · 2 calls · 9.8k tok          │d: Details  2 running · 1 finished · NN.Nk tokens
+ executor  Fix the heading parser                                           1s · 2 calls · 8.9k tok          │d: Details  2 running · 1 finished · NN.Nk tokens
   ⎿  Fenced lines are skipped now, and the heading tests pass.                                                │
                                                                                                               │
 ● ok                                                                                                          │
