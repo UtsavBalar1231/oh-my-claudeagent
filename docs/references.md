@@ -63,6 +63,13 @@ Only orchestrator and planner can spawn further agents. `servers/categories.json
 work to tiers for delegation: `quick`, `standard` and `readonly` to `sonnet`, `deep` to `opus`,
 `hardest` to `fable`.
 
+No agent sets `background: true`. A probe on Claude Code 2.1.319 against a mock model found that an
+agent spawned from the main session already runs in the background in `claude -p` and in an
+interactive session with fork mode on or off, and its result arrives in a `<task-notification>`
+before `-p` exits. The flag only overrides an explicit request to wait, and in `claude -p` a
+subagent that spawns a flagged agent finishes before that agent's result arrives, which then goes
+to the main session. The probe measures delivery, not model behavior.
+
 The roster's tier and effort hold unless something overrides them: a `model` passed on one call,
 `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`, which puts every agent on one model, or a `maxEffortLevel`
 cap, which clamps every declared effort. The doctor reports the last two.
@@ -77,9 +84,9 @@ done. With the advisor off, they escalate to architect.
 | --- | --- | --- |
 | plan | `/oh-my-claudeagent:plan <task>` | planner planning, with analyzer and reviewer. It writes the plan document and creates the run's tasks. Only you can start it |
 | start-work | `/oh-my-claudeagent:start-work [run name] [--worktree <path>]` | Runs the open tasks of a run in the main session, delegating each task. The run name picks one of several open runs. Only you can start it |
-| analyzer | `/oh-my-claudeagent:analyzer` | Runs analyzer on a request or plan, in a forked context |
-| reviewer | `/oh-my-claudeagent:reviewer <plan>` | Runs reviewer on a plan, in a forked context |
-| build-fixer | `/oh-my-claudeagent:build-fixer` | Runs build-fixer on a failing build, in a forked context |
+| analyzer | `/oh-my-claudeagent:analyzer` | Runs analyzer on a request or plan, in a forked background context |
+| reviewer | `/oh-my-claudeagent:reviewer <plan>` | Runs reviewer on a plan, in a forked background context |
+| build-fixer | `/oh-my-claudeagent:build-fixer` | Runs build-fixer on a failing build, in a forked background context |
 | handoff | `/oh-my-claudeagent:handoff` | Writes a context block for a new session. Only you can start it |
 | debugging | `/oh-my-claudeagent:debugging` | Reproduce, rank hypotheses, instrument, fix, verify |
 | refactor | `/oh-my-claudeagent:refactor <target>` | Maps the code and its tests, plans, then refactors step by step |
@@ -152,10 +159,10 @@ server's `omca_hook` tool, which dispatches through `servers/hooks/registry.ts`.
 | `tool.check` for Bash, PowerShell and Monitor | The destructive-command guard and its review dialog; a Monitor command is read as bash |
 | `session.start` | Registers `/omca`, writes the session's mod marker, draws the band's first state, and writes a transcript line when the `omca` server is not connected, naming a missing bun or the server's error, with a status line under the prompt until it connects |
 | `prompt.submit` | Tracks user-origin submissions and cancels a pending refusal recovery when new user input arrives; notes which keyword modes have fired so the prompt stops underlining them |
-| `turn.start`, `turn.complete` | The turn's tokens, cost and verification receipt for its closing line, a finished agent's notice, the band and its buttons, the pane's refresh. At a main turn's start, the mod asks whether the `omca` server is still connected, and one that has stopped gets the same transcript line and status line. A main turn you started in an interactive session that still ends in a `reasoning_extraction` refusal, after Claude Code's own retry, gets at most one follow-up prompt from OMCA; the refusal itself stands |
+| `turn.start`, `turn.complete` | The turn's tokens, cost and verification receipt for its closing line, a finished agent's notice, the band and its Task list button, the pane's refresh. At a main turn's start, the mod asks whether the `omca` server is still connected, and one that has stopped gets the same transcript line and status line. A main turn you started in an interactive session that still ends in a `reasoning_extraction` refusal, after Claude Code's own retry, gets at most one follow-up prompt from OMCA; the refusal itself stands |
 | `agent.spawn`, `turn.step` | The Agents tab and delegation records |
 | `tool.call` | A subagent's tool calls, kept for its page on the Agents tab; only a subagent's call reaches the mod, and a main-loop call skips it |
-| `ui.render`, `ui.focus`, `ui.scroll`, `ui.close`, `prompt.edit`, `prompt.change`, `command.run` | The turn line, an agent's launch and finish rows, the receipts and picture previews under tool groups in the transcript, the band, the pane and the commands, and the underline on a keyword trigger in the prompt |
+| `ui.render`, `ui.focus`, `ui.scroll`, `ui.close`, `prompt.edit`, `prompt.change`, `command.run` | The turn line, an agent's launch and finish rows, the receipts and picture previews under tool groups in the transcript, OMCA's rows for the refusals and held completions it issues in place of the engine's error text, the band, the pane and the commands, and the underline on a keyword trigger in the prompt |
 
 An observed user submission cancels a follow-up before it is queued. If user input races a
 follow-up already queued, neither competing turn qualifies for another automatic recovery.
@@ -175,10 +182,10 @@ rejects `model.fork`, `http.fetch` and `store.*`.
 | `UserPromptExpansion` | any | `guidance`, `slash-mode-detector` |
 | `SubagentStart` | any | `subagent-context`: protocol, date, output contract and run context for each subagent |
 | `PreToolUse` | `Write`, `Edit`, `TaskUpdate` | `final-task-guard` (on `TaskUpdate`), `comment-gate` |
-| `PostToolUse` | `Read`, `Write`, `Edit`, `Agent`, `SubagentHandback`, `Bash`, `PowerShell` | `verification-recorder`, `context-injector`, `empty-task-response` |
-| `PostToolUseFailure` | any | `failure-recovery`: advice on a failed call, and a stuck-loop note from a tool's third failure in five minutes |
+| `PostToolUse` | `Read`, `Write`, `Edit`, `Agent`, `SubagentHandback`, `Bash`, `PowerShell`, `TaskCreate`, `TaskUpdate`, `evidence_log` | `verification-recorder`, `context-injector`, `task-touch`, `empty-task-response` |
+| `PostToolUseFailure` | any | `failure-recovery`: advice on a failed call, and a stuck-loop note from a tool's third failure in five minutes; `verification-recorder`, for a verification that ran and exited non-zero |
 | `Stop` | any | `stop-gates`: task continuation (open tasks of a run), drift guard, in that order |
-| `TaskCompleted` | any | `task-completed`: refuses to complete a task while a recent verification is unlogged, and a run's final task until its `final_verification` is logged |
+| `TaskCompleted` | any | `task-completed`: refuses to complete a task while the completing agent's own recent verification has no `evidence_log` call from that agent after it, and a run's final task until its `final_verification` is logged |
 
 Each stop gate continues the turn at most five times in a session and gets that budget back once
 its condition clears. OMCA requires the task tools and sets `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` at session start when
@@ -205,13 +212,14 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | Name | Turns off |
 | --- | --- |
 | `bash-guard` | The guard's review and its refusals. The catastrophic-removal deny stays |
+| `blocker-rows` | OMCA's rows for its own refusals and held completions in the transcript; the engine's error text shows instead |
 | `refusal-recovery` | The follow-up prompt after a `reasoning_extraction` refusal |
 | `stop-gates` | Every stop gate |
 | `task-continuation`, `drift-guard` | One stop gate |
 | `final-verification` | The final task's refusals: completing it without a passing verdict, and marking it blocked, deleting it or unmarking it without any verdict |
 | `final-task-guard` | The refusals on updates that mark the final task blocked, delete it or unmark it, leaving the completion check on |
 | `task-completed` | The task completion check |
-| `verification-recorder` | Recording verification commands, which the band, the turn line and the task check read |
+| `verification-recorder` | Recording each agent's verification commands and its own `evidence_log` calls, which the turn line, the Stats page and the task check read |
 | `context-injector` | `AGENTS.md`, `README.md` and rule injection when a file is read or edited |
 | `comment-gate` | The comment check on writes |
 | `empty-task-response` | The note on an empty or transitional agent report; concise findings need no fixed headers |
@@ -306,7 +314,7 @@ OMCA keeps its state in the project's `.omca/` directory, which it gitignores ex
 | --- | --- | --- |
 | `.omca/evidence/verification-evidence.json` | `evidence_log` | The append-only evidence log. Older entries move to a monthly archive file when it grows past 1 MiB or 1,000 entries |
 | `.omca/notepads/<plan>/<section>.md` | `notepad_write`, `notepad_compact` | Plan notepads |
-| `.omca/state/session/<session id>.json` | the server | The last hook call and the last verification command |
+| `.omca/state/session/<session id>.json` | the server | The last hook call and the main conversation's last verification command, with whether it logged evidence for it |
 | `.omca/state/mod/<session id>.json` | the mod | Proof the mod ran this session, and its options. `health_check` and the first-prompt notice read it from any worktree of the repository |
 | `.omca/metrics/<session id>/<agent id>.json` | the mod | One record per delegation, read by the Stats page |
 | `.omca/logs/file-access.jsonl` | `file_read` | One line per call |
@@ -341,7 +349,8 @@ the guard leaves its decisions in place. A Desktop session in WSL loads no plugi
 ## Platform support
 
 CI runs the validator, the lint, the type checks, the bun specs, the mod tests, a smoke session
-and the OpenCode adapter specs on Linux, macOS and Windows against Claude Code 2.1.316. The
+and the OpenCode adapter specs against Claude Code 2.1.319. Pushes to main and pull requests run
+on Linux; a release tag or a manual run adds macOS and Windows. The
 guard reads Bash and PowerShell commands, including `cmd /c` and `Invoke-Expression`, and
 resolves home and project paths per platform. The README screenshots are captured with tmux,
 kitty and Xvfb, so capturing them needs Linux or WSL.

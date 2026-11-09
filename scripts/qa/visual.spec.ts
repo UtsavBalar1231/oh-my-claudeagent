@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { copyFixture, maskLive, maskScratch, mouseReports, parseSizes, parseView, teardown, withoutBlink } from "./visual.ts";
+import { addGitRemote, captureName, copyFixture, INLINE_PLUGIN_KEY, maskLive, maskScratch, mouseReports, parseSizes, parseView, sessionSettings, teardown, Tmux, withoutBlink } from "./visual.ts";
 
 const VISUAL = join(import.meta.dir, "visual.ts");
 const temps: string[] = [];
@@ -32,8 +32,46 @@ describe("parseView", () => {
     });
   });
 
+  test("reads env, options, settings, gitRemote and startDelayMs when present", () => {
+    expect(
+      parseView(
+        '{"command":"x","env":{"A_B":"1"},"options":{"guardMode":"deny"},"settings":{"permissions":{"allow":["Bash"]}},"gitRemote":true,"startDelayMs":4000}',
+      ),
+    ).toEqual({
+      command: "x",
+      keys: [],
+      mockScript: null,
+      fixture: null,
+      env: { A_B: "1" },
+      options: { guardMode: "deny" },
+      settings: { permissions: { allow: ["Bash"] } },
+      gitRemote: true,
+      startDelayMs: 4000,
+    });
+    expect(Object.keys(parseView('{"command":"x","gitRemote":false,"startDelayMs":0}'))).not.toContain("gitRemote");
+  });
+
+  test("reads waitFor as a list, from a string or an array", () => {
+    expect(parseView('{"command":"x","waitFor":"OMCA guard"}').waitFor).toEqual(["OMCA guard"]);
+    expect(parseView('{"command":"x","waitFor":["a","b"]}').waitFor).toEqual(["a", "b"]);
+    expect(parseView('{"command":"x"}')).not.toHaveProperty("waitFor");
+  });
+
   test.each([
     ["[]", "a view must be a JSON object"],
+    ['{"command":"x","waitFor":""}', '"waitFor" must be a non-empty string or an array of non-empty strings'],
+    ['{"command":"x","waitFor":[]}', '"waitFor" must be a non-empty string or an array of non-empty strings'],
+    ['{"command":"x","waitFor":["a",1]}', '"waitFor" must be a non-empty string or an array of non-empty strings'],
+    ['{"command":"x","waitFor":5}', '"waitFor" must be a non-empty string or an array of non-empty strings'],
+    ['{"command":"x","env":{"A":1}}', '"env" must be an object of string values named like variables'],
+    ['{"command":"x","env":{"A B":"1"}}', '"env" must be an object of string values named like variables'],
+    ['{"command":"x","env":[]}', '"env" must be an object of string values named like variables'],
+    ['{"command":"x","options":[]}', '"options" must be an object'],
+    ['{"command":"x","settings":"s"}', '"settings" must be an object'],
+    ['{"command":"x","gitRemote":"yes"}', '"gitRemote" must be a boolean'],
+    ['{"command":"x","startDelayMs":-1}', '"startDelayMs" must be a non-negative integer'],
+    ['{"command":"x","startDelayMs":1.5}', '"startDelayMs" must be a non-negative integer'],
+    ['{"command":"x","startDelayMs":"5"}', '"startDelayMs" must be a non-negative integer'],
     ["{}", '"command" must be a non-empty string'],
     ['{"command":""}', '"command" must be a non-empty string'],
     ['{"command":"x","keys":"n"}', '"keys" must be an array of non-empty strings'],
@@ -43,6 +81,46 @@ describe("parseView", () => {
   ])("rejects %s", (text, message) => {
     expect(() => parseView(text)).toThrow(message);
   });
+});
+
+describe("sessionSettings", () => {
+  const base = parseView('{"command":"x"}');
+
+  test("a plain view keeps the fullscreen settings, and --inline drops tui only", () => {
+    expect(sessionSettings(base, false)).toEqual({ tui: "fullscreen", prefersReducedMotion: true });
+    expect(sessionSettings(base, true)).toEqual({ prefersReducedMotion: true });
+  });
+
+  test("options go under the --plugin-dir key and settings merge in", () => {
+    expect(INLINE_PLUGIN_KEY).toBe("oh-my-claudeagent@inline");
+    const view = parseView('{"command":"x","options":{"guardMode":"deny"},"settings":{"permissions":{"allow":["Bash"]}}}');
+    expect(sessionSettings(view, false)).toEqual({
+      tui: "fullscreen",
+      prefersReducedMotion: true,
+      permissions: { allow: ["Bash"] },
+      pluginConfigs: { "oh-my-claudeagent@inline": { options: { guardMode: "deny" } } },
+    });
+  });
+});
+
+test("captureName keeps the default names and marks an inline capture", () => {
+  expect(captureName("footer", 120, 40, false, false)).toBe("footer-120.txt");
+  expect(captureName("footer", 120, 40, true, false)).toBe("footer-120x40.txt");
+  expect(captureName("footer", 120, 40, false, true)).toBe("footer-inline-120.txt");
+  expect(captureName("footer", 120, 40, true, true)).toBe("footer-inline-120x40.txt");
+});
+
+test.skipIf(Bun.which("git") === null)("addGitRemote makes the cwd its own repository with one commit on main pushed to a bare origin", () => {
+  const scratch = temp("omca-visual-git-");
+  const cwd = join(scratch, "cwd");
+  mkdirSync(cwd);
+  writeFileSync(join(cwd, "a.txt"), "a\n");
+  addGitRemote(cwd, scratch);
+  const git = (dir: string, ...args: string[]) => Bun.spawnSync(["git", "-C", dir, ...args], { stdout: "pipe" }).stdout.toString().trim();
+  expect(realpathSync(git(cwd, "rev-parse", "--show-toplevel"))).toBe(realpathSync(cwd));
+  expect(git(cwd, "rev-list", "--count", "HEAD")).toBe("1");
+  expect(git(cwd, "rev-parse", "HEAD")).toBe(git(join(scratch, "remote.git"), "rev-parse", "main"));
+  expect(git(cwd, "status", "--porcelain")).toBe("");
 });
 
 describe("mouseReports", () => {
@@ -154,6 +232,53 @@ test("maskLive fixes an agent page's running seconds, a tool line's timers and t
     "│      ▀        ▄  started HH:MM",
     "│ Bash ls plans                                   Nms",
     "│ Read src/a.ts                                   Nms",
+  ]);
+});
+
+describe("Tmux.waitForText", () => {
+  class Scripted extends Tmux {
+    shown: string[];
+    constructor(...shown: string[]) {
+      super("unused");
+      this.shown = shown;
+    }
+    override screen(): string {
+      return this.shown.length > 1 ? (this.shown.shift() ?? "") : (this.shown[0] ?? "");
+    }
+  }
+
+  test("returns the screen once every text shows", async () => {
+    const tmux = new Scripted("Waiting for permission…", "Waiting for permission…\nOMCA guard\nAllow?");
+    expect(await tmux.waitForText(["OMCA guard", "Allow?"], 5_000)).toContain("OMCA guard");
+  });
+
+  test("fails naming the text that never showed", async () => {
+    const tmux = new Scripted("Waiting for permission…");
+    await expect(tmux.waitForText(["OMCA guard"], 200)).rejects.toThrow(
+      'timed out waiting for "OMCA guard" to show; the screen was:\nWaiting for permission…',
+    );
+  });
+});
+
+test("maskLive fixes the expanded view's clock, a wrapped cost and the spinner's up-arrow count, and leaves what is not live", () => {
+  const screen = [
+    "                                        05:26 PM claude-mock",
+    "  Tue 13:35  FINAL  ✓  0  just ci   5:26 PM standup",
+    "  NN.Nk in NN out · $0.6005",
+    "  38.2k in 13 out",
+    "  $12.40 engine cost",
+    "● Shimmying… (35s · ↑ 15.3k tokens)",
+    "  Smooshing… (5s · ↑ 1.2k tokens)",
+  ].join("\n");
+
+  expect(maskLive(screen).split("\n")).toEqual([
+    "                                           HH:MM claude-mock",
+    "  Tue 13:35  FINAL  ✓  0  just ci   5:26 PM standup",
+    "  NN.Nk in NN out · $X.XX",
+    "  NN.Nk in NN out",
+    "  $12.40 engine cost",
+    "● Working… (NNs · ↑ NN.Nk tokens)",
+    "  Working… (Ns · ↑ N.Nk tokens)",
   ]);
 });
 

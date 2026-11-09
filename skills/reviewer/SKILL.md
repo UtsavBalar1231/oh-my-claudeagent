@@ -2,7 +2,6 @@
 name: reviewer
 description: Rigorous plan review via the reviewer. Validates clarity, verifiability, and completeness before execution; returns OKAY or REJECT.
 context: fork
-background: false
 agent: oh-my-claudeagent:reviewer
 user-invocable: true
 argument-hint: "[plan file path]"

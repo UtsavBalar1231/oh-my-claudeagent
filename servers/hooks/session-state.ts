@@ -3,10 +3,16 @@ import type { ErrorCount } from "../../src/core/error-counts.ts";
 import type { Backoff, StopLedger } from "../../src/core/stop-ledger.ts";
 import type { Verification } from "../../src/core/verification.ts";
 
+/** The key of the main conversation's slot: a hook firing there carries no agent_id. */
+export const MAIN_THREAD = "";
+
+/** The agent a hook fired in, keyed as `verifications` keys it. The client sends an absent agent_id as "". */
+export const agentKey = (agentId: unknown): string => (typeof agentId === "string" ? agentId : MAIN_THREAD);
+
 export type Session = {
   readonly id: string;
   stampedAt?: number;
-  verification?: Verification;
+  verifications?: Map<string, Verification>;
   isGuided?: boolean;
   isTitleChecked?: boolean;
   isModChecked?: boolean;

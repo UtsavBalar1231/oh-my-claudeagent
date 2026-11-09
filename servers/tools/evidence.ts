@@ -2,8 +2,8 @@ import { dirname, join } from "node:path";
 import { entriesOf, EVIDENCE_TYPES, type EvidenceType, readLedger } from "../../src/core/evidence.ts";
 import { STATE_VERSION } from "../../src/core/state-version.ts";
 import { isRecord } from "../../src/core/tool-input.ts";
-import { latestSessionId, touchSession } from "../hooks/session-state.ts";
-import { ledgerPath, readTaskList, writeStatus } from "../hooks/status-file.ts";
+import { latestSessionId } from "../hooks/session-state.ts";
+import { ledgerPath, readTaskList } from "../hooks/status-file.ts";
 import { ensureStateDir, readOrNull, withLock, writeFileAtomic } from "../io.ts";
 import type { Tool } from "../omca.ts";
 import { workingTreeStamp } from "../tree-stamp.ts";
@@ -68,16 +68,6 @@ export async function appendEvidence(root: string, entry: EvidenceEntry, beforeW
   });
 }
 
-function updateStatus(root: string): void {
-  const sessionId = latestSessionId();
-  if (sessionId === undefined) return;
-  try {
-    writeStatus(root, touchSession(sessionId), Date.now());
-  } catch (error) {
-    console.error(`omca: evidence was logged but the status file of session ${sessionId} was not updated:`, error);
-  }
-}
-
 /** The run and list of the final task a verdict names, so a verdict for one list's task #N never closes another list's. */
 function verdictStamp(root: string, taskId: string): { run: string; task_list: string } {
   if (taskId === "") throw new Error("evidence_log: a final_verification names the run's final task in task_id");
@@ -116,7 +106,6 @@ async function evidenceLog(args: Record<string, unknown>): Promise<string> {
   };
   ensureStateDir(root);
   const total = await appendEvidence(root, entry);
-  updateStatus(root);
   return `Evidence recorded: ${type} (exit ${exitCode}), ${total} total entries`;
 }
 

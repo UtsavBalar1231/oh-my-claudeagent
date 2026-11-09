@@ -1,0 +1,9 @@
+{
+  "command": "Add a sum helper, set up the review task, then push",
+  "mockScript": "blockers",
+  "options": { "guardMode": "deny" },
+  "env": { "OMCA_COMMENT_GATE": "deny", "OMCA_DISABLED_HOOKS": "task-continuation" },
+  "settings": { "permissions": { "allow": ["Bash", "Write", "Edit", "Read"] } },
+  "gitRemote": true,
+  "startDelayMs": 4000
+}

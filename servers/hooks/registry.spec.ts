@@ -33,7 +33,7 @@ describe("registry", () => {
     expect(names).toEqual({
       PreToolUse: ["final-task-guard", "comment-gate"],
       PostToolUse: ["verification-recorder", "context-injector", "task-touch", "empty-task-response"],
-      PostToolUseFailure: ["failure-recovery"],
+      PostToolUseFailure: ["failure-recovery", "verification-recorder"],
       UserPromptSubmit: ["mod-notice", "guidance", "keyword-detector"],
       UserPromptExpansion: ["guidance", "slash-mode-detector"],
       SubagentStart: ["subagent-context"],
@@ -70,11 +70,11 @@ describe("hooks.json against the registry", () => {
   const READS: Record<string, readonly string[]> = {
     PreToolUse: ["tool_name", "tool_input"],
     PostToolUse: ["agent_id", "agent_type", "tool_name", "tool_input", "tool_response"],
-    PostToolUseFailure: ["tool_name", "tool_input", "error", "duration_ms"],
+    PostToolUseFailure: ["agent_id", "tool_name", "tool_input", "error", "duration_ms"],
     UserPromptSubmit: ["agent_id", "prompt", "session_title"],
     UserPromptExpansion: ["command_name"],
     SubagentStart: ["agent_type"],
-    TaskCompleted: ["task_id"],
+    TaskCompleted: ["agent_id", "task_id"],
     Stop: ["transcript_path", "stop_hook_active", "last_assistant_message", "background_tasks"],
     SessionStart: ["source"],
   };
@@ -84,8 +84,10 @@ describe("hooks.json against the registry", () => {
     expect(Object.keys(READS).toSorted()).toEqual(Object.keys(REGISTRY).toSorted());
   });
 
-  test("PostToolUse reaches the task tools, whose touch the continuation gate waits for", () => {
-    expect(HOOKS.PostToolUse?.map(({ matcher }) => matcher)).toEqual(["Read|Write|Edit|Agent|SubagentHandback|Bash|PowerShell|TaskCreate|TaskUpdate"]);
+  test("PostToolUse reaches the task tools, whose touch the continuation gate waits for, and evidence_log, which satisfies its caller's verification", () => {
+    expect(HOOKS.PostToolUse?.map(({ matcher }) => matcher)).toEqual([
+      "Read|Write|Edit|Agent|SubagentHandback|Bash|PowerShell|TaskCreate|TaskUpdate|mcp__plugin_oh-my-claudeagent_omca__evidence_log",
+    ]);
   });
 
   test("every entry passes its event, the session id and each field its handlers read, substituted from the payload", () => {

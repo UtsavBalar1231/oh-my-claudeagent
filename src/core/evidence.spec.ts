@@ -5,9 +5,7 @@ import {
   type Evidence,
   isSlotRecent,
   latestByType,
-  ledgerCoversSlot,
   MAX_SLOT_AGE_SECONDS,
-  MTIME_SLACK_SECONDS,
   namesTask,
   nextTypeFilter,
   parseLedger,
@@ -39,30 +37,6 @@ describe("isSlotRecent", () => {
 
   test("a verification that just finished is recent", () => {
     expect(isSlotRecent(10_000, 10_000)).toBe(true);
-  });
-});
-
-describe("ledgerCoversSlot", () => {
-  test("a ledger written in the same second as the verification covers it", () => {
-    expect(ledgerCoversSlot(500, 500)).toBe(true);
-  });
-
-  test("a ledger written after the verification covers it", () => {
-    expect(ledgerCoversSlot(501, 500)).toBe(true);
-  });
-
-  test("a ledger last written within the mtime slack before the verification still covers it", () => {
-    expect(MTIME_SLACK_SECONDS).toBe(2);
-    expect(ledgerCoversSlot(499, 500)).toBe(true);
-    expect(ledgerCoversSlot(498, 500)).toBe(true);
-  });
-
-  test("a ledger last written more than the slack before the verification does not cover it", () => {
-    expect(ledgerCoversSlot(497, 500)).toBe(false);
-  });
-
-  test("a missing ledger, treated as mtime 0, does not cover a real verification", () => {
-    expect(ledgerCoversSlot(0, 1_786_000_000)).toBe(false);
   });
 });
 

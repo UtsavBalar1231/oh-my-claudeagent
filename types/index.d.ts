@@ -15,6 +15,7 @@ declare module "claude-code" {
           costUsd: number | null;
           status: "running" | "idle" | "waiting" | "pending" | "answer" | "aborted" | "refusal" | "error" | "gone";
           teammate: boolean;
+          evidenceLogged: boolean;
         };
       };
       lanes: {
@@ -27,12 +28,11 @@ declare module "claude-code" {
         };
       };
       nextActions: readonly {
-        kind: "log-evidence" | "task-list";
+        kind: "task-list";
         label: string;
         prompt: string;
       }[];
       band: {
-        verification: { command: string; at: number; isLogged: boolean } | null;
         error: string | null;
         readAt: number;
       };

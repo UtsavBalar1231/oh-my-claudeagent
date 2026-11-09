@@ -3,6 +3,7 @@ import { FORK, lookOf } from "../src/core/agent-type.ts";
 import { firstLine, lastLine, toolDetail } from "../src/core/mission.ts";
 import { estimateCostUsd } from "../src/core/pricing.ts";
 import { fitEnd, glyphs, oneLine } from "../src/core/ui-kit.ts";
+import { EVIDENCE_LOG_TOOL } from "../src/core/verification.ts";
 import { redact } from "../src/core/visual.ts";
 import type { Features } from "./dispatch.ts";
 import { type Host, sessionOf, type State, update } from "./host.ts";
@@ -181,6 +182,7 @@ export const agentsTracker: Features = {
           costUsd: 0,
           status: "running",
           teammate: e.isTeammate === true,
+          evidenceLogged: false,
         },
       }));
       const prompt = await masked(host, e.prompt, PROMPT_CELLS);
@@ -218,12 +220,14 @@ export const agentsTracker: Features = {
       const [now, root] = await Promise.all([host.clock.now(), host.session.root()]);
       const began = startedAt.get(e.tool_use_id)?.at;
       startedAt.delete(e.tool_use_id);
+      const ok = result.deny === undefined && result.isError !== true;
       record(agentId, {
         tool: e.tool,
         summary: await masked(host, toolDetail(e.tool, e, root), LINE_CELLS),
-        ok: result.deny === undefined && result.isError !== true,
+        ok,
         durationMs: began === undefined ? null : now - began,
       });
+      if (ok && e.tool === EVIDENCE_LOG_TOOL) await edit(host, agentId, (row) => ({ ...row, evidenceLogged: true }));
       return undefined;
     },
   },

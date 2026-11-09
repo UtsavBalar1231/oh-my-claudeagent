@@ -7,13 +7,14 @@
 //
 // The sessions run in bypassPermissions: under auto mode the classifier would send its own
 // requests to the mock and consume scripted turns. The mod's tool.check guard runs in both
-// modes. Events that need a slash command or task tools (UserPromptExpansion, SessionStart on
-// clear or compact, TaskCompleted) are not driven here.
+// modes. Events that need a slash command (UserPromptExpansion, SessionStart on clear or
+// compact) are not driven here; TaskCompleted runs with the task tools switched on.
 //
 // Usage: bun scripts/qa/hook-live-probe.ts
 // Exit: 0 pass, 1 a check failed, 2 the run could not be set up.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { EVIDENCE_LOG_TOOL } from "../../src/core/verification.ts";
 import type { Run } from "../validate/core.ts";
 import {
   type AccessEntry,
@@ -46,11 +47,23 @@ type Family = {
   name: string;
   script: (project: string) => Script;
   seed?: (project: string) => void;
+  env?: Record<string, string>;
   plugin: (checks: Checks, o: Observed, label: string) => void;
   control: (checks: Checks, o: Observed, label: string) => void;
 };
 
 const bash = (command: string): Turn => call("Bash", { command, description: "probe command" });
+
+
+/** Each delegation's `evidence_logged`, in the order the delegations started. */
+function delegationEvidence(project: string): unknown[] {
+  const dir = join(project, ".omca", "metrics");
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
+    .flatMap((session) => readdirSync(join(dir, session)).map((file) => JSON.parse(readFileSync(join(dir, session, file), "utf8"))))
+    .toSorted((a, b) => String(a.started_at).localeCompare(String(b.started_at)))
+    .map((record) => record.evidence_logged);
+}
 
 const sessionStatus = (project: string): string => {
   const dir = join(project, ".omca", "state", "session");
@@ -129,6 +142,51 @@ const FAMILIES: Family[] = [
       noPluginTrace(checks, o, label);
     },
   },
+  {
+    // The completing agent answers for its own runs: a subagent's unlogged build must not hold
+    // the main conversation's task, and a subagent's evidence must not cover the main one's run.
+    name: "TaskCompleted attribution",
+    script: () => ({
+      main: [
+        call("TaskCreate", { subject: "first", description: "probe one" }),
+        call("TaskCreate", { subject: "second", description: "probe two" }),
+        call("Agent", { description: "probe-alpha", prompt: "probe-alpha", subagent_type: "general-purpose" }),
+        say("launched alpha"),
+        call("TaskUpdate", { taskId: "1", status: "completed" }),
+        bash("bun run build"),
+        call("Agent", { description: "probe-beta", prompt: "probe-beta", subagent_type: "general-purpose" }),
+        say("launched beta"),
+        call("TaskUpdate", { taskId: "2", status: "completed" }),
+        call(EVIDENCE_LOG_TOOL, { evidence_type: "build", command: "bun run build", exit_code: 0, output_snippet: "ok" }),
+        call("TaskUpdate", { taskId: "2", status: "completed" }),
+        say("done"),
+      ],
+      subagent: [],
+      agents: {
+        "probe-alpha": [bash("bun run build"), say("alpha done")],
+        "probe-beta": [call(EVIDENCE_LOG_TOOL, { evidence_type: "build", command: "bun run build", exit_code: 0, output_snippet: "ok" }), say("beta done")],
+      },
+    }),
+    seed: (project) => seedFile(project, "package.json", '{"scripts":{"build":"echo ok"}}\n'),
+    env: { CLAUDE_CODE_ENABLE_TODO_TOOLS: "1" },
+    plugin(checks, o, label) {
+      const outputs = o.trace.filter((e) => e.event === "TaskCompleted").map((e) => e.output);
+      checks.check(
+        JSON.stringify(outputs) === JSON.stringify(["empty", "block", "empty"]),
+        `${label}: a subagent's run held nothing, a subagent's evidence covered nothing, and the main conversation's own evidence released its task`,
+        `${label}: TaskCompleted answered ${JSON.stringify(outputs)}, expected ["empty","block","empty"]`,
+      );
+      const logged = delegationEvidence(o.project);
+      checks.check(
+        JSON.stringify(logged) === JSON.stringify([false, true]),
+        `${label}: only the delegation that called evidence_log is recorded as having logged evidence`,
+        `${label}: delegation records say evidence_logged ${JSON.stringify(logged)} in start order, expected [false,true]`,
+      );
+    },
+    control(checks, o, label) {
+      noPluginTrace(checks, o, label);
+    },
+  },
 ];
 
 async function observe({ scratch, checks }: Qa, family: Family, pluginDir: string | undefined, label: string): Promise<Observed> {
@@ -148,6 +206,7 @@ async function observe({ scratch, checks }: Qa, family: Family, pluginDir: strin
       configDir: scratch.dir("config"),
       debugFile: join(logDir, "debug.log"),
       hookTrace: true,
+      ...(family.env !== undefined && { env: family.env }),
     });
   } finally {
     await mock.stop();

@@ -1,4 +1,4 @@
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · /…/omca-visual-80x40-XXXXXX/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
 
 
 ❯ Fix the parser with the executor
@@ -12,7 +12,7 @@
 
 ✻ Waiting for executor, explorer, architect · NN.Nk in NN out · $X.XX
 
- executor  Fix the heading parser                      1s · 2 calls · 9.8k tok
+ executor  Fix the heading parser                      1s · 2 calls · 8.9k tok
   ⎿  Fenced lines are skipped now, and the heading tests pass.
 
 ● ok

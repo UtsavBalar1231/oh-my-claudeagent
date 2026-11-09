@@ -1,9 +1,10 @@
 
- ▐▛███▛█   Claude Code v2.1.316
+ ▐▛███▛█   Claude Code v2.1.319
 ▝▜██████▀  Sonnet 5.5 with high effort · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · /…/omca-visual-80x40-XXXXXX/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
 
 
+› From main
 ❯ Find every caller of the shared router and say which ones bypass the harness.
 
   Searched for 2 patterns, listed 1 directory
@@ -14,8 +15,7 @@
 
 
 
-
-● Flowing… (3s · ↑ N.Nk tokens)
+● Working… (Ns · ↑ N.Nk tokens)
   ⎿  Tip: Start with small features or bug fixes, tell Claude to propose a plan,
      and verify its suggested edits
 ╭────────────────────────────────────────────────────────────────────────────✕─╮

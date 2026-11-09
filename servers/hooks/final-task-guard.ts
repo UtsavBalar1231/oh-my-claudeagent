@@ -1,5 +1,6 @@
 import { namesTask, readLedger } from "../../src/core/evidence.ts";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
+import { internalFinalReason, noVerdictReason, stayFinalReason } from "../../src/core/refusals.ts";
 import { field, inputText, isRecord } from "../../src/core/tool-input.ts";
 import { INVALID_LEDGER_REASON } from "../../src/core/verification.ts";
 import { readOrNull } from "../io.ts";
@@ -21,8 +22,8 @@ export const handle: Handler = (payload, { root }) => {
   const list = readTaskList(root, payload.session_id);
   const task = list.tasks.find(({ id }) => id === taskId);
   if (task?.isFinal !== true) return;
-  if (unmarks) return preToolUseDeny(`Task #${taskId} is the final task of run '${task.run}', and it stays final.`);
-  if (hides) return preToolUseDeny(`Task #${taskId} is the final task of run '${task.run}', and it stays final: an internal task drops out of the run.`);
+  if (unmarks) return preToolUseDeny(stayFinalReason(taskId, task.run));
+  if (hides) return preToolUseDeny(internalFinalReason(taskId, task.run));
   let text: string | null;
   try {
     text = readOrNull(ledgerPath(root));
@@ -33,7 +34,5 @@ export const handle: Handler = (payload, { root }) => {
   const ledger = readLedger(text ?? "{}");
   if (ledger.kind === "refused") return preToolUseDeny(INVALID_LEDGER_REASON);
   if (ledger.entries.some((entry) => namesTask(entry, { list: list.id, run: task.run, id: taskId }))) return;
-  return preToolUseDeny(
-    `Task #${taskId} is the final task of run '${task.run}', and no final verification names it. Record the verdict first: evidence_log(evidence_type="final_verification", command="<what the review covered>", exit_code=<0 for COMPLETE, 1 for INCOMPLETE>, output_snippet="<verdict, and why the run stops here>", task_id="${taskId}").`,
-  );
+  return preToolUseDeny(noVerdictReason(taskId, task.run));
 };

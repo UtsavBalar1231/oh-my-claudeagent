@@ -4,7 +4,6 @@ import { displayWidth, fitEnd, type Glyphs, glyphs, type GlyphTier, oneLine, sha
 import { type Piece, piecesWidth } from "./visual.ts";
 
 export type Band = {
-  verification: { command: string; at: number; isLogged: boolean } | null;
   error: string | null;
   readAt: number;
 };
@@ -14,11 +13,6 @@ export type Span = { text: string; tone: Tone };
 export type BandButton = { key: NextActionKind; hotkey: string; label: string; prompt: string };
 export type BandView = { status: readonly Span[]; run: readonly Piece[]; buttons: readonly BandButton[] };
 
-const FULL = { logged: " evidence logged", unlogged: " evidence not logged" };
-const COMPACT = { logged: " logged", unlogged: " not logged" };
-
-// Below this many cells a command stops reading as a name, so the shorter wording takes the room.
-const MIN_COMMAND = 14;
 export const BUTTON_GAP = 3;
 // The engine draws the band's collapse mark, `[-]`, over the last three columns of its first row,
 // so the status row and the run line, either of which can be first, stop one column short of it.
@@ -42,26 +36,13 @@ function clip(spans: readonly Span[], width: number, g: Glyphs): Span[] {
   return out.filter((span) => span.text !== "");
 }
 
-// The subject takes what the spans around it leave.
-function fitted(lead: Span, subject: string, tail: Span | undefined, width: number, g: Glyphs): Span[] {
-  const room = width - displayWidth(lead.text) - displayWidth(tail?.text ?? "");
-  const fit: Span = { text: fitEnd(subject, Math.max(0, room), g.ellipsis), tone: "plain" };
-  return clip([lead, fit, ...(tail === undefined ? [] : [tail])], width, g);
-}
-
-function verificationRow({ command, isLogged }: NonNullable<Band["verification"]>, width: number, g: Glyphs): Span[] {
-  const lead: Span = { text: `${isLogged ? g.check : g.warn} `, tone: isLogged ? "ok" : "warn" };
-  const subject = oneLine(command);
-  const wordsOf = ({ logged, unlogged }: typeof FULL) => (isLogged ? logged : unlogged);
-  const need = displayWidth(lead.text) + Math.min(MIN_COMMAND, displayWidth(subject)) + displayWidth(wordsOf(FULL));
-  const words = wordsOf(need <= width ? FULL : COMPACT);
-  return fitted(lead, subject, { text: words, tone: isLogged ? "muted" : "plain" }, width, g);
-}
-
+// The error takes what the glyph leaves.
 function statusRow(band: Band, width: number, tier: GlyphTier): Span[] {
+  if (band.error === null) return [];
   const g = glyphs(tier);
-  if (band.error !== null) return fitted({ text: `${g.cross} `, tone: "fail" }, oneLine(band.error), undefined, width, g);
-  return band.verification === null ? [] : verificationRow(band.verification, width, g);
+  const lead: Span = { text: `${g.cross} `, tone: "fail" };
+  const fit: Span = { text: fitEnd(oneLine(band.error), Math.max(0, width - displayWidth(lead.text)), g.ellipsis), tone: "plain" };
+  return clip([lead, fit], width, g);
 }
 
 function buttonRow(actions: readonly NextAction[], width: number, g: Glyphs): BandButton[] {
@@ -80,7 +61,7 @@ function buttonRow(actions: readonly NextAction[], width: number, g: Glyphs): Ba
 
 /** Nothing to draw (undefined) until the first snapshot, and while no section has content. `run` is an open run. */
 export function bandView(band: Band | undefined, actions: readonly NextAction[], columns: number, tier: GlyphTier, run: RunSummary | undefined): BandView | undefined {
-  if (band === undefined || (band.verification === null && band.error === null && actions.length === 0 && run === undefined)) return undefined;
+  if (band === undefined || (band.error === null && actions.length === 0 && run === undefined)) return undefined;
   const room = Math.max(0, columns - MARK_CELLS);
   return {
     status: statusRow(band, room, tier),

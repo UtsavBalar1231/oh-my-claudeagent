@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-11-09
+
+### Added
+
+- **Blocker rows:** in the normal view, a refusal OMCA issues draws as OMCA's own two-line row in
+  place of Claude Code's error text, which names every plugin with a check hook. The rows cover
+  the destructive-command guard (`OMCA guard refused · <title>` and what to do instead), your
+  Refuse in the guard dialog, the final-task guard, an unreadable evidence ledger and the comment
+  check's deny for a Write or Edit. In a folded group, a group of only refused commands draws each
+  command with its rows, and a `TaskUpdate` whose completion OMCA held gets a `completion held`
+  row, where Claude Code draws nothing. `ctrl+o`, a client that does not report its view and a
+  remote surface keep Claude Code's text, and `OMCA_DISABLED_HOOKS=blocker-rows` turns the rows off.
+  The Stop-hook holds and the comment gate's advice have no row.
+
+### Changed
+
+- **Claude Code 2.1.319:** OMCA is tested with Claude Code 2.1.319, and the engine types come from
+  it. The floor stays 2.1.300. The mod declines the new `$.theme` backdrop and the `effort` on
+  `$.model.fork`, which it has no use for.
+- **Subagent status line:** Claude Code 2.1.319 substitutes `${CLAUDE_PLUGIN_ROOT}` in a plugin's
+  `subagentStatusLine` command. Setup keeps writing the user setting while the floor is below
+  2.1.319.
+- **Reviewer, analyzer and build-fixer skills:** they run in the background. Their result arrives in
+  a task notification a few seconds after the launch acknowledgement, and a subagent that invokes
+  one is held open until it lands. `/rewind` does not undo the build-fixer's edits.
+- **Agents:** no agent sets `background: true`. A probe on 2.1.319 against the mock model found an
+  agent spawned from the main session already runs in the background in `claude -p` and in an
+  interactive session with fork mode on or off, with its result delivered in a task notification.
+  The probe measures delivery, not model behavior.
+- **The band:** it no longer shows the last verification with `evidence logged` or `evidence not
+  logged`, and the Log evidence button is gone. It keeps the run line, the Task list button and a
+  status file error. The turn line's note and the failed-verification toast still report it.
+
+### Fixed
+
+- **The guard dialog's Refuse:** Claude now reads that you refused the command, and asks how to
+  proceed, where it read a reason that ended with how to turn the guard off. Text you type under
+  Other reaches it as your own words.
+- A task completion is held only for the completing agent's own verification. A background
+  subagent's unlogged test run no longer blocks the main conversation's `TaskUpdate`, which used
+  to leave it logging evidence for a result it never saw.
+- A verification counts as logged only when the agent that ran it calls `evidence_log`
+  successfully. A ledger write by anything else, a subagent's evidence included, used to cover the
+  main conversation's unlogged run.
+- A verification that exits non-zero is recorded. Failed runs arrive on `PostToolUseFailure`,
+  which the recorder never read, so the gate, the band and the turn line saw only passing runs.
+- The Stats page credits evidence to the delegation that logged it. Two delegations running at
+  once used to share any evidence entry timestamped inside both windows.
+
 ## [4.0.0] - 2026-11-09
 
 **Upgrading from 3.5.x:** finish or abandon an open run before you update, or run `plan` again on
@@ -3350,6 +3399,7 @@ for multi-agent orchestration.
 - Shellcheck fixes applied across all hook scripts
 - Ruff fixes applied to Python MCP servers
 
+[4.1.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.5.1...v4.0.0
 [3.5.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.5.0...v3.5.1
 [3.5.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.4.0...v3.5.0

@@ -1,6 +1,6 @@
 import type { On } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
-import { LEDGER, ROOT, run, SESSION, type World, world, write } from "./world.ts";
+import { ROOT, run, SESSION, type World, world, write } from "./world.ts";
 
 const STATUS = `${ROOT}/.omca/state/session/${SESSION}.json`;
 
@@ -66,8 +66,8 @@ test("a nonzero verification toasts once, and one from before the session toasts
   expect(w.toasts).toHaveLength(1);
 });
 
-test("a subagent's turn reads no file while the ledger and status file keep their stamps, and still toasts a failed verification", async ($, on) => {
-  const w = setup(on, { [STATUS]: status(1000, 0), [LEDGER]: JSON.stringify({ entries: [] }) });
+test("a subagent's turn reads no file while the status file keeps its stamp, and still toasts a failed verification", async ($, on) => {
+  const w = setup(on, { [STATUS]: status(1000, 0) });
   await start($);
   await mainTurn($);
   w.contentReads.length = 0;

@@ -105,6 +105,20 @@ export type GitOperation =
   | "push --force"
   | "commit --no-verify";
 export type GitFinding = { operation: GitOperation; remote?: string; branch?: string };
+
+export const gitTitle = (operation: GitOperation): string => `git ${operation}`;
+export const RM_CATASTROPHIC_TITLE = "rm -rf on a protected path";
+export const RM_TITLE = "recursive removal";
+export const FORCE_PUSH_TITLE = "force push to the default branch";
+
+/** What each automatic deny reason is called and what it advises, for a surface that shows a refusal without the reason's full text. */
+export const GUARD_REASONS: readonly { reason: string; title: string; remedy: string }[] = [
+  { reason: RM_CATASTROPHIC_REASON, title: RM_CATASTROPHIC_TITLE, remedy: "name a deeper path explicitly" },
+  { reason: GIT_REASON, title: "destructive git command", remedy: "if the working tree is dirty, report and stop" },
+  { reason: FORCE_PUSH_REASON, title: FORCE_PUSH_TITLE, remedy: "push to another branch, or ask the user to push" },
+  { reason: NO_VERIFY_REASON, title: gitTitle("commit --no-verify"), remedy: "fix what the hook reports and commit without the flag" },
+];
+export const REVIEW_REFUSED_REMEDY = "ask the user how to proceed";
 /**
  * `blocking` holds a git operation that discards work in the tree or the index, a force push to
  * the default branch or a commit that skips its hooks, denied where no dialog can show it;
@@ -654,6 +668,9 @@ export function classify(command: string, ctx: Context = BASH): Finding | undefi
   };
 }
 
+const firstBlockingOperation = (finding: Reviewable): GitOperation | undefined =>
+  finding.git.find((git) => git.operation !== "push --force")?.operation;
+
 /**
  * The deny reason for each kind; an advisory match is denied only by a refusal. A blocking match
  * is named by its first finding that is not a force push, since a force push is blocking only to
@@ -664,11 +681,28 @@ export function reasonFor(finding: Finding): string {
     case "catastrophic":
       return RM_CATASTROPHIC_REASON;
     case "blocking": {
-      const operation = finding.git.find((git) => git.operation !== "push --force")?.operation;
+      const operation = firstBlockingOperation(finding);
       if (operation === undefined) return FORCE_PUSH_REASON;
       return operation === "commit --no-verify" ? NO_VERIFY_REASON : GIT_REASON;
     }
     case "advisory":
       return REVIEW_REFUSED_REASON;
+  }
+}
+
+/** The short name of what a finding matched, following the choice `reasonFor` makes; an advisory match is named by its first git operation. */
+export function titleFor(finding: Finding): string {
+  switch (finding.kind) {
+    case "catastrophic":
+      return RM_CATASTROPHIC_TITLE;
+    case "blocking": {
+      const operation = firstBlockingOperation(finding);
+      return operation === undefined ? FORCE_PUSH_TITLE : gitTitle(operation);
+    }
+    case "advisory": {
+      const first = finding.git[0];
+      if (first === undefined) return RM_TITLE;
+      return first.operation === "push --force" && first.branch !== undefined ? `force push to ${first.branch}` : gitTitle(first.operation);
+    }
   }
 }

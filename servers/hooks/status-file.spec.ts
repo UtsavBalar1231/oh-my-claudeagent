@@ -73,7 +73,7 @@ describe("hook stamp", () => {
     });
   });
 
-  test("evidence_logged turns true on the next stamp once the ledger postdates the verification", async () => {
+  test("a ledger written after the verification leaves evidence_logged false on the next stamp", async () => {
     const root = project();
     const sessionId = crypto.randomUUID();
     await dispatch({ event: "PostToolUse", session_id: sessionId, tool_name: "Bash", tool_input: { command: "just test" } }, root, NOW);
@@ -81,7 +81,16 @@ describe("hook stamp", () => {
     writeFileSync(ledgerPath(root), '{"entries":[]}');
     utimesSync(ledgerPath(root), NOW_S + 3, NOW_S + 3);
     await stop(root, sessionId, NOW + STAMP_INTERVAL_MS);
-    expect(status(root, sessionId).verification).toEqual({ command: "just test", at: NOW_S, exit_code: null, evidence_logged: true });
+    expect(status(root, sessionId).verification).toEqual({ command: "just test", at: NOW_S, exit_code: null, evidence_logged: false });
+  });
+
+  test("a subagent's verification never reaches the status file", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    const bash = { event: "PostToolUse", session_id: sessionId, agent_id: "a54ee4c474f89151b", tool_name: "Bash", tool_input: { command: "bun run build" } };
+    await dispatch(bash, root, NOW);
+    await stop(root, sessionId, NOW + STAMP_INTERVAL_MS);
+    expect(status(root, sessionId)).toEqual({ session_id: sessionId, last_hook_at: NOW_S + 5, verification: null });
   });
 
   test("a failed stamp is logged and the hook answer still stands", async () => {

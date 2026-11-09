@@ -491,7 +491,7 @@ export const SHOTS: readonly Still[] = [
       main: [{ content: [bash("just test", "Run the tests"), TASK_7] }, { content: [text("The tests pass, and the executor is on task 7.")] }],
       subagent: [{ content: [tool("Read", { file_path: "src/steps/summary.ts" })] }, { content: [WATCH_SUMMARY] }],
     },
-    ready: (screen) => screen.includes("evidence not logged") && screen.includes("just test · 42 passed"),
+    ready: (screen) => screen.includes("6/14") && screen.includes("just test · 42 passed"),
   },
   {
     name: "transcript",
@@ -766,9 +766,6 @@ function writeProject(project: string, home: string, shot: Shot): void {
   }));
   const ledger = join(project, ".omca", "evidence", "verification-evidence.json");
   writeFileSync(ledger, JSON.stringify({ entries }, null, 2));
-  // The band counts a ledger changed within seconds of a verification as its evidence.
-  const lastLogged = new Date(now - Math.min(...LEDGER.map(([age]) => age)));
-  utimesSync(ledger, lastLogged, lastLogged);
   for (const [age, files] of FILE_AGES) {
     const at = new Date(now - age);
     for (const file of files) utimesSync(join(project, file), at, at);

@@ -4,6 +4,7 @@ import {
   blankQuotedSpans,
   classifierNote,
   exitCodeOf,
+  failureExitCode,
   isVerificationCommand,
   keepsSlot,
   quotableCommand,
@@ -119,22 +120,39 @@ describe("blankQuotedSpans", () => {
 });
 
 describe("keepsSlot", () => {
-  test("keeps a slot no evidence followed", () => {
-    expect(keepsSlot({ command: "just test", at: 100, exit_code: null }, 97, 200)).toBe(true);
+  const slot = { command: "just test", at: 100, exit_code: null, evidence_logged: false };
+
+  test("keeps a slot its agent logged no evidence for", () => {
+    expect(keepsSlot(slot, 200)).toBe(true);
   });
 
-  test("replaces a slot evidence covered, including evidence in the same second", () => {
-    expect(keepsSlot({ command: "just test", at: 100, exit_code: null }, 100, 200)).toBe(false);
+  test("replaces a slot its agent logged evidence for", () => {
+    expect(keepsSlot({ ...slot, evidence_logged: true }, 200)).toBe(false);
   });
 
   test("has nothing to keep without a slot", () => {
-    expect(keepsSlot(undefined, 0, 200)).toBe(false);
+    expect(keepsSlot(undefined, 200)).toBe(false);
   });
 
   test("replaces an unsatisfied slot once the gate treats it as stale", () => {
-    const slot = { command: "just test", at: 100, exit_code: null };
-    expect(keepsSlot(slot, 97, 100 + MAX_SLOT_AGE_SECONDS)).toBe(true);
-    expect(keepsSlot(slot, 97, 101 + MAX_SLOT_AGE_SECONDS)).toBe(false);
+    expect(keepsSlot(slot, 100 + MAX_SLOT_AGE_SECONDS)).toBe(true);
+    expect(keepsSlot(slot, 101 + MAX_SLOT_AGE_SECONDS)).toBe(false);
+  });
+});
+
+describe("failureExitCode", () => {
+  test("reads the exit code from the first line of a failed shell call", () => {
+    expect(failureExitCode("Exit code 1\nbun test v1.4.2\nerror: 0 test files matching")).toBe(1);
+    expect(failureExitCode("Exit code 137")).toBe(137);
+  });
+
+  test("is null when the shell never started or the error is not text", () => {
+    expect([failureExitCode("spawn /bin/bash ENOENT"), failureExitCode("output\nExit code 1"), failureExitCode(undefined), failureExitCode({ error: "Exit code 1" })]).toEqual([
+      null,
+      null,
+      null,
+      null,
+    ]);
   });
 });
 
@@ -180,7 +198,7 @@ describe("unloggedReason", () => {
     const previous = process.env.TZ;
     process.env.TZ = "UTC";
     try {
-      expect(unloggedReason({ command: "just test", at: 1_786_000_000, exit_code: null })).toBe(
+      expect(unloggedReason({ command: "just test", at: 1_786_000_000, exit_code: null, evidence_logged: false })).toBe(
         "You ran `just test` at 07:06 but logged no evidence after it. Log the real result with evidence_log, " +
           'including a non-zero exit_code if it failed. Example: evidence_log(evidence_type="test", ' +
           'command="just test", exit_code=0, output_snippet="10 passed")',

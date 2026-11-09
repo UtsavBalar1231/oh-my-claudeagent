@@ -1,8 +1,11 @@
-import { isSlotRecent, ledgerCoversSlot } from "./evidence.ts";
+import { isSlotRecent } from "./evidence.ts";
 import { isRecord } from "./tool-input.ts";
 import { two } from "./ui-kit.ts";
 
-export type Verification = { command: string; at: number; exit_code: number | null };
+/** One agent's latest verification. `evidence_logged` turns true only on that agent's own successful evidence_log call. */
+export type Verification = { command: string; at: number; exit_code: number | null; evidence_logged: boolean };
+
+export const EVIDENCE_LOG_TOOL = "mcp__plugin_oh-my-claudeagent_omca__evidence_log";
 
 // A runner missing from this list records nothing and the gate stays silent, so a miss is a
 // false negative, never a false block; the list grows only when a real runner goes unrecorded.
@@ -43,17 +46,13 @@ export function quotableCommand(command: string): string {
 }
 
 /**
- * A recent unsatisfied slot, one with no evidence logged after it, outranks a newer
+ * A recent unsatisfied slot, one its agent has logged no evidence for, outranks a newer
  * verification: overwriting it would let a logged lint run shadow an earlier unlogged failing
  * test run. Once the gate stops enforcing it as stale, a newer verification replaces it, or
  * one forgotten log would switch the gate off for the rest of the session.
  */
-export function keepsSlot(previous: Verification | undefined, ledgerMtimeSeconds: number, nowSeconds: number): boolean {
-  return (
-    previous !== undefined &&
-    isSlotRecent(nowSeconds, previous.at) &&
-    !ledgerCoversSlot(ledgerMtimeSeconds, previous.at)
-  );
+export function keepsSlot(previous: Verification | undefined, nowSeconds: number): boolean {
+  return previous !== undefined && isSlotRecent(nowSeconds, previous.at) && !previous.evidence_logged;
 }
 
 /** Display only: the Bash tool_response shape is undocumented, so anything else is null. */
@@ -61,6 +60,15 @@ export function exitCodeOf(toolResponse: unknown): number | null {
   if (!isRecord(toolResponse)) return null;
   const code = toolResponse["exitCode"] ?? toolResponse["exit_code"];
   return typeof code === "number" ? code : null;
+}
+
+/**
+ * The exit code a failed Bash or PowerShell call reports on its first line, or null when the
+ * shell never started, in which case the command did not run.
+ */
+export function failureExitCode(error: unknown): number | null {
+  const code = typeof error === "string" ? /^Exit code (\d+)/.exec(error)?.[1] : undefined;
+  return code === undefined ? null : Number(code);
 }
 
 export function unloggedReason({ command, at }: Verification): string {

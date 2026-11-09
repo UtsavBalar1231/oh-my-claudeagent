@@ -1,8 +1,7 @@
-import { isEvidenceLogged, type MetricsRecord, outcomeOf, parseRecord, recordPath } from "../src/core/metrics.ts";
-import { LEDGER } from "../src/core/omca-paths.ts";
+import { type MetricsRecord, outcomeOf, parseRecord, recordPath } from "../src/core/metrics.ts";
 import { estimateCostUsd } from "../src/core/pricing.ts";
 import type { Features } from "./dispatch.ts";
-import { type Host, reason, type State } from "./host.ts";
+import { type Host, type State } from "./host.ts";
 
 type Row = State["agents"][string];
 
@@ -32,17 +31,6 @@ const running = (sessionId: string, agentId: string, row: Row): MetricsRecord =>
   outcome: "running",
   evidence_logged: null,
 });
-
-// null when the ledger exists but cannot be read: unknown, not "no evidence".
-async function evidenceLogged(host: Host, root: string, startMs: number, endMs: number): Promise<boolean | null> {
-  const path = `${root}/${LEDGER}`;
-  try {
-    return (await host.fs.exists(path)) && isEvidenceLogged(await host.fs.read(path), startMs, endMs);
-  } catch (error) {
-    host.log(`metrics: could not read ${LEDGER}: ${reason(error)}`);
-    return null;
-  }
-}
 
 async function agentRow(host: Host, agentId: string): Promise<Row | undefined> {
   const row = (await host.state.agents.get()).value?.[agentId];
@@ -82,7 +70,7 @@ export const metrics: Features = {
         // The lane prices each response on its own, which a model priced by prompt length needs.
         estimated_cost_usd: usage === undefined ? null : e.usage === undefined ? estimateCostUsd(usage.model, usage) : row.costUsd,
         outcome: outcomeOf(e),
-        evidence_logged: await evidenceLogged(host, at.root, row.startedAt, endedAt),
+        evidence_logged: row.evidenceLogged,
       });
       return undefined;
     },

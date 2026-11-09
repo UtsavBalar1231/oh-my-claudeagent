@@ -1,7 +1,7 @@
                                                                                                               │                                                                                       ✕
- ▐▛███▛█   Claude Code v2.1.316                                                                               │1: Agents  2: Evidence  3: Notepad
+ ▐▛███▛█   Claude Code v2.1.319                                                                               │1: Agents  2: Evidence  3: Notepad
 ▝▜██████▀  Opus 5.5 · API Usage Billing                                                                       │──────────────────────────────────────────────────────────────────────────────────────
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · /home/utsav/.cache/tmp/omca-visual-200x50-XXXXXX/cwd             │checkout-redesign · 10 entries · 1 masked
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd                       │checkout-redesign · 10 entries · 1 masked
                                                                                                               │f: Find  l: Notepads (3)
                                                                                                               │ Learnings · 3 entries  10-03 13:47
                                                                                                               │ Issues · 2 entries  10-02 22:18
