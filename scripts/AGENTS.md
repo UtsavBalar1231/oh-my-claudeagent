@@ -16,7 +16,7 @@ under `servers/hooks/`. Every file is TypeScript on bun.
   fails. `engine` packages a copy of the tree and runs `claude plugin validate --strict` on it,
   and skips without the claude CLI. `mcp` runs the omca server through the handshake fixtures, and
   `qa/install-verify.ts` reuses it on a packaged copy. The `tree` group fails a tracked python,
-  bash or sh script, by its shebang or by a `.py`, `.sh` or `.bash` name. The `formats` group reads every committed state fixture (registries, ledgers, plans, notepads) through the shared parsers; `EXPECTED_INVALID` in `validate/formats.ts` lists the fixtures that must keep failing. `workflow.spec.ts`
+  bash or sh script, by its shebang or by a `.py`, `.sh` or `.bash` name. The `formats` group reads every committed state fixture (ledgers and notepads) through the shared parsers. `workflow.spec.ts`
   parses `.github/workflows/` and checks both directions: CI runs every command of every `just ci`
   recipe, and every command CI runs belongs to one of those recipes or carries a reason to run in
   CI only.
@@ -65,13 +65,13 @@ under `servers/hooks/`. Every file is TypeScript on bun.
 - `docs/`: the capture pipeline. `screenshots.ts` runs real Claude Code sessions in tmux against
   the mock model and attaches kitty to each one on a private Xvfb display. With no name it writes
   the README shots to `.github/assets/`: a PNG still per scene (ImageMagick `import`, optimized
-  with `magick`) and a GIF for `pane-tour` and `guard-dialog` (`ffmpeg` x11grab, then palettegen
+  with `magick`) and a GIF for `guard-dialog` (`ffmpeg` x11grab, then palettegen
   and paletteuse). `clips` writes the video footage to `video/public/footage/`: per clip a BT.709
   MP4 at 30 fps, a `<clip>.json` manifest of the frames at which its states first appeared
   (`clip-manifest.ts`, which `video/src/footage.ts` mirrors) and a `<clip>.sheet.png` contact sheet
   of those frames. Each session gets a scratch HOME and config directory with the built-in `dark`
-  theme, except `clip-board-light`, which uses `light`, and `fixtures/acme-app` is the project it
-  opens. Pixels cannot be masked afterwards, so `privacy.ts` checks the pane's plain text before
+  theme, and `fixtures/acme-app` is the project it opens, with the run's tasks written into the
+  session's task list from the plan document the fixture holds. Pixels cannot be masked afterwards, so `privacy.ts` checks the pane's plain text before
   and after each still and throughout each recording, and refuses the capture when it shows the
   username, the home path, the hostname or the scratch directory's name. It needs Xvfb, kitty,
   tmux, xdotool, ImageMagick, ffmpeg and ffprobe, and a JetBrains Mono font that fontconfig

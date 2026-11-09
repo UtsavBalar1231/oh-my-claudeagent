@@ -1,3 +1,4 @@
+import "../../tests/fixtures/canonical-tmp.ts";
 import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";

@@ -535,6 +535,21 @@ test("a git operation with nothing to gather names its effect", async ($, on) =>
   ]);
 });
 
+test("an operation a command runs twice names its effect once", async ($, on) => {
+  const { asked } = world(on);
+
+  await check($, "git stash -q; bun test; git stash pop -q");
+
+  expect(asked.map((a) => a.question)).toEqual([
+    [
+      "OMCA held this command for your review:",
+      "  git stash -q; bun test; git stash pop -q",
+      "git stash moves uncommitted changes out of the working tree.",
+      "Run it?",
+    ].join("\n"),
+  ]);
+});
+
 const FILES = (count: number) => Array.from({ length: count }, (_, i) => String.fromCharCode(97 + i));
 const filesOf = (names: string[]) => Object.fromEntries(names.map((t) => [t, { kind: "file" as const }]));
 

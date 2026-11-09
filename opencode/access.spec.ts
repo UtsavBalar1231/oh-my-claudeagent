@@ -31,9 +31,9 @@ test("path resolution expands home paths without discarding their spelling", () 
 })
 
 test("uses location-relative read resources without creating missing state", async () => {
-  const path = join(root, ".omca", "state", "boulder.json")
+  const path = join(root, ".omca", "state", "tasks", "1.json")
   expect(await authorizePath(context(), "ses_one", "build", root, path, "read")).toBe(path)
-  expect(calls).toEqual([expect.objectContaining({ action: "read", resources: [".omca/state/boulder.json"] })])
+  expect(calls).toEqual([expect.objectContaining({ action: "read", resources: [".omca/state/tasks/1.json"] })])
 })
 
 test("external reads assert the directory boundary before the canonical file", async () => {

@@ -29,6 +29,7 @@ const UNICODE_SET = {
   waiting: "⊘",
   blocked: "⊗",
   agent: "◆",
+  final: "◆",
   mask: "‹masked›",
 } as const;
 
@@ -53,6 +54,7 @@ const NERD: Glyphs = {
   waiting: "\u{f056}",
   blocked: "\u{f05e}",
   agent: "\u{f007}",
+  final: "\u{f11e}",
 };
 
 const ASCII: Glyphs = {
@@ -74,6 +76,7 @@ const ASCII: Glyphs = {
   waiting: "/",
   blocked: "%",
   agent: "@",
+  final: "=",
   mask: "<masked>",
 };
 

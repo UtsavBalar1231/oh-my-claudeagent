@@ -1,10 +1,9 @@
 import type { Plugin } from "@opencode/plugin"
 import { afterEach, beforeEach, expect, spyOn, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { isAbsolute, join } from "node:path"
 import plugin from "./index.ts"
-import { PLAN_FILE_BYTE_LIMIT } from "./state.ts"
 
 type Rec = Record<string, unknown>
 type Hook = (event: Rec) => Promise<void>
@@ -148,7 +147,7 @@ function command(fake: ReturnType<typeof fakeContext>, name: string): Command {
 }
 
 async function fireContext(fake: ReturnType<typeof fakeContext>, agent: string) {
-  const event = { sessionID: "ses_one", agent, tools: { omca_session_search: {}, omca_omca_hook: {}, omca_health_check: {}, omca_agents_migrate: {}, omca_evidence_log: {} }, system: [] as Rec[] }
+  const event = { sessionID: "ses_one", agent, tools: { omca_session_search: {}, omca_omca_hook: {}, omca_health_check: {}, omca_agents_migrate: {}, omca_evidence_log: {}, omca_task_create: {}, omca_task_update: {}, omca_task_list: {}, omca_task_get: {}, todowrite: {} }, system: [] as Rec[] }
   await hook(fake, "session.context")(event)
   return event
 }
@@ -208,7 +207,7 @@ test("the context hook pushes the output style only for a primary agent and hide
   const primary = await fire("build")
   expect(primary.system).toHaveLength(1)
   expect(primary.system[0]).toMatchObject({ type: "text" })
-  expect(Object.keys(primary.tools)).toEqual(["omca_health_check", "omca_evidence_log"])
+  expect(Object.keys(primary.tools)).toEqual(["omca_health_check", "omca_evidence_log", "omca_task_list", "omca_task_get", "todowrite"])
   const sub = await fire("omca-explorer")
   expect(sub.system).toHaveLength(0)
   expect(sub.tools).not.toHaveProperty("omca_session_search")
@@ -315,29 +314,64 @@ test("planning command switches only to native Plan and preserves delivery", asy
   expect(String(fake.prompts[0]?.text)).toContain("review auth")
 })
 
-test("start-work refuses Plan mode before any write permission or binding", async () => {
+test("only the coordinator is offered the task writers, and it gets one list", async () => {
+  const fake = fakeContext()
+  await plugin.setup(fake.ctx)
+  const coordinator = await fireContext(fake, "omca")
+  expect(Object.keys(coordinator.tools)).toEqual(["omca_health_check", "omca_evidence_log", "omca_task_create", "omca_task_update", "omca_task_list", "omca_task_get"])
+  for (const agent of ["build", "plan", "omca-executor"]) {
+    const { tools } = await fireContext(fake, agent)
+    expect(tools).not.toHaveProperty("omca_task_create")
+    expect(tools).not.toHaveProperty("omca_task_update")
+    expect(tools).toHaveProperty("omca_task_list")
+  }
+})
+
+test("start-work refuses Plan mode before asking anything", async () => {
   const fake = fakeContext()
   fake.session("ses_one").agent = "plan"
   await plugin.setup(fake.ctx)
   await expect(command(fake, "omca-start-work").execute({ sessionID: "ses_one", prompt: { text: "work.md" }, delivery: "steer" })).rejects.toThrow("Switch to Build")
   expect(fake.permissions).toHaveLength(0)
+  expect(fake.prompts).toEqual([])
 })
 
-test("start-work binds an approved FINAL plan and pause keeps its file", async () => {
+test("start-work asks approval, switches to the coordinator and writes no state", async () => {
   const fake = fakeContext()
-  const path = join(fake.ctx.location.directory, "work.md")
-  writeFileSync(path, "# Work\n\nStatus: FINAL\n\n- [ ] 1. Implement and test\n")
   await plugin.setup(fake.ctx)
-  await command(fake, "omca-start-work").execute({ sessionID: "ses_one", prompt: { text: path }, delivery: "steer" })
-  expect(fake.permissions.some((input) => input.action === "omca.start")).toBe(true)
+  await command(fake, "omca-start-work").execute({ sessionID: "ses_one", prompt: { text: " plans/work.md " }, delivery: "steer" })
+  expect(fake.permissions).toEqual([{ sessionID: "ses_one", action: "omca.start", resources: ["plans/work.md"], save: [] }])
   expect(fake.session("ses_one").agent).toBe("omca")
-  expect(readFileSync(join(fake.ctx.location.directory, ".omca", ".gitignore"), "utf8")).toBe("*\n!/rules/\n!/rules/**\n")
-  const snapshot = fake.rpcHandlers.snapshot
-  expect(snapshot).toBeDefined()
-  expect(await snapshot?.({ sessionID: "ses_one" })).toMatchObject({ plan: { name: "work" } })
-  await command(fake, "omca-pause").execute({ sessionID: "ses_one" })
-  expect(fake.interruptions).toEqual(["ses_one"])
-  expect(await snapshot?.({ sessionID: "ses_one" })).toMatchObject({ plan: null })
+  expect(fake.prompts[0]).toMatchObject({ sessionID: "ses_one", delivery: "steer" })
+  expect(String(fake.prompts[0]?.text)).toStartWith("The user ran /omca-start-work and approved it.")
+  expect(String(fake.prompts[0]?.text)).toContain("Read omca_task_list first.")
+  expect(String(fake.prompts[0]?.text)).toEndWith("Plan document or instructions:\n plans/work.md ")
+  expect(existsSync(join(fake.ctx.location.directory, ".omca"))).toBe(false)
+})
+
+test("start-work with no argument approves the open run", async () => {
+  const fake = fakeContext()
+  await plugin.setup(fake.ctx)
+  await command(fake, "omca-start-work").execute({ sessionID: "ses_one", prompt: { text: "" }, delivery: "steer" })
+  expect(fake.permissions).toEqual([{ sessionID: "ses_one", action: "omca.start", resources: ["*"], save: [] }])
+})
+
+test("a denied start leaves the session where it was", async () => {
+  const fake = fakeContext()
+  await plugin.setup(fake.ctx)
+  fake.deny(() => { throw new Error("native denial") })
+  await expect(command(fake, "omca-start-work").execute({ sessionID: "ses_one", prompt: { text: "work.md" }, delivery: "steer" })).rejects.toThrow("native denial")
+  expect(fake.session("ses_one").agent).toBe("build")
+  expect(fake.prompts).toEqual([])
+})
+
+test("the panel reads the checkout's run for any session in it", async () => {
+  const fake = fakeContext()
+  const dir = join(fake.ctx.location.directory, ".omca", "state", "tasks")
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, "1.json"), JSON.stringify({ id: "1", subject: "Work", status: "pending", metadata: { run: "work" } }))
+  await plugin.setup(fake.ctx)
+  expect(await fake.rpcHandlers.snapshot?.({ sessionID: "ses_two" })).toMatchObject({ run: { name: "work", tasks: [{ id: "1", subject: "Work" }] } })
 })
 
 test("RPC refuses a session in a different checkout", async () => {
@@ -351,115 +385,14 @@ test("RPC refuses a session in a different checkout", async () => {
 
 test("RPC authorizes every standard notepad section even when files are absent", async () => {
   const fake = fakeContext()
-  const path = join(fake.ctx.location.directory, "work.md")
-  writeFileSync(path, "Status: FINAL\n\n- [ ] 1. Work\n")
+  const dir = join(fake.ctx.location.directory, ".omca", "state", "tasks")
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, "1.json"), JSON.stringify({ id: "1", subject: "Work", status: "pending", metadata: { run: "work" } }))
   await plugin.setup(fake.ctx)
-  await command(fake, "omca-start-work").execute({ sessionID: "ses_one", prompt: { text: path }, delivery: "steer" })
   fake.deny((input) => {
     if (input.action === "read" && (input.resources as string[]).includes(".omca/notepads/work/decisions.md")) throw new Error("section denied")
   })
   await expect(fake.rpcHandlers.snapshot?.({ sessionID: "ses_one" })).rejects.toThrow("section denied")
-})
-
-test("workflow commands honor registry read and lock-owner edit denials", async () => {
-  for (const [action, resource] of [["read", ".omca/state/boulder.json"], ["edit", ".omca/state/boulder.json.lock.d/owner"]]) {
-    const fake = fakeContext()
-    const path = join(fake.ctx.location.directory, "work.md")
-    writeFileSync(path, "Status: FINAL\n\n- [ ] 1. Work\n")
-    await plugin.setup(fake.ctx)
-    fake.deny((input) => {
-      if (input.action === action && (input.resources as string[]).includes(resource!)) throw new Error("native denial")
-    })
-    await expect(command(fake, "omca-start-work").execute({ sessionID: "ses_one", prompt: { text: path }, delivery: "steer" })).rejects.toThrow("native denial")
-    expect(existsSync(join(fake.ctx.location.directory, ".omca"))).toBe(false)
-  }
-})
-
-test("start-work refuses a plan edited while approval is pending", async () => {
-  const fake = fakeContext()
-  const path = join(fake.ctx.location.directory, "work.md")
-  writeFileSync(path, "Status: FINAL\n\n- [ ] 1. Original\n")
-  await plugin.setup(fake.ctx)
-  fake.deny((input) => {
-    if (input.action === "omca.start") writeFileSync(path, "Status: FINAL\n\n- [ ] 1. Different scope\n")
-  })
-  await expect(command(fake, "omca-start-work").execute({ sessionID: "ses_one", prompt: { text: path }, delivery: "steer" })).rejects.toThrow("Plan changed")
-  expect(existsSync(join(fake.ctx.location.directory, ".omca"))).toBe(false)
-})
-
-test("start-work refuses an oversized plan before requesting execution approval", async () => {
-  const fake = fakeContext()
-  const path = join(fake.ctx.location.directory, "work.md")
-  writeFileSync(path, Buffer.alloc(PLAN_FILE_BYTE_LIMIT + 1, "x"))
-  await plugin.setup(fake.ctx)
-  await expect(command(fake, "omca-start-work").execute({ sessionID: "ses_one", prompt: { text: path }, delivery: "steer" })).rejects.toThrow("native read limit")
-  expect(fake.permissions.some((input) => input.action === "omca.start")).toBe(false)
-  expect(existsSync(join(fake.ctx.location.directory, ".omca"))).toBe(false)
-})
-
-test.skipIf(process.platform === "win32")("start-work refuses identical-content plan retargeting during approval", async () => {
-  const fake = fakeContext()
-  const path = join(fake.ctx.location.directory, "approved.md")
-  const denied = join(fake.ctx.location.directory, "denied.md")
-  const content = "Status: FINAL\n\n- [ ] 1. Approved\n"
-  writeFileSync(path, content)
-  writeFileSync(denied, content)
-  await plugin.setup(fake.ctx)
-  fake.deny((input) => {
-    if (input.action === "read" && (input.resources as string[]).includes("denied.md")) throw new Error("unapproved plan")
-    if (input.action === "omca.start") { rmSync(path); symlinkSync(denied, path) }
-  })
-  await expect(command(fake, "omca-start-work").execute({ sessionID: "ses_one", prompt: { text: path }, delivery: "steer" })).rejects.toThrow("Path changed")
-  expect(existsSync(join(fake.ctx.location.directory, ".omca"))).toBe(false)
-  expect(fake.prompts).toEqual([])
-})
-
-test.each(["read", "edit"])("denying state gitignore %s prevents a first binding", async (action) => {
-  const fake = fakeContext()
-  const path = join(fake.ctx.location.directory, "work.md")
-  writeFileSync(path, "Status: FINAL\n\n- [ ] 1. Work\n")
-  await plugin.setup(fake.ctx)
-  fake.deny((input) => {
-    if (input.action === action && (input.resources as string[]).includes(".omca/.gitignore")) throw new Error("ignore denied")
-  })
-  await expect(command(fake, "omca-start-work").execute({ sessionID: "ses_one", prompt: { text: path }, delivery: "steer" })).rejects.toThrow("ignore denied")
-  expect(existsSync(join(fake.ctx.location.directory, ".omca"))).toBe(false)
-})
-
-test.each(["pause", "reload"])("%s supersedes an in-flight start without admitting execution", async (action) => {
-  const fake = fakeContext()
-  const path = join(fake.ctx.location.directory, "work.md")
-  writeFileSync(path, "Status: FINAL\n\n- [ ] 1. Work\n")
-  const cleanup = await plugin.setup(fake.ctx)
-  let entered!: () => void
-  let release!: () => void
-  const enteredSwitch = new Promise<void>((resolve) => { entered = resolve })
-  const releaseSwitch = new Promise<void>((resolve) => { release = resolve })
-  const spy = spyOn(fake.ctx.session, "switchAgent").mockImplementation(async () => {
-    entered()
-    await releaseSwitch
-    fake.session("ses_one").agent = "omca"
-  })
-  try {
-    const start = command(fake, "omca-start-work").execute({ sessionID: "ses_one", prompt: { text: path }, delivery: "steer" })
-    const verdict = start.then(() => null, (error: unknown) => error)
-    await enteredSwitch
-    expect(JSON.parse(readFileSync(join(fake.ctx.location.directory, ".omca", "state", "boulder.json"), "utf8")).bindings).toHaveProperty("opencode:ses_one")
-    if (action === "pause") await command(fake, "omca-pause").execute({ sessionID: "ses_one" })
-    else {
-      if (!cleanup) throw new Error("Plugin did not register cleanup")
-      await cleanup()
-    }
-    release()
-    expect(String(await verdict)).toContain("superseded or paused")
-    expect(fake.prompts).toEqual([])
-    const bindings = JSON.parse(readFileSync(join(fake.ctx.location.directory, ".omca", "state", "boulder.json"), "utf8")).bindings
-    if (action === "pause") expect(bindings).not.toHaveProperty("opencode:ses_one")
-    else expect(bindings).toHaveProperty("opencode:ses_one")
-  } finally {
-    release()
-    spy.mockRestore()
-  }
 })
 
 test("native edits invalidate their session and its parent without requiring an open panel", async () => {

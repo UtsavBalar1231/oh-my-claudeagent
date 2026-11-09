@@ -15,7 +15,6 @@ declare module "claude-code" {
           costUsd: number | null;
           status: "running" | "idle" | "waiting" | "pending" | "answer" | "aborted" | "refusal" | "error" | "gone";
           teammate: boolean;
-          task?: number;
         };
       };
       lanes: {
@@ -28,41 +27,66 @@ declare module "claude-code" {
         };
       };
       nextActions: readonly {
-        kind: "log-evidence" | "start-work" | "final-verification" | "review";
+        kind: "log-evidence" | "task-list";
         label: string;
         prompt: string;
       }[];
       band: {
-        plan: {
-          name: string;
-          path: string;
-          done: number;
-          blocked: number;
-          total: number;
-          next: { n: number; title: string } | null;
-        } | null;
         verification: { command: string; at: number; isLogged: boolean } | null;
-        proof?: { proven: number; unproven: number; failed: number };
         error: string | null;
         readAt: number;
       };
       pane: {
-        tab: "agents" | "plan" | "evidence" | "notepad" | "stats" | "doctor";
+        tab: "agents" | "evidence" | "notepad" | "stats" | "doctor";
         notepad: {
           planName: string;
-          bound: string | null;
           plans: readonly string[];
           sections: readonly {
             name: "learnings" | "issues" | "decisions" | "problems";
             text: string;
           }[];
         } | null;
-        plans: {
-          dirs: readonly string[];
-          files: readonly { name: string; path: string; mtimeMs: number }[];
-        } | null;
-        errors: { notepad: string | null; plans: string | null };
+        errors: { notepad: string | null };
         readAt: number;
+      };
+      tasks: {
+        tasks: readonly {
+          id: string;
+          subject: string;
+          description: string;
+          activeForm: string;
+          status: "pending" | "in_progress" | "completed";
+          owner: string;
+          blocks: readonly string[];
+          blockedBy: readonly string[];
+          run: string;
+          isFinal: boolean;
+          blockedReason: string;
+          details: readonly { name: string; text: string }[];
+        }[];
+        hasTools: boolean;
+        isCleared: boolean;
+        error: string | null;
+        list: string;
+      };
+      placedRows: {
+        readonly [id: string]: {
+          summary: {
+            name: string;
+            done: number;
+            total: number;
+            running: readonly string[];
+            blocked: readonly string[];
+            isOpen: boolean;
+          };
+          changes: {
+            created: number;
+            completed: readonly string[];
+            started: readonly string[];
+            blocked: readonly string[];
+            isFinalDone: boolean;
+          };
+        };
       };
       ledger: {
         entries: readonly {
@@ -72,29 +96,14 @@ declare module "claude-code" {
           at: number;
           snippet: string;
           verifiedBy: string | null;
-          planSha: string;
+          taskId: string;
+          run: string;
+          taskList: string;
           tree: string;
         }[];
-        plan: { name: string; sha: string; blocked: number } | { name: string; error: string } | null;
         error: string | null;
         readAt: number;
       };
-      plan:
-        | {
-            path: string;
-            title: string;
-            pages: readonly {
-              title: string;
-              level: number;
-              body: string;
-              task?: { n: number; state: "open" | "done" | "blocked" };
-            }[];
-            done: number;
-            blocked: number;
-            total: number;
-            readAt: number;
-          }
-        | { path: string; error: string; readAt: number };
       stats: {
         rows: readonly {
           agentType: string;
@@ -143,14 +152,6 @@ declare module "claude-code" {
         costUsd: number | null;
         receipt: { command: string; at: number; isLogged: boolean } | null;
         waiting: readonly string[];
-      }[];
-      receipts: readonly {
-        id: string;
-        plan: string;
-        path: string;
-        total: number;
-        tasks: readonly { n: number; title: string; proof: "proven" | "unproven" | "failed" | null; command: string | null }[];
-        complete: { proven: number; unproven: number; failed: number; isVerified: boolean } | null;
       }[];
       doctor: {
         isRunning: boolean;

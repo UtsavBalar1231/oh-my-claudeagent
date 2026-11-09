@@ -407,7 +407,7 @@ describe("failures of any other tool", () => {
   });
 
   test("a wrapped not-connected error is caught before the generic server-error branch", async () => {
-    const advice = await session().report(tool("mcp__plugin_oh-my-claudeagent_omca__boulder_write", "Error: MCP server 'plugin:oh-my-claudeagent:omca' not connected"));
+    const advice = await session().report(tool("mcp__plugin_oh-my-claudeagent_omca__notepad_write", "Error: MCP server 'plugin:oh-my-claudeagent:omca' not connected"));
     expect(advice).toBe(NOT_CONNECTED);
     expect(advice).not.toContain("/reload-plugins");
   });

@@ -1,7 +1,6 @@
 import { isSafeId } from "./session-id.ts";
 import { isRecord } from "./tool-input.ts";
 
-export const BOULDER = ".omca/state/boulder.json";
 export const LEDGER = ".omca/evidence/verification-evidence.json";
 
 /** The session's status file, or undefined when the id cannot name a file under `.omca/state/`. */

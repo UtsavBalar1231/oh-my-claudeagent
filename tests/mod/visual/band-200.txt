@@ -1,7 +1,7 @@
 
  ▐▛███▛█   Claude Code v2.1.316
 ▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/.cache/tmp/omca-visual-200x50-XXXXXX/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · /home/utsav/.cache/tmp/omca-visual-200x50-XXXXXX/cwd
 
 
 ❯ Run the tests
@@ -38,13 +38,13 @@
 
 
 
-█▎███ 12/46 · next 13 Port the snapshot and the ledger onto the shared router ·  just test evidence not logged                                                                                     [-]
+ just test evidence not logged                                                                                                                                                                     [-]
 1: Log evidence
                                                                                                                                                                                     ◐ medium · /effort
-─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── OMCA: 46-task-plan ─
+─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
   ⏸ manual mode on · ? for shortcuts · ← for agents · ↓ to manage
 
   ● main
-  ◯ oh-my-claudeagent:executor  Port the snapshot onto the router                                                                                                                                   1s
+  ◯ oh-my-claudeagent:executor  Port the snapshot onto the router                                                                                                                                   0s

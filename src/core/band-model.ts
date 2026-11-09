@@ -1,150 +1,30 @@
-import { planTasks, taskCounts } from "./checkboxes.ts";
 import type { NextAction, NextActionKind } from "./next-actions.ts";
-import { arrange, displayWidth, fitEnd, type Glyphs, glyphs, type GlyphTier, oneLine, type Ranked, share, usableColumns } from "./ui-kit.ts";
-import { bar, piecesWidth, type ThemeKey } from "./visual.ts";
-
-export type NextTask = { n: number; title: string };
-export type Proof = { proven: number; unproven: number; failed: number };
+import { bandRunLine, type RunSummary } from "./run-line.ts";
+import { displayWidth, fitEnd, type Glyphs, glyphs, type GlyphTier, oneLine, share, usableColumns } from "./ui-kit.ts";
+import { type Piece, piecesWidth } from "./visual.ts";
 
 export type Band = {
-  plan: { name: string; path: string; done: number; blocked: number; total: number; next: NextTask | null } | null;
   verification: { command: string; at: number; isLogged: boolean } | null;
-  proof?: Proof;
   error: string | null;
   readAt: number;
 };
 
-export type Tone = "title" | "plain" | "muted" | "ok" | "warn" | "fail" | "active";
-// The progress bar's cells carry their own keys, a seam cell two.
-export type Span = { text: string; tone: Tone; color?: ThemeKey; backgroundColor?: ThemeKey };
+export type Tone = "plain" | "muted" | "ok" | "warn" | "fail";
+export type Span = { text: string; tone: Tone };
 export type BandButton = { key: NextActionKind; hotkey: string; label: string; prompt: string };
-export type BandView = { status: readonly Span[]; buttons: readonly BandButton[] };
+export type BandView = { status: readonly Span[]; run: readonly Piece[]; buttons: readonly BandButton[] };
 
-type Part = Span & { isFlexible?: true; isTrailing?: true; min?: number };
-type Words = { logged: string; unlogged: string; proof: Readonly<Record<keyof Proof, string>> };
+const FULL = { logged: " evidence logged", unlogged: " evidence not logged" };
+const COMPACT = { logged: " logged", unlogged: " not logged" };
 
-const FULL: Words = {
-  logged: " evidence logged",
-  unlogged: " evidence not logged",
-  proof: { proven: " proven", unproven: " unproven", failed: " failed" },
-};
-const COMPACT: Words = { logged: " logged", unlogged: " not logged", proof: { proven: "", unproven: "", failed: "" } };
-
-// Below this many cells a flexible part (task title, command) stops reading as a name.
-const MIN_FLEXIBLE = 14;
-const BAR_CELLS = 5;
+// Below this many cells a command stops reading as a name, so the shorter wording takes the room.
+const MIN_COMMAND = 14;
 export const BUTTON_GAP = 3;
 // The engine draws the band's collapse mark, `[-]`, over the last three columns of its first row,
-// so the status row stops one column short of it.
+// so the status row and the run line, either of which can be first, stop one column short of it.
 const MARK_CELLS = 4;
 // A plain Button draws its hotkey, a colon and a space before the label.
 const HOTKEY_CELLS = 3;
-
-// Below this many cells a task title is left out, since an ellipsis after the task number reads as a cut number.
-const MIN_TITLE = 4;
-// The full wording keeps MIN_FLEXIBLE cells of title and the space before it.
-const FULL_TITLE_MIN = MIN_FLEXIBLE + 1;
-
-// The order a narrowing band gives segments up in, last first: progress is the one fact that
-// always stays, then the unverified-evidence warning, what comes next, the proof, then a logged
-// verification.
-const PRIORITY = { progress: 1, unlogged: 2, next: 3, proof: 4, logged: 5 } as const;
-
-/** The numbered tasks' tally and the first open one, read the way every plan reader reads them. */
-export function planTally(text: string): { done: number; blocked: number; total: number; next: NextTask | null } {
-  const tasks = planTasks(text);
-  const open = tasks.find((task) => task.state === "open");
-  const { done, blocked, total } = taskCounts(tasks);
-  return {
-    done,
-    blocked,
-    total,
-    next: open === undefined ? null : { n: open.number, title: oneLine(open.label) },
-  };
-}
-
-type Segment = Ranked & { parts: Part[] };
-
-const segment = (priority: number, parts: Part[]): Segment => ({
-  priority,
-  parts,
-  min: parts.reduce((sum, part) => sum + (part.isFlexible ? Math.min(part.min ?? MIN_FLEXIBLE, displayWidth(part.text)) : displayWidth(part.text)), 0),
-});
-
-// Only the counts that are not zero, each a glyph and a number, and a word while the band has room.
-function proofParts(proof: Proof, g: Glyphs, words: Words): Part[] {
-  const kinds = [
-    ["proven", g.check, "ok"],
-    ["unproven", g.warn, "warn"],
-    ["failed", g.cross, "fail"],
-  ] as const;
-  return kinds
-    .filter(([kind]) => proof[kind] > 0)
-    .flatMap(([kind, glyph, tone], index): Part[] => [
-      ...(index === 0 ? [] : [{ text: "  ", tone: "muted" as const }]),
-      { text: `${glyph} `, tone },
-      { text: `${proof[kind]}${words.proof[kind]}`, tone: "plain" },
-    ]);
-}
-
-function statusSegments(band: Band, words: Words, g: Glyphs, ascii: boolean, titleMin: number): Segment[] {
-  if (band.error !== null) {
-    return [segment(0, [{ text: `${g.cross} `, tone: "fail" }, { text: oneLine(band.error), tone: "plain", isFlexible: true }])];
-  }
-  const { plan, verification, proof } = band;
-  const segments: Segment[] = [];
-  if (plan !== null) {
-    const cells = bar({ done: plan.done, blocked: plan.blocked, todo: plan.total - plan.done - plan.blocked }, BAR_CELLS, ascii).map((piece): Span => ({ ...piece, tone: "plain" }));
-    const blocked: Part[] = plan.blocked === 0 ? [] : [{ text: ` ${g.dot} `, tone: "muted" }, { text: `${plan.blocked} blocked`, tone: "warn" }];
-    segments.push(segment(PRIORITY.progress, [...cells, { text: ` ${plan.done}/${plan.total}`, tone: "muted" }, ...blocked]));
-    if (plan.next !== null) {
-      segments.push(
-        segment(PRIORITY.next, [
-          { text: "next ", tone: "muted" },
-          { text: `${plan.next.n}`, tone: "title" },
-          { text: ` ${oneLine(plan.next.title)}`, tone: "plain", isFlexible: true, isTrailing: true, min: titleMin },
-        ]),
-      );
-    }
-  }
-  const proven = proof === undefined ? [] : proofParts(proof, g, words);
-  if (proven.length > 0) segments.push(segment(PRIORITY.proof, proven));
-  if (verification !== null) {
-    const { isLogged } = verification;
-    segments.push(
-      segment(isLogged ? PRIORITY.logged : PRIORITY.unlogged, [
-        { text: `${isLogged ? g.check : g.warn} `, tone: isLogged ? "ok" : "warn" },
-        { text: oneLine(verification.command), tone: "plain", isFlexible: true },
-        { text: isLogged ? words.logged : words.unlogged, tone: isLogged ? "muted" : "plain" },
-      ]),
-    );
-  }
-  return segments;
-}
-
-function joined(segments: readonly Segment[], g: Glyphs): Part[] {
-  return segments.flatMap((kept, index) => [...(index === 0 ? [] : [{ text: ` ${g.dot} `, tone: "muted" as const }]), ...kept.parts]);
-}
-
-const fixedWidth = (parts: readonly Part[]): number =>
-  parts.reduce((sum, part) => sum + (part.isFlexible ? 0 : displayWidth(part.text)), 0);
-
-// The trailing part (the task title) keeps what the others leave, but never less than its own minimum.
-function fitParts(parts: readonly Part[], width: number, g: Glyphs): Span[] {
-  const room = width - fixedWidth(parts);
-  const trailing = parts.find((part) => part.isTrailing);
-  const reserved = trailing === undefined ? 0 : Math.min(trailing.min ?? 0, displayWidth(trailing.text));
-  const sizes = share(
-    parts.filter((part) => part.isFlexible && part !== trailing).map((part) => displayWidth(part.text)),
-    room - reserved,
-  );
-  const spare = room - sizes.reduce((sum, size) => sum + size, 0);
-  let flexible = 0;
-  return parts.map(({ isFlexible, isTrailing, min: _min, ...span }) => {
-    if (isTrailing) return { ...span, text: spare < MIN_TITLE ? "" : fitEnd(span.text, spare, g.ellipsis) };
-    return isFlexible ? { ...span, text: fitEnd(span.text, sizes[flexible++] ?? 0, g.ellipsis) } : span;
-  });
-}
 
 function clip(spans: readonly Span[], width: number, g: Glyphs): Span[] {
   if (piecesWidth(spans) <= width) return spans.filter((span) => span.text !== "");
@@ -162,14 +42,26 @@ function clip(spans: readonly Span[], width: number, g: Glyphs): Span[] {
   return out.filter((span) => span.text !== "");
 }
 
+// The subject takes what the spans around it leave.
+function fitted(lead: Span, subject: string, tail: Span | undefined, width: number, g: Glyphs): Span[] {
+  const room = width - displayWidth(lead.text) - displayWidth(tail?.text ?? "");
+  const fit: Span = { text: fitEnd(subject, Math.max(0, room), g.ellipsis), tone: "plain" };
+  return clip([lead, fit, ...(tail === undefined ? [] : [tail])], width, g);
+}
+
+function verificationRow({ command, isLogged }: NonNullable<Band["verification"]>, width: number, g: Glyphs): Span[] {
+  const lead: Span = { text: `${isLogged ? g.check : g.warn} `, tone: isLogged ? "ok" : "warn" };
+  const subject = oneLine(command);
+  const wordsOf = ({ logged, unlogged }: typeof FULL) => (isLogged ? logged : unlogged);
+  const need = displayWidth(lead.text) + Math.min(MIN_COMMAND, displayWidth(subject)) + displayWidth(wordsOf(FULL));
+  const words = wordsOf(need <= width ? FULL : COMPACT);
+  return fitted(lead, subject, { text: words, tone: isLogged ? "muted" : "plain" }, width, g);
+}
+
 function statusRow(band: Band, width: number, tier: GlyphTier): Span[] {
   const g = glyphs(tier);
-  const ascii = tier === "ascii";
-  const gap = displayWidth(` ${g.dot} `);
-  const full = statusSegments(band, FULL, g, ascii, FULL_TITLE_MIN);
-  const kept = arrange(full, width, gap);
-  const chosen = kept.length === full.length ? kept : arrange(statusSegments(band, COMPACT, g, ascii, 0), width, gap);
-  return clip(fitParts(joined(chosen, g), width, g), width, g);
+  if (band.error !== null) return fitted({ text: `${g.cross} `, tone: "fail" }, oneLine(band.error), undefined, width, g);
+  return band.verification === null ? [] : verificationRow(band.verification, width, g);
 }
 
 function buttonRow(actions: readonly NextAction[], width: number, g: Glyphs): BandButton[] {
@@ -186,11 +78,13 @@ function buttonRow(actions: readonly NextAction[], width: number, g: Glyphs): Ba
   }));
 }
 
-/** Nothing to draw (undefined) until the first snapshot, and while neither section has content. */
-export function bandView(band: Band | undefined, actions: readonly NextAction[], columns: number, tier: GlyphTier): BandView | undefined {
-  if (band === undefined || (band.plan === null && band.error === null && actions.length === 0)) return undefined;
+/** Nothing to draw (undefined) until the first snapshot, and while no section has content. `run` is an open run. */
+export function bandView(band: Band | undefined, actions: readonly NextAction[], columns: number, tier: GlyphTier, run: RunSummary | undefined): BandView | undefined {
+  if (band === undefined || (band.verification === null && band.error === null && actions.length === 0 && run === undefined)) return undefined;
+  const room = Math.max(0, columns - MARK_CELLS);
   return {
-    status: statusRow(band, Math.max(0, columns - MARK_CELLS), tier),
+    status: statusRow(band, room, tier),
+    run: run === undefined ? [] : bandRunLine(run, glyphs(tier), room),
     buttons: buttonRow(actions, usableColumns(columns), glyphs(tier)),
   };
 }

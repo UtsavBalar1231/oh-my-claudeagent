@@ -69,9 +69,9 @@ The `/omca` pane, the band and the status line draw Nerd Font icons unless `OMCA
    bun "${CLAUDE_PLUGIN_ROOT}/scripts/setup-statusline.ts" --glyph-test
    ```
 
-   It prints four Nerd Font icons: a check in a circle, gears, an eye and a terminal prompt. They are private-use characters that do not survive being retyped, so never write them into your own reply; point the user at the command's output.
+   It prints four Nerd Font icons: a check in a circle, gears, an eye and a terminal prompt. They are private-use characters that do not survive being retyped, so never write them into your own reply; point the user at the command's output. Claude Code folds the shell result into a tool group row, and the mod draws the printed line under that row, after a `glyph test` label. When the user sees no such line, for example because the mod is not running, they press ctrl+o to expand the shell output.
 
-2. Ask with `AskUserQuestion` whether that output shows four small icons or boxes and blanks. When they see the icons, report `nerd` and end the phase.
+2. Ask with `AskUserQuestion` whether the line after `glyph test` under the shell command's row, or the expanded shell output, shows four small icons or boxes and blanks. When they see the icons, report `nerd` and end the phase.
 
 3. When they see boxes, preview the change:
 

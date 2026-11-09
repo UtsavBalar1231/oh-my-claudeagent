@@ -88,6 +88,7 @@ const CHECKS = [
   " ✓ OK    omca server   Last hook call 2 min ago",
   " ✓ OK    ast-grep      sg 0.39.0 is on PATH",
   " ✓ OK    Options       showBand on, guardMode deny",
+  " ✓ OK    Task tools    On, as OMCA requires",
   " ✓ OK    Agent models  Each agent keeps the model tier it declares",
   " ✓ OK    Effort cap    No maxEffortLevel, so agents run at the effort they declare",
   " ✓ OK    Mod policy    Mods you install may load",
@@ -119,14 +120,14 @@ for (const layout of LAYOUTS) {
 
     expect(w.opened).toEqual([{ id: "omca", title: "OMCA", focus: true, closeOnEscape: true, rows: 12, columns: 56 }]);
     expect(body(await ui.drawn())).toEqual([
-      `r: Run again   ! 2 warn  ✓ 11 ok  checked ${local(NOW_S)}`,
+      `r: Run again   ! 2 warn  ✓ 12 ok  checked ${local(NOW_S)}`,
       " ! WARN  OMCA          Could not read this mod's version from its manifest",
       STATUS_ROW,
-      "o: Show passing   ✓ 11 ok · Claude Code, bun, omca server, ast-grep, Options, Agent models, Ef…",
+      "o: Show passing   ✓ 12 ok · Claude Code, bun, omca server, ast-grep, Options, Task tools, Agen…",
     ]);
     await ui.press({ key: "o" });
     expect(body(await ui.drawn())).toEqual([
-      `r: Run again   ! 2 warn  ✓ 11 ok  checked ${local(NOW_S)}`,
+      `r: Run again   ! 2 warn  ✓ 12 ok  checked ${local(NOW_S)}`,
       " ! WARN  OMCA          Could not read this mod's version from its manifest",
       STATUS_ROW,
       "o: Hide passing",
@@ -140,9 +141,9 @@ for (const layout of LAYOUTS) {
     write(w, manifest, '{ "name": "oh-my-claudeagent", "version": "3.0.0" }');
     await ui.press({ key: "r" });
     expect(body(await ui.drawn()).slice(0, 3)).toEqual([
-      `r: Run again   ! 1 warn  ✓ 12 ok  checked ${local(NOW_S)}`,
+      `r: Run again   ! 1 warn  ✓ 13 ok  checked ${local(NOW_S)}`,
       STATUS_ROW,
-      "o: Show passing   ✓ 12 ok · OMCA, Claude Code, bun, omca server, ast-grep, Options, Agent mode…",
+      "o: Show passing   ✓ 13 ok · OMCA, Claude Code, bun, omca server, ast-grep, Options, Task tools…",
     ]);
     await ui.unmount();
   });
@@ -330,8 +331,8 @@ for (const layout of LAYOUTS) {
     const ui = await $.ui.mount(pane("terminal", WIDE));
     await ui.press({ key: "r" });
 
-    const head = `r: Run again   ✓ 13 ok  checked ${local(NOW_S)}`;
-    const folded = "o: Show passing   ✓ 13 ok · OMCA, Claude Code, bun, omca server, ast-grep, Options, Agent mode…";
+    const head = `r: Run again   ✓ 14 ok  checked ${local(NOW_S)}`;
+    const folded = "o: Show passing   ✓ 14 ok · OMCA, Claude Code, bun, omca server, ast-grep, Options, Task tools…";
     expect(body(await ui.drawn())).toEqual([head, folded]);
 
     await ui.press({ key: "o" });
@@ -362,7 +363,7 @@ for (const layout of LAYOUTS) {
     expect(closed[1]).toStartWith(" ! WARN  OMCA ");
     expect(closed[2]).toStartWith(" ! WARN  Status line ");
     expect(closed[2]).toEndWith("i: Add refreshInterval 5");
-    expect(closed[3]).toBe("o: Show passing   ✓ 11 ok · Claude Code, bun, omca server, ast-grep, Options, Agent models, Ef…");
+    expect(closed[3]).toBe("o: Show passing   ✓ 12 ok · Claude Code, bun, omca server, ast-grep, Options, Task tools, Agen…");
 
     await ui.press({ key: "o" });
     expect(body(await ui.drawn()).slice(3)).toEqual(["o: Hide passing", ...CHECKS]);
@@ -374,13 +375,13 @@ for (const layout of LAYOUTS) {
     await $.command.run(run("doctor", 80));
     const ui = await $.ui.mount(pane("terminal", { columns: 80, rows: 40, placement: "inline" }));
     const drawn = body(await ui.drawn());
-    expect(drawn[0]).toBe(`r: Run again   ! 2 warn  + 11 ok  checked ${local(NOW_S)}`);
+    expect(drawn[0]).toBe(`r: Run again   ! 2 warn  + 12 ok  checked ${local(NOW_S)}`);
     expect(drawn[1]).toBe(`[! WARN] OMCA          Could not read this mod's version from its${PAD}manifest`);
-    expect(drawn[3]).toBe("o: Show passing   + 11 ok - Claude Code, bun, omca server, ast-grep, O...");
+    expect(drawn[3]).toBe("o: Show passing   + 12 ok - Claude Code, bun, omca server, ast-grep, O...");
     await ui.press({ key: "o" });
     const opened = body(await ui.drawn());
     expect(opened).toContain("[+ OK]   Claude Code   2.1.300 meets the 2.1.300 floor");
-    expect(opened.at(-2)).toBe("  v 9 more - ^v scroll");
+    expect(opened.at(-2)).toBe("  v 10 more - ^v scroll");
       expect(rows(await ui.drawn()).filter((row) => !isAscii(row))).toEqual([]);
     await ui.unmount();
   });
@@ -423,10 +424,10 @@ for (const [placement, columns, expectedCut] of [
       const below = drawn.filter((row) => row.includes("more")).at(-1);
       cut.push(below !== undefined);
       if (below === undefined) {
-        expect(checks).toBe(13);
+        expect(checks).toBe(14);
         expect(drawn.length).toBeLessThanOrEqual(bodyRows);
       } else {
-        expect(below).toBe(`  ↓ ${14 - checks - folds} more · ↑↓ scroll`);
+        expect(below).toBe(`  ↓ ${15 - checks - folds} more · ↑↓ scroll`);
         expect(drawn.length, "the body, and the row that lets the engine scroll").toBe(bodyRows + 1);
       }
       await ui.unmount();
@@ -449,21 +450,21 @@ test("the arrows, a page key and the wheel move the Doctor list by whole checks,
   const edges = async () => bodyLines(await ui.drawn()).filter((row) => row.includes("more"));
 
   expect((await titles())[0]).toBe("check-mod");
-  expect(await edges()).toEqual(["  ↓ 5 more · ↑↓ scroll"]);
+  expect(await edges()).toEqual(["  ↓ 6 more · ↑↓ scroll"]);
 
   await scroll(1);
   expect((await titles())[0]).toBe("check-server");
-  expect(await edges()).toEqual(["  ↑ 1 more", "  ↓ 4 more · ↑↓ scroll"]);
+  expect(await edges()).toEqual(["  ↑ 1 more", "  ↓ 5 more · ↑↓ scroll"]);
 
   await scroll(26);
-  expect(await edges()).toEqual(["  ↑ 4 more"]);
+  expect(await edges()).toEqual(["  ↑ 5 more"]);
   expect((await titles()).at(-1)).toBe("check-style");
 
   await scroll(1);
-  expect(await edges()).toEqual(["  ↑ 4 more"]);
+  expect(await edges()).toEqual(["  ↑ 5 more"]);
 
   await scroll(-3);
-  expect(await edges()).toEqual(["  ↑ 3 more", "  ↓ 1 more · ↑↓ scroll"]);
+  expect(await edges()).toEqual(["  ↑ 3 more", "  ↓ 2 more · ↑↓ scroll"]);
 
   await scroll(-100);
   expect((await titles())[0]).toBe("check-mod");
@@ -485,15 +486,15 @@ test("Home and End send the Doctor list to its first and last check even when on
 
   expect(contentRows).toBe(9);
   expect(await titles()).toEqual(["check-mod", "check-server"]);
-  expect(await edges()).toEqual(["  ↓ 12 more · ↑↓ scroll"]);
+  expect(await edges()).toEqual(["  ↓ 13 more · ↑↓ scroll"]);
 
   await key(contentRows);
   expect(await titles()).toEqual(["check-style"]);
-  expect(await edges()).toEqual(["  ↑ 13 more"]);
+  expect(await edges()).toEqual(["  ↑ 14 more"]);
 
   await key(-contentRows);
   expect(await titles()).toEqual(["check-mod", "check-server"]);
-  expect(await edges()).toEqual(["  ↓ 12 more · ↑↓ scroll"]);
+  expect(await edges()).toEqual(["  ↓ 13 more · ↑↓ scroll"]);
 
   await key(contentRows - 1);
   expect(await titles()).toEqual(["check-statusline"]);
@@ -512,7 +513,7 @@ test("a body too short for two checks windows the list down to one check and nam
   const drawn = bodyLines(await ui.drawn());
 
   expect(titles).toEqual(["check-mod"]);
-  expect(drawn.at(-2)).toBe("  ↓ 13 more · ↑↓ scroll");
+  expect(drawn.at(-2)).toBe("  ↓ 14 more · ↑↓ scroll");
   await ui.unmount();
 });
 
@@ -616,7 +617,7 @@ test("a row is a chip with the level's glyph and word on its tone, the label bol
       piece({}, " 2 warn"),
       piece({}, "  "),
       piece({ color: "success" }, "✓"),
-      piece({}, " 11 ok"),
+      piece({}, " 12 ok"),
       piece({ color: "inactive" }, `  checked ${local(NOW_S)}`),
     ),
   );
@@ -717,7 +718,7 @@ test("a question timeout set in project or local settings, which Claude Code ign
   await $.command.run(run("doctor", 120));
   const ui = await $.ui.mount(pane("terminal", WIDE));
   const drawn = rows(await ui.drawn()).join("\n");
-  expect(drawn).toContain("Effort cap");
+  expect(drawn).toContain("Task tools");
   expect(drawn).not.toContain("Questions");
   await ui.unmount();
 });
@@ -756,7 +757,7 @@ test("on Desktop a body too short for two checks still draws every check, with n
   expect(nodeByKey(await ui.drawn(), "passing")).toBeDefined();
   await ui.press({ key: "o" });
 
-  expect(await checkKeys()).toHaveLength(13);
+  expect(await checkKeys()).toHaveLength(14);
   expect(bodyLines(await ui.drawn()).filter((row) => row.includes("more"))).toEqual([]);
   await ui.unmount();
 });
@@ -773,7 +774,7 @@ test("the folded line is the key, then the ok glyph in its tone and the count an
       { type: "Button", props: { key: "o", hotkey: "o", label: "Show passing", plain: true }, press: expect.anything() },
       line(
         piece({ color: "success" }, "✓"),
-        piece({ dimColor: true }, " 10 ok · Claude Code, bun, ast-grep, Options, Agent models, Effort cap, Mod…"),
+        piece({ dimColor: true }, " 11 ok · Claude Code, bun, ast-grep, Options, Task tools, Agent models, Eff…"),
       ),
     ],
   });
@@ -788,7 +789,7 @@ test("at 56 columns the folded line ends in the ellipsis within the room the key
   const drawn = await ui.drawn();
   const folded = body(drawn).at(-1) ?? "";
 
-  expect(folded).toBe("o: Show passing   ✓ 10 ok · Claude Code, bun, ast-grep,…");
+  expect(folded).toBe("o: Show passing   ✓ 11 ok · Claude Code, bun, ast-grep,…");
   expect(displayWidth(folded)).toBeLessThanOrEqual(56);
   for (const child of topRows(drawn)) expect(cellsAcross(child)).toBeLessThanOrEqual(56);
   await ui.unmount();

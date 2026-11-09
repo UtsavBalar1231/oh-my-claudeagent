@@ -5,12 +5,12 @@ import type { PanelInput } from "@opencode/plugin/tui/context";
 import type { JSX } from "@opentui/solid";
 import { For, Show, createMemo, type Accessor } from "solid-js";
 import { parseEntries } from "../src/core/notepad.ts";
-import { taskCounts } from "../src/core/checkboxes.ts";
+import { groupTasks, openBlockers, runState, type NativeTask } from "../src/core/native-tasks.ts";
 import { fitEnd } from "../src/core/ui-kit.ts";
 import type { Snapshot } from "./rpc.ts";
-import { nextRunnable, noRunnableNote, plain, tabs, waitingOn, type ReadState, type Tab } from "./tui-model.ts";
+import { noRunnableNote, plain, tabs, taskCounts, type ReadState, type Tab } from "./tui-model.ts";
 
-type Plan = NonNullable<Snapshot["plan"]>;
+type TaskRun = NonNullable<Snapshot["run"]>;
 type Run = Snapshot["evidence"]["entries"][number];
 type Props = {
   panel: PanelInput;
@@ -23,7 +23,7 @@ type Props = {
 const oneLine = (text: string) => plain(text).replace(/\s+/g, " ").trim();
 const stamp = (at: number) => new Date(at).toISOString().slice(0, 16).replace("T", " ") + " UTC";
 const runType = (type: string) => type === "final_verification" ? "Final check" : type[0]?.toUpperCase() + type.slice(1);
-const shortTabs: Record<Tab, string> = { Overview: "Home", Plan: "Plan", Agents: "Agents", Evidence: "Runs", Notepad: "Notes", Doctor: "Health" };
+const shortTabs: Record<Tab, string> = { Overview: "Home", Tasks: "Tasks", Agents: "Agents", Evidence: "Runs", Notepad: "Notes", Doctor: "Health" };
 
 export function OmcaPanel(props: Props): JSX.Element {
   const ctx = usePlugin();
@@ -40,9 +40,9 @@ export function OmcaPanel(props: Props): JSX.Element {
   const activeWorkers = () => workers().filter((session) => ctx.data.session.status(session.id) === "running").length;
   const runs = () => value()?.evidence.entries.toReversed() ?? [];
   const errors = () => value()?.health.filter((item) => item.state === "error") ?? [];
-  const waiting = (task: Plan["tasks"][number], plan: Plan) => waitingOn(task, plan.tasks);
-  const markColor = (task: Plan["tasks"][number]) => task.state === "done" ? theme().text.feedback.success.base : task.state === "blocked" ? theme().text.feedback.warning.base : theme().text.muted;
-  const mark = (task: Plan["tasks"][number], plan: Plan) => task.state === "done" ? "✓ " : task.state === "blocked" ? "⊗ " : waiting(task, plan).length ? "· " : "○ ";
+  const taskList = () => value()?.run?.tasks ?? [];
+  const markColor = (task: NativeTask) => task.blockedReason !== "" ? theme().text.feedback.warning.base : task.status === "completed" ? theme().text.feedback.success.base : task.status === "in_progress" ? theme().text.action.primary.base : theme().text.muted;
+  const mark = (task: NativeTask, run: TaskRun) => task.blockedReason !== "" ? "⊗ " : task.status === "completed" ? "✓ " : task.status === "in_progress" ? "▸ " : openBlockers(task, run.tasks).length ? "· " : "○ ";
 
   function navigate(sessionID: string) {
     if (ctx.ui.tabs.enabled()) ctx.ui.tabs.focus(sessionID);
@@ -65,7 +65,7 @@ export function OmcaPanel(props: Props): JSX.Element {
   async function inspectRun(entry: Run) {
     await ctx.ui.dialog.alert({
       title: `${runType(entry.type)} · exit ${entry.exitCode}`,
-      message: plain(`${entry.command}\n${stamp(entry.at)}\n\n${entry.snippet || "No output recorded."}\n\nReported by: ${entry.verifiedBy ?? "unspecified"}\nPlan digest: ${entry.planSha || "unscoped"}\n\nThis is an attested result, not verification of the current checkout.`),
+      message: plain(`${entry.command}\n${stamp(entry.at)}\n\n${entry.snippet || "No output recorded."}\n\nReported by: ${entry.verifiedBy ?? "unspecified"}\nTask: ${entry.taskId ? `#${entry.taskId}` : "unscoped"}\n\nThis is an attested result, not verification of the current checkout.`),
     });
   }
 
@@ -78,10 +78,21 @@ export function OmcaPanel(props: Props): JSX.Element {
     if (index !== undefined && entries[index]) await inspectRun(entries[index]!);
   }
 
-  async function inspectPlan() {
-    const plan = value()?.plan;
-    if (!plan) return;
-    await ctx.ui.dialog.alert({ title: "Plan details", message: plain(`${plan.name}\n${plan.path}\n\nStatus: ${plan.status}\nSHA256: ${plan.sha256}\n\nBound only to this session.`) });
+  async function inspectTask(task: NativeTask) {
+    await ctx.ui.dialog.alert({
+      title: `#${task.id} · ${task.status}${task.isFinal ? " · final" : ""}`,
+      message: plain([task.subject, task.description, task.blockedReason && `Closed as blocked: ${task.blockedReason}`, task.blockedBy.length > 0 ? `Blocked by: ${task.blockedBy.map((id) => `#${id}`).join(", ")}` : ""].filter(Boolean).join("\n\n")),
+    });
+  }
+
+  async function chooseTask() {
+    const tasks = taskList();
+    const id = await ctx.ui.dialog.select({
+      title: "Tasks",
+      options: tasks.map((task) => ({ title: oneLine(`#${task.id} ${task.subject}`), value: task.id, description: task.blockedReason ? "closed as blocked" : task.status })),
+    });
+    const task = tasks.find((other) => other.id === id);
+    if (task) await inspectTask(task);
   }
 
   ctx.keymap.layer(() => ({
@@ -91,7 +102,7 @@ export function OmcaPanel(props: Props): JSX.Element {
       { id: "omca.refresh", title: "Refresh OMCA", bind: "r", run: props.refresh },
       { id: "omca.fullscreen", title: "Toggle OMCA fullscreen", bind: "f", run: props.panel.toggleFullscreen },
       { id: "omca.close", title: "Close OMCA", bind: "escape", run: props.panel.close },
-      { id: "omca.plan.details", title: "Inspect plan details", bind: "d", enabled: () => props.tab() === "Plan" && !!value()?.plan, run: inspectPlan },
+      { id: "omca.task.select", title: "Inspect task", bind: "return", enabled: () => props.tab() === "Tasks" && taskList().length > 0, run: chooseTask },
       { id: "omca.agent.select", title: "Open session", bind: "return", enabled: () => props.tab() === "Agents", run: chooseSession },
       { id: "omca.evidence.select", title: "Inspect recorded check", bind: "return", enabled: () => props.tab() === "Evidence" && runs().length > 0, run: chooseRun },
     ],
@@ -111,15 +122,15 @@ export function OmcaPanel(props: Props): JSX.Element {
     </box>;
   }
 
-  function Progress(progress: { plan: Plan }): JSX.Element {
-    const counts = () => taskCounts(progress.plan.tasks);
+  function Progress(progress: { run: TaskRun }): JSX.Element {
+    const counts = () => taskCounts(progress.run.tasks);
     const total = () => counts().total;
     const done = () => counts().done;
     const cells = () => width() < 26 ? 0 : Math.min(32, width() - 22);
     const filled = () => total() === 0 ? 0 : Math.round(done() / total() * cells());
     return <text fg={theme().text.muted}>
       <span style={{ fg: theme().text.action.primary.base }}>{"━".repeat(filled())}</span>{"─".repeat(cells() - filled())}
-      <span style={{ fg: theme().text.base }}>{`  ${done()}/${total()}`}</span>{" checked"}
+      <span style={{ fg: theme().text.base }}>{`  ${done()}/${total()}`}</span>{" completed"}
       <Show when={counts().blocked > 0}><span style={{ fg: theme().text.feedback.warning.base }}>{` · ${counts().blocked} blocked`}</span></Show>
     </text>;
   }
@@ -135,10 +146,10 @@ export function OmcaPanel(props: Props): JSX.Element {
     </box>;
   }
 
-  function PlanSummary(summary: { plan: Plan }): JSX.Element {
+  function RunSummary(summary: { run: TaskRun }): JSX.Element {
     return <box flexDirection="column" gap={1} flexShrink={0}>
-      <text fg={theme().text.base}><strong>{clip(summary.plan.name, width() - summary.plan.status.length - 2)}</strong><span style={{ fg: theme().text.muted }}>{`  ${summary.plan.status}`}</span></text>
-      <Progress plan={summary.plan} />
+      <text fg={theme().text.base}><strong>{clip(summary.run.name)}</strong></text>
+      <Progress run={summary.run} />
     </box>;
   }
 
@@ -161,7 +172,7 @@ export function OmcaPanel(props: Props): JSX.Element {
     </Show>
     <scrollbox flexGrow={1} minHeight={0} focused={props.panel.focused} scrollX={false}>
       <box flexDirection="column" gap={2} paddingX={2} paddingBottom={1} minWidth={0}>
-        <Show when={!props.current() || props.current()?.phase === "loading"}><Empty title="Reading session state" message="Loading the bound plan, recorded checks, and notes." /></Show>
+        <Show when={!props.current() || props.current()?.phase === "loading"}><Empty title="Reading session state" message="Loading the task list, recorded checks, and notes." /></Show>
         <Show when={props.tab() === "Agents"}>
           <Section title="Sessions" detail={`${activeWorkers()} working`}>
             <For each={sessions()} fallback={<Empty title="No sessions loaded" message="Delegated sessions appear here when OpenCode discovers them." />}>{(session) => <box flexDirection="column" flexShrink={0} minWidth={0} onMouseDown={() => navigate(session.id)}>
@@ -179,12 +190,12 @@ export function OmcaPanel(props: Props): JSX.Element {
               <text fg={theme().text.base}><strong>{clip(currentSession()?.title ?? "Current session")}</strong></text>
               <text fg={theme().text.muted}>{clip(ctx.ui.format.path(data().directory))}</text>
             </box>
-            <Show when={data().plan} fallback={<Empty title="No plan bound" message="Use /omca-plan to plan work, then /omca-start-work with the saved plan when you are ready. Opening this panel never starts execution." />}>
-              {(plan: Accessor<Plan>) => <Section title="Current plan">
-                <PlanSummary plan={plan()} />
-                <Show when={nextRunnable(plan().tasks)} fallback={<text fg={theme().text.muted} wrapMode="word">{noRunnableNote(plan().tasks)}</text>}>{(task: Accessor<Plan["tasks"][number]>) => <box flexDirection="column" gap={1} border={["left"]} borderColor={theme().border.base} paddingLeft={1} flexShrink={0}>
+            <Show when={data().run} fallback={<Empty title="No run" message="Use /omca-plan to plan work, then /omca-start-work when you are ready. Opening this panel never starts execution." />}>
+              {(run: Accessor<TaskRun>) => <Section title="Current run">
+                <RunSummary run={run()} />
+                <Show when={runState(run().tasks)?.next} fallback={<text fg={theme().text.muted} wrapMode="word">{noRunnableNote(run().tasks)}</text>}>{(task: Accessor<NativeTask>) => <box flexDirection="column" gap={1} border={["left"]} borderColor={theme().border.base} paddingLeft={1} flexShrink={0}>
                   <text fg={theme().text.muted}>Next task</text>
-                  <text fg={theme().text.base} wrapMode="word">{plain(`${task().number}. ${task().label}`)}</text>
+                  <text fg={theme().text.base} wrapMode="word">{plain(`#${task().id} ${task().subject}`)}</text>
                 </box>}</Show>
               </Section>}
             </Show>
@@ -194,28 +205,29 @@ export function OmcaPanel(props: Props): JSX.Element {
             <Show when={workers().length > 0}><text fg={theme().text.muted}>{`${activeWorkers()} working · ${workers().length} delegated sessions`}</text></Show>
             <For each={errors()}>{(item) => <text fg={theme().text.feedback.error.base} wrapMode="word">{plain(`${item.name}: ${item.detail}`)}</text>}</For>
           </Show>
-          <Show when={props.tab() === "Plan"}>
-            <Show when={data().plan} fallback={<Empty title="No plan bound" message="A saved plan appears here after /omca-start-work explicitly binds it to this session." />}>{(plan: Accessor<Plan>) => <>
-              <PlanSummary plan={plan()} />
-              <Section title="Tasks">
-                <For each={plan().tasks}>{(task) => <box flexDirection="column" flexShrink={0}>
-                  <text fg={task.state === "done" ? theme().text.muted : theme().text.base} wrapMode="word">
-                    <span style={{ fg: markColor(task) }}>{mark(task, plan())}</span>{plain(`${task.number}. ${task.label}`)}
+          <Show when={props.tab() === "Tasks"}>
+            <Show when={data().run} fallback={<Empty title="No run" message="Tasks appear here once /omca-start-work creates them." />}>{(run: Accessor<TaskRun>) => <>
+              <RunSummary run={run()} />
+              <For each={groupTasks(run().tasks)}>{(group) => <Section title={group.name} detail={String(group.tasks.length)}>
+                <For each={group.tasks}>{(task) => <box flexDirection="column" flexShrink={0} minWidth={0} onMouseDown={() => void inspectTask(task)}>
+                  <text fg={task.status === "completed" ? theme().text.muted : theme().text.base} wrapMode="word">
+                    <span style={{ fg: markColor(task) }}>{mark(task, run())}</span>{plain(`#${task.id} ${task.subject}`)}
                   </text>
-                  <Show when={task.state === "open" && waiting(task, plan()).length > 0}><text fg={theme().text.muted}>{`  Waiting on ${waiting(task, plan()).join(", ")}`}</text></Show>
+                  <Show when={task.blockedReason !== ""}><text fg={theme().text.feedback.warning.base} wrapMode="word">{plain(`  Blocked: ${task.blockedReason}`)}</text></Show>
+                  <Show when={task.blockedReason === "" && task.status !== "completed" && openBlockers(task, run().tasks).length > 0}><text fg={theme().text.muted}>{`  Waiting on ${openBlockers(task, run().tasks).map((id) => `#${id}`).join(", ")}`}</text></Show>
                 </box>}</For>
-              </Section>
-              <text fg={theme().text.muted}>Checkbox progress is not verified completion.</text>
+              </Section>}</For>
+              <text fg={theme().text.muted} wrapMode="word">A completed task is not verified completion.</text>
             </>}</Show>
           </Show>
           <Show when={props.tab() === "Evidence"}>
-            <Section title="Recorded checks" detail={data().evidence.verdict === "historical" ? "matching plan history" : data().evidence.verdict === "stale" ? "earlier plan history" : "no final verification"}>
+            <Section title="Recorded checks" detail={data().evidence.verdict === "historical" ? "matching run history" : data().evidence.verdict === "stale" ? "earlier run history" : "no final verification"}>
               <text fg={theme().text.muted} wrapMode="word">Reported command results, not live verification. Select a check for its output and provenance.</text>
               <For each={runs()} fallback={<Empty title="No checks recorded" message="Build, test, and lint results appear after they are logged with OMCA's evidence tool." />}>{(entry) => <RunRow entry={entry} />}</For>
             </Section>
           </Show>
           <Show when={props.tab() === "Notepad"}>
-            <For each={data().notepads} fallback={<Empty title="No notes yet" message="Discoveries and decisions recorded for the bound plan appear here." />}>{(note) => <Section title={note.section[0]?.toUpperCase() + note.section.slice(1)}>
+            <For each={data().notepads} fallback={<Empty title="No notes yet" message="Discoveries and decisions recorded for the current run appear here." />}>{(note) => <Section title={note.section[0]?.toUpperCase() + note.section.slice(1)}>
               <For each={parseEntries(note.content).toReversed()}>{(entry) => <box flexDirection="column" gap={1} flexShrink={0}>
                 <Show when={entry.at !== null}><text fg={theme().text.muted}>{stamp(entry.at!)}</text></Show>
                 <text fg={theme().text.base} wrapMode="word">{plain(entry.text)}</text>
@@ -237,7 +249,7 @@ export function OmcaPanel(props: Props): JSX.Element {
       </box>
     </scrollbox>
     <box paddingX={2} paddingY={1} flexShrink={0}>
-      <text fg={theme().text.muted}>{clip(!props.panel.focused ? "Click panel to focus" : `${props.panel.width >= 58 ? "1–6 views  " : ""}${props.tab() === "Agents" ? "enter open  " : props.tab() === "Evidence" && runs().length ? "enter inspect  " : props.tab() === "Plan" && value()?.plan ? "d details  " : ""}r refresh  ${props.panel.width >= 58 ? "f expand  " : ""}esc close`)}</text>
+      <text fg={theme().text.muted}>{clip(!props.panel.focused ? "Click panel to focus" : `${props.panel.width >= 58 ? "1–6 views  " : ""}${props.tab() === "Agents" ? "enter open  " : props.tab() === "Evidence" && runs().length ? "enter inspect  " : props.tab() === "Tasks" && taskList().length ? "enter inspect  " : ""}r refresh  ${props.panel.width >= 58 ? "f expand  " : ""}esc close`)}</text>
     </box>
   </box>;
 }

@@ -9,11 +9,12 @@ const SERVER = join(import.meta.dir, "..", "omca.ts");
 // runner, which outlasts the 5 s default and leaves the workers writing into a directory being removed.
 const CONCURRENT_TIMEOUT_MS = 60_000;
 const MODULE = join(import.meta.dir, "evidence.ts");
-const PLAN_SHA = "deadbeef".repeat(8);
 const ISO_SECONDS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/;
 
 const roots: string[] = [];
 const servers: Bun.Subprocess[] = [];
+const { CLAUDE_CONFIG_DIR, CLAUDE_CODE_TASK_LIST_ID } = process.env;
+const LIST = "omca-evidence-spec";
 
 // A killed process keeps its working directory open on Windows until it has exited, so the directory is removed only after the exit.
 afterEach(async () => {
@@ -22,7 +23,21 @@ afterEach(async () => {
     await server.exited;
   }
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+  for (const [name, value] of Object.entries({ CLAUDE_CONFIG_DIR, CLAUDE_CODE_TASK_LIST_ID })) {
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
 });
+
+/** Puts a run's task on the list the session reads: `CLAUDE_CODE_TASK_LIST_ID` under a scratch config directory. */
+function onList(id: string, metadata: Record<string, unknown>): void {
+  const config = mkdtempSync(join(tmpdir(), "omca-evidence-config-"));
+  roots.push(config);
+  process.env.CLAUDE_CONFIG_DIR = config;
+  process.env.CLAUDE_CODE_TASK_LIST_ID = LIST;
+  mkdirSync(join(config, "tasks", LIST), { recursive: true });
+  writeFileSync(join(config, "tasks", LIST, `${id}.json`), JSON.stringify({ id, subject: "Final verification", description: "", status: "pending", blocks: [], blockedBy: [], metadata }));
+}
 
 function project(): string {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "omca-evidence-")));
@@ -71,7 +86,7 @@ describe("appendEvidence", () => {
       mkdirSync(join(root, ".omca", "evidence"), { recursive: true });
       writeFileSync(ledgerFile(root), json(document));
     }
-    await log(legacy, { command: "c".repeat(2500), output_snippet: "😀".repeat(2500), verified_by: "executor", plan_sha256: PLAN_SHA });
+    await log(legacy, { command: "c".repeat(2500), output_snippet: "😀".repeat(2500), verified_by: "executor", task_id: "7" });
     const trusted = entries(legacy).at(-1) as EvidenceEntry;
     expect(await appendEvidence(shared, trusted)).toBe(3);
     expect(read(ledgerFile(shared))).toBe(read(ledgerFile(legacy)));
@@ -217,32 +232,64 @@ describe("evidence_log", () => {
     expect(Object.keys(entries(root)[0])).toEqual(["type", "command", "exit_code", "output_snippet", "timestamp"]);
   });
 
-  test("evidence_log with plan_sha256 stores it after verified_by", async () => {
+  test("a final verification stores task_id, then the task's run and list, after verified_by and before the tree stamp", async () => {
     const root = project();
-    await log(root, { evidence_type: "final_verification", verified_by: "orchestrator", plan_sha256: PLAN_SHA });
+    onList("7", { run: "docs", final: true });
+    await log(root, { evidence_type: "final_verification", verified_by: "orchestrator", task_id: "7" });
     const [stored] = entries(root);
-    expect(Object.keys(stored)).toEqual(["type", "command", "exit_code", "output_snippet", "timestamp", "verified_by", "plan_sha256", "tree"]);
-    expect(stored.plan_sha256).toBe(PLAN_SHA);
+    expect(Object.keys(stored)).toEqual(["type", "command", "exit_code", "output_snippet", "timestamp", "verified_by", "task_id", "run", "task_list", "tree"]);
+    expect([stored.task_id, stored.run, stored.task_list]).toEqual(["7", "docs", LIST]);
   });
 
-  test.each([
-    ["a short digest", "deadbeef"],
-    ["an uppercase digest", "DEADBEEF".repeat(8)],
-    ["a 65-digit digest", `${PLAN_SHA}0`],
-    ["a 10,000-character value", "x".repeat(10_000)],
-  ])("evidence_log refuses %s as plan_sha256", async (_name, planSha256) => {
+  test("a final verification naming a task that is not a final task on the list is refused, and nothing is written", async () => {
     const root = project();
-    await expect(log(root, { evidence_type: "final_verification", plan_sha256: planSha256 })).rejects.toThrow(
-      "evidence_log: plan_sha256 must be 64 lowercase hex digits or empty",
-    );
+    onList("7", { run: "docs" });
+    for (const taskId of ["7", "8"]) {
+      await expect(log(root, { evidence_type: "final_verification", task_id: taskId })).rejects.toThrow(`task #${taskId} is not a final task on this session's task list`);
+    }
     expect(existsSync(ledgerFile(root))).toBe(false);
   });
 
-  test("evidence_log without plan_sha256, or with an empty one, omits the key", async () => {
+  test("another evidence type keeps its task_id and is not stamped", async () => {
     const root = project();
-    await log(root, { output_snippet: `plan_sha256:${PLAN_SHA}` });
-    await log(root, { plan_sha256: "" });
-    expect(entries(root).map((e: object) => "plan_sha256" in e)).toEqual([false, false]);
+    onList("7", { run: "docs", final: true });
+    await log(root, { task_id: "7" });
+    expect(entries(root)[0]).not.toHaveProperty("task_list");
+  });
+
+  test("evidence_log without task_id, or with an empty one, omits the key", async () => {
+    const root = project();
+    await log(root);
+    await log(root, { task_id: "" });
+    expect(entries(root).map((e: object) => "task_id" in e)).toEqual([false, false]);
+  });
+
+  test("a final verification without a task_id is refused, and nothing is written", async () => {
+    const root = project();
+    onList("7", { run: "docs", final: true });
+    for (const extra of [{}, { task_id: "" }]) {
+      await expect(log(root, { evidence_type: "final_verification", ...extra })).rejects.toThrow("a final_verification names the run's final task in task_id");
+    }
+    expect(existsSync(ledgerFile(root))).toBe(false);
+  });
+
+  test("evidence_log refuses a task_id that is not a string", async () => {
+    const root = project();
+    await expect(log(root, { evidence_type: "final_verification", task_id: 7 })).rejects.toThrow("task_id");
+    expect(existsSync(ledgerFile(root))).toBe(false);
+  });
+
+  test("evidence_log caps a long task_id at 200 characters", async () => {
+    const root = project();
+    await log(root, { task_id: "9".repeat(500) });
+    expect(entries(root)[0].task_id).toBe("9".repeat(200));
+  });
+
+  test("the evidence_log schema names task_id for final_verification", () => {
+    const { properties } = tool("evidence_log").inputSchema;
+    expect(properties.task_id).toEqual({ type: "string", default: "", description: "The id of the run's final task this verdict covers. Set it on final_verification entries only." });
+    expect(properties).not.toHaveProperty("plan_sha256");
+    expect(tool("evidence_log").inputSchema.required).toEqual(["evidence_type", "command", "exit_code", "output_snippet"]);
   });
 
   test("evidence_log leaves only the ledger in .omca/evidence", async () => {

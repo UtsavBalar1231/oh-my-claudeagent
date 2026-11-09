@@ -81,7 +81,7 @@ function bestEffort(what: string, cleanup: () => void): void {
   }
 }
 
-const removeFile = (path: string): void => retryBusy(() => rmSync(path, { force: true }));
+export const removeFile = (path: string): void => retryBusy(() => rmSync(path, { force: true }));
 
 const NOT_A_REPOSITORY = /not a git repository/i;
 
@@ -315,23 +315,6 @@ export async function withLock<T>(
   }
   try {
     return await fn();
-  } finally {
-    release(lockPath, held);
-  }
-}
-
-/** Runs `fn` under the lock if it can be taken within `waitMs`; returns false, having run nothing, when it cannot. */
-export function tryWithLockSync(lockPath: string, fn: () => void, waitMs: number): boolean {
-  const nonce = crypto.randomUUID();
-  const deadline = Date.now() + waitMs;
-  let held: string | undefined;
-  while ((held = tryAcquire(lockPath, nonce)) === undefined) {
-    if (Date.now() >= deadline) return false;
-    Bun.sleepSync(1);
-  }
-  try {
-    fn();
-    return true;
   } finally {
     release(lockPath, held);
   }

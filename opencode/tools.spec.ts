@@ -1,14 +1,12 @@
 import type { Plugin } from "@opencode/plugin";
 import type { Info, ToolContext, ToolEditor } from "@opencode/plugin/promise/tool";
 import { afterEach, expect, spyOn, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { tools as astTools } from "../servers/tools/ast.ts";
 import { LEDGER } from "../src/core/omca-paths.ts";
 import { withLock } from "../servers/io.ts";
-import * as state from "./state.ts";
-import { bindPlan } from "./state.ts";
 import { registerTools } from "./tools.ts";
 
 const dirs: string[] = [];
@@ -63,11 +61,15 @@ const ledger = (root: string) => join(root, LEDGER);
 const section = (root: string) => join(root, ".omca", "notepads", "native", "learnings.md");
 const permissionPath = (path: string) => path.replaceAll("\\", "/");
 
-test("registers stable native names with direct workflow tools and no boulder writer", async () => {
+const newTask = (run: string, metadata: Record<string, unknown> = {}) => ({ subject: "Do it", description: "Done when it passes", metadata: { run, ...metadata } });
+const coordinate = (f: Awaited<ReturnType<typeof fake>>, name: string, input: Record<string, unknown> = {}) => f.call(name, input, "ses_a", "omca");
+const taskFile = (root: string, id: string) => join(root, ".omca", "state", "tasks", `${id}.json`);
+
+test("registers stable native names with direct workflow tools and no plan tools", async () => {
   const f = await fake();
-  for (const name of ["evidence_log", "boulder_progress", "notepad_write"]) expect(f.tools.get(`omca_${name}`)?.options?.codemode).toBe(false);
+  for (const name of ["evidence_log", "notepad_write", "task_create", "task_update", "task_list", "task_get"]) expect(f.tools.get(`omca_${name}`)?.options?.codemode).toBe(false);
   for (const name of ["evidence_read", "notepad_read", "file_read", "ast_search"]) expect(f.tools.get(`omca_${name}`)?.options?.codemode).toBe(true);
-  expect(f.tools.has("omca_boulder_write")).toBe(false);
+  for (const name of ["boulder_write", "boulder_progress"]) expect(f.tools.has(`omca_${name}`)).toBe(false);
   for (const tool of f.tools.values()) {
     const input = tool.input as { properties: Record<string, unknown> };
     expect(input.properties).not.toHaveProperty("working_directory");
@@ -177,51 +179,101 @@ test("internal permission resources use active-location-relative paths, includin
   expect(existsSync(join(pkg, ".omca"))).toBe(false);
 });
 
-test("read-only tools do not initialize missing state and progress never inherits another session binding", async () => {
+test("read-only tools do not initialize missing state", async () => {
   const f = await fake();
   await f.call("evidence_read");
   await f.call("notepad_list");
   await f.call("notepad_read", { plan_name: "native" });
-  const unbound = await f.call("boulder_progress");
-  expect(JSON.parse(String(unbound.content)).plan).toBeNull();
+  expect(String((await f.call("task_list")).content)).toBe("The task list is empty.");
+  await expect(f.call("task_get", { taskId: "1" })).rejects.toThrow("Task #1 is not on the list");
   expect(existsSync(join(f.a, ".omca"))).toBe(false);
-  const plan = join(f.a, "plan.md");
-  writeFileSync(plan, "Status: FINAL\n\n- [x] 1. done\n- [ ] 2. next\n");
-  await bindPlan(f.a, "ses_b", plan);
-  expect(JSON.parse(String((await f.call("boulder_progress")).content)).plan).toBeNull();
-  await bindPlan(f.a, "ses_a", plan);
-  expect(JSON.parse(String((await f.call("boulder_progress")).content))).toMatchObject({ total: 2, completed: 1, remaining: 1, next_task_label: "next" });
 });
 
-test("omca_boulder_progress counts a blocked task apart and skips it for the next task", async () => {
+test("the task tools keep a run on disk that any session in the checkout reads", async () => {
   const f = await fake();
-  const plan = join(f.a, "plan.md");
-  writeFileSync(plan, "Status: FINAL\n\n- [x] 1. done\n- [~] 2. stuck\n- [ ] 3. next\n");
-  await bindPlan(f.a, "ses_a", plan);
-  expect(JSON.parse(String((await f.call("boulder_progress")).content))).toMatchObject({ total: 3, completed: 1, blocked: 1, remaining: 1, next_task_label: "next" });
+  const created = await coordinate(f, "task_create", newTask("work"));
+  expect(created.content).toBe("Task #1 created: Do it");
+  expect(JSON.parse(readFileSync(taskFile(f.a, "1"), "utf8"))).toEqual({ id: "1", subject: "Do it", description: "Done when it passes", activeForm: "", status: "pending", owner: "", blocks: [], blockedBy: [], metadata: { run: "work" } });
+  await coordinate(f, "task_create", { ...newTask("work", { final: true }), subject: "Final verification" });
+  expect((await coordinate(f, "task_update", { taskId: "2", addBlockedBy: ["1"] })).content).toBe("Task #2 [pending] Final verification");
+  f.locations.set("ses_c", f.a);
+  const listed = await f.call("task_list", {}, "ses_c", "build");
+  expect(listed.content).toBe("Run work:\n#1 [pending] Do it\n#2 [pending] Final verification [final] [waiting on #1]");
+  expect(JSON.parse(String((await f.call("task_get", { taskId: "2" }, "ses_c", "plan")).content))).toMatchObject({ id: "2", isFinal: true, blockedBy: ["1"], run: "work" });
+  expect(f.changes).toEqual(["ses_a", "ses_a", "ses_a"]);
 });
 
-test("snapshot inspection passes the approved binding and cannot substitute a newly bound plan", async () => {
+test.each(["build", "plan", "omca-executor"])("only the coordinator changes the task list, not %s", async (agent) => {
   const f = await fake();
-  const approvedPlan = join(f.a, "approved.md");
-  const otherPlan = join(f.a, "other.md");
-  writeFileSync(approvedPlan, "Status: FINAL\n\n- [ ] 1. approved task\n");
-  writeFileSync(otherPlan, "Status: FINAL\n\n- [ ] 1. NEVER_EXPOSE_UNAPPROVED_TASK\n");
-  await bindPlan(f.a, "ses_a", approvedPlan);
-  const registryPath = join(f.a, ".omca", "state", "boulder.json");
-  const approvedRegistry = readFileSync(registryPath, "utf8");
-  await bindPlan(f.a, "ses_a", otherPlan);
-  const swappedRegistry = readFileSync(registryPath, "utf8");
-  writeFileSync(registryPath, approvedRegistry);
-  const original = state.readBoundPlan;
-  const spy = spyOn(state, "readBoundPlan").mockImplementation((directory, sessionID, expected) => {
-    expect(expected).toMatchObject({ name: "approved", path: approvedPlan });
-    writeFileSync(registryPath, swappedRegistry);
-    return original(directory, sessionID, expected);
+  await expect(f.call("task_create", newTask("work"), "ses_a", agent)).rejects.toThrow("Only the OMCA coordinator");
+  await expect(f.call("task_update", { taskId: "1", status: "completed" }, "ses_a", agent)).rejects.toThrow("Only the OMCA coordinator");
+  expect(f.assertions).toEqual([]);
+  expect(existsSync(join(f.a, ".omca"))).toBe(false);
+});
+
+test("a task needs a run", async () => {
+  const f = await fake();
+  await expect(coordinate(f, "task_create", { subject: "x", description: "y", metadata: {} })).rejects.toThrow("metadata.run must name the run");
+  expect(existsSync(join(f.a, ".omca"))).toBe(false);
+});
+
+test.each([["the string true", "true"], ["false", false], ["null", null]])("task_create refuses metadata.final set to %s and creates nothing", async (_name, final) => {
+  const f = await fake();
+  await expect(coordinate(f, "task_create", newTask("work", { final }))).rejects.toThrow("metadata.final must be the boolean true");
+  expect(existsSync(join(f.a, ".omca"))).toBe(false);
+});
+
+test.each([["a string", "oops"], ["an array", ["run"]], ["null", null]])("task_create and task_update refuse metadata that is %s", async (_name, metadata) => {
+  const f = await fake();
+  await expect(coordinate(f, "task_create", { subject: "x", description: "y", metadata })).rejects.toThrow("metadata must be an object");
+  await coordinate(f, "task_create", newTask("work"));
+  await expect(coordinate(f, "task_update", { taskId: "1", status: "completed", metadata })).rejects.toThrow("metadata must be an object");
+  expect(JSON.parse(readFileSync(taskFile(f.a, "1"), "utf8")).status).toBe("pending");
+});
+
+test("the final task refuses completion until a passing verdict names it, end to end through the tools", async () => {
+  const f = await fake();
+  await coordinate(f, "task_create", newTask("work"));
+  await coordinate(f, "task_create", newTask("work", { final: true }));
+  await expect(coordinate(f, "task_update", { taskId: "2", status: "completed" })).rejects.toThrow("no passing final verification names it");
+  await coordinate(f, "evidence_log", { ...evidence, evidence_type: "final_verification", exit_code: 1, task_id: "2" });
+  await expect(coordinate(f, "task_update", { taskId: "2", status: "completed" })).rejects.toThrow("no passing final verification names it");
+  await coordinate(f, "evidence_log", { ...evidence, evidence_type: "final_verification", exit_code: 0, task_id: "2" });
+  expect((await coordinate(f, "task_update", { taskId: "2", status: "completed" })).content).toBe("Task #2 [completed] Do it");
+});
+
+test("task writes honor native denials and create nothing when refused", async () => {
+  for (const [action, resource] of [["omca_task_create", ".omca/state/tasks"], ["edit", ".omca/state/tasks"], ["edit", ".omca/state/tasks.lock.d/owner"], ["read", ".omca/.gitignore"], ["edit", ".omca/.gitignore"]]) {
+    const f = await fake();
+    f.deny((input) => {
+      if (input.action === action && input.resources.includes(resource!)) throw new Error("native denial");
+    });
+    await expect(coordinate(f, "task_create", newTask("work"))).rejects.toThrow("native denial");
+    expect(existsSync(join(f.a, ".omca"))).toBe(false);
+  }
+});
+
+test("reading the list asks only for the list", async () => {
+  const f = await fake();
+  await coordinate(f, "task_create", newTask("work"));
+  f.deny((input) => {
+    if (input.action === "read" && input.resources.some((resource) => resource.includes("notepads") || resource.includes("verification-evidence"))) throw new Error("unrelated state denied");
   });
-  restores.push(() => spy.mockRestore());
-  await expect(f.call("boulder_progress")).rejects.toThrow("Plan binding changed");
-  expect(spy).toHaveBeenCalledTimes(1);
+  expect(String((await f.call("task_list")).content)).toContain("#1 [pending] Do it");
+});
+
+test("a task write refuses a switch to Plan while waiting for the list's lock", async () => {
+  const f = await fake();
+  await coordinate(f, "task_create", newTask("work"));
+  let release!: () => void;
+  const held = withLock(join(f.a, ".omca", "state", "tasks.lock"), () => new Promise<void>((resolve) => { release = resolve; }));
+  const pending = coordinate(f, "task_update", { taskId: "1", status: "completed" }).then(() => null, (error: unknown) => error);
+  await Bun.sleep(20);
+  f.agents.set("ses_a", "plan");
+  release();
+  await held;
+  expect(String(await pending)).toContain("switched to the plan agent");
+  expect(JSON.parse(readFileSync(taskFile(f.a, "1"), "utf8")).status).toBe("pending");
 });
 
 test("evidence validates integer exits, deduplicates call retries, and preserves ledger shape", async () => {
@@ -241,6 +293,38 @@ test("evidence validates integer exits, deduplicates call retries, and preserves
   expect(readFileSync(ledger(f.a), "utf8")).toBe("broken");
 });
 
+test("logging evidence rotates a ledger past its cap, as the omca server does at start", async () => {
+  const f = await fake();
+  await f.call("evidence_log", evidence);
+  const [first] = JSON.parse(readFileSync(ledger(f.a), "utf8")).entries;
+  writeFileSync(ledger(f.a), JSON.stringify({ version: 1, entries: Array.from({ length: 1001 }, (_, i) => ({ ...first, command: `cmd-${i}` })) }));
+  await f.call("evidence_log", { ...evidence, command: "after" });
+  const live = JSON.parse(readFileSync(ledger(f.a), "utf8")).entries;
+  expect(live.map((entry: { command: string }) => entry.command)).toEqual([...Array.from({ length: 500 }, (_, i) => `cmd-${i + 501}`), "after"]);
+  const archives = readdirSync(dirname(ledger(f.a))).filter((name) => /^verification-evidence\.\d{6}\.json$/.test(name));
+  expect(archives).toHaveLength(1);
+  expect(JSON.parse(readFileSync(join(dirname(ledger(f.a)), archives[0] ?? ""), "utf8")).entries).toHaveLength(501);
+});
+
+test("a month's archive the reader refuses stops the rotation, not the logging", async () => {
+  const f = await fake();
+  await f.call("evidence_log", evidence);
+  const [first] = JSON.parse(readFileSync(ledger(f.a), "utf8")).entries;
+  writeFileSync(ledger(f.a), JSON.stringify({ version: 1, entries: Array.from({ length: 1001 }, () => first) }));
+  const now = new Date();
+  const archive = join(dirname(ledger(f.a)), `verification-evidence.${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}.json`);
+  writeFileSync(archive, "torn");
+  const logged = spyOn(console, "error").mockImplementation(() => undefined);
+  try {
+    await f.call("evidence_log", { ...evidence, command: "after" });
+    expect(logged).toHaveBeenCalledTimes(1);
+  } finally {
+    logged.mockRestore();
+  }
+  expect(JSON.parse(readFileSync(ledger(f.a), "utf8")).entries).toHaveLength(1002);
+  expect(readFileSync(archive, "utf8")).toBe("torn");
+});
+
 test("evidence deduplication includes the native message identity", async () => {
   const f = await fake();
   const signal = new AbortController().signal;
@@ -253,20 +337,13 @@ test("evidence deduplication includes the native message identity", async () => 
   expect(entries.map((entry: { provenance: { message_id: string } }) => entry.provenance.message_id)).toEqual(["msg_one", "msg_two"]);
 });
 
-test("progress and final evidence do not require unrelated notepad or ledger reads", async () => {
+test("final evidence does not require unrelated notepad reads", async () => {
   const f = await fake();
-  const plan = join(f.a, "plan.md");
-  writeFileSync(plan, "Status: FINAL\n\n- [x] 1. Done\n");
-  await bindPlan(f.a, "ses_a", plan);
-  f.deny((input) => {
-    if (input.action === "read" && input.resources.some((resource) => resource.includes("notepads") || resource.includes("verification-evidence"))) throw new Error("unrelated state denied");
-  });
-  const progress = JSON.parse(String((await f.call("boulder_progress")).content));
-  expect(progress.completed).toBe(1);
+  await coordinate(f, "task_create", newTask("work", { final: true }));
   f.deny((input) => {
     if (input.action === "read" && input.resources.some((resource) => resource.includes("notepads"))) throw new Error("notepads denied");
   });
-  await f.call("evidence_log", { ...evidence, evidence_type: "final_verification", exit_code: 0, plan_sha256: progress.plan_sha256 });
+  await f.call("evidence_log", { ...evidence, evidence_type: "final_verification", exit_code: 0, task_id: "1" });
   expect(JSON.parse(readFileSync(ledger(f.a), "utf8")).entries).toHaveLength(1);
 });
 
@@ -304,18 +381,33 @@ test.each([["evidence_log", "read"], ["evidence_log", "edit"], ["file_read", "re
   expect(readFileSync(join(f.a, ".omca", ".gitignore"), "utf8")).toBe("*\n!/rules/\n!/rules/**\n");
 });
 
-test("final verification requires an explicit binding and exact current hash; health remains historical", async () => {
+test("final verification must name a run's final task; health remains historical", async () => {
   const f = await fake();
-  const final = { ...evidence, evidence_type: "final_verification", exit_code: 0, plan_sha256: "a".repeat(64) };
-  await expect(f.call("evidence_log", final)).rejects.toThrow("exact current hash");
-  const plan = join(f.a, "plan.md");
-  writeFileSync(plan, "Status: FINAL\n\n- [x] 1. done\n");
-  await bindPlan(f.a, "ses_a", plan);
-  await expect(f.call("evidence_log", final)).rejects.toThrow("exact current hash");
-  const progress = JSON.parse(String((await f.call("boulder_progress")).content));
-  await f.call("evidence_log", { ...final, plan_sha256: progress.plan_sha256 });
+  const final = { ...evidence, evidence_type: "final_verification", exit_code: 0 };
+  await expect(f.call("evidence_log", final)).rejects.toThrow("task_id of a run's final task");
+  await coordinate(f, "task_create", newTask("work"));
+  await expect(f.call("evidence_log", { ...final, task_id: "1" })).rejects.toThrow("task_id of a run's final task");
+  await expect(f.call("evidence_log", { ...final, task_id: "2" })).rejects.toThrow("task_id of a run's final task");
+  await coordinate(f, "task_create", newTask("work", { final: true }));
+  await f.call("evidence_log", { ...final, task_id: "2" });
   expect(JSON.parse(String((await f.call("health_check")).content)).verification).toBe("historical");
-  expect(JSON.parse(readFileSync(ledger(f.a), "utf8")).entries[0].origin).toBe("attested");
+  const [entry] = JSON.parse(readFileSync(ledger(f.a), "utf8")).entries;
+  expect(entry).toMatchObject({ origin: "attested", task_id: "2", run: "work", task_list: ".omca/state/tasks" });
+  expect(entry).not.toHaveProperty("plan_sha256");
+});
+
+test("the health snapshot refuses a list that moved to another run during approval", async () => {
+  const f = await fake();
+  await coordinate(f, "task_create", newTask("approved"));
+  let moved = false;
+  f.deny((input) => {
+    if (input.action === "read" && input.resources.includes(".omca/notepads/approved/learnings.md") && !moved) {
+      moved = true;
+      writeFileSync(taskFile(f.a, "1"), JSON.stringify({ id: "1", subject: "Moved", status: "pending", metadata: { run: "other" } }));
+    }
+  });
+  const health = JSON.parse(String((await f.call("health_check")).content)).health as { name: string; state: string; detail: string }[];
+  expect(health).toContainEqual(expect.objectContaining({ name: "tasks", state: "error", detail: expect.stringContaining("changed during inspection") }));
 });
 
 test("OMCA state symlinks cannot redirect reads or writes", async () => {
@@ -323,6 +415,8 @@ test("OMCA state symlinks cannot redirect reads or writes", async () => {
   symlinkSync(f.b, join(f.a, ".omca"), "dir");
   await expect(f.call("notepad_write", note)).rejects.toThrow("symlinks");
   await expect(f.call("evidence_read")).rejects.toThrow("symlinks");
+  await expect(coordinate(f, "task_create", newTask("work"))).rejects.toThrow("symlinks");
+  await expect(f.call("task_list")).rejects.toThrow("symlinks");
   expect(existsSync(join(f.b, "state"))).toBe(false);
 });
 
@@ -475,15 +569,15 @@ test("native AST refuses symlink escapes and ignored dependency trees", async ()
 });
 
 test.each([".break", ".d", ".d/owner", ".break.d", ".break.d/owner"])("owned lock sidecar %s cannot be redirected through a symlink", async (suffix) => {
-  for (const name of ["evidence_log", "notepad_write"]) {
+  for (const name of ["evidence_log", "notepad_write", "task_create"]) {
     const f = await fake();
-    const path = name === "evidence_log" ? ledger(f.a) : section(f.a);
-    const sidecar = `${path}.lock${suffix}`;
+    const path = name === "evidence_log" ? ledger(f.a) : name === "notepad_write" ? section(f.a) : join(f.a, ".omca", "state", "tasks");
+    const sidecar = name === "task_create" ? join(f.a, ".omca", "state", `tasks.lock${suffix}`) : `${path}.lock${suffix}`;
     const target = suffix.endsWith(".d") ? f.b : join(f.b, "target");
     if (!suffix.endsWith(".d")) writeFileSync(target, "outside must stay unchanged");
     mkdirSync(dirname(sidecar), { recursive: true });
     symlinkSync(target, sidecar, suffix.endsWith(".d") ? "dir" : "file");
-    await expect(f.call(name, name === "evidence_log" ? evidence : note)).rejects.toThrow("symlinks");
+    await expect(f.call(name, name === "evidence_log" ? evidence : name === "notepad_write" ? note : newTask("work"), "ses_a", name === "task_create" ? "omca" : "build")).rejects.toThrow("symlinks");
     expect(existsSync(path)).toBe(false);
     if (!suffix.endsWith(".d")) expect(readFileSync(target, "utf8")).toBe("outside must stay unchanged");
   }

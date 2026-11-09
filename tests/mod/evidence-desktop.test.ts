@@ -20,7 +20,7 @@ async function openEvidence($: Engine, on: On, entries: unknown[]) {
   w.surfaces = ["desktop"];
   await $.command.run(run(""));
   const ui = await $.ui.mount(pane("desktop"));
-  await ui.press({ key: "3" });
+  await ui.press({ key: "2" });
   await ui.redraw();
   return ui;
 }
@@ -102,7 +102,7 @@ test("Evidence on desktop puts the focus on the paging Button that stays drawn a
   w.surfaces = ["desktop"];
   await $.command.run(run(""));
   const ui = await $.ui.mount(pane("desktop"));
-  await ui.press({ key: "3" });
+  await ui.press({ key: "2" });
   await ui.redraw();
   const turn = async (key: string) => {
     await ui.press({ key });

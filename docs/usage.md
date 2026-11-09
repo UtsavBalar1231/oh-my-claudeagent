@@ -105,32 +105,37 @@ Commands:
 | --- | --- |
 | `/omca` | Open the terminal panel without starting work |
 | `/omca-plan <request>` | Discuss a plan in native Plan mode; save a file only when asked |
-| `/omca-start-work <path>` | Ask approval, validate and bind a FINAL plan, then coordinate execution |
-| `/omca-pause` | Interrupt the coordinator and remove its binding without deleting its files |
+| `/omca-start-work [plan or instructions]` | Ask approval, then coordinate the open run or turn the plan into tasks and run them |
 | `/omca-analyzer`, `/omca-reviewer`, `/omca-build-fixer` | Ask the primary agent to launch the specialist |
 
-Use Build or OMCA before starting work. A saved plan needs `Status: FINAL`,
-numbered task checkboxes and valid dependencies. Plans may live in the checkout
-or `~/.opencode/plan`. A fork or a session moved to another checkout does not
-inherit an execution binding. Run start-work explicitly at the destination.
-Independent background sessions retain OpenCode's own interruption controls.
-Plan reads refuse files over 1 MiB or plans over 1,000 numbered tasks. Dashboard
-snapshots refuse state files over 4 MiB rather than allocating unbounded inputs.
+Use Build or OMCA before starting work. A plan is the conversation or a document in
+any format, since nothing parses it. The coordinator turns it into tasks on the
+checkout's task list, in `.omca/state/tasks/`, with the same run, final-task and
+blocked-task rules as Claude Code's list. Every session in a checkout shares that
+list, so a new session picks up an open run. Stopping is OpenCode's own interrupt;
+the tasks stay. Each worktree has its own list. Only the OMCA coordinator changes the
+list: Build, Plan and child agents can read it. List reads refuse a task file over
+256 KiB or a list over 1,000 tasks. Dashboard snapshots refuse state files over 4 MiB
+rather than allocating unbounded inputs.
 
-The panel shows the bound plan, native child sessions, evidence, notepads and
+The panel shows the current run, native child sessions, evidence, notepads and
 adapter health. Selecting a child opens its native session. The interface uses
 the current theme and leaves native tabs, the composer and permission prompts
 in place. Headless clients use the same tools without the panel.
 
-The adapter registers native `omca_*` evidence, notepad, AST, progress and file
+The adapter registers native `omca_*` evidence, notepad, AST, task and file
 tools. It does not start a duplicate OMCA MCP process. Custom filesystem tools
 still check native read/edit permissions; they do not bypass an external-directory
 deny. The shell guard uses the actual command directory. The comment gate blocks
 only with `OMCA_COMMENT_GATE=deny`.
 
-**Limits:** OpenCode has no OMCA Stop veto. Completed checkboxes and historical
-passing evidence do not prove the current checkout is verified. The panel labels
-ledger successes as historical until native execution provenance is supported.
+**Limits:** OpenCode has no OMCA Stop veto, so nothing keeps a session working. A
+run's final task does refuse to complete until a passing verdict names it, and refuses
+to be deleted or closed as blocked until a verdict of any outcome names it. Completed
+tasks and historical passing evidence do not prove the current checkout is verified.
+The panel labels ledger successes as historical until native execution provenance is
+supported. OpenCode's experimental `todowrite` list is separate from a run, and the
+coordinator is not offered it.
 The TUI is a terminal extension, not a Desktop or Web UI extension. OMCA does not
 replace provider authentication, compaction, scheduling, memory, or native undo.
 
@@ -140,40 +145,44 @@ replace provider authentication, compaction, scheduling, memory, or native undo.
 
 Run `/oh-my-claudeagent:plan <what you want done>`. The planner agent interviews you for what
 the plan needs, consults analyzer for gaps, writes the plan, and has reviewer review it. The plan
-lands in your plans directory: the `plansDirectory` setting when you set one, relative to the
-project, and `~/.claude/plans` otherwise. Ask for a project-local plan and it lands in
+is a Markdown document that nothing parses, so its headings and prose are the planner's to choose.
+It lands in your plans directory: the `plansDirectory` setting when you set one, relative to the
+project, and `plans/` in the Claude config directory (`CLAUDE_CONFIG_DIR`, or `~/.claude`) otherwise. Ask for a project-local plan and it lands in
 `.omca/plans` under the project instead. To make that the default, set
 `plansDirectory: ".omca/plans"`. `.omca/` is gitignored, so those plans stay out of commits.
-Each task is a numbered checkbox, `- [ ] 1. ...`; progress tracking counts only numbered boxes.
-A finished task reads `- [x] 1. ...`, and a task that cannot be finished reads `- [~] 1. ...` with
-a `- Blocked: <one line>` sub-bullet. A blocked task is closed for what runs next and never counts
-as done.
+
+After the review the skill creates the run in Claude Code's task list, one task for each unit of
+work. Every task of a run carries `metadata.run`, the run's name, and names the tasks it waits on
+in `blockedBy`. The last task is the final verification and carries `metadata.final: true`. A task
+that cannot be finished carries `metadata.blocked: "<why>"`, which closes it without completing
+it, so it never counts as done and does not hold the run open.
 
 To research before planning, ask `/oh-my-claudeagent:plan` to help you understand or research
-the problem. Planner interviews you and returns its findings with no plan file.
-
-The plan skill writes the plan and does not bind the session to it. `start-work` registers the
-plan and binds the session that runs it.
+the problem. Planner interviews you and returns its findings with no plan file and no tasks.
 
 ### Run it
 
-Run `/oh-my-claudeagent:start-work`, or `/oh-my-claudeagent:start-work <plan file>` to pick a
-plan. The session binds itself to the plan, hands each task to an executor agent (in parallel
-where the plan allows it), records a verification for each task, and checks its box when the
-task is done. Add `--worktree <path>` to have every task work in an existing git worktree.
+A run lives in Claude Code's task list, not in the plan file. At session start OMCA sets
+`CLAUDE_CODE_ENABLE_TODO_TOOLS=1` and `CLAUDE_CODE_TASK_LIST_ID` when nothing has set them, with
+one list for each checkout, so the tasks outlive `/clear` and a new session in the same checkout
+can pick the run up with `/oh-my-claudeagent:start-work`. Set `CLAUDE_CODE_TASK_LIST_ID` yourself
+to use another list.
 
-To resume after an interruption, run `/oh-my-claudeagent:start-work` again. It continues from the
-first open task. `/loop` cannot run `start-work` for you, because only you can start it.
+Run `/oh-my-claudeagent:start-work`. The session reads the run's tasks, hands each open task to
+an executor agent (in parallel where `blockedBy` allows it), records a verification for each,
+and marks the task completed. With several open runs, add the run's name to pick one. Add
+`--worktree <path>` to have every task work in an existing git worktree.
+
+To resume after an interruption, or from a new session, run `/oh-my-claudeagent:start-work` again.
+It continues from the first open task. `/loop` cannot run `start-work` for you, because only you
+can start it.
 
 ### What keeps a session honest
 
 After any build, test, lint or typecheck command, the agent logs the result with
 `evidence_log`. These checks run when a session tries to stop:
 
-- **Plan continuation**: the bound plan still has open tasks.
-- **Final verification**: no task is open, but no `final_verification` entry with exit code 0
-  matches the plan's current content. With blocked tasks the message names them, and an exit 0
-  verdict must name each one and its gap.
+- **Task continuation**: the run still has open tasks, the final task included.
 - **Drift guard**: the last reply claims the work is done while a changed line still holds a
   stub marker.
 
@@ -181,14 +190,15 @@ Each one continues the turn with its reason. A check gives up after five continu
 session and gets its budget back once its condition clears, so a stuck check cannot trap a
 session.
 
-When the task tools are on, marking a task complete is also refused while a verification command
-under an hour old has not been logged. Claude Code turns the task tools on by default only for
-older models, up to Opus 4.7 and Sonnet 4.6; on other models set
-`CLAUDE_CODE_ENABLE_TODO_TOOLS=1`.
+Marking a task complete is also refused while a verification command under an hour old has not
+been logged, and the run's final task cannot close until
+`evidence_log(evidence_type="final_verification", ..., exit_code=0, task_id="<id>")` is logged for
+it. `evidence_log` records the task's run and list with the verdict, so a verdict for task `#3` of
+one list never closes task `#3` of another.
 
 ### Hand off a long session
 
-When the context is long, run `/oh-my-claudeagent:handoff`. It gathers git state, the plan and
+When the context is long, run `/oh-my-claudeagent:handoff`. It gathers git state, the open tasks and
 the notepad into a block you paste as the first message of a new session. Only you can start it;
 the model cannot.
 
@@ -236,39 +246,29 @@ the work happens:
   OMCA says so in the transcript when tmux holds them back. A group of more than three pictures
   previews three and names the rest, and the pictures in one group share 2 MiB: past that, and in
   tmux and iTerm2, a picture drawn from its file keeps the name row alone.
-- **A plan task's receipt.** When a main turn finishes tasks of the bound plan, a row under its
-  turn line names each one with its [proof](#proof): `✓ Task 7 Wire the panel · proven by just
-  test`, `! Task 8 Move the rates · unproven`, or `✗ Task 9 Add the form · failed bun test`. The
-  turn that ends the plan adds `Plan checkout complete · 14/14 · ✓ 12 proven ! 2 unproven · final
-  verification not logged`, dropping the counts first where the row runs short. A row stays where
-  it landed and settles as evidence comes in: a run logged in a later turn turns `unproven` to
-  `proven` or `failed` in place, and a final verification logged later turns the last row to `final
-  verification passed`. A row that says `proven` keeps saying it when later work edits the same
-  files; the band and the Plan tab show the live verdict. Tasks already done when the session
-  started or the plan was bound place no row. The row is for you: Claude never reads it, it is not
-  in the transcript file, and `--resume` does not bring it back. Outside fullscreen, a compaction
-  ends it. Claude Code holds 500 rows per plugin in a conversation until `/clear`; past that a task
-  places no row, and a plan's end is a toast.
-  `OMCA_DISABLED_HOOKS=plan-receipts` turns the rows off. Claude Code 2.1.314 or later draws them;
-  on an older one a plan's end is a toast instead.
-
+- **A turn that changed a run.** Claude Code draws nothing for its task tools, so under the turn
+  line of a turn that created or updated a run's tasks OMCA adds one row: the run's name, done of
+  total, then only that turn's changes, each with its mark: `+26 tasks`, `✓ #5` completed,
+  `◐ #6 #7` started, `⊗ #8 blocked` closed as blocked and `◆ final done`, then `/tasklist`. A list
+  names three ids, then how many more. As the window narrows, whole parts leave from the end; the
+  run's name and the ids are never cut. A subagent's turn adds no row.
 Running agents are listed by Claude Code itself, under the prompt. A session without a terminal
 gets the turn's figures as one text row beneath the answer instead.
 
 ### The band
 
-The band sits above the prompt. It shows the bound plan's progress as a bar with its done and
-total tasks, the next open task, how many tasks are proven, unproven and failed (see
-[proof](#proof)), and a verification command whose evidence was not logged. As the window narrows
-it drops the proof counts first, then the next task, then the verification; the bar stays. With
-no plan bound and no step to offer, it draws nothing. The prompt's border names the plan.
+The band sits above the prompt. It shows a verification command whose evidence was not logged,
+and a line when the session status file cannot be read. While a run has open tasks, a line under
+it names the run with a short progress bar, done of total, the running tasks and how many were
+closed as blocked, as in `◆ dotman-rewrite ━━━━────────── 5/27 · ◐ #6 #7 · ⊗ 1`. As the band
+narrows, that line drops the bar, then the running tasks, then the blocked count. With none of
+these, the band draws nothing.
 
-Below it, numbered buttons offer the next step: log the evidence, start work, run the final
-verification, or review the changes with architect. Press a button's digit in an empty prompt, or
-click it, to fill the prompt with that step; nothing runs until you send it. Typing anything else
-clears the buttons, and so does filling the prompt from history, an undo or another plugin. The
-buttons are held while an agent's transcript is in the main view and return with the main
-conversation.
+Below them, numbered buttons offer the next steps: log the evidence, which stays first, and open the
+task list while a run is open. Press a button's digit in an empty prompt, or click it, to fill the
+prompt with that step; nothing runs until you send it. Typing anything else clears the buttons, and
+so does filling the prompt from history, an undo or another plugin. The buttons are held while an
+agent's transcript is in the main view and return with the main conversation.
 
 Claude Code has one band for every mod, and a band another mod draws stays beneath OMCA's rows.
 Set the `showBand` option to `false` to hide OMCA's.
@@ -301,14 +301,12 @@ Set the `showBand` option to `false` to hide OMCA's.
    The one-line results,
    prompts and outputs in the lanes, the details rows and the card keep their markdown styles:
    code in the code color, bold, italics and links, with the markers dropped.
-2. **Plan**: the plan board, below.
-3. **Evidence**: the proof ledger, below.
-4. **Notepad**: one row per section of the bound plan's notepad (learnings, issues, decisions and
+2. **Evidence**: the proof ledger, below.
+3. **Notepad**: one row per section of a run's notepad (learnings, issues, decisions and
    problems), each with its entry count and the date of its newest entry. Enter or a click on a
    row opens that section's page, every entry under its date, which the mouse wheel scrolls a
    row at a time; `b` goes back to the rows. `f` finds text in the entries on either view, `w`
    clears the search, and `l` picks another plan's notepad from the rows.
-
 Two pages have no digit key. `/omca stats` and `/omca doctor` open them, the tab bar names the
 one shown after the tabs, and a digit goes back to a tab:
 
@@ -318,9 +316,7 @@ one shown after the tabs, and a digit goes back to a tab:
   known price are counted as excluded rather than estimated. `r` reloads the records.
 - **Doctor**: the checks described below.
 
-`/omca plan` opens the pane on the Plan tab. As you type, the
-prompt's typeahead offers the subcommands, and the plans in your plans directory after
-`/omca plan`. Press Ctrl+X then Tab,
+As you type, the prompt's typeahead offers the `/omca` subcommands. Press Ctrl+X then Tab,
 or click the pane, to focus it. Esc, the close mark in the pane's corner, or Ctrl+X then X close
 it. Every key letter below works only while its tab is shown and its key is drawn.
 
@@ -331,8 +327,7 @@ initial. A wide terminal gives the docked pane up to 120 columns while the trans
 
 The pane opens only when you ask for it; the transcript reports each agent as it finishes.
 
-A toast appears when a verification fails and when the plan completes. While a turn runs, the
-spinner's line ends with the plan's position, as in `… · task 7/14`.
+A toast appears when a verification fails and when a run completes.
 
 #### Mascots
 
@@ -354,82 +349,61 @@ row has room for it beside the agent's name, so nothing depends on color alone. 
 commands, output and notes, such as API keys, tokens, `password=` values and the password in a
 URL like `postgres://user:pass@host`, are drawn as `‹masked›`, and your home folder as `~`.
 
-### The plan board
+### The Tasks pane
 
-`/omca plan` opens the bound plan; `/omca plan <name or path>` opens another. The picker lists
-the plans directory, `.omca/plans` under the project and every registered plan whose file
-exists, and a name resolves against both directories and the registry. A plan with
-numbered tasks opens on its board: a header with a DRAFT chip while the plan is a draft, a
-progress bar, the proof counts, the next task and the running agents, then the tasks grouped by
-milestone. Each task row shows whether it is done, in progress, open, waiting on another task or
-blocked (its box reads `[~]`), its proof mark,
-the agent working on it, and the tasks it waits on. A task whose only unfinished dependency is
-the task just before it is next in line, so it reads as open. A plan without numbered tasks opens
-on its sections.
+`/tasklist` opens the Tasks pane, separate from the OMCA pane. It shows Claude's own task list,
+the one Ctrl+T toggles under the prompt, whole. That checklist stops at five rows and drops
+finished ones; the pane lists every task and updates while Claude works. Claude Code deletes a list
+seconds after its last task completes, and the pane keeps the finished tasks until `/clear`.
 
-A wide pane shows the focused task's detail beside the list, a narrower one under the task's
-row, and Enter opens it as a page. The detail holds the task's steps, its done-when commands, its
-dependencies with their state, its files with the time since each changed, and the evidence runs
-that bear on it.
+The top of the pane names the run with work left and how many of its tasks are done, then a
+progress bar and a count of each state. The tasks follow in the order the work runs, each section
+under its own rule:
 
-The mouse wheel over the list moves the focus as Up and Down do, and over the detail beside it
-scrolls the detail. In a wide pane a click on a task's title selects it and a second click opens
-it; in a narrower one a click opens it.
-
-The board's key row holds the keys for the focused task, `k`, `s` and `c`, and `m`, which shows
-every other key beside them until you press it again or open another plan. A pane wide enough for
-all of them on one row shows them all and no `m`. A key works only while it is drawn, so on a narrower pane press
-`m` before `e`, `o`, `x`, `f`, `t` or `l`. A note such as `Copied task 6.` follows the keys
-while it lasts.
-
-| Key | On the board | On a task page |
+| Section | Mark | Holds |
 | --- | --- | --- |
-| Up, Down | Move | Scroll |
-| Enter | Open the task | |
-| `n`, `p` | | Next or previous task |
-| `k` | Fill the prompt to run the task's check | The same |
-| `s` | Fill the prompt to start work from the task | The same |
-| `c` | Copy the task | The same |
-| `e` | Switch to the Evidence tab | The same |
-| `o` | Show open tasks only | |
-| `x` | Show failing tasks only | |
-| `f` | Find tasks by their text | |
-| `t` | The plan's sections | |
-| `l` | Recent plans | |
-| `m` | Show or fold the keys past `c` | |
-| `b` | | Back to the board |
-| Esc | Close the pane | Close the pane |
+| Running | `◐` | Tasks in progress, with the agent that owns each |
+| Ready | `○` | Tasks nothing holds back |
+| Blocked | `⊗` | Tasks closed as blocked, with the reason on the row below |
+| Waiting | `·` | Tasks that wait on another, with the first open one (`← #6 +1`) |
+| Done | `✓` | Finished tasks, folded to one row with their count |
 
-In the sections list Enter opens a section, `b` returns to the board, `r` reloads and `l` lists
-recent plans. On a section, `n` and `p` step to the next or previous one, `r` reloads and `t`
-returns to the list. The board reloads the file when it changes on disk and keeps your place.
+The final task carries `◆` and sits last in its section; while it waits, it shows how many tasks
+are still open. Done opens by itself once nothing else is left. Other runs, and tasks that belong
+to no run, fold to one row each under the open run; a click opens one. The marks follow
+`OMCA_GLYPHS`, so the Nerd Font and ASCII tiers draw their own. When the pane is short, the blank
+rows between sections go first, then the count row, and a list still too long scrolls under
+`↑ n more` and `↓ n more`.
 
-#### Proof
+Enter or a click opens a task's page: its state and owner, the full reason a blocked task was given
+up, the tasks it waits on and holds up, then its description and metadata. Each linked task is a
+row you can open. The final task's page also shows the newest `final_verification` entry that names
+it, passed or failed, with its exit code, time and first line of output.
 
-A task's proof mark compares the files its `File:` line lists with the evidence log. The newest
-test, build or lint run since any of those files last changed decides it: **PROVEN** when it
-passed, **FAILED** when it failed, **UNPROVEN** when no such run has happened yet. A task that
-lists no file, or whose files do not exist, gets no mark. For a registered plan, only changes
-made since the plan started count, so a task whose files have not changed since then gets no
-mark from an earlier or unrelated run. PROVEN and UNPROVEN describe finished work, so a task
-still open shows a mark only when it is FAILED, and the proof counts on the board and the band
-count the marks. A board row ends with the mark's glyph in the theme's color and its word,
-`✓ proven`, `! unproven` or `✗ failed`, with `proven` drawn muted; a row too narrow for the word
-keeps the glyph. The task's detail shows the state as a chip.
+| Key | Where | Action |
+| --- | --- | --- |
+| Up, Down | List | Move between tasks |
+| Enter | List | Open the task's page |
+| `d` | List | Show or hide the done tasks |
+| `b` | Page | Back to the list, on that task's row |
+| `n`, `p` | Page | The next or previous task, in list order |
+| Up, Down, wheel | Page | Scroll the page |
+| Esc | Both | Close the pane |
+
+A subagent running in the background has no task tools, so only the main session and foreground
+subagents change the list. Every agent can read it with OMCA's `task_list` and `task_get` tools. The
+pane reads the session's list or the one `CLAUDE_CODE_TASK_LIST_ID` names; an agent team's shared list is not covered.
 
 ### The proof ledger
 
-The Evidence tab opens on a verdict for the bound plan: **COMPLETE** when a passing final
-verification matches the plan file as it is now, **CLOSED** when it matches but tasks remain
-blocked, **STALE** when the plan changed after it passed or a later run saw different code,
-and **MISSING** when none passed. Under it a checklist says whether the newest build, test, lint
-and manual run each passed.
+The Evidence tab opens on a checklist that says whether the newest build, test, lint and manual
+run each passed.
 
 Below it the runs are grouped by day, newest first, each with its outcome, time, type, command
 and the agent that logged it. Up and Down move the focus, and the focused run opens to show its
 command, output and exit code. In a wide pane it opens in a card beside the list, titled with
-whether it passed, that shows the exit code, when it ran and who logged it, whether a final
-verification is for the plan as it is now, an earlier version of it or any plan, and the whole
+whether it passed, that shows the exit code, when it ran and who logged it, which task a final
+verification closed, and the whole
 command and output, wrapped rather than cut. When they run taller than the card, a cue on its
 last row says so and the mouse wheel over the card scrolls it. The wheel over the list moves the
 focus, and a click anywhere on a run's row focuses that run (on Desktop, a click on its time does).
@@ -528,15 +502,14 @@ without sending: `m` for `/mcp`, `a` for `/advisor fable`, `y` for `/config`, `s
 ## The status line
 
 Once setup has configured it, the status line shows three rows, each on its own line: the
-session (model and effort, vim mode, the active agent, and the bound plan's progress and next
-task), the workspace (a context bar, git state, the project, the worktree and pull request, lines
+session (model and effort, vim mode and the active agent), the workspace (a context bar, git state, the project, the worktree and pull request, lines
 changed and extra directories), and usage (the session's cost and duration, the prompt cache's
 state and time left, your usage limits and a spend limit). A row too wide for the terminal wraps
 onto more lines. When the rows need more lines than the terminal allows, segments give way one at
 a time across all three rows, least useful first: extra directories, lines changed, the spend
 limit, the 7 day limit, the cache state, the pull request, the worktree, the vim mode, the agent,
-the directory, the 5 hour limit, the cost and duration, the branch, the context bar, then the
-plan. The model always stays. No segment is cut in half, and a terminal under 60 columns gets one
+the directory, the 5 hour limit, the cost and duration, the branch, then the context bar. The model always
+stays. No segment is cut in half, and a terminal under 60 columns gets one
 compact line.
 
 The usage limits appear for Claude.ai Pro, Max and Ultra subscribers. The cost shows only when they are
@@ -588,21 +561,17 @@ On Desktop the mod draws differently:
 - Mascots are still images: Desktop rebuilds every drawing on each change, which would restart an
   animation ([#99211](https://github.com/anthropics/claude-code/issues/99211)). The same rebuild
   can drop a click; click again.
-- A button that fills the prompt, such as the band's Start work or the Evidence tab's Rerun, shows
+- A button that fills the prompt, such as the band's Task list or the Evidence tab's Rerun, shows
   the text in a toast when Desktop's prompt box does not take it.
 - The pane scrolls the way Desktop's own panes do, and each tab draws whole, with none of the
   terminal's scrolling windows inside it. The Evidence tab shows 40 runs at a time, with `n` and
   `o` for the newer and older ones. A view larger than Desktop draws at once shows a notice in its
   place; narrow it with Find, or read it in a terminal.
-- A plan too large for Desktop to draw shows that notice and keeps its Find field and keys. It
-  leaves out its header and some task rows until Find narrows it.
 - `f` opens a Find field, but Desktop keeps the keyboard on the pane's buttons, so click the field
   before typing.
-- Copy can report that the surface has no clipboard, and the spinner keeps Desktop's own text.
+- Copy can report that the surface has no clipboard.
 - The transcript keeps Desktop's own rows: Desktop draws its own turn footer, so the turn's
-  figures and receipt arrive as a text row beneath the answer. A plan task's receipt is OMCA's own
-  row, so it needs no Desktop row to redraw, but it has not been checked on Desktop; a bundled copy
-  older than 2.1.314 shows a toast at the plan's end instead.
+  figures and receipt arrive as a text row beneath the answer.
 
 The VS Code chat panel runs OMCA's hooks but draws none of its interface: no band, no pane and
 no guard dialog ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)).
@@ -620,7 +589,7 @@ the server's state. A failed server is not started again on its own: choose Reco
 and in `claude -p` runs Claude Code skips it for 15 minutes after a failed start. A server listed
 there as pending approval needs your approval.
 
-**`evidence_log` fails partway through a plan.** The server was reconnecting or reloading. Call
+**`evidence_log` fails partway through a run.** The server was reconnecting or reloading. Call
 the tool again; do not skip the evidence.
 
 **The band, the pane and the guard are gone.** The mod is not running. On the first prompt of a
@@ -641,6 +610,10 @@ stop unless the runtime is `ok`, repeating its reason. `hooks_inactive` means no
 hook reached the server in this session: `disableAllHooks` or `allowManagedHooksOnly` is set.
 `mod_absent` means the mod has not marked the session since the last prompt: your organization
 sets `allowManagedModsOnly`, the session started with `--safe-mode`, or the mod worker crashed.
+`task_tools_absent` means Claude Code's task tools are off, and OMCA requires them. OMCA sets
+`CLAUDE_CODE_ENABLE_TODO_TOOLS=1` at session start when nothing has set it, so something is keeping
+them off: that variable set to another value, `CLAUDE_CODE_ENABLE_TASKS=0`, a deny rule on
+`TaskCreate` or `TaskUpdate`, or a `--tools` list without them. `/omca doctor` names which.
 When the tool itself is missing, the `omca` server is not connected; see the first entry above.
 
 **Nothing from OMCA runs at all.** A session started with `--restricted` or
@@ -650,7 +623,7 @@ When the tool itself is missing, the `omca` server is not connected; see the fir
 install` retries over HTTPS, but an install or update from `/plugin` inside a session does not.
 Set `CLAUDE_CODE_PLUGIN_PREFER_HTTPS=1` to clone over HTTPS everywhere.
 
-**A plan run stopped with no message.** A turn that ends in an API error, such as a rate limit,
+**A run stopped with no message.** A turn that ends in an API error, such as a rate limit,
 skips the stop checks. Resume with `/oh-my-claudeagent:start-work`.
 
 **A turn ended with a safeguards refusal.** Claude Code continues a flagged turn once on its

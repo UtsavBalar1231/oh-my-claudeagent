@@ -76,7 +76,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Write|Edit",
+        "matcher": "Write|Edit|TaskUpdate",
         "hooks": [
           {
             "type": "mcp_tool",
@@ -95,7 +95,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Read|Write|Edit|Agent|SubagentHandback|Bash|PowerShell",
+        "matcher": "Read|Write|Edit|Agent|SubagentHandback|Bash|PowerShell|TaskCreate|TaskUpdate",
         "hooks": [
           {
             "type": "mcp_tool",
@@ -166,7 +166,8 @@
             "timeout": 10,
             "input": {
               "event": "TaskCompleted",
-              "session_id": "${session_id}"
+              "session_id": "${session_id}",
+              "task_id": "${task_id}"
             }
           }
         ]

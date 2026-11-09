@@ -16,7 +16,7 @@ Slash commands always available. Keyword triggers activate only when `enableKeyw
 | Fix broken build         | "fix build"            | /oh-my-claudeagent:build-fixer           |
 | Session handoff          | "handoff" (advisory nudge only) | /oh-my-claudeagent:handoff      |
 
-`/omca` opens OMCA's pane (Agents, Plan, Evidence, Notepad). `/omca stats` shows what each agent cost, and `/omca doctor` checks the environment.
+`/omca` opens OMCA's pane (Agents, Evidence, Notepad), and `/tasklist` opens the Tasks pane. `/omca stats` shows what each agent cost, and `/omca doctor` checks the environment.
 
 ## Agent catalog
 
@@ -41,21 +41,21 @@ To set one delegation's effort, pass `effort` (`low`, `medium`, `high`, `xhigh` 
 
 ## Workflow
 
-Pipeline: **planner → analyzer → reviewer → user approval → `/oh-my-claudeagent:start-work`.**
+Pipeline: **planner → analyzer → reviewer → user approval → tasks on the task list → `/oh-my-claudeagent:start-work`.**
 
-1. `planner` interviews the user and drafts the plan. When the user wants to understand or research something rather than get a plan, it runs an interview and returns a synthesis, with no plan file.
-2. `analyzer` gap-analyzes the draft.
-3. `reviewer` reviews for clarity, verifiability, completeness.
-4. **User approves** (ExitPlanMode or confirmation).
-5. `/oh-my-claudeagent:start-work` executes the approved plan end-to-end at depth 0. The main session (orchestrator identity) spawns `executor` for each task (parallel where the plan declares `Parallel Execution: YES`), logs evidence per task, and runs a final completeness check before reporting back to the user.
+1. `planner` interviews the user and writes a free-form plan document. When the user wants to understand or research something rather than get a plan, it runs an interview and returns a synthesis, with no plan document.
+2. `analyzer` gap-analyzes the document.
+3. `reviewer` reviews the document and the proposed tasks for clarity, verifiability, completeness.
+4. **User approves** (ExitPlanMode or confirmation). Only then does the planner create the run's tasks on Claude Code's task list, ending with a `Final verification` task blocked by all the others. The tasks hold the work, and the document holds the why.
+5. `/oh-my-claudeagent:start-work` executes the open run end-to-end at depth 0. The main session (orchestrator identity) spawns `executor` for each task (parallel when tasks do not depend on each other), reviews each result, logs evidence per task, completes the tasks itself, and runs a completeness review on the final task before reporting back to the user. Completing the final task is refused until its verdict is logged.
 
-User runs `/oh-my-claudeagent:start-work [plan path]`. Do not auto-start execution.
+User runs `/oh-my-claudeagent:start-work`. Do not auto-start execution.
 
 ## Cross-cutting policy
 
 - **Delegate by size**: the main session does known changes, quick lookups, and single fixes itself, and routes sizeable, self-contained work to the specialist in the catalog above that is built for it. Each subagent re-establishes context and the main session then re-reads its report, so delegate when the payoff clearly exceeds that overhead.
 - **Evidence-first**: every build, test, or lint verification is logged via `evidence_log` before a completion claim is made.
-- **Plan pipeline**: `/oh-my-claudeagent:plan` drafts a plan through the planner/analyzer/reviewer pipeline; `/oh-my-claudeagent:start-work` executes an approved plan end to end.
+- **Plan pipeline**: `/oh-my-claudeagent:plan` drafts a plan through the planner/analyzer/reviewer pipeline; `/oh-my-claudeagent:start-work` executes the approved run end to end.
 - **Advisor on call**: when you have the `advisor` tool, consult it before committing to a large plan, when the same error comes back, and before calling a long task done. It reads the whole conversation, so it needs no briefing; the architect stays the escalation for an investigation that needs its own tool calls. The user turns it on with `/advisor fable` or `/advisor opus`, and `/omca doctor` reports anything that keeps it off.
 
 ## Verification and escalation

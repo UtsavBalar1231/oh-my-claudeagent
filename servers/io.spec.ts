@@ -3,7 +3,7 @@ import * as fs from "node:fs";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { hostname, tmpdir } from "node:os";
 import { join } from "node:path";
-import { ensureStateDir, LOCK_STALE_MS, projectRoot, tryWithLockSync, withLock, writeFileAtomic } from "./io.ts";
+import { ensureStateDir, LOCK_STALE_MS, projectRoot, withLock, writeFileAtomic } from "./io.ts";
 
 const IO_MODULE = join(import.meta.dir, "io.ts");
 
@@ -102,13 +102,13 @@ describe("ensureStateDir", () => {
   test("git ignores everything under .omca except the files under rules/", () => {
     gitInit(dir);
     ensureStateDir(dir);
-    const files = [".omca/rules/a.md", ".omca/rules/sub/b.md", ".omca/state/boulder.json", ".omca/top.json"];
+    const files = [".omca/rules/a.md", ".omca/rules/sub/b.md", ".omca/state/status.json", ".omca/top.json"];
     for (const file of files) {
       mkdirSync(join(dir, file, ".."), { recursive: true });
       writeFileSync(join(dir, file), "");
     }
     const ignored = Bun.spawnSync(["git", "check-ignore", ...files], { cwd: dir, env: process.env }).stdout.toString().trim().split("\n");
-    expect(ignored).toEqual([".omca/state/boulder.json", ".omca/top.json"]);
+    expect(ignored).toEqual([".omca/state/status.json", ".omca/top.json"]);
   });
 });
 
@@ -220,38 +220,6 @@ describe("withLock", () => {
     const other = `${process.pid} ${Date.now()} other-holder`;
     await withLock(lock, () => writeFileSync(lock, other));
     expect(readFileSync(lock, "utf8")).toBe(other);
-  });
-});
-
-describe("tryWithLockSync", () => {
-  test("runs the function under the lock and removes the lock", () => {
-    const lock = join(dir, "data.lock");
-    let seen = "";
-    expect(tryWithLockSync(lock, () => (seen = readFileSync(lock, "utf8")), 0)).toBe(true);
-    expect(seen.split(" ")[0]).toBe(String(process.pid));
-    expect(existsSync(lock)).toBe(false);
-  });
-
-  test("gives up on a live holder once its wait runs out, running nothing", () => {
-    const lock = join(dir, "data.lock");
-    const held = `${process.pid} ${Date.now()} other-holder`;
-    writeFileSync(lock, held);
-    let ran = false;
-    const started = performance.now();
-    expect(tryWithLockSync(lock, () => (ran = true), 30)).toBe(false);
-    const elapsed = performance.now() - started;
-    // The deadline is kept in whole Date.now() milliseconds, so the wait can end up to 1 ms early.
-    expect(elapsed).toBeGreaterThanOrEqual(29);
-    expect(elapsed).toBeLessThan(500);
-    expect(ran).toBe(false);
-    expect(readFileSync(lock, "utf8")).toBe(held);
-  });
-
-  test("breaks a dead holder's lock", async () => {
-    const lock = join(dir, "data.lock");
-    writeFileSync(lock, holder(await deadPid()));
-    expect(tryWithLockSync(lock, () => {}, 0)).toBe(true);
-    expect(existsSync(lock)).toBe(false);
   });
 });
 

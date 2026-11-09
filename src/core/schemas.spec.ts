@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { tools as boulderTools } from "../../servers/tools/boulder.ts";
 import { tools as evidenceTools } from "../../servers/tools/evidence.ts";
 import { EVIDENCE_TYPES } from "./evidence.ts";
 import { STATE_VERSION } from "./state-version.ts";
@@ -21,7 +20,6 @@ type Json = Record<string, unknown>;
 const DOCS = join(import.meta.dir, "../../docs");
 const schemaOf = (name: string): Schema => JSON.parse(readFileSync(join(DOCS, "schemas", name), "utf8"));
 const LEDGER = schemaOf("evidence-ledger.v1.schema.json");
-const REGISTRY = schemaOf("plan-registry.v1.schema.json");
 
 const jsonType = (value: unknown): string => {
   if (value === null) return "null";
@@ -54,9 +52,24 @@ function validate(schema: Schema, value: unknown, path = "$"): string[] {
 }
 
 const roots: string[] = [];
+const { CLAUDE_CONFIG_DIR, CLAUDE_CODE_TASK_LIST_ID } = process.env;
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
+  for (const [name, value] of Object.entries({ CLAUDE_CONFIG_DIR, CLAUDE_CODE_TASK_LIST_ID })) {
+    if (value === undefined) delete process.env[name];
+    else process.env[name] = value;
+  }
 });
+
+/** A run's final task #3 on the list the session reads, so a final verification can name it. */
+function finalTaskListed(): void {
+  const config = mkdtempSync(join(tmpdir(), "omca-schemas-config-"));
+  roots.push(config);
+  process.env.CLAUDE_CONFIG_DIR = config;
+  process.env.CLAUDE_CODE_TASK_LIST_ID = "omca-schemas";
+  mkdirSync(join(config, "tasks", "omca-schemas"), { recursive: true });
+  writeFileSync(join(config, "tasks", "omca-schemas", "3.json"), JSON.stringify({ id: "3", subject: "Final verification", status: "pending", metadata: { run: "docs", final: true } }));
+}
 
 function project(): string {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "omca-schemas-")));
@@ -71,22 +84,13 @@ const callTool = async (tools: { name: string; call: (args: Record<string, unkno
   await tool.call(args);
 };
 
-const PLAN_SHA = "ab".repeat(32);
-
 async function writtenLedger(): Promise<Json> {
   const root = project();
+  finalTaskListed();
   const base = { evidence_type: "test", command: "just test", exit_code: 0, output_snippet: "5 passed", working_directory: root };
   await callTool(evidenceTools, "evidence_log", base);
-  await callTool(evidenceTools, "evidence_log", { ...base, evidence_type: "final_verification", verified_by: "executor", plan_sha256: PLAN_SHA });
+  await callTool(evidenceTools, "evidence_log", { ...base, evidence_type: "final_verification", verified_by: "executor", task_id: "3" });
   return JSON.parse(readFileSync(join(root, ".omca", "evidence", "verification-evidence.json"), "utf8"));
-}
-
-async function writtenRegistry(): Promise<Json> {
-  const root = project();
-  const plan = { active_plan: "/home/user/plan.md", working_directory: root };
-  await callTool(boulderTools, "boulder_write", { ...plan, plan_name: "plain", session_id: "session-one" });
-  await callTool(boulderTools, "boulder_write", { ...plan, plan_name: "tree", session_id: "session-two", worktree_path: "/home/user/tree" });
-  return JSON.parse(readFileSync(join(root, ".omca", "state", "boulder.json"), "utf8"));
 }
 
 const keysOf = (objects: readonly Json[]): string[] => [...new Set(objects.flatMap((object) => Object.keys(object)))].sort();
@@ -109,7 +113,7 @@ describe("evidence ledger schema", () => {
     const entries = ledger["entries"] as Json[];
     expect(entries).toHaveLength(2);
     expectMatches(LEDGER.properties?.["entries"]?.items ?? {}, entries, { optional: ["tree"] });
-    expect(entries.map((entry) => Object.keys(entry).length)).toEqual([6, 8]);
+    expect(entries.map((entry) => Object.keys(entry).length)).toEqual([6, 10]);
   });
 
   test("holds the writer's version and entry types", () => {
@@ -147,52 +151,13 @@ describe("evidence ledger schema", () => {
   });
 });
 
-describe("plan registry schema", () => {
-  test("names the keys, types and requirements the writer emits", async () => {
-    const registry = await writtenRegistry();
-    expectMatches(REGISTRY, [registry], { optional: ["version"] });
-    const plans = Object.values(registry["plans"] as Record<string, Json>);
-    const bindings = Object.values(registry["bindings"] as Record<string, Json>);
-    expect(plans).toHaveLength(2);
-    expect(bindings).toHaveLength(2);
-    const planSchema = REGISTRY.properties?.["plans"]?.additionalProperties as Schema;
-    const bindingSchema = REGISTRY.properties?.["bindings"]?.additionalProperties as Schema;
-    expectMatches(planSchema, plans);
-    expectMatches(bindingSchema, bindings);
-    expect(planSchema.properties?.["session_ids"]?.items?.type).toBe("string");
-  });
-
-  test("holds the writer's version", () => {
-    expect(REGISTRY.properties?.["version"]?.const).toBe(STATE_VERSION);
-  });
-
-  test("accepts what the writer wrote", async () => {
-    expect(validate(REGISTRY, await writtenRegistry())).toEqual([]);
-  });
-
-  test("rejects an entry that lacks a required field", async () => {
-    const registry = await writtenRegistry();
-    const plan = (registry["plans"] as Record<string, Json>)["plain"] as Json;
-    const binding = (registry["bindings"] as Record<string, Json>)["session-one"] as Json;
-    for (const field of ["active_plan", "started_at", "session_ids"]) {
-      const { [field]: _dropped, ...rest } = plan;
-      expect(validate(REGISTRY, { ...registry, plans: { plain: rest } })).toEqual([`$.plans.plain.${field} is required`]);
-    }
-    for (const field of ["plan_name", "bound_at"]) {
-      const { [field]: _dropped, ...rest } = binding;
-      expect(validate(REGISTRY, { ...registry, bindings: { one: rest } })).toEqual([`$.bindings.one.${field} is required`]);
-    }
-    expect(validate(REGISTRY, { version: 1, plans: {} })).toEqual(["$.bindings is required"]);
-  });
-});
-
 describe("docs/formats.md examples", () => {
   const JSON_BLOCK = /```json\n([\s\S]*?)```/g;
   const examples = [...readFileSync(join(DOCS, "formats.md"), "utf8").matchAll(JSON_BLOCK)].map((match) => JSON.parse(match[1] ?? "") as Json);
 
   test("each document example satisfies its schema", () => {
-    const documents = examples.filter((example) => "entries" in example || "plans" in example);
-    expect(documents.map((example) => ("entries" in example ? "ledger" : "registry"))).toEqual(["ledger", "registry"]);
-    for (const example of documents) expect(validate("entries" in example ? LEDGER : REGISTRY, example)).toEqual([]);
+    const documents = examples.filter((example) => "entries" in example);
+    expect(documents).toHaveLength(1);
+    for (const example of documents) expect(validate(LEDGER, example)).toEqual([]);
   });
 });

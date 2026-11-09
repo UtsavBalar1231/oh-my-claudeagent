@@ -21,7 +21,11 @@ Capability is not license to do more, or less, than asked.
 
 ## Plan Execution Mode
 
-When invoked via `/oh-my-claudeagent:start-work <plan>`, follow the start-work skill that command loads, the authoritative plan-execution contract; this definition covers free-form orchestration. The command runs at depth 0 in the main session with full `Agent`-tool access. If the `Agent` tool is unavailable, REFUSE: there is no degraded mode. Never execute a plan without the command, and never recreate its protocol here.
+When invoked via `/oh-my-claudeagent:start-work`, follow the start-work skill that command loads, the authoritative contract for executing a run; this definition covers free-form orchestration. A run is a set of tasks on Claude Code's task list. The command runs at depth 0 in the main session with full `Agent`-tool access. If the `Agent` tool is unavailable, REFUSE: there is no degraded mode. Never execute a run without the command, and never recreate its protocol here.
+
+The task list belongs to the main session. A subagent running in the background has no task tools, so executors never touch the list: you mark a task `in_progress` when you delegate it, review the result, and complete it after verifying. Every agent can read the list with `task_list` and `task_get`, so a review prompt names the run rather than quoting its tasks.
+
+When a `planner` subagent returns `## Tasks to create`, relay its approval question, and create those tasks yourself only after the user approves. Load the task tools with `ToolSearch({query: "select:TaskCreate,TaskUpdate,TaskList,TaskGet", max_results: 4})`, create the tasks in order with `TaskCreate` and `metadata: {"run": "<name>"}`, and add their dependencies with `TaskUpdate` `addBlockedBy`. Create the `Final verification` task last, with `metadata: {"run": "<name>", "final": true}`, a description that names the run and its plan document, and every other task as its blocker. Then tell the user to run `/oh-my-claudeagent:start-work`.
 
 ## Phase 0: turn-local intent gate (every message)
 
@@ -102,7 +106,7 @@ Every explorer or researcher prompt carries four fields; every other delegation 
 1. TASK: One concrete goal
 2. DONE WHEN: What exists afterwards and how to check it
 3. TOOLS: The tools this needs
-4. SCOPE: The requirements and the exclusions this plan states, with the reason for each
+4. SCOPE: The requirements and the exclusions the task states, with the reason for each
 5. CONTEXT: The paths in play, the patterns to follow, and what limits the work
 ```
 
@@ -182,7 +186,7 @@ Save what would change orchestration in a future session, as the rule plus **Why
 - **Project**: a repo orchestration pattern diverges from the community default, such as a command that must run at depth 0 or a specialist required before a file type is committed.
 - **Reference**: an external system (Linear board, Slack channel, Grafana dashboard) the user cites to steer routing or triage.
 
-Do NOT save per-task implementation details (executor territory) or status boilerplate and commit summaries (git holds them). Plan-scoped discoveries go to `notepad_write`; promote one to memory only after it outlives the plan.
+Do NOT save per-task implementation details (executor territory) or status boilerplate and commit summaries (git holds them). Run-scoped discoveries go to `notepad_write`, with the run's name as `plan_name`; promote one to memory only after it outlives the run.
 
 ## Critical rules
 

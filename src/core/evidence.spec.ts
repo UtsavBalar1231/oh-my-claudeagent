@@ -8,6 +8,7 @@ import {
   ledgerCoversSlot,
   MAX_SLOT_AGE_SECONDS,
   MTIME_SLACK_SECONDS,
+  namesTask,
   nextTypeFilter,
   parseLedger,
   placeEntries,
@@ -15,8 +16,7 @@ import {
   rerunPrompt,
   shownIndices,
   treeMovedSince,
-  verdictOf,
-} from "./evidence.ts";
+  provesTask } from "./evidence.ts";
 import { sha256Hex } from "./sha256.ts";
 import { clockOf, dayOf } from "./ui-kit.ts";
 
@@ -117,7 +117,9 @@ const run = (overrides: Partial<Evidence>): Evidence => ({
   at: at("2026-10-02T12:00:00Z"),
   snippet: "",
   verifiedBy: "executor",
-  planSha: "",
+  taskId: "",
+  run: "",
+  taskList: "",
   tree: "",
   ...overrides,
 });
@@ -131,7 +133,7 @@ describe("parseLedger", () => {
         { type: "lint", command: "just lint", exit_code: "0", timestamp: "2026-10-02T12:07:00Z" },
         { type: "lint", command: "just lint", exit_code: 0, timestamp: "not a time" },
         null,
-        { type: "final_verification", command: "just ci", exit_code: 1, timestamp: "2026-10-02T12:08:00Z", verified_by: "", plan_sha256: "ab" },
+        { type: "final_verification", command: "just ci", exit_code: 1, timestamp: "2026-10-02T12:08:00Z", verified_by: "", plan_sha256: "ab", task_id: "7", run: "docs", task_list: "omca-repo-1a2b3c4d" },
       ],
     });
     expect(parseLedger(text)).toEqual([
@@ -142,10 +144,12 @@ describe("parseLedger", () => {
         at: at("2026-10-02T12:05:00Z"),
         snippet: "10 passed",
         verifiedBy: "oh-my-claudeagent:executor",
-        planSha: "",
+        taskId: "",
+        run: "",
+        taskList: "",
         tree: "",
       },
-      { type: "final_verification", command: "just ci", exitCode: 1, at: at("2026-10-02T12:08:00Z"), snippet: "", verifiedBy: null, planSha: "ab", tree: "" },
+      { type: "final_verification", command: "just ci", exitCode: 1, at: at("2026-10-02T12:08:00Z"), snippet: "", verifiedBy: null, taskId: "7", run: "docs", taskList: "omca-repo-1a2b3c4d", tree: "" },
     ]);
   });
 
@@ -157,41 +161,6 @@ describe("parseLedger", () => {
     expect(() => parseLedger('{"items":[]}')).toThrow("it holds no entries list");
     expect(() => parseLedger("{")).toThrow("it is not valid JSON");
     expect(() => parseLedger('{"version":2}')).toThrow('its "version" is 2, and only version 1 is supported');
-  });
-});
-
-describe("verdictOf", () => {
-  const SHA = "a".repeat(64);
-  const final = (exitCode: number, planSha: string, iso: string) => run({ type: "final_verification", exitCode, planSha, at: at(iso) });
-
-  test("a passing final verification scoped to the plan's bytes is complete", () => {
-    const proof = final(0, SHA, "2026-10-02T11:00:00Z");
-    expect(verdictOf([proof, run({})], SHA)).toEqual({ kind: "complete", entry: proof });
-  });
-
-  test("a passing final verification with no scope matches any plan, as the Stop gate reads it", () => {
-    const proof = final(0, "", "2026-10-02T11:00:00Z");
-    expect(verdictOf([proof], SHA)).toEqual({ kind: "complete", entry: proof });
-  });
-
-  test("one scoped to other bytes is stale, and the newest such entry is named", () => {
-    const older = final(0, "b".repeat(64), "2026-10-02T09:00:00Z");
-    const newer = final(0, "c".repeat(64), "2026-10-02T10:00:00Z");
-    expect(verdictOf([older, newer], SHA)).toEqual({ kind: "stale", entry: newer });
-  });
-
-  test("a matching pass anywhere in the ledger wins over a newer stale one", () => {
-    const proof = final(0, SHA, "2026-10-02T09:00:00Z");
-    expect(verdictOf([proof, final(0, "c".repeat(64), "2026-10-02T10:00:00Z")], SHA)).toEqual({ kind: "complete", entry: proof });
-  });
-
-  test("only failing final verifications are missing, naming the newest failure", () => {
-    const failed = final(1, SHA, "2026-10-02T10:00:00Z");
-    expect(verdictOf([final(2, SHA, "2026-10-02T09:00:00Z"), failed], SHA)).toEqual({ kind: "missing", failed });
-  });
-
-  test("no final verification at all is missing with nothing failed", () => {
-    expect(verdictOf([run({})], SHA)).toEqual({ kind: "missing", failed: null });
   });
 });
 
@@ -296,14 +265,11 @@ describe("placeEntries", () => {
 
 describe("rerunPrompt", () => {
   test("a check is run again and logged as its own type", () => {
-    expect(rerunPrompt("lint", "just lint", "ab")).toBe("Run `just lint` again and log the result with evidence_log as lint evidence.");
+    expect(rerunPrompt("lint", "just lint")).toBe("Run `just lint` again and log the result with evidence_log as lint evidence.");
   });
 
-  test("a final verification names the plan's current bytes when they are known", () => {
-    expect(rerunPrompt("final_verification", "just ci", "ab")).toBe(
-      'Run the final verification again (`just ci`) and log the verdict with evidence_log as final_verification evidence with plan_sha256="ab".',
-    );
-    expect(rerunPrompt("final_verification", "just ci", null)).toBe(
+  test("a final verification is logged as a verdict", () => {
+    expect(rerunPrompt("final_verification", "just ci")).toBe(
       "Run the final verification again (`just ci`) and log the verdict with evidence_log as final_verification evidence.",
     );
   });
@@ -357,5 +323,33 @@ describe("treeMovedSince", () => {
   test("an unstamped entry never reads as moved", () => {
     const verdict = stamped("");
     expect(treeMovedSince([verdict, stamped("b")], verdict)).toBe(false);
+  });
+});
+
+describe("a verdict names one task of one run on one list", () => {
+  const task = { list: "omca-repo-1a2b3c4d", run: "docs", id: "7" };
+  const verdict = (overrides: Partial<Evidence>) => run({ type: "final_verification", taskId: "7", run: "docs", taskList: "omca-repo-1a2b3c4d", ...overrides });
+
+  test("provesTask holds only for a passing verdict with the task's id, run and list", () => {
+    expect(provesTask(verdict({}), task)).toBe(true);
+    expect(provesTask(verdict({ exitCode: 1 }), task)).toBe(false);
+    expect(provesTask(verdict({ type: "test" }), task)).toBe(false);
+  });
+
+  test("the same id on another list, or in another run, proves nothing", () => {
+    expect(provesTask(verdict({ taskList: ".omca/state/tasks" }), task)).toBe(false);
+    expect(provesTask(verdict({ run: "release" }), task)).toBe(false);
+    expect(provesTask(verdict({ taskId: "8" }), task)).toBe(false);
+  });
+
+  test("a verdict logged without its run and list proves nothing, even for a task whose list or run reads empty", () => {
+    expect(provesTask(verdict({ run: "", taskList: "" }), task)).toBe(false);
+    expect(provesTask(verdict({ taskList: "" }), { ...task, list: "" })).toBe(false);
+    expect(provesTask(verdict({ taskId: "" }), task)).toBe(false);
+  });
+
+  test("namesTask ignores the outcome, so a failing verdict still names its task", () => {
+    expect(namesTask(verdict({ exitCode: 1 }), task)).toBe(true);
+    expect(namesTask(verdict({ exitCode: 1, taskList: "other" }), task)).toBe(false);
   });
 });

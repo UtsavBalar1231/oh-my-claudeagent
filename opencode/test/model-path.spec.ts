@@ -15,8 +15,9 @@ let EVIDENCE: string
 let HANDOFF: string
 const VISIBLE_OMCA_TOOLS = [
   "omca_ast_dump_tree", "omca_ast_find_rule", "omca_ast_replace", "omca_ast_search", "omca_ast_test_rule",
-  "omca_boulder_progress", "omca_evidence_log", "omca_evidence_read", "omca_file_read",
+  "omca_evidence_log", "omca_evidence_read", "omca_file_read",
   "omca_notepad_compact", "omca_notepad_list", "omca_notepad_read", "omca_notepad_write",
+  "omca_task_get", "omca_task_list",
 ]
 let fixture: Fixture | undefined
 
@@ -204,8 +205,8 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
     verify(buildTools.length > 0, "tools: no build request carried tools")
     for (const names of buildTools) {
       verify(names.includes("omca_evidence_log"), "tools: native evidence tool missing")
-      verify(names.includes("omca_boulder_progress"), "tools: native progress tool missing")
-      verify(!names.some((name) => ["omca_omca_hook", "omca_agents_migrate", "omca_boulder_write"].includes(name)), "tools: a legacy transport tool is exposed")
+      verify(names.includes("omca_task_list"), "tools: native task list tool missing")
+      verify(!names.some((name) => ["omca_omca_hook", "omca_agents_migrate", "omca_boulder_write", "omca_boulder_progress", "omca_task_create", "omca_task_update"].includes(name)), "tools: Build was offered a tool it must not have")
     }
   }, SLOW)
 
@@ -247,6 +248,34 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
     verify(result !== "", "skill-load: no follow-up request carried the skill result")
     verify(result.includes(HANDOFF), "skill-load: native handoff instructions are missing")
     verify(!result.includes("oh-my-claudeagent:"), "skill-load: skill result contains untranslated oh-my-claudeagent: text")
+  }, SLOW)
+
+  test("a run on the task list: the coordinator writes it, a worker cannot, and the final task holds until its verdict", async () => {
+    const { ws } = need()
+    const inOmca = (scenario: string) => run(scenario, "omca")
+    const task = (id: string) => JSON.parse(readFileSync(join(ws, ".omca", "state", "tasks", `${id}.json`), "utf8")) as { status: string; metadata: Record<string, unknown> }
+
+    await inOmca("task-create")
+    await inOmca("task-final")
+    verify(task("1").metadata.run === "stub-run", "tasks: the first task was not stored with its run")
+    verify(task("2").metadata.final === true, "tasks: the final task was not stored as final")
+
+    const before = requests().length
+    await inOmca("task-worker")
+    const childRequests = requests().slice(before).filter((request) => system(request).includes(EXECUTOR))
+    verify(childRequests.length > 0, "tasks: the worker did not run")
+    verify(childRequests.every((request) => !toolNames(request).some((name) => ["omca_task_create", "omca_task_update"].includes(name))), "tasks: a worker was offered a task writer")
+    verify(childRequests.every((request) => toolNames(request).includes("omca_task_list")), "tasks: a worker cannot read the list")
+    verify(task("1").status === "pending", "tasks: a worker changed the list")
+
+    const refused = requests().length
+    await inOmca("task-close-final")
+    verify(requests().slice(refused).filter(lastIsTool).map(lastText).join("\n").includes("no passing final verification names it"), "tasks: closing the final task was not refused")
+    verify(task("2").status === "pending", "tasks: the final task closed without a verdict")
+
+    await inOmca("task-verdict")
+    await inOmca("task-close-final")
+    verify(task("2").status === "completed", "tasks: the final task did not close after its verdict")
   }, SLOW)
 
   test("Code Mode discovers deferred native OMCA tools", async () => {

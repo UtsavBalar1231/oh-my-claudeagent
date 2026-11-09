@@ -251,7 +251,7 @@ describe("renderMarkdown with data that contradicts the usual findings", () => {
 
   test("reads the with-bun guard and stop results from the records, and cites no unmeasured error", () => {
     expect(outLines).toContain("| Bash guard (`rm -rf /` and `git reset --hard`) | RAN, blocked | RAN, blocked |");
-    expect(outLines).toContain("| Stop gate continued a plan-bound session | no | no |");
+    expect(outLines).toContain("| Stop gate continued a session with an open run | no | no |");
     expect(out).not.toMatch(/no error in the session|shows no error/);
   });
 
@@ -272,7 +272,7 @@ describe("renderMarkdown with data that contradicts the usual findings", () => {
   });
 
   test("quotes the bun bullet only from the probe it ran", () => {
-    expect(out).toContain("**Without bun.** The probe in section 9 hid bun: the first request carried 3 MCP tools and 0 hook-context tokens, the stop gate did not continue a plan-bound session, and the Bash guard let through `rm -rf /` and `git reset --hard`.");
+    expect(out).toContain("**Without bun.** The probe in section 9 hid bun: the first request carried 3 MCP tools and 0 hook-context tokens, the stop gate did not continue a session with an open run, and the Bash guard let through `rm -rf /` and `git reset --hard`.");
     expect(renderMarkdown({ ...contrary, noBun: null }).markdown).not.toContain("section 9");
   });
 });

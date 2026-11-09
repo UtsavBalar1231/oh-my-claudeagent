@@ -8,10 +8,7 @@ export const ROOT = "/work";
 const HOME = "/home/u";
 export const SESSION = "s1";
 export const LEDGER = `${ROOT}/.omca/evidence/verification-evidence.json`;
-export const BOULDER = `${ROOT}/.omca/state/boulder.json`;
 const OUTPUT_STYLE = "---\nname: OMCA Default\nkeep-coding-instructions: true\nforce-for-plugin: true\n---\n\n# oh-my-claudeagent\n";
-
-const bytesValue = (text: string) => ({ base64: btoa(String.fromCharCode(...new TextEncoder().encode(text))) });
 
 // Where the session runs: the platform's path shape and the environment that names its home.
 // `root` and `home` are spelled as the engine reports them; the other paths are normalized, the way the mod writes them.
@@ -21,9 +18,7 @@ export type Layout = {
   root: string;
   home: string;
   env: Readonly<Record<string, string>>;
-  plans: string;
   settings: string;
-  boulder: string;
 };
 
 function layoutOf(name: string, platform: Platform, root: string, home: string, env: Record<string, string>): Layout {
@@ -33,9 +28,7 @@ function layoutOf(name: string, platform: Platform, root: string, home: string, 
     root,
     home,
     env,
-    plans: joinPath(platform, home, ".claude", "plans"),
     settings: joinPath(platform, home, ".claude", "settings.json"),
-    boulder: joinPath(platform, root, ".omca", "state", "boulder.json"),
   };
 }
 
@@ -44,6 +37,7 @@ export const WINDOWS = layoutOf("win32", "win32", "C:\\work", "C:\\Users\\u", { 
 export const LAYOUTS: readonly Layout[] = [POSIX, WINDOWS];
 
 export type World = {
+  tools: string[];
   layout: Layout;
   sessionId: string;
   spelled: (path: string) => string;
@@ -74,10 +68,6 @@ export type World = {
   blits: { requestId: string; key: string; cells: string | undefined; columns: number | undefined; rows: number | undefined }[];
   /** What `$.ui.status` was called with, in order; undefined clears the line. */
   statuses: (string | undefined)[];
-  /** The ids `$.ui.place` was called with, in order. */
-  placed: string[];
-  /** What `$.ui.place` answers: a result, or the reason it rejects as on a client with no placed rows. */
-  placeAnswer: { isPlaced: false; requestId?: string; reason: string } | { rejects: string } | undefined;
   conversations: Map<string, SessionMessage[]>;
   opened: unknown[];
   /** Why `ui.open` leaves a pane unplaced; undefined places every pane. */
@@ -138,14 +128,13 @@ export function world(
     selection: undefined,
     selectionReads: 0,
     surfaces: ["terminal"],
+    tools: ["Bash", "TaskCreate", "TaskUpdate"],
     invalidations: 0,
     toasts: [],
     blitDeny: undefined,
     blitFix: undefined,
     blits: [],
     statuses: [],
-    placed: [],
-    placeAnswer: undefined,
     conversations: new Map(),
     opened: [],
     unplaced: undefined,
@@ -157,9 +146,13 @@ export function world(
   };
   mock.env(on, { OMCA_GLYPHS: "unicode", ...layout.env, ...env });
   on("session.root", () => ({ value: layout.root }));
+  on("process.run", { argv: ["git", "rev-parse", "--show-toplevel"] }, () => ({
+    value: { exitCode: 0, stdout: `${layout.root.replaceAll("\\", "/")}\n`, stderr: "", isStdoutTruncated: false, isStderrTruncated: false },
+  }));
   on("session.id", () => ({ value: w.sessionId }));
   on("settings.read", (_$, e) => ({ value: (e.source === undefined ? undefined : w.sources[e.source]) ?? w.settings }));
   on("agent.list", () => ({ value: w.agents }));
+  on("tool.list", () => ({ value: w.tools.map((name) => ({ name })) as never }));
   on("fs.read", { path: /[\\/]output-styles[\\/]omca-default\.md$/ }, (_$, e) => {
     w.reads.push(spelled(e.path));
     w.contentReads.push(spelled(e.path));
@@ -171,7 +164,7 @@ export function world(
     await w.holds.get(key(e.path));
     const file = w.files.get(key(e.path));
     if (file === undefined) return { deny: `ENOENT: no such file, ${spelled(e.path)}` };
-    return { value: e.as === "bytes" ? bytesValue(file.text) : file.text };
+    return { value: file.text };
   });
   on("fs.exists", (_$, e) => {
     w.reads.push(spelled(e.path));
@@ -227,12 +220,6 @@ export function world(
     return { value: deny === undefined ? {} : { deny, ...(w.blitFix !== undefined && { fix: w.blitFix }) } };
   });
   on("ui.status", (_$, e) => (w.statuses.push(e.text), { value: undefined }));
-  on("ui.place", (_$, e) => {
-    w.placed.push(e.id);
-    const answer = w.placeAnswer;
-    if (answer === undefined) return { value: { isPlaced: true, requestId: `placed-${e.id}` } };
-    return "rejects" in answer ? { deny: answer.rejects } : { value: answer };
-  });
   on("session.messages", (_$, e) => {
     const found = e.agentId === undefined ? undefined : w.conversations.get(e.agentId);
     return { value: found ?? { deny: `no conversation for ${e.agentId ?? "main"}` } };

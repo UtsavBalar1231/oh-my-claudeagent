@@ -14,7 +14,7 @@ const handler = (event: string) => ({
 });
 
 const POSTURE = 'allowManagedPermissionRulesOnly\nsandbox.failIfUnavailable\nThe filter does not auto-allow anything.\n';
-const HOOK_MODEL = "hooks/register.ts mcp_tool omca_hook tool.check OMCA_DISABLED_HOOKS boulder.json verification-evidence.json\n";
+const HOOK_MODEL = "hooks/register.ts mcp_tool omca_hook tool.check OMCA_DISABLED_HOOKS verification-evidence.json\n";
 
 /** A tree in which every check passes; a spec changes one file and asserts the one check that reads it. */
 export const VALID: Readonly<Record<string, string>> = {

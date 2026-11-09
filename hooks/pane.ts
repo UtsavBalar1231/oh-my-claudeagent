@@ -12,7 +12,6 @@ import * as agents from "./tabs/agents.ts";
 import * as doctor from "./tabs/doctor.ts";
 import * as evidence from "./tabs/evidence.ts";
 import * as notepad from "./tabs/notepad.ts";
-import * as plan from "./tabs/plan.ts";
 import * as stats from "./tabs/stats.ts";
 import { isDrawable, isRemote, type Kit, kitOf, ROW_GAP, Rule, rowsAtLeast, sizeOf } from "./ui.ts";
 
@@ -37,7 +36,7 @@ const DOCK_TRANSCRIPT_COLUMNS = 100;
 const RULE_MIN_ROWS = 30;
 
 type Pane = State["pane"];
-export type Tab = Pane["tab"];
+type Tab = Pane["tab"];
 export type Press = (work: () => unknown) => () => Promise<void>;
 export type View = {
   kit: Kit;
@@ -58,7 +57,6 @@ export type TabView = (host: Host, view: View) => Promise<readonly RenderElement
 
 const TABS: readonly (readonly [Tab, string])[] = [
   ["agents", "Agents"],
-  ["plan", "Plan"],
   ["evidence", "Evidence"],
   ["notepad", "Notepad"],
 ];
@@ -72,8 +70,6 @@ function viewOf(tab: Tab): TabView {
   switch (tab) {
     case "agents":
       return agents.view;
-    case "plan":
-      return plan.view;
     case "evidence":
       return evidence.view;
     case "notepad":
@@ -109,29 +105,24 @@ export function patchPane(host: Host, change: (pane: Pane) => Pane): Promise<voi
       pane ?? {
         tab: "agents",
         notepad: null,
-        plans: null,
-        errors: { notepad: null, plans: null },
+        errors: { notepad: null },
         readAt: 0,
       },
     ),
   );
 }
 
-async function refresh(host: Host, tab?: Tab, within?: object): Promise<void> {
+async function refresh(host: Host, tab?: Tab): Promise<void> {
   const root = await host.session.root();
   if ((await host.state.pane.get()).value === undefined) notepad.reset();
   const [, pad] = await Promise.all([evidence.sync(host, root), notepad.read(host, root)]);
-  await plan.sync(host, within);
   if (tab === undefined && pad === undefined) return;
   const readAt = await host.clock.now();
   await patchPane(host, (pane) => ({
     ...pane,
     ...(tab === undefined ? {} : { tab }),
     ...(pad === undefined ? {} : { notepad: pad.notepad }),
-    errors: {
-      ...pane.errors,
-      ...(pad === undefined ? {} : { notepad: pad.error }),
-    },
+    ...(pad === undefined ? {} : { errors: { notepad: pad.error } }),
     readAt,
   }));
 }
@@ -172,15 +163,16 @@ function stop(): void {
   mascots.stop();
 }
 
+export const dockColumns = (terminal: number): number =>
+  Math.max(clamp(Math.round(terminal * DOCK_SHARE), DOCK_MIN_COLUMNS, DOCK_MAX_COLUMNS), Math.min(DOCK_WIDE_MAX_COLUMNS, terminal - DOCK_TRANSCRIPT_COLUMNS));
+
+export const INLINE_REQUEST_ROWS = INLINE_ROWS;
+
 export async function open(host: Host, e: Input<"command.run">, tab: Tab): Promise<CommandRunResult> {
   await sessionOf(host);
   now = await host.clock.now();
   await refresh(host, tab);
-  const terminal = e.presentation.columns;
-  const columns = Math.max(
-    clamp(Math.round(terminal * DOCK_SHARE), DOCK_MIN_COLUMNS, DOCK_MAX_COLUMNS),
-    Math.min(DOCK_WIDE_MAX_COLUMNS, terminal - DOCK_TRANSCRIPT_COLUMNS),
-  );
+  const columns = dockColumns(e.presentation.columns);
   // The first drawing must already know whether the person prefers reduced motion.
   await mascots.ensure(host);
   const opened = await host.ui.open({ id: PANE, title: "OMCA", focus: true, closeOnEscape: true, rows: INLINE_ROWS, columns });
@@ -262,8 +254,6 @@ export function refocusRemote(host: Host, view: View, key: string, tab: Tab): vo
   if (isRemote(view.kit)) refocus(host, key, tab);
 }
 
-export const tabKey = (tab: Tab): string => String(TABS.findIndex(([id]) => id === tab) + 1);
-
 const selectTab = (host: Host, tab: Tab): Promise<void> => patchPane(host, (pane) => (pane.tab === tab ? pane : { ...pane, tab }));
 
 // Desktop's scrollbar takes two cells from the tab bar whenever the body is taller than the pane.
@@ -283,7 +273,7 @@ function tabBar(width: number, active: Tab): { gap: number; cells: TabCell[]; pa
   return { gap: across(cells, COLUMN_GAP) <= width ? COLUMN_GAP : 1, cells, page };
 }
 
-function bodyRows(host: Host, e: Input<"ui.render Pane">, isInline: boolean): number {
+export function bodyRows(host: Host, e: Input<"ui.render Pane">, isInline: boolean): number {
   const shown = e.props.scroll.bodyRows;
   const rows = e.viewport?.rows ?? 0;
   if (rows !== viewportRows) {
@@ -354,39 +344,14 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
   }
   if (!isTerminal) {
     const above = [...tabs, ...(hasRule ? [rule(view)] : [])];
-    const tree = Box({ flexDirection: "column", width, children: [...above, ...body] });
-    const size = sizeOf(tree);
-    if (isDrawable(size)) return tree;
-    // A remote surface refuses a tree past its size cap whole, which would leave the pane blank. The
-    // largest elements go first, so the small ones a tab steers by (its header, Find field and keys) stay.
-    host.log(`omca ${active} tab is too large for ${e.surface}: ${size.nodes} nodes, ${size.chars} characters`);
-    const notice = `${g.cross} This view is more than Claude Desktop draws at once. Narrow it with Find where the tab has one, or read it in a terminal.`;
-    const noticeText = Text({ color: TONE_KEYS.warn, wrap: "wrap", children: [notice] });
-    // A tree's nodes and characters are its frame's plus each child's, so each element is measured once.
-    const frame = sizeOf(Box({ flexDirection: "column", width, children: [...above, noticeText] }));
-    const kept = body.map((element) => ({ element, size: sizeOf(element) }));
-    const total = { nodes: frame.nodes, chars: frame.chars };
-    for (const { size: part } of kept) {
-      total.nodes += part.nodes;
-      total.chars += part.chars;
-    }
-    const depth = () => Math.max(frame.depth, 1 + Math.max(0, ...kept.map(({ size: part }) => part.depth)));
-    while (kept.length > 0 && !isDrawable({ ...total, depth: depth() })) {
-      const largest = kept.reduce((most, each, at) => (each.size.nodes > (kept[most]?.size.nodes ?? 0) ? at : most), 0);
-      const [gone] = kept.splice(largest, 1);
-      if (gone !== undefined) {
-        total.nodes -= gone.size.nodes;
-        total.chars -= gone.size.chars;
-      }
-    }
-    return Box({ flexDirection: "column", width, children: [...above, noticeText, ...kept.map(({ element }) => element)] });
+    return remoteTree(host, kit, { width, above, body, label: `${active} tab`, cross: g.cross, surface: e.surface });
   }
   const drawnRows = [...tabs, ...body].reduce((sum, child) => sum + rowsAtLeast(child), hasRule ? 1 : 0);
   // The engine raises the wheel only over a tree taller than the body, so a tab that fits but holds
   // a region with more to show gets rows past the body, and those rows never scroll the pane.
   const isPadded = hasOverflow(layout) && drawnRows <= rows;
   if (isPadded) body = [...body, ...blanks(view, rows + 1 - drawnRows)];
-  commitLayout({ ...layout, isPadded, treeRows: isPadded ? rows + 1 : drawnRows });
+  commitLayout(PANE, { ...layout, isPadded, treeRows: isPadded ? rows + 1 : drawnRows });
   const children = [...tabs, ...(hasRule ? [rule(view)] : []), ...body];
   drawnShape = CUED.includes(active) && !isPadded ? shapeOf(children) : "";
   const cues =
@@ -394,6 +359,40 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
       ? []
       : [lessCue(view, e.props.scroll.offset), moreCue(view, e.props.scroll, isInline ? rows : 0, children)].filter((cue) => cue !== undefined);
   return Box({ flexDirection: "column", width, ...(isInline ? { minHeight: rows } : {}), children: [...children, ...cues] });
+}
+
+// A remote surface refuses a tree past its size cap whole, which would leave the pane blank. The
+// largest elements go first, so the small ones a view steers by (its header, Find field and keys) stay.
+export function remoteTree(
+  host: Host,
+  kit: Kit,
+  { width, above, body, label, cross, surface }: { width: number; above: readonly RenderElement[]; body: readonly RenderElement[]; label: string; cross: string; surface: string },
+): RenderElement {
+  const { Box, Text } = kit;
+  const tree = Box({ flexDirection: "column", width, children: [...above, ...body] });
+  const size = sizeOf(tree);
+  if (isDrawable(size)) return tree;
+  host.log(`omca ${label} is too large for ${surface}: ${size.nodes} nodes, ${size.chars} characters`);
+  const notice = `${cross} This view is more than Claude Desktop draws at once. Narrow it with Find where the tab has one, or read it in a terminal.`;
+  const noticeText = Text({ color: TONE_KEYS.warn, wrap: "wrap", children: [notice] });
+  // A tree's nodes and characters are its frame's plus each child's, so each element is measured once.
+  const frame = sizeOf(Box({ flexDirection: "column", width, children: [...above, noticeText] }));
+  const kept = body.map((element) => ({ element, size: sizeOf(element) }));
+  const total = { nodes: frame.nodes, chars: frame.chars };
+  for (const { size: part } of kept) {
+    total.nodes += part.nodes;
+    total.chars += part.chars;
+  }
+  const depth = () => Math.max(frame.depth, 1 + Math.max(0, ...kept.map(({ size: part }) => part.depth)));
+  while (kept.length > 0 && !isDrawable({ ...total, depth: depth() })) {
+    const largest = kept.reduce((most, each, at) => (each.size.nodes > (kept[most]?.size.nodes ?? 0) ? at : most), 0);
+    const [gone] = kept.splice(largest, 1);
+    if (gone !== undefined) {
+      total.nodes -= gone.size.nodes;
+      total.chars -= gone.size.chars;
+    }
+  }
+  return Box({ flexDirection: "column", width, children: [...above, noticeText, ...kept.map(({ element }) => element)] });
 }
 
 // Drawn over the window's first row once the engine has scrolled past the tree's top.
@@ -440,8 +439,8 @@ export const pane: Features = {
     async post(host) {
       await host.command.register({
         name: "omca",
-        description: "Open the OMCA pane: agents, plan, evidence and notepad, or its stats and doctor pages",
-        argumentHint: "[plan [name|path]|stats|doctor]",
+        description: "Open the OMCA pane: agents, evidence and notepad, or its stats and doctor pages",
+        argumentHint: "[stats|doctor]",
         immediate: true,
       });
       await sessionOf(host);
@@ -450,9 +449,9 @@ export const pane: Features = {
     },
   },
   "turn.complete": {
-    async post(host, e) {
+    async post(host) {
       if (timer === undefined) return undefined;
-      await refresh(host, undefined, e);
+      await refresh(host);
       if ((await host.state.pane.get()).value?.tab === "stats") await stats.load(host);
       return undefined;
     },
@@ -469,7 +468,7 @@ export const pane: Features = {
       const tab = (await host.state.pane.get()).value?.tab;
       if (tab === "agents") agents.focus(e);
       if (tab === "notepad") notepad.focus(e);
-      return tab === "plan" ? plan.focus(host, e) : undefined;
+      return undefined;
     },
   },
   "ui.scroll": {
@@ -480,7 +479,7 @@ export const pane: Features = {
       if (!(await host.session.surfaces()).includes("terminal")) return undefined;
       if (drawnShape !== "") measured = { shape: drawnShape, rows: e.contentRows };
       if (e.origin.kind !== "person") return undefined;
-      const layout = committedLayout();
+      const layout = committedLayout(PANE);
       // The wheel moves only what is under it. Over nothing, the engine gets the tick only while the
       // tree has rows past the body besides the one that brings the wheel here.
       if (e.pointer !== undefined) {
@@ -492,11 +491,10 @@ export const pane: Features = {
       }
       const tab = (await host.state.pane.get()).value?.tab;
       if (tab === "agents" && agents.scroll(host, e)) return { answer: {} };
-      if (tab === "plan") return (await plan.scroll(host, e)) ? { answer: {} } : undefined;
       if (tab === "evidence") return evidence.scroll(host, e) ? { answer: {} } : undefined;
       // A key no tab took moves a region: a page key asks for `bodyRows`, Home and End for `contentRows`.
       const step = Math.abs(e.by) === e.bodyRows ? "page" : Math.abs(e.by) === e.contentRows ? "end" : "row";
-      if (scrollKeyed(e.by, step)) {
+      if (scrollKeyed(PANE, e.by, step)) {
         host.ui.invalidate();
         return { answer: {} };
       }

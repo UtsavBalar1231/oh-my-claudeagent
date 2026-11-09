@@ -1,38 +1,38 @@
 
  ▐▛███▛█   Claude Code v2.1.316
 ▝▜██████▀  Sonnet 5.5 with high effort · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · /…/omca-visual-80x40-XXXXXX/cwd
 
 
-❯ Fix the heading parser so fenced lines are skipped. The staging token is
-  password=hunter2-staging; do not print it.
+❯ Find every caller of the shared router and say which ones bypass the harness.
 
-  Read 1 file
-
-● Write(notes/heading-parser.md)
-  ⎿  Wrote 1 line to notes/heading-parser.md
-      1 # Heading parser
-
-● Fenced lines are skipped now, and the heading tests pass.
+  Searched for 2 patterns, listed 1 directory
 
 
 
 
+
+
+
+
+● Flowing… (3s · ↑ N.Nk tokens)
+  ⎿  Tip: Start with small features or bug fixes, tell Claude to propose a plan,
+     and verify its suggested edits
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
-│ 1: Agents  2: Plan  3: Evidence  4: Notepad                                  │
-│    ▄▀ ▀▀ ▀▄ ▄▄▄   executor · Fix the heading parser                         │
-│ ▀   ▀▀   ▀        done · 1s · NN.Nk tokens                                  │
-│ ▀  ▀ ▀▀▀▀ ▀ ▀    sonnet-5-5 · high                                           │
-│    ▀▀▀▀▀▀▀▀      2 tool calls                                                │
+│ 1: Agents  2: Evidence  3: Notepad                                           │
+│   ▄▄▀▀▀▀▀▀▄▄      explorer · Map the router callers                         │
+│     ▀▀  ▀▀ ▀▄▄▀   running · Ns · NN.Nk tokens                               │
+│    ▀▀▀▀▀▀▀▀   ▀  sonnet-5-5 · high                                           │
+│    ▀▀▀▀▀▀▀▀      3 tool calls                                                │
 │ Brief                                                                        │
-│ Fix the heading parser so fenced lines are skipped. The staging token is     │
-│ password=‹masked›; do not print it.                                          │
-│ Tool calls · 2                                                               │
+│ Find every caller of the shared router and say which ones bypass the         │
+│ harness.                                                                     │
+│ Tool calls · 1                                                               │
 │ ↓ more · wheel to scroll                                                     │
 │ b: Back  c: Copy brief  r: Reload  v: Back to main                           │
 ╰──────────────────────────────────────────────────────────────────────────────╯
                                                             ◐ medium · /effort
-─────────────────────────────────────────────────────── Fix the heading parser ─
+─────────────────────────────────────────────────────── Map the router callers ─
 ❯ Message @oh-my-claudeagent:e……
 ────────────────────────────────────────────────────────────────────────────────
   ⏸ manual mode on · /tasks to see subagents · ← for agents · ↓ to manage

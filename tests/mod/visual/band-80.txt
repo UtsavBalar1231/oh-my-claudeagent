@@ -1,7 +1,7 @@
 
  ▐▛███▛█   Claude Code v2.1.316
 ▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · /…/omca-visual-80x40-XXXXXX/cwd
 
 
 ❯ Run the tests
@@ -28,10 +28,10 @@
 
 
 
-█▎███ 12/46 · next 13 Port the snaps… ·  just test evidence not logged     [-]
+ just test evidence not logged                                             [-]
 1: Log evidence
                                                             ◐ medium · /effort
-─────────────────────────────────────────────────────────── OMCA: 46-task-plan ─
+─────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 
 ────────────────────────────────────────────────────────────────────────────────
   ⏸ manual mode on · ? for shortcuts · ← for agents · ↓ to manage

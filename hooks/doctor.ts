@@ -4,6 +4,7 @@ import { parseFrontmatter } from "../src/core/frontmatter.ts";
 import { statusPath } from "../src/core/omca-paths.ts";
 import { joinPath, type Platform, tildePath } from "../src/core/path.ts";
 import { type Host, pluginVersion, reason, sessionOf, type State, update } from "./host.ts";
+import { hasTaskTools } from "./task-tools.ts";
 
 type Doctor = State["doctor"];
 
@@ -133,6 +134,8 @@ async function check(host: Host): Promise<Doctor["checks"]> {
     OMCA_GLYPHS: await host.env.OMCA_GLYPHS(),
     CLAUDE_CODE_EFFORT_LEVEL: await host.env.CLAUDE_CODE_EFFORT_LEVEL(),
     CLAUDE_AFK_TIMEOUT_MS: await host.env.CLAUDE_AFK_TIMEOUT_MS(),
+    CLAUDE_CODE_ENABLE_TODO_TOOLS: await host.env.CLAUDE_CODE_ENABLE_TODO_TOOLS(),
+    CLAUDE_CODE_ENABLE_TASKS: await host.env.CLAUDE_CODE_ENABLE_TASKS(),
   };
   const checks = doctorChecks({
     modVersion: mod,
@@ -148,6 +151,7 @@ async function check(host: Host): Promise<Doctor["checks"]> {
     userSettings,
     isStyleForced: isForced,
     hasOldMemory: isOld,
+    hasTaskTools: await hasTaskTools(host),
   });
   seen.clear();
   for (const { fix } of checks) {

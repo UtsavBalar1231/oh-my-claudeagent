@@ -1,10 +1,9 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { blockedNumbers, nextTaskLabel, planTasks } from "../../src/core/checkboxes.ts";
 import { pluginRoot } from "../plugin-root.ts";
 import type { Handler } from "./registry.ts";
 import type { Session } from "./session-state.ts";
-import { readBoundPlan, registryPath, statusPath } from "./status-file.ts";
+import { type OpenRun, readOpenRun, statusPath } from "./status-file.ts";
 
 let template: string | undefined;
 
@@ -13,34 +12,20 @@ export function guidanceTemplate(): string {
   return template;
 }
 
-type BoundPlan = { name: string; path: string; content: string };
+export const activeRunLine = ({ name, open, next }: OpenRun): string => `[ACTIVE RUN] ${name}: ${open.length} open, next #${next.id} ${next.subject}`;
 
-function boundPlanOf(root: string, sessionId: string): BoundPlan | undefined {
-  const read = readBoundPlan(root, sessionId);
-  if (read.kind === "ok") return read.file && { name: read.name, path: read.path, content: read.file.content };
-  if (read.kind === "corrupt") console.error(`omca: guidance: ${registryPath(root)} is not valid JSON, so no plan context is added`);
-  if (read.kind === "unreadable") console.error(`omca: guidance could not read ${read.path} (${read.code}), so no plan context is added`);
-  return undefined;
-}
-
-function noneOpen(content: string): string {
-  const blocked = blockedNumbers(planTasks(content));
-  return blocked.length === 0 ? "None open: every numbered task is checked." : `None open: every numbered task is checked or blocked (blocked: ${blocked.join(", ")}).`;
-}
-
-const planContext = ({ name, path, content }: BoundPlan): string =>
+const runContext = (run: OpenRun): string =>
   [
-    `[ACTIVE PLAN] ${name}: ${path}`,
-    `[NEXT TASK] ${nextTaskLabel(content) ?? noneOpen(content)}`,
-    `[NOTEPAD] Record discoveries, decisions and blockers with notepad_write('${name}', section, content); the sections are learnings, issues, decisions and problems.`,
+    activeRunLine(run),
+    `[NOTEPAD] Record discoveries, decisions and blockers with notepad_write('${run.name}', section, content); the sections are learnings, issues, decisions and problems.`,
   ].join("\n");
 
-const contextFor = (sessionId: string, plan: BoundPlan | undefined): string =>
-  [guidanceTemplate(), `Session ${sessionId}`, ...(plan === undefined ? [] : [planContext(plan)])].join("\n");
+const contextFor = (sessionId: string, run: OpenRun | undefined): string =>
+  [guidanceTemplate(), `Session ${sessionId}`, ...(run === undefined ? [] : [runContext(run)])].join("\n");
 
-/** The template, then the session's id and its bound plan when there is a session to name. */
+/** The template, then the session's id and its open run when there is a session to name. */
 export function guidanceContext(root: string, sessionId: string | undefined): string {
-  return sessionId === undefined ? guidanceTemplate() : contextFor(sessionId, boundPlanOf(root, sessionId));
+  return sessionId === undefined ? guidanceTemplate() : contextFor(sessionId, readOpenRun(root, sessionId, { atPrompt: true }));
 }
 
 // `claude --resume` keeps the session id but starts a new server, whose first hook call for the
@@ -60,9 +45,9 @@ export const handle: Handler = (payload, { root, now, session }) => {
   const isTitleDue = payload.event === "UserPromptSubmit" && !session.isTitleChecked;
   if (isTitleDue) session.isTitleChecked = true;
   const wantsTitle = isTitleDue && !payload.session_title;
-  const plan = !isHeldBack || wantsTitle ? boundPlanOf(root, session.id) : undefined;
-  const context = isHeldBack ? undefined : contextFor(session.id, plan);
-  const title = wantsTitle && plan !== undefined ? `OMCA: ${plan.name}` : undefined;
+  const run = !isHeldBack || wantsTitle ? readOpenRun(root, session.id, { atPrompt: true }) : undefined;
+  const context = isHeldBack ? undefined : contextFor(session.id, run);
+  const title = wantsTitle && run !== undefined ? `OMCA: ${run.name}` : undefined;
   if (context === undefined && title === undefined) return;
   return {
     hookSpecificOutput: {

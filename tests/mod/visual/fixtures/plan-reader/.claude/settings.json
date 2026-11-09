@@ -1,4 +1,0 @@
-{
-  "plansDirectory": "{{cwd}}/plans",
-  "permissions": { "defaultMode": "default", "allow": ["Bash(touch:*)", "Bash(sleep:*)"] }
-}

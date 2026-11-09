@@ -1,4 +1,3 @@
-import type { SessionMessage } from "claude-code";
 import { expect, test } from "claude-code/testing";
 import { split, USAGE } from "../../hooks/omca-router.ts";
 import { readOptions } from "../../hooks/register.ts";
@@ -15,9 +14,9 @@ const ATOMS = [
   "notices",
   "pages",
   "pane",
-  "plan",
-  "receipts",
+  "placedRows",
   "stats",
+  "tasks",
   "turns",
 ].map((key) => ({ plugin: PLUGIN, key }));
 
@@ -50,7 +49,6 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
         "ui.scroll",
         "command.run",
         "ui.render",
-        "session.compact",
       ],
       calls: [
         "agent.list",
@@ -59,6 +57,7 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
         "clock.now",
         "command.register",
         "env.get",
+        "env.set",
         "fs.exists",
         "fs.list",
         "fs.read",
@@ -80,13 +79,13 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
         "settings.read",
         "state.get",
         "state.set",
+        "tool.list",
         "ui.ask",
         "ui.blit",
         "ui.copy",
         "ui.focus",
         "ui.invalidate",
         "ui.log",
-        "ui.notify",
         "ui.open",
         "ui.panes",
         "ui.place",
@@ -101,7 +100,10 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
           "CLAUDE_CODE_DISABLE_ADVISOR_TOOL",
           "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
           "CLAUDE_CODE_EFFORT_LEVEL",
+          "CLAUDE_CODE_ENABLE_TASKS",
+          "CLAUDE_CODE_ENABLE_TODO_TOOLS",
           "CLAUDE_CODE_SUBAGENT_MODEL_FORCE",
+          "CLAUDE_CODE_TASK_LIST_ID",
           "CLAUDE_CONFIG_DIR",
           "DISABLE_GROWTHBOOK",
           "DISABLE_TELEMETRY",
@@ -113,7 +115,7 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
           "OMCA_GLYPHS",
           "USERPROFILE",
         ],
-        writes: [],
+        writes: ["CLAUDE_CODE_ENABLE_TODO_TOOLS", "CLAUDE_CODE_TASK_LIST_ID"],
       },
       state: { reads: ATOMS, writes: ATOMS },
     },
@@ -173,7 +175,6 @@ test("each passthrough dispatcher calls next once and returns its answer", async
   on("turn.start", (_$, e) => (calls.push("turn.start"), { turnId: e.turnId }));
   on("turn.complete", (_$, e) => (calls.push("turn.complete"), { text: `${e.answer}!` }));
   on("agent.spawn", () => (calls.push("agent.spawn"), { model: "claude-sonnet-5-5", agentId: "a-1" }));
-  on("session.compact", (_$, e) => (calls.push("session.compact"), { messages: e.messages.slice(-1) }));
   on("ui.focus", () => (calls.push("ui.focus"), {}));
   on("ui.scroll", () => (calls.push("ui.scroll"), {}));
 
@@ -194,14 +195,6 @@ test("each passthrough dispatcher calls next once and returns its answer", async
       fork: false,
     }),
   ).toEqual({ model: "claude-sonnet-5-5", agentId: "a-1" });
-  const kept: SessionMessage = { role: "assistant", text: "the plan is bound", toolUses: [] };
-  expect(
-    await $.session.compact({
-      trigger: "manual",
-      instructions: "keep the plan",
-      messages: [{ role: "user", text: "start", toolUses: [] }, kept],
-    }),
-  ).toEqual({ messages: [kept] });
   expect(
     await $.ui.focus({ component: "Pane", requestId: "omca", element: "row-1", origin: { kind: "person" } }),
   ).toEqual({});
@@ -213,7 +206,6 @@ test("each passthrough dispatcher calls next once and returns its answer", async
     "turn.start",
     "turn.complete",
     "agent.spawn",
-    "session.compact",
     "ui.focus",
     "ui.scroll",
   ]);
@@ -289,6 +281,9 @@ test("/omca answers an unknown subcommand with its usage and runs no command", a
   expect(await $.command.run(run("statz"))).toEqual({
     text: `Unknown /omca subcommand "statz". ${USAGE}`,
   });
+  expect(await $.command.run(run("plan"))).toEqual({
+    text: `Unknown /omca subcommand "plan". ${USAGE}`,
+  });
   expect(calls).toEqual([]);
 });
 
@@ -296,7 +291,7 @@ test("the router splits the first word from the rest and keeps the rest verbatim
   expect(split("")).toEqual({ name: "", rest: "" });
   expect(split("   ")).toEqual({ name: "", rest: "" });
   expect(split("stats")).toEqual({ name: "stats", rest: "" });
-  expect(split("  plan  ~/plans/my  plan.md ")).toEqual({ name: "plan", rest: "~/plans/my  plan.md" });
+  expect(split("  stats  my  page ")).toEqual({ name: "stats", rest: "my  page" });
   expect(split("doctor\tnow")).toEqual({ name: "doctor", rest: "now" });
 });
 

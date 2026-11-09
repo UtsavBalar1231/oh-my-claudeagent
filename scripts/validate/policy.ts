@@ -17,7 +17,6 @@ const HOOK_MODEL_MARKERS: readonly Marker[] = [
   { text: "omca_hook", label: "the server hook tool" },
   { text: "tool.check", label: "the guard's mod event" },
   { text: "OMCA_DISABLED_HOOKS", label: "the kill switch" },
-  { text: "boulder.json", label: "the plan registry" },
   { text: "verification-evidence.json", label: "the evidence ledger" },
 ];
 

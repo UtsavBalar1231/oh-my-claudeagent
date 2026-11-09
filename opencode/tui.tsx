@@ -74,7 +74,7 @@ export default Plugin.define({
     function open(input?: string) {
       const selected = commandTab(input);
       if (!selected) {
-        ctx.ui.toast.show({ title: "OMCA", message: "Usage: /omca [plan|agents|evidence|notepad|doctor]", variant: "warning" });
+        ctx.ui.toast.show({ title: "OMCA", message: "Usage: /omca [tasks|agents|evidence|notepad|doctor]", variant: "warning" });
         return;
       }
       if (ctx.ui.router.current().type !== "session" || !ctx.ui.panel.open("omca.overview")) {
@@ -104,8 +104,8 @@ export default Plugin.define({
         if (!current || current.phase === "loading") return "OMCA: …";
         if (current.phase === "error") return "OMCA: offline";
         const value = current.value;
-        if (!value?.plan) return "OMCA";
-        return footerStatus(value.plan.tasks);
+        if (!value?.run) return "OMCA";
+        return footerStatus(value.run.tasks);
       };
       return <text fg={ctx.theme.text.muted} wrapMode="none">{status()}</text>;
     }

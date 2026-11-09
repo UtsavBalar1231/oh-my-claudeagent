@@ -3,7 +3,7 @@ import { entriesOf, EVIDENCE_TYPES, type EvidenceType, readLedger } from "../../
 import { STATE_VERSION } from "../../src/core/state-version.ts";
 import { isRecord } from "../../src/core/tool-input.ts";
 import { latestSessionId, touchSession } from "../hooks/session-state.ts";
-import { ledgerPath, writeStatus } from "../hooks/status-file.ts";
+import { ledgerPath, readTaskList, writeStatus } from "../hooks/status-file.ts";
 import { ensureStateDir, readOrNull, withLock, writeFileAtomic } from "../io.ts";
 import type { Tool } from "../omca.ts";
 import { workingTreeStamp } from "../tree-stamp.ts";
@@ -12,8 +12,8 @@ import { argReader, isoTimestamp, rootOf, stringArg, WORKING_DIRECTORY } from ".
 export const SNIPPET_MAX_CHARS = 2000;
 export const COMMAND_MAX_CHARS = 2000;
 export const VERIFIED_BY_MAX_CHARS = 200;
+export const TASK_ID_MAX_CHARS = 200;
 const DEFAULT_READ_ENTRIES = 20;
-const SHA256_HEX = /^[0-9a-f]{64}$/;
 // A full read is many 2,000-character snippets; 100,000 holds about 50, well under the client's 500,000 ceiling.
 const EVIDENCE_MAX_RESULT_CHARS = 100_000;
 // The mod reads the ledger through $.fs.read, which fails past 4 MiB.
@@ -30,7 +30,7 @@ export type EvidenceEntry = {
   output_snippet: string;
   timestamp: string;
   verified_by?: string;
-  plan_sha256?: string;
+  task_id?: string;
   tree?: string;
   record_id?: string;
   [key: string]: unknown;
@@ -78,6 +78,15 @@ function updateStatus(root: string): void {
   }
 }
 
+/** The run and list of the final task a verdict names, so a verdict for one list's task #N never closes another list's. */
+function verdictStamp(root: string, taskId: string): { run: string; task_list: string } {
+  if (taskId === "") throw new Error("evidence_log: a final_verification names the run's final task in task_id");
+  const list = readTaskList(root, latestSessionId() ?? process.env.CLAUDE_CODE_SESSION_ID ?? "");
+  const task = list.tasks.find(({ id }) => id === taskId);
+  if (task?.isFinal !== true) throw new Error(`evidence_log: task #${taskId} is not a final task on this session's task list; name the run's final task in task_id`);
+  return { run: task.run, task_list: list.id };
+}
+
 async function evidenceLog(args: Record<string, unknown>): Promise<string> {
   const arg = argReader(args, "evidence_log").string;
   const type = arg("evidence_type");
@@ -89,9 +98,9 @@ async function evidenceLog(args: Record<string, unknown>): Promise<string> {
   if (typeof exitCode !== "number" || !Number.isInteger(exitCode)) throw new Error("evidence_log: exit_code must be an integer");
   const snippet = arg("output_snippet");
   const verifiedBy = arg("verified_by", "");
-  const planSha256 = arg("plan_sha256", "");
-  if (planSha256 !== "" && !SHA256_HEX.test(planSha256)) throw new Error("evidence_log: plan_sha256 must be 64 lowercase hex digits or empty");
+  const taskId = capped(arg("task_id", ""), TASK_ID_MAX_CHARS);
   const root = rootOf(arg("working_directory", ""));
+  const stamp = type === "final_verification" ? verdictStamp(root, taskId) : {};
   const tree = await workingTreeStamp(root);
 
   const entry = {
@@ -101,7 +110,8 @@ async function evidenceLog(args: Record<string, unknown>): Promise<string> {
     output_snippet: capped(snippet, SNIPPET_MAX_CHARS),
     timestamp: isoTimestamp(),
     ...(verifiedBy && { verified_by: capped(verifiedBy, VERIFIED_BY_MAX_CHARS) }),
-    ...(planSha256 && { plan_sha256: planSha256 }),
+    ...(taskId && { task_id: taskId }),
+    ...stamp,
     ...(tree !== null && { tree }),
   };
   ensureStateDir(root);
@@ -143,7 +153,7 @@ export const tools: Tool[] = [
   {
     name: "evidence_log",
     description:
-      "Record a build, test or lint run in the project's evidence log with its real exit code; a failing run counts too. OMCA's stop and task gates read this log. At the end of a plan, log one final_verification entry with plan_sha256 from boulder_progress.",
+      "Record a build, test or lint run in the project's evidence log with its real exit code; a failing run counts too. OMCA's task gates read this log. Before completing a run's final task, log one final_verification entry with that task's task_id.",
     inputSchema: {
       type: "object",
       properties: {
@@ -151,7 +161,7 @@ export const tools: Tool[] = [
           type: "string",
           enum: [...EVIDENCE_TYPES],
           description:
-            "final_verification is the end-of-plan verdict. The plan's stop gate accepts one with exit_code 0 whose plan_sha256 matches the plan file as it is now.",
+            "final_verification is a run's verdict. A run's final task cannot complete until one with exit_code 0 names its task_id.",
         },
         command: { type: "string", description: "Command that was executed" },
         exit_code: {
@@ -161,11 +171,10 @@ export const tools: Tool[] = [
         output_snippet: { type: "string", description: "Relevant output snippet (truncated if needed)" },
         verified_by: { type: "string", default: "", description: "Agent or user who verified" },
         working_directory: WORKING_DIRECTORY,
-        plan_sha256: {
+        task_id: {
           type: "string",
           default: "",
-          description:
-            "The plan_sha256 boulder_progress returns. Set it on final_verification entries only.",
+          description: "The id of the run's final task this verdict covers. Set it on final_verification entries only.",
         },
       },
       required: ["evidence_type", "command", "exit_code", "output_snippet"],
@@ -186,7 +195,7 @@ export const tools: Tool[] = [
   {
     name: "evidence_read",
     description:
-      "Return the newest entries of the project's verification evidence log as JSON, oldest first, or a no-evidence message. It returns 20 entries by default and pass limit=0 for all; when entries are cut the output starts with a line giving the count shown and the total. The log is never cleared and is shared by all sessions in the project, so it holds entries from earlier sessions and other plans; there is no filter, and each output_snippet is capped at 2,000 characters. Use it to confirm what was logged, for example evidence a subagent reports.",
+      "Return the newest entries of the project's verification evidence log as JSON, oldest first, or a no-evidence message. It returns 20 entries by default and pass limit=0 for all; when entries are cut the output starts with a line giving the count shown and the total. The log is never cleared and is shared by all sessions in the project, so it holds entries from earlier sessions and other runs; there is no filter, and each output_snippet is capped at 2,000 characters. Use it to confirm what was logged, for example evidence a subagent reports.",
     inputSchema: {
       type: "object",
       properties: {

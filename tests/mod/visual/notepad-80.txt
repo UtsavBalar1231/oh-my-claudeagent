@@ -1,7 +1,8 @@
 
  ▐▛███▛█   Claude Code v2.1.316
 ▝▜██████▀  Opus 5.5 · API Usage Billing
- ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
+ ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · /…/omca-visual-80x40-XXXXXX/cwd
+
 
 
 
@@ -20,9 +21,9 @@
 
 
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
-│ 1: Agents  2: Plan  3: Evidence  4: Notepad                                  │
-│ checkout-redesign  BOUND  · 10 entries · 1 masked                            │
-│ f: Find  l: Plans (3)                                                        │
+│ 1: Agents  2: Evidence  3: Notepad                                           │
+│ checkout-redesign · 10 entries · 1 masked                                    │
+│ f: Find  l: Notepads (3)                                                     │
 │  Learnings · 3 entries  10-03 13:47                                         │
 │  Issues · 2 entries  10-02 22:18                                            │
 │  Decisions · 3 entries  10-03 13:25                                         │
@@ -32,7 +33,6 @@
 │                                                                              │
 │                                                                              │
 ╰──────────────────────────────────────────────────────────────────────────────╯
-██▌██ 2/4 · next 3 Show the saved payment methods                           [-]
                                                             ◐ medium · /effort
 ─────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 

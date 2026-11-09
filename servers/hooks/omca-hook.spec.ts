@@ -28,13 +28,14 @@ afterEach(async () => {
   }
 });
 
-function startServer(trace: boolean): Server {
+function startServer(trace: boolean, config?: string): Server {
   const project = realpathSync(mkdtempSync(join(tmpdir(), "omca-hook-")));
   expect(Bun.spawnSync(["git", "init", "-q", project], { env: process.env }).exitCode).toBe(0);
   const env: Record<string, string | undefined> = { ...process.env };
   delete env.OMCA_DISABLED_HOOKS;
   delete env.OMCA_HOOK_TRACE;
   if (trace) env.OMCA_HOOK_TRACE = "1";
+  if (config !== undefined) env.CLAUDE_CONFIG_DIR = config;
   const proc = Bun.spawn([process.execPath, SERVER], { cwd: project, env, stdin: "pipe", stdout: "pipe", stderr: "pipe" });
   const pending = new Map<number, (text: string) => void>();
   let nextId = 1;
@@ -98,35 +99,41 @@ describe("omca_hook over stdio", () => {
     ]);
   });
 
-  test("a bound plan's Stop answers with additionalContext once, then {} on the stop_hook_active retry", async () => {
-    const server = startServer(true);
-    const sessionId = crypto.randomUUID();
-    const plan = join(server.project, "plan.md");
-    writeFileSync(plan, "# Plan\n\n- [ ] 1. First task\n");
-    mkdirSync(join(server.project, ".omca", "state"), { recursive: true });
-    const registry = {
-      plans: { demo: { active_plan: plan, started_at: "2026-01-01T00:00:00Z", session_ids: [sessionId] } },
-      bindings: { [sessionId]: { plan_name: "demo", bound_at: Math.floor(Date.now() / 1000) } },
-    };
-    writeFileSync(join(server.project, ".omca", "state", "boulder.json"), JSON.stringify(registry));
-    const stop = { event: "Stop", session_id: sessionId, transcript_path: "", last_assistant_message: "", background_tasks: "" };
+  test("a session that touched a task gets additionalContext on Stop once, then {} on the stop_hook_active retry", async () => {
+    const config = mkdtempSync(join(tmpdir(), "omca-hook-config-"));
+    try {
+      const server = startServer(true, config);
+      const sessionId = crypto.randomUUID();
+      mkdirSync(join(server.project, ".omca", "state", "mod"), { recursive: true });
+      writeFileSync(join(server.project, ".omca", "state", "mod", `${sessionId}.json`), JSON.stringify({ written_at: Date.now(), task_list: sessionId }));
+      mkdirSync(join(config, "tasks", sessionId), { recursive: true });
+      const task = { id: "1", subject: "First task", status: "pending", blocks: [], blockedBy: [], metadata: { run: "demo" } };
+      writeFileSync(join(config, "tasks", sessionId, "1.json"), JSON.stringify(task));
+      const stop = { event: "Stop", session_id: sessionId, transcript_path: "", last_assistant_message: "", background_tasks: "" };
 
-    expect(JSON.parse(await server.hook({ ...stop, stop_hook_active: "false" }))).toEqual({
-      hookSpecificOutput: {
-        hookEventName: "Stop",
-        additionalContext:
-          "[PLAN CONTINUATION] The bound plan 'demo' still has 1 open task (next: First task). Continue with the next task. " +
-          "If its work is already done and reviewed, flip its checkbox. If it cannot proceed, close it as blocked (`- [~] N.` with a `- Blocked:` line), or record why with notepad_write and " +
-          "ask the user; a turn that asks the user is not blocked.",
-      },
-    });
-    expect(await server.hook({ ...stop, stop_hook_active: "true" })).toBe("{}");
+      expect(await server.hook({ ...stop, stop_hook_active: "false" })).toBe("{}");
+      expect(await server.hook({ event: "PostToolUse", session_id: sessionId, agent_id: "", agent_type: "", tool_name: "TaskUpdate", tool_input: '{"status":"in_progress"}', tool_response: "{}" })).toBe("{}");
+      expect(JSON.parse(await server.hook({ ...stop, stop_hook_active: "false" }))).toEqual({
+        hookSpecificOutput: {
+          hookEventName: "Stop",
+          additionalContext:
+            "[TASK CONTINUATION] Run 'demo' still has 1 open task (next: #1 First task). Continue with the next task. " +
+            'If its work is already done and reviewed, complete it with TaskUpdate. If it cannot proceed, close it as blocked with TaskUpdate metadata {"blocked": "<why>"}, or ' +
+            "ask the user; a turn that asks the user is not blocked.",
+        },
+      });
+      expect(await server.hook({ ...stop, stop_hook_active: "true" })).toBe("{}");
 
-    const trace = readFileSync(join(server.project, ".omca", "state", "hook-trace.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line));
-    expect(trace.map(({ event, output }) => [event, output])).toEqual([
-      ["Stop", "continue"],
-      ["Stop", "empty"],
-    ]);
+      const trace = readFileSync(join(server.project, ".omca", "state", "hook-trace.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line));
+      expect(trace.map(({ event, output }) => [event, output])).toEqual([
+        ["Stop", "empty"],
+        ["PostToolUse", "empty"],
+        ["Stop", "continue"],
+        ["Stop", "empty"],
+      ]);
+    } finally {
+      rmSync(config, { recursive: true, force: true });
+    }
   });
 
   test("without OMCA_HOOK_TRACE the server writes no trace", async () => {

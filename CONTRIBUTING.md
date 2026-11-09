@@ -62,7 +62,7 @@ Key rules:
 3. If the skill should be keyword-activated, add a detection pattern to `src/core/keywords.ts`
 4. A skill that omits `context: fork` expands inline in whatever session invoked it, so one invoked from the main session runs at depth 0 and keeps that session's `Agent` tool. That is what an orchestrator skill needs; `start-work` is the worked example, fanning out to `executor` agents from an inline body. `context: fork` does the opposite. It runs the body in a forked subagent one level down, where the platform may withhold the `Agent` tool depending on the configured spawn depth, so do not reach for it when the body has to delegate.
 5. Keep a skill description under the 512-character soft cap and the 1,536-character hard cap. The platform truncates at the hard cap, and older clients may truncate at the soft cap. Run `just validate --check claims` before committing: it counts `description` plus `when_to_use`, warns at 512 and fails at 1,536. Move longer trigger phrases or usage notes into the SKILL.md body.
-6. Keep hook internals out of skills. Skills describe what users do, and hooks automate how. Unless a skill's primary purpose is hook configuration or diagnosis, it must not mention raw `.omca/state/*.json` file paths (use the `boulder_write` and `boulder_progress` MCP tools from the omca server instead), hook handler names (`task-completed`, `stop-gates`), hook event names (`PreToolUse`, `Stop`) or hook env vars (`OMCA_DISABLED_HOOKS`). The recognized exception is `omca-setup`, which states the hook and managed-settings policy it works under and sends a diagnosis to `/omca doctor`. A file path in a skill forces users to learn internal layouts they cannot control, and every hook refactor then has to update skill prose.
+6. Keep hook internals out of skills. Skills describe what users do, and hooks automate how. Unless a skill's primary purpose is hook configuration or diagnosis, it must not mention raw `.omca/state/*.json` file paths (use the omca server's MCP tools or Claude Code's task tools instead), hook handler names (`task-completed`, `stop-gates`), hook event names (`PreToolUse`, `Stop`) or hook env vars (`OMCA_DISABLED_HOOKS`). The recognized exception is `omca-setup`, which states the hook and managed-settings policy it works under and sends a diagnosis to `/omca doctor`. A file path in a skill forces users to learn internal layouts they cannot control, and every hook refactor then has to update skill prose.
 
 ## Testing
 
@@ -87,6 +87,11 @@ Use `just ci` before claiming a change is verified; `just test` runs the bun spe
 CI runs each recipe's commands directly, `bun scripts/validate.ts` for `just validate` for
 example, not through `just`. `scripts/validate/workflow.spec.ts` checks that CI runs every
 command of the `just ci` recipes and nothing else without a stated reason.
+
+Pull requests and pushes to `main` run CI on Linux only, because a macOS minute costs ten Linux
+minutes and a Windows minute two. A release tag runs it on all three, and so does a manual run:
+`gh workflow run ci.yml --ref <branch>`. Start one before merging a change to paths, shells or
+process handling.
 
 After changing the OpenCode UI or its RPC contract, run `just build-opencode`.
 The package exports the compiled TUI because installed JSX is not transformed by
@@ -161,6 +166,10 @@ The script never pushes. It prints one atomic push of both branches and both tag
 `git push --atomic origin main plugin v<version> plugin-v<version>`, so the stamped SHA never
 names a commit the remote lacks. The packaged tag is named `plugin-v<version>` because
 `release.yml` runs on `v*.*.*`. Add the CHANGELOG entry for the version first.
+
+Before the push, run CI on all three systems with `gh workflow run ci.yml --ref main` and wait
+for it to pass. The tag's own run gates only the GitHub release: the atomic push has already
+published the `plugin` branch that installs read.
 
 Prefer the recipe over hand-editing the three version fields, which must stay identical.
 

@@ -42,31 +42,11 @@ const read = (root: string, path: string): string => readFileSync(join(root, pat
 
 const entry = (i: number) => ({ type: "test", command: `run ${i}`, exit_code: 0, output_snippet: "ok", timestamp: "2026-10-01T00:00:00Z" });
 
-function seedDurable(root: string): void {
-  put(root, "done.md", "- [x] 1. one\n");
-  put(root, "live.md", "- [ ] 1. one\n");
-  const registry = JSON.stringify({
-    plans: {
-      done: { active_plan: join(root, "done.md"), started_at: "2026-10-01T00:00:00Z", session_ids: [] },
-      live: { active_plan: join(root, "live.md"), started_at: "2026-10-01T00:00:00Z", session_ids: ["s1"] },
-    },
-    bindings: { s1: { plan_name: "live", bound_at: 1_786_000_000 } },
-  });
-  const ledger = JSON.stringify({ entries: Array.from({ length: 1001 }, (_, i) => entry(i)) });
-  put(root, ".omca/state/boulder.json", registry);
-  put(root, ".omca/evidence/verification-evidence.json", ledger);
-}
-
 describe("start-up work", () => {
-  test("the server prunes the plan registry and rotates the evidence ledger", async () => {
+  test("the server rotates the evidence ledger", async () => {
     const root = project();
-    seedDurable(root);
+    put(root, ".omca/evidence/verification-evidence.json", JSON.stringify({ entries: Array.from({ length: 1001 }, (_, i) => entry(i)) }));
     await startWork(root, NOW);
-    expect(JSON.parse(read(root, ".omca/state/boulder.json"))).toEqual({
-      version: 1,
-      plans: { live: { active_plan: join(root, "live.md"), started_at: "2026-10-01T00:00:00Z", session_ids: ["s1"] } },
-      bindings: { s1: { plan_name: "live", bound_at: 1_786_000_000 } },
-    });
     const live = JSON.parse(read(root, ".omca/evidence/verification-evidence.json")).entries;
     const archived = JSON.parse(read(root, ".omca/evidence/verification-evidence.202610.json")).entries;
     expect([live.length, live[0].command, archived.length, archived.at(-1).command]).toEqual([500, "run 501", 501, "run 500"]);
@@ -97,21 +77,21 @@ describe("start-up work", () => {
   test("temp files a crash left under state, evidence and notepads go after 24 hours, and no directory is removed", async () => {
     const root = project();
     const old = [
-      ".omca/state/boulder.json.1111.tmp",
-      ".omca/state/boulder.json.lock.2222.tmp",
+      ".omca/state/sample.json.1111.tmp",
+      ".omca/state/sample.json.lock.2222.tmp",
       ".omca/state/session/s1.json.3333.tmp",
       ".omca/evidence/verification-evidence.json.4444.tmp",
       ".omca/notepads/plan-a/learnings.md.5555.tmp",
     ];
     for (const path of old) put(root, path, "partial", 25 * HOUR_MS);
-    put(root, ".omca/state/boulder.json.6666.tmp", "partial", 23 * HOUR_MS);
+    put(root, ".omca/state/sample.json.6666.tmp", "partial", 23 * HOUR_MS);
     put(root, ".omca/notepads/plan-a/learnings.md", "kept", 25 * HOUR_MS);
-    mkdirSync(join(root, ".omca", "state", "boulder.json.lock.d"));
+    mkdirSync(join(root, ".omca", "state", "sample.json.lock.d"));
     await startWork(root, NOW);
-    expect(files(root, ".omca/state")).toEqual(["boulder.json.6666.tmp"]);
+    expect(files(root, ".omca/state")).toEqual(["sample.json.6666.tmp"]);
     expect(files(root, ".omca/evidence")).toEqual([]);
     expect(files(root, ".omca/notepads")).toEqual(["plan-a/learnings.md"]);
-    expect(existsSync(join(root, ".omca", "state", "boulder.json.lock.d"))).toBe(true);
+    expect(existsSync(join(root, ".omca", "state", "sample.json.lock.d"))).toBe(true);
   });
 
   test("a file that cannot be removed is logged and the entries after it are still pruned", async () => {

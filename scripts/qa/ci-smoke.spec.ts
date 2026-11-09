@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { offeredTools, smokeScript } from "./ci-smoke.ts";
+import { offeredTools, smokeScript, taskRunScript, toolResults } from "./ci-smoke.ts";
 import { guardDenies, hookCalls, pluginDenies } from "./lib.ts";
 
 const REASON = "Destructive rm -rf blocked: the target is the filesystem root, home, the working directory, or a directory directly under root or home. Name a deeper path explicitly.";
@@ -80,5 +80,48 @@ describe("smokeScript", () => {
   test("scripts the PowerShell removal at a target that does not exist", () => {
     const first = smokeScript(true).main[0]?.content[0];
     expect(first?.type === "tool_use" ? first.input.command : undefined).toBe("Remove-Item -Recurse -Force C:\\omca-ci-smoke-no-such-dir");
+  });
+});
+
+describe("taskRunScript", () => {
+  const calls = taskRunScript("/config/tasks/omca-project-12345678/1.json").main.map((turn) => turn.content.map((block) => (block.type === "tool_use" ? [block.name, block.input] : ["text", block.text])));
+
+  test("creates the final task, reads its file and the server's list, then completes it around the verdict", () => {
+    expect(calls).toEqual([
+      [["TaskCreate", { subject: "Review the smoke run", description: "Review the smoke run and record its verdict.", activeForm: "Reviewing the smoke run", metadata: { run: "ci-smoke-run", final: true } }]],
+      [["Read", { file_path: "/config/tasks/omca-project-12345678/1.json" }]],
+      [["mcp__plugin_oh-my-claudeagent_omca__task_list", {}]],
+      [["TaskUpdate", { taskId: "1", status: "completed" }]],
+      [["mcp__plugin_oh-my-claudeagent_omca__evidence_log", { evidence_type: "final_verification", command: "ci smoke task run", exit_code: 0, output_snippet: "COMPLETE", task_id: "1" }]],
+      [["TaskUpdate", { taskId: "1", status: "completed" }]],
+      [["text", "done"]],
+    ]);
+  });
+});
+
+describe("toolResults", () => {
+  const assistant = (...content: object[]) => JSON.stringify({ type: "assistant", message: { content } });
+  const user = (...content: object[]) => JSON.stringify({ type: "user", message: { content } });
+
+  test("names each result by the tool_use it answers, reading string and block content and the error flag", () => {
+    const stream = [
+      JSON.stringify({ type: "system", subtype: "init", tools: ["TaskCreate"] }),
+      assistant({ type: "tool_use", id: "toolu_mock_1", name: "TaskCreate", input: {} }),
+      user({ type: "tool_result", tool_use_id: "toolu_mock_1", content: "Task #1 created successfully: Review the smoke run" }),
+      assistant({ type: "text", text: "next" }, { type: "tool_use", id: "toolu_mock_2", name: "mcp__plugin_oh-my-claudeagent_omca__task_list", input: {} }),
+      user({ type: "tool_result", tool_use_id: "toolu_mock_2", content: [{ type: "text", text: "Run ci-smoke-run:" }, { type: "text", text: "#1 [pending] Review the smoke run [final]" }] }),
+      user({ type: "tool_result", tool_use_id: "toolu_mock_9", content: "orphan", is_error: true }),
+      JSON.stringify({ type: "result" }),
+    ].join("\n");
+    expect(toolResults(stream)).toEqual([
+      { name: "TaskCreate", text: "Task #1 created successfully: Review the smoke run", isError: false },
+      { name: "mcp__plugin_oh-my-claudeagent_omca__task_list", text: "Run ci-smoke-run:\n#1 [pending] Review the smoke run [final]", isError: false },
+      { name: "", text: "orphan", isError: true },
+    ]);
+  });
+
+  test("reads no results from a stream without messages", () => {
+    expect(toolResults(JSON.stringify({ type: "result" }))).toEqual([]);
+    expect(toolResults("")).toEqual([]);
   });
 });
