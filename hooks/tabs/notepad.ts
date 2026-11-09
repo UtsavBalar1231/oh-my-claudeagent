@@ -1,11 +1,10 @@
 import type { RenderElement } from "claude-code";
 import { isPlanName, matches, NOTEPAD_SECTIONS, type NotepadSection, parseEntries } from "../../src/core/notepad.ts";
-import { BOULDER } from "../../src/core/omca-paths.ts";
-import { clean } from "../../src/core/checkboxes.ts";
+import { clean } from "../../src/core/text.ts";
 import { COLUMN_GAP, displayWidth, fitEnd, formatWhen } from "../../src/core/ui-kit.ts";
-import { chip, fitPieces, type Piece, piecesWidth, redact, themeKey, type Tone, TONE_KEYS } from "../../src/core/visual.ts";
+import { fitPieces, type Piece, piecesWidth, redact, themeKey, type Tone, TONE_KEYS } from "../../src/core/visual.ts";
 import type { Input } from "../dispatch.ts";
-import { boundPlanOf, type Host, reason, type State } from "../host.ts";
+import { type Host, reason, type State } from "../host.ts";
 import { buttonRow, keyButton, noticeRow, patchPane, refocus, refocusRemote, type TabView, type View } from "../pane.ts";
 import { aimKeys, markdownUnits, resetOffset, ScrollRegion, type Unit } from "../regions.ts";
 import { Field, isRemote, Line, Rule } from "../ui.ts";
@@ -41,13 +40,6 @@ export const reset = (): void => {
   opened = undefined;
 };
 
-async function boundPlan(host: Host, root: string): Promise<{ name: string | undefined; seen: string }> {
-  const path = `${root}/${BOULDER}`;
-  if (!(await host.fs.exists(path))) return { name: undefined, seen: "" };
-  const { mtimeMs } = await host.fs.stat(path);
-  return { name: (await boundPlanOf(host))?.name, seen: `${mtimeMs}` };
-}
-
 // Every notepad, the most recently written first. A listing reports a directory's time as 0, so a
 // notepad is as recent as its newest section file; one that cannot be listed counts as oldest. The
 // server bumps `.omca/notepads` on every write, so the ranking is listed again only when that moves.
@@ -70,20 +62,13 @@ async function rankedNotepads(host: Host, root: string): Promise<Ranked[]> {
   return plans;
 }
 
-// The bound plan first, then the most recently written.
-async function notepadPlans(host: Host, root: string, bound: string | undefined): Promise<{ name: string; seen: string }[]> {
-  const rest = (await rankedNotepads(host, root)).filter(({ name }) => name !== bound).map(({ name, at }) => ({ name, seen: `${at}` }));
-  return bound === undefined ? rest : [{ name: bound, seen: "" }, ...rest];
-}
-
 // Unchanged files answer undefined, so a refresh writes, and redraws, nothing.
 export async function read(
   host: Host,
   root: string,
 ): Promise<{ notepad: Notepad | null; error: string | null } | undefined> {
   try {
-    const bound = await boundPlan(host, root);
-    const plans = await notepadPlans(host, root, bound.name);
+    const plans = await rankedNotepads(host, root);
     const shown = plans.find((plan) => plan.name === chosen) ?? plans[0];
     if (shown === undefined) {
       if (signature === "none") return undefined;
@@ -97,10 +82,8 @@ export async function read(
       return file === undefined ? [] : [{ name, path: `${dir}/${file.name}`, seen: `${file.mtimeMs}:${file.size}` }];
     });
     const seen = [
-      bound.name ?? "",
-      bound.seen,
       shown.name,
-      ...plans.map((plan) => `${plan.name}:${plan.seen}`),
+      ...plans.map((plan) => `${plan.name}:${plan.at}`),
       ...present.map((section) => `${section.name}:${section.seen}`),
     ].join("|");
     if (seen === signature) return undefined;
@@ -111,7 +94,6 @@ export async function read(
     return {
       notepad: {
         planName: shown.name,
-        bound: bound.name ?? null,
         plans: plans.map((plan) => plan.name),
         sections: sections.filter((section) => section.text !== ""),
       },
@@ -219,7 +201,7 @@ function pickKeys(host: Host, notepad: Notepad): Key[] {
     host.ui.invalidate();
     refocus(host, `${PICK}${notepad.planName}`, "notepad");
   };
-  return notepad.plans.length > 1 ? [["l", `Plans (${notepad.plans.length})`, pick]] : [];
+  return notepad.plans.length > 1 ? [["l", `Notepads (${notepad.plans.length})`, pick]] : [];
 }
 
 function field(host: Host, view: View): RenderElement {
@@ -250,12 +232,11 @@ const finder = (host: Host, view: View): RenderElement[] => (isSearching ? [fiel
 function picker(host: Host, notepad: Notepad, view: View): RenderElement[] {
   const { Box, Button, Text } = view.kit;
   return [
-    Text({ dimColor: true, children: [fitEnd(`Notepads ${view.g.dot} ${notepad.plans.length} plans, the bound one first`, view.width, view.g.ellipsis)] }),
+    Text({ dimColor: true, children: [fitEnd(`Notepads ${view.g.dot} ${notepad.plans.length}, the newest first`, view.width, view.g.ellipsis)] }),
     ...notepad.plans.map((name) => {
       const isShown = name === notepad.planName;
       const lead = `${isShown ? view.g.pointer : " "} `;
-      const mark = name === notepad.bound ? chip("BOUND", "plan", view.isAscii) : undefined;
-      const room = view.width - displayWidth(lead) - (mark === undefined ? 0 : displayWidth(mark.text) + 1);
+      const room = view.width - displayWidth(lead);
       return Box({
         key: `${PICK}row-${name}`,
         flexDirection: "row",
@@ -268,7 +249,6 @@ function picker(host: Host, notepad: Notepad, view: View): RenderElement[] {
             ...(isShown ? { autoFocus: true } : {}),
             onPress: view.press(() => choose(host, view, name)),
           }),
-          ...(mark === undefined ? [] : [Text({ children: [" "] }), Line(view.kit, [mark])]),
         ],
       });
     }),
@@ -350,7 +330,7 @@ export function focus(_e: Input<"ui.focus">): void {
 
 export const view: TabView = async (host, view) => {
   const pane = (await host.state.pane.get()).value;
-  const words = { loading: "Reading the notepad", empty: "No plan has a notepad yet; a plan's agents add one with notepad_write." };
+  const words = { loading: "Reading the notepad", empty: "No notepad yet; agents add one with notepad_write." };
   if (pane === undefined) return [noticeRow(view, { kind: "loading" }, words)];
   if (pane.errors.notepad !== null) return [noticeRow(view, { kind: "error", reason: pane.errors.notepad }, words)];
   const { notepad } = pane;
@@ -361,8 +341,7 @@ export const view: TabView = async (host, view) => {
   if (open !== undefined && open.total > 0) return page(host, notepad, view, open);
   opened = undefined;
   const entries = sum(sections, (section) => section.total);
-  const lead: Piece[] = [planPiece(notepad), { text: " " }, notepad.bound === notepad.planName ? chip("BOUND", "plan", view.isAscii) : { text: "not bound", color: TONE_KEYS.muted }];
-  const head = Line(view.kit, headerPieces(view, lead, entries, sum(sections, (section) => section.entries.length), sum(sections, (section) => section.masked)));
+  const head = Line(view.kit, headerPieces(view, [planPiece(notepad)], entries, sum(sections, (section) => section.entries.length), sum(sections, (section) => section.masked)));
   if (entries === 0) {
     return [
       head,

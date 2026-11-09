@@ -12,5 +12,6 @@ effort: high
 Review the work plan at: $ARGUMENTS
 
 Require one unambiguous plan file path, not an inline summary. Ask for it when
-missing. Apply the reviewer's instructions and return OKAY or REJECT with
+missing. Text after the path, when present, is the plan's tasks: judge it together
+with the file. Apply the reviewer's instructions and return OKAY or REJECT with
 concrete blockers, source references and the smallest corrections.

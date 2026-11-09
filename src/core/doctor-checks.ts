@@ -12,6 +12,8 @@ export const MIGRATE_COMMAND = `${SETUP_COMMAND} --migrate`;
 
 type DoctorEnv = Readonly<{
   CLAUDE_CODE_SUBAGENT_MODEL_FORCE?: string | undefined;
+  CLAUDE_CODE_ENABLE_TODO_TOOLS?: string | undefined;
+  CLAUDE_CODE_ENABLE_TASKS?: string | undefined;
   CLAUDE_CODE_DISABLE_ADVISOR_TOOL?: string | undefined;
   DISABLE_TELEMETRY?: string | undefined;
   DO_NOT_TRACK?: string | undefined;
@@ -42,6 +44,7 @@ export type Inputs = {
   userSettings: string | null;
   isStyleForced: boolean | null;
   hasOldMemory: boolean;
+  hasTaskTools: boolean;
 };
 
 const ENGINE_FLOOR = "2.1.300";
@@ -141,6 +144,15 @@ function astGrepCheck(found: Inputs["astGrep"]): Check {
 
 function optionsCheck({ showBand, guardMode }: Inputs["options"]): Check {
   return check("options", "Options", "ok", `showBand ${showBand ? "on" : "off"}, guardMode ${guardMode}`);
+}
+
+function taskToolsCheck(hasTaskTools: boolean, env: DoctorEnv): Check {
+  if (hasTaskTools) return check("task-tools", "Task tools", "ok", "On, as OMCA requires");
+  const todo = env.CLAUDE_CODE_ENABLE_TODO_TOOLS;
+  if (todo !== undefined && todo !== "" && todo !== "1") return check("task-tools", "Task tools", "fail", `Off, and OMCA requires them: CLAUDE_CODE_ENABLE_TODO_TOOLS=${todo} keeps them off`);
+  if (env.CLAUDE_CODE_ENABLE_TASKS === "0") return check("task-tools", "Task tools", "fail", "Off, and OMCA requires them: CLAUDE_CODE_ENABLE_TASKS=0 gives TodoWrite instead");
+  if (todo === undefined || todo === "") return check("task-tools", "Task tools", "fail", "Off, and OMCA requires them: the mod's set of CLAUDE_CODE_ENABLE_TODO_TOOLS=1 was refused, as managed settings hold the variable");
+  return check("task-tools", "Task tools", "fail", "Off, and OMCA requires them: a deny rule on TaskCreate or TaskUpdate, or a --tools list without them, keeps them off");
 }
 
 function modelForceCheck(env: DoctorEnv): Check {
@@ -318,6 +330,7 @@ export function doctorChecks(inputs: Inputs): Check[] {
     hookCheck(inputs.hook, inputs.now),
     astGrepCheck(inputs.astGrep),
     optionsCheck(inputs.options),
+    taskToolsCheck(inputs.hasTaskTools, inputs.env),
     modelForceCheck(inputs.env),
     ...glyphsCheck(inputs.env),
     effortCheck(inputs.settings["maxEffortLevel"]),

@@ -29,10 +29,16 @@ export type Evidence = {
   at: number;
   snippet: string;
   verifiedBy: string | null;
-  planSha: string;
+  taskId: string;
+  /** The run and the list of the task a final verification names, stamped when it was logged; empty on other entries. */
+  run: string;
+  taskList: string;
   /** The working tree the server stamped when the entry was logged; empty when it could not. */
   tree: string;
 };
+
+/** A task as a verdict names it. Ids restart on each task list, and lists share one ledger per checkout. */
+export type TaskRef = { list: string; run: string; id: string };
 
 const isType = (value: unknown): value is EvidenceType => EVIDENCE_TYPES.some((type) => type === value);
 
@@ -44,7 +50,7 @@ export function entriesOf(data: unknown): unknown[] | undefined {
 
 function toEvidence(raw: unknown): Evidence[] {
   if (!isRecord(raw)) return [];
-  const { type, command, exit_code: exitCode, timestamp, output_snippet: snippet, verified_by: verifiedBy, plan_sha256: planSha, tree } = raw;
+  const { type, command, exit_code: exitCode, timestamp, output_snippet: snippet, verified_by: verifiedBy, task_id: taskId, run, task_list: taskList, tree } = raw;
   const at = typeof timestamp === "string" ? Date.parse(timestamp) : Number.NaN;
   if (!isType(type) || typeof command !== "string" || typeof exitCode !== "number" || Number.isNaN(at)) return [];
   return [
@@ -55,7 +61,9 @@ function toEvidence(raw: unknown): Evidence[] {
       at,
       snippet: typeof snippet === "string" ? snippet : "",
       verifiedBy: typeof verifiedBy === "string" && verifiedBy !== "" ? verifiedBy : null,
-      planSha: typeof planSha === "string" ? planSha : "",
+      taskId: typeof taskId === "string" ? taskId : "",
+      run: typeof run === "string" ? run : "",
+      taskList: typeof taskList === "string" ? taskList : "",
       tree: typeof tree === "string" ? tree : "",
     },
   ];
@@ -86,24 +94,12 @@ export function parseLedger(text: string): Evidence[] {
   return read.entries;
 }
 
-export type Verdict =
-  | { kind: "complete"; entry: Evidence }
-  | { kind: "stale"; entry: Evidence }
-  | { kind: "missing"; failed: Evidence | null };
+/** Whether the entry is a final verification logged for this task: the same id, run and list. */
+export const namesTask = (entry: Evidence, task: TaskRef): boolean =>
+  entry.type === "final_verification" && entry.taskList !== "" && entry.taskList === task.list && entry.run === task.run && entry.taskId === task.id;
 
-/** The Stop gate's rule: a passing final verification scoped to these plan bytes, or to no plan at all. */
-export const provesPlan = (entry: Evidence, planSha: string): boolean =>
-  entry.type === "final_verification" && entry.exitCode === 0 && (entry.planSha === "" || entry.planSha === planSha);
-
-/** The Stop gate's rule read newest first; a passing final verification scoped to other bytes means the plan changed. */
-export function verdictOf(entries: readonly Evidence[], planSha: string): Verdict {
-  const finals = entries.filter((entry) => entry.type === "final_verification").toReversed();
-  const complete = finals.find((entry) => provesPlan(entry, planSha));
-  if (complete !== undefined) return { kind: "complete", entry: complete };
-  const stale = finals.find((entry) => entry.exitCode === 0);
-  if (stale !== undefined) return { kind: "stale", entry: stale };
-  return { kind: "missing", failed: finals[0] ?? null };
-}
+/** Whether a passing final verification was logged for this task. */
+export const provesTask = (entry: Evidence, task: TaskRef): boolean => namesTask(entry, task) && entry.exitCode === 0;
 
 /** Whether a later entry saw a different working tree, so the code moved after this entry ran. */
 export function treeMovedSince(entries: readonly Evidence[], entry: Evidence): boolean {
@@ -180,11 +176,10 @@ export function placeEntries(
   return { start, end: endFrom(start) };
 }
 
-/** What `r` puts in the prompt to run an entry again; a final verification names the plan's bytes when known. */
-export function rerunPrompt(type: EvidenceType, command: string, planSha: string | null): string {
+/** What `r` puts in the prompt to run an entry again. */
+export function rerunPrompt(type: EvidenceType, command: string): string {
   if (type !== "final_verification") return `Run \`${command}\` again and log the result with evidence_log as ${type} evidence.`;
-  const scope = planSha === null ? "" : ` with plan_sha256="${planSha}"`;
-  return `Run the final verification again (\`${command}\`) and log the verdict with evidence_log as final_verification evidence${scope}.`;
+  return `Run the final verification again (\`${command}\`) and log the verdict with evidence_log as final_verification evidence.`;
 }
 
 // A verification older than this belongs to earlier work, not the task completing now.

@@ -7,6 +7,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-11-09
+
+**Upgrading from 3.5.x:** finish or abandon an open run before you update, or run `plan` again on
+the old document afterward. An open run is released without a warning, because the gates read the
+task list and find it empty. `start-work` then reports that no run is open and names `plan`, even
+when you pass the old plan file. OpenCode's `/omca-start-work <path>` turns that document into
+tasks. Nothing reads `.omca/state/boulder.json` any more and nothing deletes it, so delete it by
+hand. `.omca/plans/*.md` stay on disk as documents that nothing reads. Evidence entries keep
+working, but `plan_sha256` is ignored and an entry without `task_id`, `run` and `task_list` proves
+no task. Notepads are
+unchanged. Allow rules that name `boulder_*` match nothing and do no harm. The task tools now turn on
+in every session, which brings Claude Code's `todo_reminder` nudge, and each checkout gets one
+shared task list. `OMCA_DISABLED_HOOKS=plan-continuation` is now `task-continuation`;
+`plan-receipts`, `plan-write-guard`, `plan-format-warn` and `compact` name nothing.
+
+### Added
+
+- **Runs in Claude Code's task list:** a run is a set of native tasks. Every task carries
+  `metadata.run`, the last carries `metadata.final: true` and cannot close until
+  `evidence_log(evidence_type="final_verification", ..., exit_code=0, task_id="<id>")` is logged for
+  it, and `metadata.blocked: "<why>"` closes a task without completing it. The mod sets
+  `CLAUDE_CODE_TASK_LIST_ID` to one list per checkout at session start when nothing has set it, so
+  the tasks outlive `/clear` and a new session in the same checkout can pick the run up with
+  `/oh-my-claudeagent:start-work`.
+- **Tasks pane:** `/tasklist` opens Claude Code's own task list whole, where its checklist stops at
+  five rows. Every task appears in the order the work runs, with what it does and what holds it
+  back, and a page for its full description, dependencies and metadata. Finished tasks stay after
+  Claude Code deletes the list, until `/clear`.
+- **`task_id` on evidence entries:** the evidence ledger schema allows `task_id`, the id of the task
+  a `final_verification` entry closes. `evidence_log` adds that task's `run` and `task_list` and
+  refuses a `task_id` that is not a final task on the session's list, and the final task accepts
+  only a verdict whose id, run and list all match, so an id that repeats on another list, such as
+  OpenCode's beside Claude Code's, closes nothing.
+- **Task list for every agent:** `task_list` and `task_get` read a run's tasks from any agent,
+  including the background subagents that have none of Claude Code's task tools, and show the run,
+  final and blocked marks those tools leave out. The reviewer, the analyzer and the architect's
+  final review read tasks this way.
+- **OpenCode task list:** `omca_task_create`, `omca_task_update`, `omca_task_list` and `omca_task_get`
+  keep a run in `.omca/state/tasks/`, in the same file shape as Claude Code's list and under the same
+  run, final-task and blocked-task rules, shared by every session in a checkout. Only the OMCA
+  coordinator writes it. `omca_task_update` refuses to complete a run's final task until a passing
+  `final_verification` names it, so OpenCode gains a completion hold. The panel's Plan tab is now
+  Tasks.
+
+### Changed
+
+- **Claude Code's task tools are required:** OMCA sets `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` at session
+  start when nothing has set it, which brings `TaskCreate` and `TaskUpdate` to every model, and the
+  task-completion check with them. A session that still has no task tools, because that variable
+  holds another value, `CLAUDE_CODE_ENABLE_TASKS=0`, a deny rule or a `--tools` list, stops at
+  `plan` and `start-work` with `runtime: task_tools_absent`, and `/omca doctor` names the cause.
+- **`plan` and `start-work`:** `plan` writes a free-form plan document that nothing parses, then
+  creates the run's tasks. `start-work` runs the open tasks and no longer registers or binds a
+  plan. The stop gates read the run from the task list.
+- **The pane's tabs:** Agents, Evidence and Notepad, on keys `1`, `2` and `3`.
+- **CI:** pull requests and pushes to `main` run on Linux only. A release tag and a manual run add
+  macOS and Windows. Each job stops at 15 minutes, and Dependabot checks monthly.
+
+### Removed
+
+- **The plan registry:** `.omca/state/boulder.json`, the `boulder_write` and `boulder_progress`
+  tools and `docs/schemas/plan-registry.v1.schema.json`. A session's binding to a plan, and the
+  plan's SHA-256 in `final_verification` entries (`plan_sha256`), give way to the task list and
+  `task_id`.
+- **Plan files as state:** numbered checkboxes, `Status: FINAL` and the sub-bullet fields are no
+  longer read, the plan parser and registry are gone from both adapters, the plan-write guard and the
+  plan format warning are gone, and the status line shows no plan segment.
+- **OpenCode's `omca_boulder_progress` and `/omca-pause`:** `omca_task_list` reports progress, and
+  OpenCode's own interrupt stops a coordinator with nothing left to unbind. `/omca-start-work` takes a
+  plan document or instructions and no longer needs `Status: FINAL`.
+- **The plan board:** the Plan tab, `/omca plan`, the proof marks the board and the band drew from
+  a task's `File:` lines, the transcript's plan task receipts and the spinner's task position.
+
+### Fixed
+
+- **A launch from a subdirectory:** the mod takes the repository's top level as its root, as the
+  `omca` server does, so both read and write the same `.omca/` and name the same task list. Before,
+  the server found no mod marker there and `health_check` refused.
+- **The guard's dialog** names an operation that a command runs twice, such as `git stash` and
+  `git stash pop`, once.
+- **OpenCode's evidence log** moves older entries to a monthly archive past 1 MiB or 1,000 entries,
+  as the `omca` server does at start.
+
 ## [3.5.1] - 2026-11-03
 
 ### Fixed
@@ -3267,6 +3350,7 @@ for multi-agent orchestration.
 - Shellcheck fixes applied across all hook scripts
 - Ruff fixes applied to Python MCP servers
 
+[4.0.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.5.1...v4.0.0
 [3.5.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.5.0...v3.5.1
 [3.5.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.4.0...v3.5.0
 [3.4.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.3.2...v3.4.0

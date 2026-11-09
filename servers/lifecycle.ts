@@ -1,7 +1,6 @@
 import { readdirSync, rmdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { hasCode } from "./io.ts";
-import { gcRegistry } from "./tools/boulder.ts";
 import { rotateLedger } from "./tools/evidence.ts";
 
 const DAY_MS = 24 * 3600 * 1000;
@@ -43,7 +42,6 @@ function prune(dir: string, suffix: string, cutoffMs: number, dropEmpty: boolean
 export async function startWork(root: string, now = Date.now()): Promise<void> {
   const omca = join(root, ".omca");
   const steps: Array<[string, () => unknown]> = [
-    ["plan registry GC", () => gcRegistry(root)],
     ["evidence ledger rotation", () => rotateLedger(root, new Date(now))],
     ["delegation record prune", () => prune(join(omca, "metrics"), ".json", now - RECORD_MAX_AGE_MS, true)],
     ["mod marker prune", () => prune(join(omca, "state", "mod"), ".json", now - MARKER_MAX_AGE_MS, true)],

@@ -179,9 +179,10 @@ function drawn(section: Section, rows: number): string[] {
 async function question(host: Host, command: string, finding: Reviewable, g: Glyphs, ctx: Context): Promise<string> {
   const shownCommand = commandRows(command, g);
   const targets = finding.removals.flatMap((removal) => removal.targets);
+  const operations = finding.git.filter((one, index, all) => all.findIndex((other) => JSON.stringify(other) === JSON.stringify(one)) === index);
   const sections = await Promise.all([
     ...(finding.removals.length > 0 ? [gathered(() => removalSection(host, targets, g, ctx), g)] : []),
-    ...finding.git.map((operation) => gathered(() => gitSection(host, operation), g)),
+    ...operations.map((operation) => gathered(() => gitSection(host, operation), g)),
   ]);
   const fixed = sections.reduce((sum, section) => sum + section.head.length + section.foot.length, 0);
   const rows = shareRows(sections, BODY_ROWS - 2 - shownCommand.length - fixed);

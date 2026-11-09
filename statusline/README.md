@@ -1,7 +1,7 @@
 # Statusline
 
-Renders the Claude Code status line from the JSON payload on stdin: model, plan progress,
-context usage, git state, cost, duration and usage limits, with ANSI colors and optional Nerd
+Renders the Claude Code status line from the JSON payload on stdin: model, context
+usage, git state, cost, duration and usage limits, with ANSI colors and optional Nerd
 Font glyphs. It lays itself out from the size of the terminal and takes no tuning settings. The
 renderer runs on bun and has no dependencies.
 
@@ -12,8 +12,8 @@ renderer runs on bun and has no dependencies.
 From 60 columns up the status line is three rows, each starting on its own line:
 
 1. **Session:** model and effort, the vim mode when vim mode is on (setup hides the platform's
-   own mode indicator, so this is the only one), the active agent, and plan progress for the plan
-   bound to the session with the label of its next open task.
+   own mode indicator, so this is the only one) and the active agent. Task progress is in
+   Claude Code's own task panel, which the status line leaves alone.
 2. **Workspace:** the context window bar with its percentage and window size, the git branch
    with modified, staged and untracked counts, the project directory name (linked to the remote
    when there is one), the worktree name with the branch it came from, the pull request number
@@ -27,26 +27,26 @@ Each segment appears only when it has something to show, and a row with nothing 
 out. A 200 column terminal shows each row on one line:
 
 ```
-> Opus 5.5 · E: high · A: oh-my-claudeagent:executor · T: 2/4 -> Wire the order summary panel into the payment step and cover it with a test
+> Opus 5.5 · E: high · A: oh-my-claudeagent:executor
 ━━━━━━━───────────── 34%  200k · * feature/checkout-redesign ~3  +2  ?1 · > shop · W: checkout-wt <- main · #42 + · +42/-7 · +2 dirs
 ~ 2m05s · C: warm 52m · ━━━━────── 45% 5h (resets 6pm) · ━━━━━━━━── 80% 7d (resets mon 5pm)
 ```
 
-An 80 column terminal wraps the session row onto two lines, and to stay within four lines it
-gives up the lowest-ranked segments (the worktree, pull request, cache state, lines changed,
-extra directories and the 7 day limit) so the duration and the 5 hour limit stay:
+An 80 column terminal wraps the workspace row onto two lines, and to stay within four lines it
+gives up the lowest-ranked segments (the cache state, lines changed, extra directories and the
+7 day limit) so the duration and the 5 hour limit stay:
 
 ```
 > Opus 5.5 · E: high · A: oh-my-claudeagent:executor
-T: 2/4 -> Wire the order summary panel into the payment step and cover it…
 ━━━━━───────── 34%  200k · * feature/checkout-redesign ~3  +2  ?1 · > shop
+W: checkout-wt <- main · #42 +
 ~ 2m05s · ━━━━────── 45% 5h (resets 6pm)
 ```
 
 A terminal under 60 columns gets one compact line:
 
 ```
-> Opus 5.5 · T: 2/4 · 34% · * main
+> Opus 5.5 · 34% · * main
 ```
 
 The samples show the `unicode` glyphs. With Nerd Font glyphs, the default, each label is a glyph instead.
@@ -94,18 +94,16 @@ a wide character such as a CJK glyph counts as two.
   When the rows need more, segments give way one at a time in a fixed order across all three
   rows, the least useful first: extra directories, lines changed, the spend limit, the 7 day
   limit, the cache state, the pull request, the worktree, the vim mode, the agent, the
-  directory, the 5 hour limit, the cost and duration, the branch, the context bar, then the plan.
-  The model always stays.
-- **The next-task label** is the only text that is ellipsized, to the room its line has. When
-  fewer than 12 cells of label would fit, the whole plan segment wraps instead.
+  directory, the 5 hour limit, the cost and duration, the branch, then the context bar. The model
+  always stays.
 - **The context bar** is 8 blocks at the least and 20 at the most, and takes the free cells left
   on its line. Eight blocks keep the 60% and 85% color thresholds apart (one block is 12.5
   points), and past 20 blocks a block is under 5 points and the bar adds nothing.
 - **Rings.** With Nerd Font glyphs, where the 5 hour and 7 day bars would push the usage row onto
   another line, both windows draw a ring in their place. A ring has the context bar's 8 steps: the
   outline at 0%, the full disc at 100%, and a slice between. The rings are Nerd Fonts v3 glyphs.
-- **Under 60 terminal columns** the output is one compact line of model, plan count, context percentage
-  and branch, dropping from the right when they do not fit. With Nerd Font glyphs a ring leads the
+- **Under 60 terminal columns** the output is one compact line of model, context percentage and
+  branch, dropping from the right when they do not fit. With Nerd Font glyphs a ring leads the
   percentage.
 - **Colors and links.** Bars and percentages are green below 60%, yellow from 60% to 84% and red
   from 85%, fixed values. The branch and a subagent row's name draw in the terminal's default
@@ -147,7 +145,7 @@ therefore follows plugin updates without another setup run. `CLAUDE_CONFIG_DIR` 
 `omca: no installed plugin version found`.
 
 `refreshInterval: 5` re-runs the command every 5 seconds, which keeps disk-sourced state (git
-status and plan progress) current while the session sits idle between background-agent
+status) current while the session sits idle between background-agent
 fan-outs. The value matches the git cache lifetime, so each tick can pick up a fresh git
 snapshot. It controls how often the platform runs the command, not how the renderer computes
 any field.
@@ -167,21 +165,9 @@ seconds) are fixed in the code. These environment variables are read:
 | `OMCA_SUBAGENT_STATUSLINE_DUMP` | unset | Path. Appends each raw `subagentStatusLine` stdin payload to this file as JSONL. Opt-in capture for answering platform-payload questions; no rotation. |
 
 Without Nerd Font glyphs the renderer uses text labels: `*` for the branch, `>` for the model
-and folder, `~` for the clock, `E:` for effort, `V:` for vim mode, `W:` for the worktree, `T:`
-for plan progress, `5h` and `7d` for the usage windows. `ascii` also draws the bars with `#` and
-`.`, separates segments with `|` and cuts with `...`.
-
----
-
-## Plan segment
-
-The plan segment shows `<done>/<total>` for the plan bound to the session, followed by the label
-of its first open task. The label is cut to 80 characters when the plan is read, and further to
-fit its line. The segment resolves through `src/core/boulder.ts` in strict
-mode: it appears only when `.omca/state/boulder.json` has a binding for the payload's
-`session_id` whose plan file still exists and has an open numbered task. A session with no
-binding shows nothing, and so does a plan with every task checked. The renderer only reads the
-registry.
+and folder, `~` for the clock, `E:` for effort, `V:` for vim mode, `W:` for the worktree, `5h`
+and `7d` for the usage windows. `ascii` also draws the bars with `#` and
+`.`, and separates segments with `|`.
 
 ---
 

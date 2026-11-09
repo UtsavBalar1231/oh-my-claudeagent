@@ -7,7 +7,6 @@ import { type Context, createDispatcher, INVALID_PARAMS, RpcError, type Handler,
 import { startWork } from "./lifecycle.ts";
 import { createProgress, type ToolContext } from "./progress.ts";
 import { tools as astTools } from "./tools/ast.ts";
-import { tools as boulderTools, unbindBoundSessions } from "./tools/boulder.ts";
 import { tools as catalogTools } from "./tools/catalog.ts";
 import { tools as evidenceTools } from "./tools/evidence.ts";
 import { tools as filesystemTools } from "./tools/filesystem.ts";
@@ -15,6 +14,7 @@ import { tools as hookTools } from "./tools/hook.ts";
 import { tools as migrateTools } from "./tools/migrate.ts";
 import { tools as notepadTools } from "./tools/notepad.ts";
 import { tools as sessionTools } from "./tools/sessions.ts";
+import { tools as taskTools } from "./tools/tasks.ts";
 
 export type Tool = {
   name: string;
@@ -33,13 +33,13 @@ export type Tool = {
 
 const HEADER = "oh-my-claudeagent (OMCA) tools. Its state lives under `.omca/` and is written only through them.";
 
-const CLAUDE_CODE_INSTRUCTIONS = [
+const INSTRUCTIONS = [
   HEADER,
   "",
   OMCA_TOOLS,
   "",
   "- After a build, test or lint run: `evidence_log`, real exit code included; `evidence_read` lists the entries.",
-  "- A multi-step plan: `boulder_write` registers it and binds this session; `boulder_progress` reports it.",
+  "- A multi-step run: Claude Code's task list holds it, each task with `metadata.run` and the last with `metadata.final`. That last task completes only after `evidence_log` records its `final_verification` with `task_id`. `task_list` and `task_get` read the list from any agent, marks included.",
   "- Notes that must outlive compaction: `notepad_write`, `notepad_read`, `notepad_list`, `notepad_compact`.",
   "- Code search by structure, where grep would only match text: `ast_search`, `ast_find_rule`, `ast_test_rule`, `ast_dump_tree`, and `ast_replace` (preview with dry_run).",
   "- A file outside the project root: `file_read`. An earlier session: `session_search`.",
@@ -47,20 +47,6 @@ const CLAUDE_CODE_INSTRUCTIONS = [
   "",
 ].join("\n");
 
-const OPENCODE_INSTRUCTIONS = [
-  HEADER,
-  "",
-  "Call each tool below directly by its name. None of them is in the Code Mode catalog, so `search` and `execute` cannot reach them.",
-  "",
-  "- After a build, test or lint run: `omca_evidence_log`, real exit code included; `omca_evidence_read` lists the entries.",
-  "- A plan's progress: `omca_boulder_progress`.",
-  "- Notes that must outlive compaction: `omca_notepad_write`, `omca_notepad_read`, `omca_notepad_list`, `omca_notepad_compact`.",
-  "- Code search by structure, where grep would only match text: `omca_ast_search`, `omca_ast_find_rule`, `omca_ast_test_rule`, `omca_ast_dump_tree`, and `omca_ast_replace` (preview with dry_run).",
-  "- A file outside the project root: `omca_file_read`.",
-  "",
-].join("\n");
-
-const INSTRUCTIONS = process.env.OMCA_CLIENT === "opencode" ? OPENCODE_INSTRUCTIONS : CLAUDE_CODE_INSTRUCTIONS;
 
 const MODERN_PROTOCOL = "2026-07-28";
 const FALLBACK_PROTOCOL = "2025-11-25";
@@ -70,7 +56,6 @@ const UNSUPPORTED_PROTOCOL_VERSION = -32022;
 
 const tools = [
   ...astTools,
-  ...boulderTools,
   ...catalogTools,
   ...evidenceTools,
   ...filesystemTools,
@@ -78,6 +63,7 @@ const tools = [
   ...migrateTools,
   ...notepadTools,
   ...sessionTools,
+  ...taskTools,
 ].sort((a, b) => (a.name < b.name ? -1 : 1));
 const toolsByName = new Map(tools.map((tool) => [tool.name, tool]));
 const toolList = tools.map(({ call: _call, ...declaration }) => declaration);
@@ -157,25 +143,7 @@ const checked = Object.fromEntries(
   ]),
 );
 
-// The client sends SIGTERM 100 ms after SIGINT, so the unbind gives up on a busy lock well before then.
-const SHUTDOWN_LOCK_WAIT_MS = 50;
-
-let isUnbound = false;
-
-function unbind(): void {
-  if (isUnbound) return;
-  isUnbound = true;
-  try {
-    unbindBoundSessions(Date.now() + SHUTDOWN_LOCK_WAIT_MS);
-  } catch (error) {
-    console.error("omca: unbinding this process's sessions at exit failed:", error);
-  }
-}
-
-function shutdown(): void {
-  unbind();
-  process.exit(0);
-}
+const shutdown = (): void => process.exit(0);
 
 // The client ends a session with SIGINT, then SIGTERM 100 ms later and SIGKILL about 500 ms
 // after the SIGINT, and never closes stdin. A killed tmux pane sends SIGHUP first. Windows
@@ -183,7 +151,6 @@ function shutdown(): void {
 const SHUTDOWN_SIGNALS: NodeJS.Signals[] = ["SIGINT", "SIGTERM", "SIGHUP"];
 if (process.platform === "win32") SHUTDOWN_SIGNALS.push("SIGBREAK");
 for (const signal of SHUTDOWN_SIGNALS) process.on(signal, shutdown);
-process.on("exit", unbind);
 
 const root = projectRoot(process.cwd());
 ensureStateDir(root);

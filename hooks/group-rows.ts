@@ -1,7 +1,7 @@
 import type { ImageSource, RenderElement } from "claude-code";
 import { isAbsolutePath, joinPath } from "../src/core/path.ts";
 import { type ImagePreview, imagePreview, previewBox, previewCaption } from "../src/core/preview.ts";
-import { receiptRow, shellReceipt } from "../src/core/receipt.ts";
+import { glyphTestLine, glyphTestRow, receiptRow, shellReceipt } from "../src/core/receipt.ts";
 import { glyphs } from "../src/core/ui-kit.ts";
 import type { Features, Input } from "./dispatch.ts";
 import { type Host, reason, resolvedSession } from "./host.ts";
@@ -92,6 +92,7 @@ async function previewRows(host: Host, kit: Kit, e: Input<"ui.render ToolGroup">
 }
 
 // Below a folded tool group: one row per verification run in it, read from the run's own output,
+// the line a glyph test printed, so the user's font draws it where the folded group hides it,
 // and a preview of each PNG a Read call returned, so the row never waits on a file or a state
 // write. An unfolded group draws each call itself, and a group with neither is left as drawn.
 export const groupRows: Features = {
@@ -105,9 +106,13 @@ export const groupRows: Features = {
         const receipt = shellReceipt(call);
         return receipt === null ? [] : [Line(kit, receiptRow(receipt, g, columns))];
       });
+      const glyphTests = e.props.calls.flatMap((call) => {
+        const line = glyphTestLine(call);
+        return line === null ? [] : [Line(kit, glyphTestRow(line, g, columns))];
+      });
       const previews = await previewRows(host, kit, e, columns);
-      if (receipts.length === 0 && previews.length === 0) return undefined;
-      return kit.Box({ key: "omca-group-rows", flexDirection: "column", children: [result, ...receipts, ...previews] });
+      if (receipts.length === 0 && glyphTests.length === 0 && previews.length === 0) return undefined;
+      return kit.Box({ key: "omca-group-rows", flexDirection: "column", children: [result, ...receipts, ...glyphTests, ...previews] });
     },
   },
 };

@@ -23,7 +23,7 @@ Skills describe what users do. Hooks are internal infrastructure that automates 
 
 Forbidden in skills, unless listed as an exception below:
 
-- Raw file paths like `.omca/state/*.json`: use the `boulder_write` and `boulder_progress` MCP tools from the omca server instead
+- Raw file paths like `.omca/state/*.json`: use the MCP tools from the omca server and Claude Code's task tools instead
 - Hook handler names (`task-completed`, `stop-gates`, etc.)
 - Hook event names used only in `hooks/hooks.json` (`PreToolUse`, `PostToolUse`, `Stop`, etc.): these are platform contracts that users never need
 - Hook-specific environment variables (`OMCA_DISABLED_HOOKS`, etc.)
