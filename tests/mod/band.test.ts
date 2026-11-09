@@ -6,15 +6,15 @@ import { hostSpelling } from "./world.ts";
 const PLUGIN = "oh-my-claudeagent";
 const SESSION = "00000000-0000-4000-8000-0000000000aa";
 const ROOT = "/work";
+const HOME = "/home/u";
+const TASK = `${HOME}/.claude/tasks/run-list/1.json`;
 const STATUS = `${ROOT}/.omca/state/session/${SESSION}.json`;
-const LEDGER = `${ROOT}/.omca/evidence/verification-evidence.json`;
 const NOW_MS = 1_790_000_000_000;
 const RAN_AT = NOW_MS / 1000 - 60;
 const BEFORE_RUN_MS = (RAN_AT - 30) * 1000;
-const AFTER_RUN_MS = (RAN_AT + 5) * 1000;
 const SURFACES = ["terminal", "desktop"] as const;
 
-const LOG_FILL = "Log evidence for `just test` with evidence_log";
+const TASK_FILL = "/tasklist";
 
 type Files = Map<string, { text: string; mtimeMs: number }>;
 type Band = Mounted<"terminal" | "desktop", "AbovePrompt">;
@@ -30,8 +30,6 @@ const statusFile = (command: string, isLogged = false) =>
     verification: { command, at: RAN_AT, exit_code: 0, evidence_logged: isLogged },
   });
 
-const ledger = (entries: readonly object[]) => JSON.stringify({ entries });
-
 function files(entries: Record<string, string | { text: string; mtimeMs: number }>): Files {
   return new Map(
     Object.entries(entries).map(([path, file]) => [
@@ -46,7 +44,7 @@ function world(on: On, disk: Files, beneath: (kit: Kit) => RenderElement = engin
   const submits: string[] = [];
   const logs: string[] = [];
   mock.clock(on, { now: NOW_MS });
-  mock.env(on, { OMCA_GLYPHS: "unicode" });
+  mock.env(on, { OMCA_GLYPHS: "unicode", HOME: HOME, CLAUDE_CODE_TASK_LIST_ID: "run-list" });
   on("session.id", () => ({ value: SESSION }));
   on("session.root", () => ({ value: ROOT }));
   on("session.start", (_$, e) => ({ cwd: e.cwd }));
@@ -56,7 +54,14 @@ function world(on: On, disk: Files, beneath: (kit: Kit) => RenderElement = engin
     return { text, cursor: e.start + e.inputText.length };
   });
   const spelled = (path: string) => hostSpelling(path, "linux");
-  on("fs.exists", (_$, e) => ({ value: disk.has(spelled(e.path)) }));
+  on("fs.exists", (_$, e) => ({ value: [...disk.keys()].some((path) => path === spelled(e.path) || path.startsWith(`${spelled(e.path)}/`)) }));
+  on("fs.list", (_$, e) => {
+    const dir = spelled(e.path);
+    const entries = [...disk.entries()]
+      .filter(([path]) => path.startsWith(`${dir}/`))
+      .map(([path, file]) => ({ name: path.slice(dir.length + 1), kind: "file" as const, size: file.text.length, mtimeMs: file.mtimeMs, isLink: false }));
+    return { value: entries };
+  });
   on("fs.read", (_$, e) => {
     const file = disk.get(spelled(e.path));
     if (file === undefined) throw new Error(`ENOENT: no such file or directory, open '${spelled(e.path)}'`);
@@ -130,8 +135,6 @@ async function buttons(band: Band): Promise<{ key: string | undefined; label: un
   }));
 }
 
-const statusRow = async (band: Band): Promise<string | undefined> => (await texts(band))[0];
-
 async function onEachSurface($: Engine, check: (band: Band) => Promise<void>, bodyColumns = 120): Promise<void> {
   for (const surface of SURFACES) {
     const band = await mount($, surface, bodyColumns);
@@ -140,9 +143,19 @@ async function onEachSurface($: Engine, check: (band: Band) => Promise<void>, bo
   }
 }
 
-const UNLOGGED_ROW = "! just test evidence not logged";
-const LOG_BUTTON = { key: "log-evidence", label: "Log evidence", hotkey: "1", plain: true };
-const UNLOGGED = () => files({ [STATUS]: statusFile("just test"), [LEDGER]: ledger([]) });
+const TASK_BUTTON = { key: "task-list", label: "Task list", hotkey: "1", plain: true };
+const UNLOGGED = () => files({ [STATUS]: statusFile("just test") });
+
+const RUN_TASK = JSON.stringify({ id: "1", subject: "a", description: "", activeForm: "", status: "pending", blocks: [], blockedBy: [], metadata: { run: "widget" } });
+const withRun = (disk: Files): Files => disk.set(TASK, { text: RUN_TASK, mtimeMs: BEFORE_RUN_MS });
+
+// The band's actions come from a turn that ends with a run open.
+async function runningWorld($: Engine, on: On, beneath?: (kit: Kit) => RenderElement): Promise<World> {
+  const w = world(on, withRun(files({})), beneath);
+  await start($);
+  await turn($);
+  return w;
+}
 
 const SPAWN = {
   prompt: "Port module 13.",
@@ -154,7 +167,7 @@ const SPAWN = {
   fork: false,
 } as const;
 
-test("with no verification the band draws nothing and the engine's drawing stands", async ($, on) => {
+test("with no run and no error the band draws nothing and the engine's drawing stands", async ($, on) => {
   world(on, files({}));
   await start($);
   await turn($);
@@ -164,47 +177,20 @@ test("with no verification the band draws nothing and the engine's drawing stand
   });
 });
 
-test("a verification shows at session start, and its action only once a turn completes", async ($, on) => {
-  world(on, UNLOGGED());
-  await start($);
-
-  await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toBe(UNLOGGED_ROW);
-    expect(await buttons(band)).toEqual([]);
-  });
-});
-
-test("an unlogged verification shows as not logged and offers to log it", async ($, on) => {
-  world(on, UNLOGGED());
+test("a verification, logged or not, draws no row and offers no button", async ($, on) => {
+  const disk = UNLOGGED();
+  world(on, disk);
   await start($);
   await turn($);
 
-  await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toBe(UNLOGGED_ROW);
-    expect(await buttons(band)).toEqual([LOG_BUTTON]);
-  });
-});
-
-test("a status file that says the evidence was logged reads logged with no ledger at all, and offers nothing", async ($, on) => {
-  world(on, files({ [STATUS]: statusFile("just test", true) }));
-  await start($);
-  await turn($);
-
-  await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toBe("✓ just test evidence logged");
-    expect(await buttons(band)).toEqual([]);
-  });
-});
-
-test("a ledger written after the run by someone else leaves a run the status file calls unlogged unlogged", async ($, on) => {
-  world(on, files({ [STATUS]: statusFile("just test"), [LEDGER]: { text: ledger([]), mtimeMs: AFTER_RUN_MS } }));
-  await start($);
-  await turn($);
-
-  await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toBe(UNLOGGED_ROW);
-    expect(await buttons(band)).toEqual([LOG_BUTTON]);
-  });
+  for (const isLogged of [false, true]) {
+    disk.set(STATUS, { text: statusFile("just test", isLogged), mtimeMs: BEFORE_RUN_MS });
+    await turn($);
+    await onEachSurface($, async (band) => {
+      expect(await texts(band)).toEqual(["engine band"]);
+      expect(await buttons(band)).toEqual([]);
+    });
+  }
 });
 
 test("a status file that is not JSON draws a one-line reason in the band", async ($, on) => {
@@ -213,7 +199,7 @@ test("a status file that is not JSON draws a one-line reason in the band", async
   expect(logs.filter((line) => line.startsWith("band"))).toEqual([]);
 
   await onEachSurface($, async (band) => {
-    expect(await statusRow(band)).toMatch(/^✗ Cannot read the session status file: \S[^\n]*$/);
+    expect((await texts(band))[0]).toMatch(/^✗ Cannot read the session status file: \S[^\n]*$/);
     expect(await buttons(band)).toEqual([]);
   });
 });
@@ -229,50 +215,47 @@ test("the band reads no plan file: a registry and a plan file leave it as it was
   expect(w.logs.filter((line) => line.startsWith("band"))).toEqual([]);
 });
 
-test("the glyph draws in its theme key, the words plain or inactive", async ($, on) => {
-  world(on, files({ [STATUS]: statusFile("just test") }));
+test("the error glyph draws in its theme key, the words plain", async ($, on) => {
+  world(on, files({ [STATUS]: "{ not json" }));
   await start($);
-  await turn($);
 
   const band = await mount($, "terminal");
-  const styled = (await band.findAll({ type: "Text" }))
-    .slice(1)
-    .map(({ text, props }) => [text, props["color"] ?? (props["weight"] === "semibold" ? "bold" : props["dimColor"] === true ? "dim" : "plain")]);
-  expect(styled).toEqual([
-    ["! ", "warning"],
-    ["just test", "plain"],
-    [" evidence not logged", "plain"],
-    ["engine band", "plain"],
-  ]);
+  const styled = (await band.findAll({ type: "Text" })).map(({ text, props }) => [text.slice(0, 6), props["color"] ?? "plain"]);
+  expect(styled).toContainEqual(["✗ ", "error"]);
+  expect(styled).toContainEqual(["Cannot", "plain"]);
+});
+
+test("an open run offers the task list once a turn completes, not before", async ($, on) => {
+  world(on, withRun(files({})));
+  await start($);
+
+  await onEachSurface($, async (band) => expect(await buttons(band)).toEqual([]));
+  await turn($);
+  await onEachSurface($, async (band) => expect(await buttons(band)).toEqual([TASK_BUTTON]));
 });
 
 test("running agents leave the band as it was, since the engine lists them under the prompt", async ($, on) => {
-  world(on, UNLOGGED());
-  await start($);
-  await turn($);
+  await runningWorld($, on);
   const band = await mount($, "terminal");
-  expect(await statusRow(band)).toBe(UNLOGGED_ROW);
+  expect(await buttons(band)).toEqual([TASK_BUTTON]);
 
   await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_1" });
   await $.agent.spawn({ ...SPAWN, tool_use_id: "toolu_2" });
   await band.redraw();
-  expect(await statusRow(band)).toBe(UNLOGGED_ROW);
-  expect(await buttons(band)).toEqual([LOG_BUTTON]);
+  expect(await buttons(band)).toEqual([TASK_BUTTON]);
 });
 
 test("a press fills the prompt with the exact text and never submits", async ($, on) => {
-  const { fills, submits } = world(on, UNLOGGED());
-  await start($);
-  await turn($);
+  const { fills, submits } = await runningWorld($, on);
 
   const band = await mount($, "terminal");
-  await band.press({ key: "log-evidence" });
+  await band.press({ key: "task-list" });
 
-  expect(fills).toEqual([LOG_FILL]);
+  expect(fills).toEqual([TASK_FILL]);
   expect(submits).toEqual([]);
 });
 
-test("a sub-agent's turn refreshes the status row and leaves the actions alone", async ($, on) => {
+test("a sub-agent's turn leaves the actions alone", async ($, on) => {
   const disk = files({});
   world(on, disk);
   await start($);
@@ -280,21 +263,18 @@ test("a sub-agent's turn refreshes the status row and leaves the actions alone",
   const band = await mount($, "terminal");
   expect(await buttons(band)).toEqual([]);
 
-  disk.set(STATUS, { text: statusFile("just test"), mtimeMs: BEFORE_RUN_MS });
+  withRun(disk);
   await turn($, "agent-1");
   await band.redraw();
-  expect(await statusRow(band)).toBe(UNLOGGED_ROW);
   expect(await buttons(band)).toEqual([]);
 
   await turn($);
   await band.redraw();
-  expect((await buttons(band)).map((button) => button.key)).toEqual(["log-evidence"]);
+  expect((await buttons(band)).map((button) => button.key)).toEqual(["task-list"]);
 });
 
 test("typing into the prompt clears the actions; an edit that leaves it empty does not", async ($, on) => {
-  world(on, UNLOGGED());
-  await start($);
-  await turn($);
+  await runningWorld($, on);
   const band = await mount($, "terminal");
 
   await edit($, "", "");
@@ -304,13 +284,10 @@ test("typing into the prompt clears the actions; an edit that leaves it empty do
   await edit($, "", "h");
   await band.redraw();
   expect(await buttons(band)).toEqual([]);
-  expect(await statusRow(band)).toBe(UNLOGGED_ROW);
 });
 
 test("a bare digit that is a shown hotkey keeps the actions so the engine can press its Button", async ($, on) => {
-  const { fills } = world(on, UNLOGGED());
-  await start($);
-  await turn($);
+  const { fills } = await runningWorld($, on);
   const band = await mount($, "terminal");
 
   for (const [text, inputText] of [["", "1"], ["", " 1 "]] as const) {
@@ -318,14 +295,12 @@ test("a bare digit that is a shown hotkey keeps the actions so the engine can pr
     await band.redraw();
     expect((await buttons(band)).map((button) => button.hotkey), JSON.stringify(inputText)).toEqual(["1"]);
   }
-  await band.press({ key: "log-evidence" });
-  expect(fills).toEqual([LOG_FILL]);
+  await band.press({ key: "task-list" });
+  expect(fills).toEqual([TASK_FILL]);
 });
 
 test("a digit with no shown Button, or a digit with more text, still clears the actions", async ($, on) => {
-  world(on, UNLOGGED());
-  await start($);
-  await turn($);
+  await runningWorld($, on);
   const band = await mount($, "terminal");
 
   await edit($, "", "2");
@@ -341,8 +316,7 @@ test("a digit with no shown Button, or a digit with more text, still clears the 
 });
 
 test("a prompt filled from history, an undo, the engine or another plugin clears the actions", async ($, on) => {
-  world(on, UNLOGGED());
-  await start($);
+  await runningWorld($, on);
   const band = await mount($, "terminal");
 
   for (const origin of [{ kind: "history" }, { kind: "undo" }, { kind: "engine" }, { kind: "plugin", name: "other-plugin" }] as const) {
@@ -356,15 +330,12 @@ test("a prompt filled from history, an undo, the engine or another plugin clears
 });
 
 test("while an agent's transcript is in view the band holds its actions, and typing there keeps them for the main view", async ($, on) => {
-  world(on, UNLOGGED());
-  await start($);
-  await turn($);
+  await runningWorld($, on);
   const main = await mount($, "terminal");
   expect((await buttons(main)).length).toBe(1);
   await main.unmount();
   const agent = await mount($, "terminal", 120, { agentId: "a1" });
   expect(await buttons(agent)).toEqual([]);
-  expect(await statusRow(agent)).toBeDefined();
 
   await edit($, "x", "x");
   await change($, "earlier draft", { kind: "history" });
@@ -374,12 +345,10 @@ test("while an agent's transcript is in view the band holds its actions, and typ
 });
 
 test("the band's own fill, an emptied prompt and a lone shown hotkey keep the actions", async ($, on) => {
-  world(on, UNLOGGED());
-  await start($);
-  await turn($);
+  await runningWorld($, on);
   const band = await mount($, "terminal");
 
-  await change($, LOG_FILL, { kind: "plugin", name: "oh-my-claudeagent" });
+  await change($, TASK_FILL, { kind: "plugin", name: "oh-my-claudeagent" });
   await change($, "", { kind: "clear" });
   await change($, "1", { kind: "engine" });
   await band.redraw();
@@ -387,7 +356,7 @@ test("the band's own fill, an emptied prompt and a lone shown hotkey keep the ac
 });
 
 test("at 40 columns no Text in the band is wider than 40 cells", async ($, on) => {
-  world(on, files({ [STATUS]: statusFile("bun test src servers statusline scripts opencode --coverage") }));
+  world(on, withRun(files({ [STATUS]: `{ ${"x".repeat(100)}` })));
   await start($);
   await turn($);
 
@@ -395,7 +364,7 @@ test("at 40 columns no Text in the band is wider than 40 cells", async ($, on) =
     $,
     async (band) => {
       const rows = await texts(band);
-      expect(rows[0]).toMatch(/^! bun test .*… evidence not logged$/);
+      expect(rows[0]).toMatch(/^✗ Cannot read .*…$/);
       for (const text of rows) expect(displayWidth(text), text).toBeLessThanOrEqual(40);
       for (const button of await buttons(band)) expect(displayWidth(`1: ${button.label}`)).toBeLessThanOrEqual(40);
     },
@@ -403,10 +372,8 @@ test("at 40 columns no Text in the band is wider than 40 cells", async ($, on) =
   );
 });
 
-test("at 80, 120 and 200 columns on both surfaces the rows read the same and end a space before the collapse mark", async ($, on) => {
-  const long = `bun test src ${"servers/".repeat(15)}`;
-  const disk = UNLOGGED();
-  world(on, disk);
+test("at 80, 120 and 200 columns on both surfaces the error row ends a space before the collapse mark", async ($, on) => {
+  world(on, withRun(files({ [STATUS]: `{ ${"x".repeat(300)}` })));
   await start($);
   await turn($);
 
@@ -414,41 +381,16 @@ test("at 80, 120 and 200 columns on both surfaces the rows read the same and end
     await onEachSurface(
       $,
       async (band) => {
-        expect(await statusRow(band)).toBe(UNLOGGED_ROW);
-        expect((await buttons(band)).map((button) => `${button.hotkey}: ${button.label}`)).toEqual(["1: Log evidence"]);
+        expect(displayWidth((await texts(band))[0] ?? "")).toBeLessThanOrEqual(columns - 4);
+        expect((await buttons(band)).map((button) => `${button.hotkey}: ${button.label}`)).toEqual(["1: Task list"]);
       },
       columns,
     );
   }
-
-  disk.set(STATUS, { text: statusFile(long), mtimeMs: BEFORE_RUN_MS });
-  await turn($);
-  for (const columns of [80, 120]) {
-    await onEachSurface(
-      $,
-      async (band) => {
-        const row = (await statusRow(band)) ?? "";
-        expect(row).toMatch(/^! bun test src .*… evidence not logged$/);
-        expect(displayWidth(row)).toBe(columns - 4);
-      },
-      columns,
-    );
-  }
-  await onEachSurface($, async (band) => expect(await statusRow(band)).toBe(`! ${long} evidence not logged`), 200);
-});
-
-test("too narrow for the full wording the row keeps the command and says not logged", async ($, on) => {
-  world(on, UNLOGGED());
-  await start($);
-  await turn($);
-
-  await onEachSurface($, async (band) => expect(await statusRow(band)).toBe("! just test not logged"), 30);
 });
 
 test("showBand false draws nothing, whatever the state", { options: { showBand: false } }, async ($, on) => {
-  world(on, UNLOGGED());
-  await start($);
-  await turn($);
+  await runningWorld($, on);
 
   await onEachSurface($, async (band) => {
     expect(await texts(band)).toEqual(["engine band"]);
@@ -456,9 +398,7 @@ test("showBand false draws nothing, whatever the state", { options: { showBand: 
 });
 
 test("the band yields to a survey", async ($, on) => {
-  world(on, UNLOGGED());
-  await start($);
-  await turn($);
+  await runningWorld($, on);
 
   for (const surface of SURFACES) {
     const band = await $.ui.mount({
@@ -479,15 +419,11 @@ test("another mod's band stays beneath the rows, in a Box with no size, position
       key: "other-band",
       children: [Text({ children: ["other mod's band"] }), Button({ key: "other-press", label: "Theme", onPress: () => void presses.push("other-press") })],
     });
-  world(on, UNLOGGED(), otherBand);
-  await start($);
-  await turn($);
+  await runningWorld($, on, otherBand);
 
   await onEachSurface($, async (band) => {
-    const rows = await texts(band);
-    expect(rows[0]).toBe(UNLOGGED_ROW);
-    expect(rows.at(-1)).toBe("other mod's band");
-    expect((await buttons(band)).map((button) => button.key)).toEqual(["log-evidence", "other-press"]);
+    expect((await texts(band)).at(-1)).toBe("other mod's band");
+    expect((await buttons(band)).map((button) => button.key)).toEqual(["task-list", "other-press"]);
     const holder = await band.find({ key: "omca-band" });
     expect(holder?.type).toBe("Box");
     const layout = ["width", "height", "minWidth", "minHeight", "position", "top", "left", "right", "bottom", "display", "overflow"];
@@ -497,26 +433,6 @@ test("another mod's band stays beneath the rows, in a Box with no size, position
   const band = await mount($, "terminal");
   await band.press({ key: "other-press", plugin: "test" });
   expect(presses).toEqual(["other-press"]);
-});
-
-test("a burst of turn ends leaves the mounted band on the last state, drawn without any invalidate", async ($, on) => {
-  const disk = UNLOGGED();
-  world(on, disk);
-  await start($);
-  const band = await mount($, "terminal");
-  expect(await statusRow(band)).toBe(UNLOGGED_ROW);
-
-  for (let n = 0; n < 8; n++) {
-    disk.set(STATUS, { text: statusFile(`just test ${n}`), mtimeMs: BEFORE_RUN_MS + n });
-    await turn($, n % 2 === 0 ? undefined : `agent-${n}`);
-  }
-
-  expect(await statusRow(band)).toBe("! just test 7 evidence not logged");
-  expect((await buttons(band)).map((button) => button.key)).toEqual(["log-evidence"]);
-
-  disk.set(STATUS, { text: statusFile("just test again"), mtimeMs: BEFORE_RUN_MS });
-  await turn($);
-  expect(await statusRow(band)).toBe("! just test again evidence not logged");
 });
 
 test("a turn that changes nothing writes nothing to the band", async ($, on) => {
@@ -529,7 +445,7 @@ test("a turn that changes nothing writes nothing to the band", async ($, on) => 
     atoms.set(e.key, { value: e.value, version });
     return { value: { isSet: true, version } };
   });
-  world(on, UNLOGGED());
+  world(on, files({ [STATUS]: "{ not json" }));
   await start($);
   await turn($);
   const band = await mount($, "terminal");
@@ -542,7 +458,7 @@ test("a turn that changes nothing writes nothing to the band", async ($, on) => 
   expect([await texts(band), await buttons(band)]).toEqual(before.drawn);
 });
 
-test("with no verification, running agents draw no band and the engine's drawing stands", async ($, on) => {
+test("with no run, running agents draw no band and the engine's drawing stands", async ($, on) => {
   world(on, files({}));
   await start($);
   await turn($);

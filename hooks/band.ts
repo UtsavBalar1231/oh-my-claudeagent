@@ -9,7 +9,7 @@ import type { Features } from "./dispatch.ts";
 import { fillPrompt, type Host, reason, sessionOf, stampOf } from "./host.ts";
 import { isRemote, type Kit, kitOf, Line, Run, type TextStyle } from "./ui.ts";
 
-type Snapshot = { band: Band; exitCode: number | null };
+type Snapshot = { band: Band; verification: ReturnType<typeof verificationOf>; exitCode: number | null };
 
 let glyphTier: GlyphTier = "nerd";
 let shownActions = 0;
@@ -37,7 +37,7 @@ async function readSnapshot(host: Host): Promise<Snapshot> {
   const statusFile = statusPath(root, sessionId);
   let exitCode: number | null = null;
   let error: string | null = null;
-  let verification: Band["verification"] = null;
+  let verification: Snapshot["verification"] = null;
   if (statusFile !== undefined) {
     try {
       const status = await readJson(host, statusFile);
@@ -47,7 +47,7 @@ async function readSnapshot(host: Host): Promise<Snapshot> {
       error = `Cannot read the session status file: ${oneLine(reason(failure))}`;
     }
   }
-  return { band: { verification, error, readAt }, exitCode };
+  return { band: { error, readAt }, verification, exitCode };
 }
 
 // What a snapshot is read from, so a subagent's turn that did not move it reads nothing.
@@ -65,10 +65,9 @@ async function snapshotOf(host: Host): Promise<Snapshot> {
 }
 
 // The first read after session.start only records what already happened; later reads toast what changed.
-function toastChanges(host: Host, { band, exitCode }: Snapshot): void {
+function toastChanges(host: Host, { verification, exitCode }: Snapshot): void {
   const isBaseline = !isBaselined;
   isBaselined = true;
-  const { verification } = band;
   const verifiedAt = verification?.at ?? 0;
   if (!isBaseline && verification !== null && verifiedAt > toastedVerificationAt && exitCode !== null && exitCode !== 0) {
     const { ellipsis } = glyphs(glyphTier);
@@ -134,7 +133,7 @@ export const band: Features = {
       const snapshot = await snapshotOf(host);
       toastChanges(host, snapshot);
       await writeBand(host, snapshot.band);
-      if (e.agentId === undefined) await writeActions(host, nextActions({ verification: snapshot.band.verification, isRunOpen: (await openRun(host)) !== undefined }));
+      if (e.agentId === undefined) await writeActions(host, nextActions({ isRunOpen: (await openRun(host)) !== undefined }));
       return undefined;
     },
   },
