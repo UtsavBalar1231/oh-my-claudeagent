@@ -98,6 +98,7 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
         reads: [
           "CLAUDE_AFK_TIMEOUT_MS",
           "CLAUDE_CODE_DISABLE_ADVISOR_TOOL",
+          "CLAUDE_CODE_DISABLE_FEATURE_FLAGS",
           "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
           "CLAUDE_CODE_EFFORT_LEVEL",
           "CLAUDE_CODE_ENABLE_TASKS",

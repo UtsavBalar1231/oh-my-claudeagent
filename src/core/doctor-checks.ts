@@ -17,6 +17,7 @@ type DoctorEnv = Readonly<{
   CLAUDE_CODE_DISABLE_ADVISOR_TOOL?: string | undefined;
   DISABLE_TELEMETRY?: string | undefined;
   DO_NOT_TRACK?: string | undefined;
+  CLAUDE_CODE_DISABLE_FEATURE_FLAGS?: string | undefined;
   DISABLE_GROWTHBOOK?: string | undefined;
   CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC?: string | undefined;
   OMCA_GLYPHS?: string | undefined;
@@ -197,7 +198,24 @@ const SETTING_WAITS: Readonly<Record<string, string>> = { "60s": "60 s", "5m": "
 
 const idle = (ms: number) => (ms % 60_000 === 0 ? `${ms / 60_000} min` : `${ms / 1000} s`);
 
-function questionsCheck(env: DoctorEnv, setting: unknown): Check[] {
+function questionsCheck(env: DoctorEnv, settings: Inputs["settings"], setting: unknown): Check[] {
+  return [...denyInsteadOfPromptingCheck(settings), ...timeoutCheck(env, setting)];
+}
+
+function denyInsteadOfPromptingCheck(settings: Inputs["settings"]): Check[] {
+  const permissions = settings["permissions"];
+  if (!isRecord(permissions) || permissions["denyInsteadOfPrompting"] !== true) return [];
+  return [
+    check(
+      "prompting",
+      "Prompting",
+      "warn",
+      "permissions.denyInsteadOfPrompting takes AskUserQuestion and plan mode away, so a plan interview cannot ask you anything",
+    ),
+  ];
+}
+
+function timeoutCheck(env: DoctorEnv, setting: unknown): Check[] {
   const raw = env.CLAUDE_AFK_TIMEOUT_MS?.trim() ?? "";
   const effect = (cause: string, wait: string) => [
     check("questions", "Questions", "warn", `${cause} answers an open question after ${wait} idle, so a plan interview can settle on its defaults without you`),
@@ -270,6 +288,7 @@ function advisorCheck(settings: Inputs["settings"], env: DoctorEnv): Check {
     ["CLAUDE_CODE_DISABLE_ADVISOR_TOOL", isOn(env.CLAUDE_CODE_DISABLE_ADVISOR_TOOL)],
     ["DISABLE_TELEMETRY", env.DISABLE_TELEMETRY !== undefined],
     ["DO_NOT_TRACK", env.DO_NOT_TRACK?.trim() === "1"],
+    ["CLAUDE_CODE_DISABLE_FEATURE_FLAGS", isOn(env.CLAUDE_CODE_DISABLE_FEATURE_FLAGS)],
     ["DISABLE_GROWTHBOOK", isOn(env.DISABLE_GROWTHBOOK)],
     ["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", isOn(env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC)],
   ];
@@ -340,7 +359,7 @@ export function doctorChecks(inputs: Inputs): Check[] {
     ...installsCheck(inputs.settings),
     outputStyleCheck(inputs.settings, inputs.isStyleForced),
     advisorCheck(inputs.settings, inputs.env),
-    ...questionsCheck(inputs.env, inputs.questionTimeout),
+    ...questionsCheck(inputs.env, inputs.settings, inputs.questionTimeout),
     statusLineCheck(inputs.settings, inputs.userSettings),
     ...migrationCheck(inputs),
   ];
