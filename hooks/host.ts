@@ -37,6 +37,7 @@ export type Host = {
     CLAUDE_CODE_DISABLE_ADVISOR_TOOL: Env;
     DISABLE_TELEMETRY: Env;
     DO_NOT_TRACK: Env;
+    CLAUDE_CODE_DISABLE_FEATURE_FLAGS: Env;
     DISABLE_GROWTHBOOK: Env;
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: Env;
     CLAUDE_CODE_EFFORT_LEVEL: Env;
@@ -61,6 +62,8 @@ export type Host = {
     resolve: Engine["ui"]["resolve"];
     copy: Engine["ui"]["copy"];
     toast: Engine["ui"]["toast"];
+    notify: Engine["ui"]["notify"];
+    cancelNotify: Engine["ui"]["cancelNotify"];
     blit: Engine["ui"]["blit"];
     view: Engine["ui"]["view"];
     status: Engine["ui"]["status"];

@@ -4,6 +4,7 @@ import { agentsTracker } from "./agents-tracker.ts";
 import { band } from "./band.ts";
 import { bashGuard } from "./bash-guard.ts";
 import { blockerRows } from "./blocker-rows.ts";
+import { briefRows } from "./brief-rows.ts";
 import { completion } from "./completion.ts";
 import { dispatch, dispatchStream, featuresFor } from "./dispatch.ts";
 import { footer } from "./footer.ts";
@@ -11,6 +12,7 @@ import { keywordPaint } from "./keyword-paint.ts";
 import type { Host, Options } from "./host.ts";
 import { metrics } from "./metrics.ts";
 import { modMarker } from "./mod-marker.ts";
+import { notify } from "./notify.ts";
 import { router } from "./omca-router.ts";
 import { refusalRecovery } from "./refusal-recovery.ts";
 import { pane } from "./pane.ts";
@@ -41,6 +43,7 @@ function bindHost($: EngineInterface, options: Options): Host {
       CLAUDE_CODE_DISABLE_ADVISOR_TOOL: () => $.env.get("CLAUDE_CODE_DISABLE_ADVISOR_TOOL"),
       DISABLE_TELEMETRY: () => $.env.get("DISABLE_TELEMETRY"),
       DO_NOT_TRACK: () => $.env.get("DO_NOT_TRACK"),
+      CLAUDE_CODE_DISABLE_FEATURE_FLAGS: () => $.env.get("CLAUDE_CODE_DISABLE_FEATURE_FLAGS"),
       DISABLE_GROWTHBOOK: () => $.env.get("DISABLE_GROWTHBOOK"),
       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: () => $.env.get("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"),
       CLAUDE_CODE_EFFORT_LEVEL: () => $.env.get("CLAUDE_CODE_EFFORT_LEVEL"),
@@ -65,6 +68,8 @@ function bindHost($: EngineInterface, options: Options): Host {
       resolve: (e) => $.ui.resolve(e),
       copy: (args) => $.ui.copy(args),
       toast: (text, toastOptions) => $.ui.toast(text, toastOptions),
+      notify: (text, options) => $.ui.notify(text, options),
+      cancelNotify: (key) => $.ui.cancelNotify(key),
       blit: (args) => $.ui.blit(args),
       view: (args) => $.ui.view(args),
       status: (text) => $.ui.status(text),
@@ -182,12 +187,13 @@ export const register: Register = (on, pluginOptions) => {
   const bash = featuresFor("tool.check", { bashGuard });
   const toolCall = featuresFor("tool.call", { agentsTracker });
   const taskCall = featuresFor("tool.call", { taskList });
+  const sendCall = featuresFor("tool.call", { briefRows });
   const sessionStart = featuresFor("session.start", { taskTools, refusalRecovery, pane, modMarker, band, serverCheck, keywordPaint, taskList });
   const promptSubmit = featuresFor("prompt.submit", { refusalRecovery, keywordPaint });
   const turnStart = featuresFor("turn.start", { refusalRecovery, footer, modMarker, serverCheck, taskRows });
-  const turnStep = featuresFor("turn.step", { metrics, agentsTracker });
-  const turnComplete = featuresFor("turn.complete", { agentsTracker, agentRows, metrics, pane, footer, refusalRecovery, taskList, band, taskRows });
-  const agentSpawn = featuresFor("agent.spawn", { agentsTracker, metrics });
+  const turnStep = featuresFor("turn.step", { metrics, agentsTracker, briefRows });
+  const turnComplete = featuresFor("turn.complete", { agentsTracker, agentRows, metrics, pane, footer, refusalRecovery, taskList, band, taskRows, notify });
+  const agentSpawn = featuresFor("agent.spawn", { agentsTracker, metrics, briefRows, notify });
   const promptEdit = featuresFor("prompt.edit", { band, refusalRecovery, keywordPaint });
   const promptChange = featuresFor("prompt.change", { band, keywordPaint });
   const promptAutocomplete = featuresFor("prompt.autocomplete", { completion });
@@ -199,7 +205,7 @@ export const register: Register = (on, pluginOptions) => {
   const bandRender = featuresFor("ui.render AbovePrompt", { band });
   const paneRender = featuresFor("ui.render Pane", { pane, taskList });
   const turnRender = featuresFor("ui.render TurnDuration", { footer });
-  const noticeRender = featuresFor("ui.render UserMessage", { agentRows });
+  const noticeRender = featuresFor("ui.render UserMessage", { agentRows, briefRows });
   const launchRender = featuresFor("ui.render ToolUse", { agentRows });
   const resultRender = featuresFor("ui.render ToolResult", { blockerRows });
   const groupRender = featuresFor("ui.render ToolGroup", { groupRows });
@@ -210,6 +216,7 @@ export const register: Register = (on, pluginOptions) => {
   ).catch((_$, _e, next) => guardFailed(next.error.message ?? next.error.kind));
   on("tool.call", { agentId: /./ }, ($, e, next) => dispatch(bindHost($, options), "tool.call", toolCall, e, next)).catch((_$, e, next) => next(e));
   on("tool.call", { tool: /^Task(?:Create|Update)$/ }, ($, e, next) => dispatch(bindHost($, options), "tool.call", taskCall, e, next)).catch((_$, e, next) => next(e));
+  on("tool.call", { tool: /^SendMessage$/ }, ($, e, next) => dispatch(bindHost($, options), "tool.call", sendCall, e, next)).catch((_$, e, next) => next(e));
   on("session.start", ($, e, next) => dispatch(bindHost($, options), "session.start", sessionStart, e, next));
   on("prompt.submit", ($, e, next) => dispatch(bindHost($, options), "prompt.submit", promptSubmit, e, next));
   on("turn.start", ($, e, next) => dispatch(bindHost($, options), "turn.start", turnStart, e, next));

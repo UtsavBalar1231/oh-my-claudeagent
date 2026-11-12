@@ -18,7 +18,7 @@ event is unregistered on purpose; `docs/references.md` carries the per-event rea
 try/catch. `host.ts` defines the `Host` closures a feature receives in place of `$`, so a
 feature module takes `host` and never `$`. The features are `bash-guard`, `server-check`,
 `mod-marker`, `agents-tracker`, `agent-rows`, `metrics`, `band`, `pane` with its `tabs/`, `footer`,
-`group-rows`, `blocker-rows`, `keyword-paint`, `completion`, `refusal-recovery`, `omca-router`, `task-tools`,
+`group-rows`, `blocker-rows`, `brief-rows`, `notify`, `keyword-paint`, `completion`, `refusal-recovery`, `omca-router`, `task-tools`,
 `task-list` and `task-rows`. `doctor.ts` runs the Doctor page's checks and fixes for `tabs/doctor.ts`; it registers
 no event. `project-root.ts` gives `host.session.root()` the repository top level of the engine's
 root, as the `omca` server names its root, so a launch from a subdirectory reads and writes the same
@@ -46,7 +46,7 @@ description; the final task's page shows the newest verdict naming it, read from
 page opens. Blank rows go first and then the counts row when the pane runs short. Closing the pane
 stops the timer and forgets its place without touching the `omca` pane.
 
-Three features redraw Claude Code's own transcript rows on the terminal, and every other surface
+These features redraw Claude Code's own transcript rows on the terminal, and every other surface
 keeps the engine's rows. None of them reads a file during a drawing, and the row hooks read only
 atoms written once per turn or per finished agent, since a row subscribes to every atom it reads.
 
@@ -69,7 +69,10 @@ atoms written once per turn or per finished agent, since a row subscribes to eve
   `isExpanded` (ctrl+o) keeps the engine's rows.
 - `group-rows` appends rows under a folded `ToolGroup`, read from its calls' own output: one per
   verification call (`isVerificationCommand`), and for a Read that returned a PNG a name row and
-  an `Image` of the picture (the first three per group; the rest keep the name row). A picture
+  an `Image` of the picture (the first three per group; the rest keep the name row). A name row
+  with a path is a plain Button whose press opens the file in the default viewer (`xdg-open`
+  detached through `sh -c`, `open`, or `explorer.exe`); a file that is gone, or a viewer that
+  fails to start, shows a toast. A picture
   whose bytes do not open as a PNG keeps its name row, since one bad `Image` refuses the whole
   tree. The previews share one tree's 2 MiB of picture bytes, the first first, and one that no
   longer fits is passed as its file. After the first picture of each kind it draws, bytes or a file,
@@ -89,6 +92,33 @@ atoms written once per turn or per finished agent, since a row subscribes to eve
   drawing. A missing prop, an expanded view, a remote surface or `OMCA_DISABLED_HOOKS=blocker-rows`
   leaves the engine's row. The Stop-hook holds and the comment gate's advice draw no row: no render
   component carries them.
+- `brief-rows` redraws the `UserMessage` row of origin `coordinator` in the agent view: the brief main
+  sends a subagent and every later message main sends it. The row is a `❯` gutter (`>` on the ASCII
+  tier), a dim header and the brief's fields. `briefFields` in `src/core/brief.ts` reads OMCA's
+  `[LABEL]:` and `1. LABEL:` lines at column 0 outside a code fence; a label draws bold in `claude`
+  and each body goes through Claude Code's own `Markdown`, in full, so ctrl+o draws the same tree.
+  Text with no label is one unlabeled field. The header names the agent, its short model, its effort
+  once a `turn.step` reports it, and the size, or reads `follow-up` for a message main sent with
+  SendMessage, or the size alone. The records behind the header are module values keyed by the row's
+  exact text: `agent.spawn` notes each prompt, `turn.step` the effort, and a main-loop SendMessage
+  `tool.call` (its own registration, beside the subagent one) the message, each capped at 200 newest.
+  They are gone after a reload or `--resume`, and the header falls back to the size. The composer's
+  and a notification's rows, a remote surface, a text over 100,000 characters and
+  `OMCA_DISABLED_HOOKS=brief-rows` leave the engine's row.
+
+`notify` sends one `$.ui.notify`, titled `OMCA`, when the last background agent of a wave ends. The
+wave is a module value, not an atom, so a change redraws nothing: `agent.spawn` adds an agent that
+has an `agentId`, is not denied and is not a teammate, and a spawn with `resume` puts it back to
+running. `turn.complete` records the end of a member by its `reason`: `answer` finished, `aborted`
+stopped, and `error` or `refusal` failed (`outcomeOf` in `src/core/notify.ts`). With no member
+running, `agentsDoneText` builds the one-line text, cut under 200 characters, and the wave is emptied
+after the send. From 2.1.321 the call carries `key: "agents-done"`, `delayMs: 60_000` and
+`untilBack: true`, so a host holds it a minute and drops it when the person returns; a terminal
+ignores all three and raises it at once. The first spawn of a wave calls
+`$.ui.cancelNotify("agents-done")` to take back a held one. A client older than 2.1.321 gets the
+title alone and no cancel. Every call is awaited in a try/catch that logs. No guard notification: Claude
+Code sends its own `permission_prompt` one while the guard dialog waits.
+`OMCA_DISABLED_HOOKS=notify` turns the feature off.
 
 `task-rows` places one row with `$.ui.place` under the turn line of a main turn that changed a run's
 tasks, found by comparing the `tasks` atom at that turn's `turn.start` with the atom at its

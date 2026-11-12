@@ -62,7 +62,8 @@ export type LaneColumns = { model: number; effort: number };
 
 export type LaneLook = { width: number; g: Glyphs; ascii: boolean; now: number; isStill: boolean; columns: LaneColumns };
 
-const shortModel = (model: string): string => model.replace(/^claude-/, "").replace(/-\d{8}$/, "");
+/** The model as the panes name it: no `claude-` prefix and no date suffix. */
+export const shortModel = (model: string): string => model.replace(/^claude-/, "").replace(/-\d{8}$/, "");
 
 // Claude Code's own working marks, so a lane reads as busy the way the main thread does.
 const SPINNER = { unicode: ["·", "✢", "✳", "✶", "✻", "✽"], ascii: ["|", "/", "-", "\\"] } as const;

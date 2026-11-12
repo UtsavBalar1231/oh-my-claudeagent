@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-11-12
+
+### Added
+
+- **Brief rows:** in the agent view on the terminal, the brief Claude sends a subagent and every
+  later message it sends that agent draw with a `❯` gutter, a dim header naming the agent, model,
+  effort and size, the brief's labels in bold and each part's text as Markdown, in full. After a
+  reload or `--resume` the header shows the size alone, and `OMCA_DISABLED_HOOKS=brief-rows` turns
+  the rows off.
+- **Agents done:** when the last background agent of a group has finished, OMCA sends one
+  notification, `explorer finished · <task>` for one agent or `3 agents done, 1 failed · explorer,
+  executor, architect` for several. A terminal shows it at once. From Claude Code 2.1.321, Desktop
+  and mobile hold it for a minute and drop it if you come back first, and the next group of agents
+  takes back one still held. `OMCA_DISABLED_HOOKS=notify` turns it off.
+
+### Changed
+
+- **Claude Code 2.1.322:** OMCA is tested with Claude Code 2.1.322, and the engine types come from
+  it. The floor stays 2.1.300. The agents-done notification uses the new notification `key`,
+  `delayMs` and `untilBack` and `$.ui.cancelNotify`. The mod declines the rest of what 2.1.321 and
+  2.1.322 add: `colors` in `$.theme.set` (a theme for the Desktop and mobile apps, separate from the
+  Claude Code theme every OMCA color already follows), the `http.fetch` hook on Claude Code's own
+  requests, `breakPromptCache` (it has no prompt-section or tool-description hook) and the test
+  kit's `keepsBeneath` (the mod tests already check Claude Code's own row by its text). It sends no
+  notification for the guard dialog, since Claude Code sends its own while the dialog waits and you
+  are away. The band keeps drawing while you collapse it, since it draws from state already in
+  memory.
+- **Costs:** Fable 5.2 and Mythos 5.2 are priced, at the list prices read 2026-11-12, where OMCA's
+  cost figures showed them as n/a, and the catalog puts Fable 5.2 in the premium tier. From Claude
+  Code 2.1.321 the architect's `fable` alias runs Fable 5.2.
+- **Doctor:** `CLAUDE_CODE_DISABLE_FEATURE_FLAGS`, which supersedes `DISABLE_GROWTHBOOK`, counts as
+  keeping the advisor off. `permissions.denyInsteadOfPrompting` gets a warning: it takes
+  AskUserQuestion and plan mode away, so a plan interview cannot ask you anything.
+- **Project installs:** the usage guide says that a plugin a project's settings turn on loads only
+  once each person installs it with `--scope project`.
+- **Picture previews:** the caption under a folded group's picture preview, with the file name
+  underlined, now opens the image in the system's default viewer when clicked. A file that has
+  since gone, or a viewer that fails to start, shows a toast naming the file.
+
 ## [4.1.0] - 2026-11-09
 
 ### Added
@@ -3399,6 +3438,7 @@ for multi-agent orchestration.
 - Shellcheck fixes applied across all hook scripts
 - Ruff fixes applied to Python MCP servers
 
+[4.2.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.5.1...v4.0.0
 [3.5.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.5.0...v3.5.1
