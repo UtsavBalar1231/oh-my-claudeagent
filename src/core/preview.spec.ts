@@ -81,6 +81,14 @@ describe("previewCaption", () => {
     expect(piecesWidth(row)).toBeLessThanOrEqual(30);
   });
 
+  test("underlines the name alone when the row is a link", () => {
+    const preview = { path: "docs/shots/band.png", base64: "", width: 1353, height: 783 };
+    expect(previewCaption(preview, U, 80).some((piece) => piece.underline)).toBe(false);
+    const row = previewCaption(preview, U, 80, true);
+    expect(text(row)).toBe("  ⎿  band.png · 1353×783");
+    expect(row.filter((piece) => piece.underline).map((piece) => piece.text)).toEqual(["band.png"]);
+  });
+
   test("draws the ASCII set when asked", () => {
     expect(text(previewCaption({ path: "a.png", base64: "", width: 4, height: 3 }, glyphs("ascii"), 80))).toBe("  |  a.png - 4x3");
   });

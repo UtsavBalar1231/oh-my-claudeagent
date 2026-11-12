@@ -57,15 +57,18 @@ export function previewBox({ width, height }: Pick<ImagePreview, "width" | "heig
 const INDENT = "  ⎿  ";
 const ASCII_INDENT = "  |  ";
 
-/** The row that names a preview under its group: the file's name and its size in pixels. */
-export function previewCaption({ path, width, height }: ImagePreview, g: Glyphs, columns: number): Piece[] {
+/** The file name a path ends in, on one line. */
+export const previewName = (path: string): string => oneLine(path.slice(Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1));
+
+/** The row that names a preview under its group: the file's name, underlined when `isLink`, and its size in pixels. */
+export function previewCaption({ path, width, height }: ImagePreview, g: Glyphs, columns: number, isLink = false): Piece[] {
   const indent = g.tier === "ascii" ? ASCII_INDENT : INDENT;
-  const name = oneLine(path.slice(Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1));
+  const name = previewName(path);
   const size = ` ${g.dot} ${width}${g.tier === "ascii" ? "x" : "×"}${height}`;
   const room = Math.max(0, columns - indent.length - size.length);
   return [
     { text: indent, color: TONE_KEYS.muted },
-    { text: fitEnd(name, room, g.ellipsis) },
+    { text: fitEnd(name, room, g.ellipsis), ...(isLink && { underline: true as const }) },
     { text: size, color: TONE_KEYS.muted },
   ];
 }
