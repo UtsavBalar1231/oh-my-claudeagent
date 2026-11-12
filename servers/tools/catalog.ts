@@ -21,7 +21,7 @@ const MOD_ABSENT =
   "The OMCA mod has not marked this session since the last prompt, so it is not running: an organization policy sets `allowManagedModsOnly`, the session started with `--safe-mode`, or the mod worker crashed three times and was unloaded.";
 
 const COST_TIERS: Array<[tier: string, models: string[]]> = [
-  ["premium", ["claude-fable-5-1", "claude-fable-5", "fable"]],
+  ["premium", ["claude-fable-5-2", "claude-fable-5-1", "claude-fable-5", "fable"]],
   ["expensive", ["claude-opus-5-5", "claude-opus-5", "claude-opus-4-8", "opus"]],
   ["cheap", ["claude-sonnet-5-5", "claude-sonnet-5", "sonnet"]],
   ["free", ["claude-haiku-4-5", "haiku"]],

@@ -144,7 +144,7 @@ test("each delegation is written running at spawn and overwritten once when its 
       "█▁ peak 13.5k",
       "Estimated cost",
       `$0.01 ${"█".repeat(41)}`,
-      "2026-10-11 list prices",
+      "2026-11-12 list prices",
       "r: Reload",
     ]);
     await ui.unmount();

@@ -1,6 +1,6 @@
-export const PRICING_AS_OF = "2026-10-11";
+export const PRICING_AS_OF = "2026-11-12";
 
-// List prices from https://platform.claude.com/docs/en/about-claude/pricing#model-pricing, read 2026-10-11.
+// List prices from https://platform.claude.com/docs/en/about-claude/pricing#model-pricing, read 2026-11-12.
 // US cents per million tokens, halves included, so a cost is an exact sum and a single division.
 // Cache writes take the 5-minute rate: a usage reports no TTL. Fast mode, batch and
 // data-residency rates are not applied. A model priced by prompt length takes its `over` rates
@@ -9,6 +9,8 @@ type Rates = { input: number; cacheRead: number; cacheWrite: number; output: num
 type Price = Rates & { over?: { tokens: number; rates: Rates } };
 
 const PRICES: Readonly<Record<string, Price>> = {
+  "fable-5.2": { input: 800, cacheRead: 20, cacheWrite: 1000, output: 4000 },
+  "mythos-5.2": { input: 800, cacheRead: 20, cacheWrite: 1000, output: 4000 },
   "fable-5.1": { input: 1000, cacheRead: 25, cacheWrite: 1250, output: 5000 },
   "mythos-5.1": { input: 1000, cacheRead: 25, cacheWrite: 1250, output: 5000 },
   "fable-5": { input: 1000, cacheRead: 100, cacheWrite: 1250, output: 5000 },

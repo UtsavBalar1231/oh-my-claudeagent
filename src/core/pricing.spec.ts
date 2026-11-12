@@ -14,6 +14,8 @@ test.each([
   ["claude-opus-5-5", usage(1200, 300), 0.0108],
   ["claude-opus-5-5", usage(0, 0, 1_000_000, 0), 0.2],
   ["claude-opus-5-5", usage(0, 0, 0, 1_000_000), 5],
+  ["claude-fable-5-2", usage(10_000, 2_000, 100_000, 4_000), 0.22],
+  ["claude-mythos-5-2", usage(1_000_000, 0), 8],
   ["claude-fable-5-1", usage(10_000, 2_000, 100_000, 4_000), 0.275],
   ["claude-haiku-4-5-20251001", usage(1_000_000, 1_000_000), 6],
   ["claude-sonnet-5-5", usage(0, 0, 1_000_000, 0), 0.1],
