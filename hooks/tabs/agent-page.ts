@@ -1,6 +1,6 @@
 import type { RenderElement } from "claude-code";
 import { lookOf } from "../../src/core/agent-type.ts";
-import { costText, type Lane, shellLanguage, STATUS_WORDS, statusMark, toolLabel } from "../../src/core/mission.ts";
+import { costText, type Lane, shellLanguage, shortModel, STATUS_WORDS, statusMark, toolLabel } from "../../src/core/mission.ts";
 import { GRID, type MascotSize } from "../../src/core/mascots.ts";
 import { agentGlyph, clockOf, COLUMN_GAP, displayWidth, fitEnd, formatDuration, formatTokens, KEYS, oneLine, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
 import { agentKey, fitPieces, levelMark, ON_SURFACE, type Piece, piecesWidth, TONE_KEYS } from "../../src/core/visual.ts";
@@ -26,7 +26,6 @@ const ROWS_BELOW = 6;
 // Shorter than two identity lines, a window with a cue row to spare and the keys, the identity shares one line.
 const COMPACT_ROWS = 6;
 const rowsOf = (size: MascotSize): number => GRID[size].height / 2;
-const shortModel = (model: string): string => model.replace(/^claude-/, "").replace(/-\d{8}$/, "");
 
 export const openKey = (id: string): string => `open-${id}`;
 
