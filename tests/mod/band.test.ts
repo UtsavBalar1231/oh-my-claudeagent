@@ -119,7 +119,7 @@ const mount = ($: Engine, surface: (typeof SURFACES)[number], bodyColumns = 120,
     surface,
     component: "AbovePrompt",
     requestId: "band",
-    props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns, scroll: { offset: 0, bodyRows: 9 }, view },
+    props: { hasSurvey: false, isCollapsed: false, isWorking: false, maxRows: 10, bodyColumns, scroll: { offset: 0, bodyRows: 9 }, view },
   });
 
 async function texts(band: Band): Promise<string[]> {
@@ -405,7 +405,7 @@ test("the band yields to a survey", async ($, on) => {
       plugin: PLUGIN,
       surface,
       component: "AbovePrompt",
-      props: { hasSurvey: true, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 9 }, view: {} },
+      props: { hasSurvey: true, isCollapsed: false, isWorking: false, maxRows: 10, bodyColumns: 120, scroll: { offset: 0, bodyRows: 9 }, view: {} },
     });
     expect(await texts(band)).toEqual(["engine band"]);
     await band.unmount();

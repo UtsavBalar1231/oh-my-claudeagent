@@ -246,6 +246,7 @@ test("the band and pane render dispatchers fall through to the engine's drawing 
     requestId: "band",
     props: {
       hasSurvey: false,
+      isCollapsed: false,
       isWorking: false,
       maxRows: 10,
       bodyColumns: 80,

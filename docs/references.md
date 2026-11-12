@@ -349,7 +349,7 @@ the guard leaves its decisions in place. A Desktop session in WSL loads no plugi
 ## Platform support
 
 CI runs the validator, the lint, the type checks, the bun specs, the mod tests, a smoke session
-and the OpenCode adapter specs against Claude Code 2.1.319. Pushes to main and pull requests run
+and the OpenCode adapter specs against Claude Code 2.1.322. Pushes to main and pull requests run
 on Linux; a release tag or a manual run adds macOS and Windows. The
 guard reads Bash and PowerShell commands, including `cmd /c` and `Invoke-Expression`, and
 resolves home and project paths per platform. The README screenshots are captured with tmux,
