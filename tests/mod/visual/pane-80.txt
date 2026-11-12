@@ -23,7 +23,7 @@
 │  explorer · Map the router callers             sonnet-5-5  high       Ns    │
 │   ✻ Bash ls plans                                                 3 calls    │
 │                                                                              │
-│  architect · Review the ledger design          fable-5-1   xhigh      Ns    │
+│  architect · Review the ledger design          fable-5-2   xhigh      Ns    │
 │   ✻ notepad_list                                                   1 call    │
 │  executor · Fix the heading parser · Fenced lines are skipped n…      1s    │
 │ d: Details  2 running · 1 finished · NN.Nk tokens                            │

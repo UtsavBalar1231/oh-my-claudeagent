@@ -218,7 +218,7 @@ test("the cost card totals the priced runs, splits its meter by agent with the c
       STACKED_WIDTH,
       "Estimated cost",
       line(text({ weight: "semibold" }, "$1.35+"), text({}, " "), text({ color: GREEN }, "█".repeat(55)), text({ color: BLUE }, "█")),
-      text({ dimColor: true, wrap: "wrap" }, "n/a: no listed price · 2026-10-11 list prices"),
+      text({ dimColor: true, wrap: "wrap" }, "n/a: no listed price · 2026-11-12 list prices"),
     ),
   );
 });
@@ -299,7 +299,7 @@ test("the Stats page aggregates two sessions by agent type with exact rows, on t
   expect(await $.command.run(run("stats", 200))).toEqual({});
   const summary = "7 delegations in 2 sessions · 1 running · 1 unreadable record skipped";
 
-  const notes = "+ excludes 1 unpriced run · n/a: no listed price · 2026-10-11 list prices";
+  const notes = "+ excludes 1 unpriced run · n/a: no listed price · 2026-11-12 list prices";
   const agents = [
     "Agents · 3 types",
     "  agent                  runs  median  tokens  est. cost  evidence  outcomes    ",
@@ -368,7 +368,7 @@ test("the columns give way until the longest name has twenty cells, and a later 
 test("the cost card holds only its total and meter and its notes, however many agents it prices and however many rows are spare", async ($, on) => {
   const names = Array.from({ length: 12 }, (_, n) => [`agent-${String(n).padStart(2, "0")}`, 12 - n] as const);
   world(on, priced(names));
-  const notes = "2026-10-11 list prices";
+  const notes = "2026-11-12 list prices";
 
   for (const rows of [50, 30]) {
     const lines = costLines(await statsTab($, { columns: 200, rows, placement: "dock" }));
@@ -385,7 +385,7 @@ test("the ASCII meter marks the seven costliest agents and merges the rest as ot
 
   expect(meter?.startsWith("$110.00 [")).toBe(true);
   for (const mark of ["#", "=", "+", "*", "%", "&", "~", "o"]) expect(meter?.includes(mark), mark).toBe(true);
-  expect(rest).toEqual(["2026-10-11 list prices"]);
+  expect(rest).toEqual(["2026-11-12 list prices"]);
   const marks = agentRows(tree).filter((row) => row.includes("agent-")).map((row) => row.slice(0, 1));
   expect(marks).toEqual(["#", "=", "+", "*", "%", "&", "~", "o", "o", "o"]);
 });
@@ -538,7 +538,7 @@ test("OMCA_GLYPHS=ascii draws the Stats page from the ASCII set", async ($, on) 
     ".@.:.. peak 990k",
     "Estimated cost",
     `$2.87+ [${"#".repeat(59)}=]`,
-    "+ excludes 1 unpriced run - n/a: no listed price - 2026-10-11 list prices",
+    "+ excludes 1 unpriced run - n/a: no listed price - 2026-11-12 list prices",
   ]);
   expect(drawn.filter((row) => !isAscii(row))).toEqual([]);
   await ui.unmount();

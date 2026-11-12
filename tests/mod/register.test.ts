@@ -82,10 +82,12 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
         "tool.list",
         "ui.ask",
         "ui.blit",
+        "ui.cancelNotify",
         "ui.copy",
         "ui.focus",
         "ui.invalidate",
         "ui.log",
+        "ui.notify",
         "ui.open",
         "ui.panes",
         "ui.place",
@@ -98,6 +100,7 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
         reads: [
           "CLAUDE_AFK_TIMEOUT_MS",
           "CLAUDE_CODE_DISABLE_ADVISOR_TOOL",
+          "CLAUDE_CODE_DISABLE_FEATURE_FLAGS",
           "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
           "CLAUDE_CODE_EFFORT_LEVEL",
           "CLAUDE_CODE_ENABLE_TASKS",
@@ -246,6 +249,7 @@ test("the band and pane render dispatchers fall through to the engine's drawing 
     requestId: "band",
     props: {
       hasSurvey: false,
+      isCollapsed: false,
       isWorking: false,
       maxRows: 10,
       bodyColumns: 80,

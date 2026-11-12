@@ -62,7 +62,7 @@ const band = ($: Engine, bodyColumns = 120, view: { agentId?: string } = {}) =>
     surface: "terminal",
     component: "AbovePrompt",
     requestId: "band",
-    props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns, scroll: { offset: 0, bodyRows: 9 }, view },
+    props: { hasSurvey: false, isCollapsed: false, isWorking: false, maxRows: 10, bodyColumns, scroll: { offset: 0, bodyRows: 9 }, view },
   });
 
 test("a turn that creates a run places one row under its turn line, naming what it created", async ($, on) => {

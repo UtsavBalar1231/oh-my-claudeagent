@@ -1,7 +1,7 @@
 import type { ImageSource, RenderElement, ToolGroupCall } from "claude-code";
 import { isHookDisabled } from "../src/core/kill-switch.ts";
-import { isAbsolutePath, joinPath } from "../src/core/path.ts";
-import { type ImagePreview, imagePreview, previewBox, previewCaption } from "../src/core/preview.ts";
+import { isAbsolutePath, joinPath, type Platform } from "../src/core/path.ts";
+import { type ImagePreview, imagePreview, previewBox, previewCaption, previewName } from "../src/core/preview.ts";
 import { glyphTestLine, glyphTestRow, receiptRow, shellReceipt } from "../src/core/receipt.ts";
 import { type Refusal, refusalOf } from "../src/core/refusals.ts";
 import { field, inputText } from "../src/core/tool-input.ts";
@@ -32,10 +32,35 @@ const pictures: Partial<Record<Kind, boolean>> = {};
 const probing = new Set<Kind>();
 let isPassthroughNoted = false;
 
+async function absoluteOf(host: Host, path: string): Promise<string> {
+  const { platform } = resolvedSession();
+  return isAbsolutePath(platform, path) ? path : joinPath(platform, await host.session.cwd(), path);
+}
+
 async function fileOf(host: Host, path: string): Promise<ImageSource | undefined> {
   if (path === "") return undefined;
-  const { platform } = resolvedSession();
-  return { file: isAbsolutePath(platform, path) ? path : joinPath(platform, await host.session.cwd(), path), format: "png" };
+  return { file: await absoluteOf(host, path), format: "png" };
+}
+
+// The detached `sh -c` returns at once, so a viewer that stays in the foreground never holds the press.
+// explorer.exe exits 1 even when it opens the file, so on win32 only a rejection is a failure.
+const openerOf = (platform: Platform, path: string): string[] =>
+  platform === "win32" ? ["explorer.exe", path] : platform === "darwin" ? ["open", path] : ["sh", "-c", 'xdg-open "$1" >/dev/null 2>&1 &', "omca-open", path];
+
+async function openImage(host: Host, path: string): Promise<void> {
+  const name = previewName(path);
+  try {
+    const target = await absoluteOf(host, path);
+    if (!(await host.fs.exists(target))) {
+      host.ui.toast(`${name} is no longer there`);
+      return;
+    }
+    const { platform } = resolvedSession();
+    const { exitCode, stderr } = await host.process.run(openerOf(platform, target));
+    if (exitCode !== 0 && platform !== "win32") host.ui.toast(`Cannot open ${name}: ${stderr.trim() || `the viewer exited ${exitCode}`}`);
+  } catch (error) {
+    host.ui.toast(`Cannot open ${name}: ${reason(error)}`);
+  }
 }
 
 // The previews share one tree's byte budget, the first first; one that no longer fits goes by its path.
@@ -85,7 +110,9 @@ async function previewRows(host: Host, kit: Kit, e: Input<"ui.render ToolGroup">
   const sources = await sourcesOf(host, previews);
   // Past the first few, a read keeps its caption alone, so a burst of screenshots stays a list.
   return previews.flatMap((preview, index) => {
-    const caption = Line(kit, previewCaption(preview, g, columns));
+    const isLink = preview.path !== "";
+    const text = Line(kit, previewCaption(preview, g, columns, isLink));
+    const caption = isLink ? kit.Button({ key: `preview-open-${index}`, plain: true, onPress: () => openImage(host, preview.path), children: [text] }) : text;
     const source = sources[index];
     if (kit.Image === undefined || source === undefined || pictures[kindOf(source)] === false) return [caption];
     const key = `preview-${index}`;

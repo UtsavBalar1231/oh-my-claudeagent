@@ -327,6 +327,33 @@ describe("question auto-continue", () => {
     expect(row({ ...afk("abc"), questionTimeout: "5m" }, "questions")?.detail).toStartWith("askUserQuestionTimeout 5m answers");
   });
 
+  describe("permissions.denyInsteadOfPrompting", () => {
+    const WARNING =
+      "permissions.denyInsteadOfPrompting takes AskUserQuestion and plan mode away, so a plan interview cannot ask you anything";
+    const denying = (value: unknown): Partial<Inputs> => ({ settings: { ...BASE.settings, permissions: { denyInsteadOfPrompting: value } } });
+
+    test("true warns", () => {
+      expect(row(denying(true), "prompting")).toEqual({ id: "prompting", label: "Prompting", level: "warn", detail: WARNING });
+    });
+
+    test("false, absent, or not a boolean adds no row", () => {
+      expect(row(denying(false), "prompting")).toBeUndefined();
+      expect(row(denying("true"), "prompting")).toBeUndefined();
+      expect(row({ settings: { ...BASE.settings, permissions: {} } }, "prompting")).toBeUndefined();
+      expect(row({}, "prompting")).toBeUndefined();
+    });
+
+    test("it comes before the AFK warning, and every row keeps its own id", () => {
+      const checks = doctorChecks({ ...BASE, ...denying(true), env: { CLAUDE_AFK_TIMEOUT_MS: "300000" }, questionTimeout: "10m" });
+      expect(checks.filter(({ id }) => id === "prompting" || id === "questions").map(({ id, detail }) => [id, detail])).toEqual([
+        ["prompting", WARNING],
+        ["questions", `CLAUDE_AFK_TIMEOUT_MS 300000 answers an open question after 5 min idle, ${TAIL}`],
+      ]);
+      const ids = checks.map(({ id }) => id);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+  });
+
   test("it lists after the advisor and carries no command to run", () => {
     const checks = doctorChecks({ ...BASE, env: { CLAUDE_AFK_TIMEOUT_MS: "300000" } });
     const ids = checks.map(({ id }) => id);
@@ -373,6 +400,16 @@ test.each<[Record<string, unknown>, Inputs["env"], Omit<Check, "id" | "label">]>
     {},
     { CLAUDE_CODE_DISABLE_ADVISOR_TOOL: "1" },
     { level: "warn", detail: "CLAUDE_CODE_DISABLE_ADVISOR_TOOL keeps the advisor off, so OMCA consults the architect instead" },
+  ],
+  [
+    {},
+    { CLAUDE_CODE_DISABLE_FEATURE_FLAGS: "1" },
+    { level: "warn", detail: "CLAUDE_CODE_DISABLE_FEATURE_FLAGS keeps the advisor off, so OMCA consults the architect instead" },
+  ],
+  [
+    { advisorModel: "fable" },
+    { CLAUDE_CODE_DISABLE_FEATURE_FLAGS: "0" },
+    { level: "ok", detail: "advisorModel fable, and nothing here keeps it off" },
   ],
   [
     {},

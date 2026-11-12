@@ -15,7 +15,7 @@ workflow.
 
 ## Requirements
 
-- Claude Code 2.1.300 or later. Tested with 2.1.319.
+- Claude Code 2.1.300 or later. Tested with 2.1.322.
 - bun 1.4.2 or later, on the `PATH` Claude Code starts with. The `omca` server, its hooks and
   the status line run on bun.
 - `ast-grep` (or `sg`), optional. Only the structural code search tools need it.
@@ -149,11 +149,12 @@ destructive-command guard), `tool.call`, `session.start`, `prompt.submit`, `turn
 validate .` lists them with the host calls the mod makes: the file system, the clock, local
 processes such as `git`, the settings file (read only), session information, the prompt box and
 the UI. It reads these environment variables: `CLAUDE_AFK_TIMEOUT_MS`,
-`CLAUDE_CODE_DISABLE_ADVISOR_TOOL`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`,
-`CLAUDE_CODE_EFFORT_LEVEL`, `CLAUDE_CODE_ENABLE_TASKS`, `CLAUDE_CODE_ENABLE_TODO_TOOLS`,
-`CLAUDE_CODE_SUBAGENT_MODEL_FORCE`, `CLAUDE_CODE_TASK_LIST_ID`, `CLAUDE_CONFIG_DIR`,
-`DISABLE_GROWTHBOOK`, `DISABLE_TELEMETRY`, `DO_NOT_TRACK`, `HOME`, `HOMEDRIVE`, `HOMEPATH`,
-`OMCA_DISABLED_HOOKS`, `OMCA_GLYPHS` and `USERPROFILE`. At `session.start` it writes two,
+`CLAUDE_CODE_DISABLE_ADVISOR_TOOL`, `CLAUDE_CODE_DISABLE_FEATURE_FLAGS`,
+`CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`, `CLAUDE_CODE_EFFORT_LEVEL`,
+`CLAUDE_CODE_ENABLE_TASKS`, `CLAUDE_CODE_ENABLE_TODO_TOOLS`, `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`,
+`CLAUDE_CODE_TASK_LIST_ID`, `CLAUDE_CONFIG_DIR`, `DISABLE_GROWTHBOOK`, `DISABLE_TELEMETRY`,
+`DO_NOT_TRACK`, `HOME`, `HOMEDRIVE`, `HOMEPATH`, `OMCA_DISABLED_HOOKS`, `OMCA_GLYPHS` and
+`USERPROFILE`. At `session.start` it writes two,
 `CLAUDE_CODE_ENABLE_TODO_TOOLS` and `CLAUDE_CODE_TASK_LIST_ID`, when nothing has set them.
 
 **What `omca-setup` writes.** Only after it prints a diff and you confirm, it sets `statusLine`

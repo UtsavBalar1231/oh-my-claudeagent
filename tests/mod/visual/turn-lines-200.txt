@@ -37,7 +37,7 @@
 
 ✻ Waiting for executor · NN.Nk in N out · $X.XX
 
- executor  Wire the order summary panel                                     2s · 2 calls · 8.5k tok
+ executor  Wire the order summary panel                                     2s · 2 calls · 8.6k tok
   ⎿  The summary panel reads the totals module now.
 
 ● ok

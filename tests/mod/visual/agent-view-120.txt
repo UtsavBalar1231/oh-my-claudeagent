@@ -1,15 +1,15 @@
                                                                   │                                                   ✕
- ▐▛███▛█   Claude Code v2.1.319                                   │1: Agents  2: Evidence  3: Notepad
+ ▐▛███▛█   Claude Code v2.1.322                                   │1: Agents  2: Evidence  3: Notepad
 ▝▜██████▀  Sonnet 5.5 with high effort · API Usage Billing        │──────────────────────────────────────────────────
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd              │                   explorer · Map the router cal…
                                                                   │      ▄▄▄▄         running · Ns · NN.Nk tokens
                                                                   │     ▀▀▀▀▀▀       sonnet-5-5 · high
 › From main                                                       │   ▀▀▀▀▀▀▀▀▀▀     3 tool calls
-❯ Find every caller of the shared router and say which ones       │      ▀        ▄  started HH:MM
-  bypass the harness.                                             │      ▀   ▀▀▀▀▀
-                                                                  │    ▀  ▀▀  ▀
-  Searched for 2 patterns, listed 1 directory                     │    ▀▀▀▀▀▀▀▀
-                                                                  │Brief
+❯ explorer · sonnet-5-5 · high · 77 chars · 1 line                │      ▀        ▄  started HH:MM
+  Find every caller of the shared router and say which ones bypass│      ▀   ▀▀▀▀▀
+  the harness.                                                    │    ▀  ▀▀  ▀
+                                                                  │    ▀▀▀▀▀▀▀▀
+  Searched for 2 patterns, listed 1 directory                     │Brief
                                                                   │Find every caller of the shared router and say
                                                                   │which ones bypass the harness.
                                                                   │

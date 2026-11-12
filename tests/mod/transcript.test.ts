@@ -1,6 +1,6 @@
 import type { On, RenderSurface, ToolGroupCall, UserMessageTask } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
-import { drain, PLUGIN, usage, world } from "./world.ts";
+import { drain, PLUGIN, usage, world, write } from "./world.ts";
 
 const ENGINE_ROW = "engine row";
 const TASK: UserMessageTask = { id: "a-1", status: "completed", toolUseId: "toolu_1", durationMs: 3_270 };
@@ -280,4 +280,66 @@ test("an image whose bytes are not a PNG keeps its caption, and the group's rece
   const { rows, images } = await groupDrawing($, [broken, passed]);
   expect(images).toEqual([]);
   expect(rows).toEqual([ENGINE_ROW, "  ⎿  ✓ just test · 12 pass", "  ⎿  step-1.png · 4×3"]);
+});
+
+type Run = { exitCode: number; stderr: string } | { deny: string };
+
+// The viewer launch answers `run`; `shots/step-1.png` exists unless `isGone`. Returns every argv run.
+async function pressed($: Engine, on: On, run: Run, { isGone = false, calls = [shot(1)] }: { isGone?: boolean; calls?: ToolGroupCall[] } = {}) {
+  on("session.cwd", () => ({ value: "/work" }));
+  const argvs: string[][] = [];
+  on("process.run", (_$, e) => {
+    if (e.argv[0] !== "git") argvs.push([...e.argv]);
+    return "deny" in run ? { deny: run.deny } : { value: { exitCode: run.exitCode, stdout: "", stderr: run.stderr, isStdoutTruncated: false, isStderrTruncated: false } };
+  });
+  const w = await engine($, on);
+  if (!isGone) write(w, "/work/shots/step-1.png", "png");
+  const mounted = await $.ui.mount({ plugin: PLUGIN, surface: "terminal", component: "ToolGroup", requestId: "group-open", props: { calls, isActive: false, isExpanded: false } });
+  return { w, argvs, mounted };
+}
+
+test("a preview's caption is a plain Button that names the file, underlined, when the Read had a path", async ($, on) => {
+  const { mounted } = await pressed($, on, { exitCode: 0, stderr: "" });
+  const button = await mounted.find({ type: "Button", key: "preview-open-0" });
+  expect(button?.props["plain"]).toBe(true);
+  expect(button?.text).toBe("  ⎿  step-1.png · 1600×400");
+  expect((await mounted.findAll({ type: "Text", text: /^step-1\.png$/ })).map(({ props }) => props["underline"])).toEqual([true]);
+  await mounted.unmount();
+});
+
+test("a preview whose Read had no path keeps a plain caption", async ($, on) => {
+  const { mounted } = await pressed($, on, { exitCode: 0, stderr: "" }, { calls: [{ ...shot(1), input: {} }] });
+  expect(await mounted.findAll({ type: "Button" })).toEqual([]);
+  expect((await mounted.findAll({ type: "Text" })).map(({ props }) => props["underline"])).not.toContain(true);
+  await mounted.unmount();
+});
+
+test("pressing the caption on linux runs xdg-open detached with the absolute path as an argument", async ($, on) => {
+  const { w, argvs, mounted } = await pressed($, on, { exitCode: 0, stderr: "" });
+  await mounted.press({ key: "preview-open-0" });
+  expect(argvs).toEqual([["sh", "-c", 'xdg-open "$1" >/dev/null 2>&1 &', "omca-open", "/work/shots/step-1.png"]]);
+  expect(w.toasts).toEqual([]);
+  await mounted.unmount();
+});
+
+test("a viewer that fails to start shows a toast naming the file and the reason", async ($, on) => {
+  const failed = await pressed($, on, { exitCode: 127, stderr: "sh: xdg-open: not found\n" });
+  await failed.mounted.press({ key: "preview-open-0" });
+  expect(failed.w.toasts).toEqual(["Cannot open step-1.png: sh: xdg-open: not found"]);
+  await failed.mounted.unmount();
+});
+
+test("a rejected launch shows a toast naming the file and the reason", async ($, on) => {
+  const { w, mounted } = await pressed($, on, { deny: "spawn sh ENOENT" });
+  await mounted.press({ key: "preview-open-0" });
+  expect(w.toasts).toEqual(["Cannot open step-1.png: spawn sh ENOENT"]);
+  await mounted.unmount();
+});
+
+test("a file that is gone shows a toast and runs nothing", async ($, on) => {
+  const { w, argvs, mounted } = await pressed($, on, { exitCode: 0, stderr: "" }, { isGone: true });
+  await mounted.press({ key: "preview-open-0" });
+  expect(argvs).toEqual([]);
+  expect(w.toasts).toEqual(["step-1.png is no longer there"]);
+  await mounted.unmount();
 });
