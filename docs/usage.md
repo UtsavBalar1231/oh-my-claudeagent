@@ -31,9 +31,9 @@ rename table.
 
 ### Share it with a team
 
-Add this to a project's `.claude/settings.json` so everyone who opens the repository in a local
-session gets the plugin. Cloud sessions skip these settings; an organization distributes plugins
-to them through server-managed settings.
+Add this to a project's `.claude/settings.json` to turn the plugin on for everyone who opens the
+repository in a local session. Cloud sessions skip these settings; an organization distributes
+plugins to them through server-managed settings.
 
 ```json
 {
@@ -43,6 +43,10 @@ to them through server-managed settings.
   "enabledPlugins": { "oh-my-claudeagent@omca": true }
 }
 ```
+
+A plugin a project's settings turn on loads only once it is installed, so each person runs
+`claude plugin install oh-my-claudeagent@omca --scope project` once in their clone. Until then,
+`/plugin` lists it on the Errors tab.
 
 For GitHub Enterprise Server, use `{ "source": "git", "url": "<clone URL>" }` as the source.
 
@@ -244,12 +248,20 @@ the work happens:
   verification gate records.
 - **A picture Claude reads.** Under a folded group with a Read of a PNG, a row names the file and
   its size, and a terminal that draws pictures (kitty, Ghostty, iTerm2 3.5 or later in fullscreen
-  rendering) shows the picture beneath it, at most 72 columns by 20 rows. A terminal that cannot
+  rendering) shows the picture beneath it, at most 72 columns by 20 rows. Click the file name to
+  open the picture in your default image viewer. A terminal that cannot
   keeps the name row alone: OMCA asks the terminal once, after the first picture it draws. Inside
   tmux 3.3 or later, pictures draw once tmux's `allow-passthrough` and `focus-events` are on, and
   OMCA says so in the transcript when tmux holds them back. A group of more than three pictures
   previews three and names the rest, and the pictures in one group share 2 MiB: past that, and in
   tmux and iTerm2, a picture drawn from its file keeps the name row alone.
+- **A brief Claude sends an agent.** When you open an agent's transcript in fullscreen, the brief
+  Claude gave it, and each later message Claude sends it, draws with a `❯` gutter, a dim header and
+  the brief's labels (`CONTEXT`, `GOAL`, `1. TASK`) in bold, each part's text drawn as Markdown and
+  shown in full. The header names the agent, its model, its effort once it has started working and
+  the brief's size: `explorer · sonnet-5-5 · high · 1,102 chars · 15 lines`. A later message reads
+  `follow-up · <size>`. After a reload or `--resume` the header shows the size alone. `ctrl+o`
+  draws the same row, and `OMCA_DISABLED_HOOKS=brief-rows` turns it off.
 - **A turn that changed a run.** Claude Code draws nothing for its task tools, so under the turn
   line of a turn that created or updated a run's tasks OMCA adds one row: the run's name, done of
   total, then only that turn's changes, each with its mark: `+26 tasks`, `✓ #5` completed,
@@ -277,6 +289,15 @@ the work happens:
   turns the rows off.
 Running agents are listed by Claude Code itself, under the prompt. A session without a terminal
 gets the turn's figures as one text row beneath the answer instead.
+
+### When the agents finish
+
+When the last background agent of a group has finished, OMCA sends one notification, titled
+`OMCA`. For one agent it reads `explorer finished · <its task>`; for several, `3 agents finished ·
+explorer, executor, architect`, or `3 agents done, 1 failed · explorer, executor, architect` when
+some did not finish. In a terminal it shows at once, through your terminal's notifications. On
+Desktop and mobile it is held for a minute and dropped if you come back to the session first, and
+the next group of agents takes back one still held. `OMCA_DISABLED_HOOKS=notify` turns it off.
 
 ### The band
 
@@ -509,7 +530,8 @@ server's whole normalized name followed by `__*`. A shorter prefix such as
 - `CLAUDE_CODE_EFFORT_LEVEL`, which sets one effort for every agent whatever it declares;
 - two enabled copies of the plugin, of which only the one loaded first runs its hooks and mod;
 - question auto-continue, from `CLAUDE_AFK_TIMEOUT_MS` or the `askUserQuestionTimeout` setting,
-  which lets a plan interview settle on its defaults while you are away;
+  which lets a plan interview settle on its defaults while you are away, and
+  `permissions.denyInsteadOfPrompting`, which takes the interview's questions away altogether;
 - `allowManagedModsOnly`, `disableAllHooks` and `allowManagedHooksOnly`;
 - which output style applies;
 - whether the advisor can run, and which setting keeps it off when it cannot;

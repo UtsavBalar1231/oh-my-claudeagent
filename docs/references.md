@@ -159,10 +159,10 @@ server's `omca_hook` tool, which dispatches through `servers/hooks/registry.ts`.
 | `tool.check` for Bash, PowerShell and Monitor | The destructive-command guard and its review dialog; a Monitor command is read as bash |
 | `session.start` | Registers `/omca`, writes the session's mod marker, draws the band's first state, and writes a transcript line when the `omca` server is not connected, naming a missing bun or the server's error, with a status line under the prompt until it connects |
 | `prompt.submit` | Tracks user-origin submissions and cancels a pending refusal recovery when new user input arrives; notes which keyword modes have fired so the prompt stops underlining them |
-| `turn.start`, `turn.complete` | The turn's tokens, cost and verification receipt for its closing line, a finished agent's notice, the band and its Task list button, the pane's refresh. At a main turn's start, the mod asks whether the `omca` server is still connected, and one that has stopped gets the same transcript line and status line. A main turn you started in an interactive session that still ends in a `reasoning_extraction` refusal, after Claude Code's own retry, gets at most one follow-up prompt from OMCA; the refusal itself stands |
-| `agent.spawn`, `turn.step` | The Agents tab and delegation records |
-| `tool.call` | A subagent's tool calls, kept for its page on the Agents tab; only a subagent's call reaches the mod, and a main-loop call skips it |
-| `ui.render`, `ui.focus`, `ui.scroll`, `ui.close`, `prompt.edit`, `prompt.change`, `command.run` | The turn line, an agent's launch and finish rows, the receipts and picture previews under tool groups in the transcript, OMCA's rows for the refusals and held completions it issues in place of the engine's error text, the band, the pane and the commands, and the underline on a keyword trigger in the prompt |
+| `turn.start`, `turn.complete` | The turn's tokens, cost and verification receipt for its closing line, a finished agent's notice, the band and its Task list button, the notification sent when the last agent of a wave ends, the pane's refresh. At a main turn's start, the mod asks whether the `omca` server is still connected, and one that has stopped gets the same transcript line and status line. A main turn you started in an interactive session that still ends in a `reasoning_extraction` refusal, after Claude Code's own retry, gets at most one follow-up prompt from OMCA; the refusal itself stands |
+| `agent.spawn`, `turn.step` | The Agents tab, delegation records, and the agent and effort a brief row names. `agent.spawn` also adds the agent to the wave whose last `turn.complete` sends the "Agents done" notification |
+| `tool.call` | A subagent's tool calls, kept for its page on the Agents tab; only a subagent's call reaches that hook, and a main-loop call skips it. Main's `SendMessage` is the one main-loop call the mod notes, for the brief rows |
+| `ui.render`, `ui.focus`, `ui.scroll`, `ui.close`, `prompt.edit`, `prompt.change`, `command.run` | The turn line, an agent's launch and finish rows, the receipts and picture previews under tool groups in the transcript, OMCA's rows for the refusals and held completions it issues in place of the engine's error text, the brief and follow-up messages main sends a subagent in the agent view, the band, the pane and the commands, and the underline on a keyword trigger in the prompt |
 
 An observed user submission cancels a follow-up before it is queued. If user input races a
 follow-up already queued, neither competing turn qualifies for another automatic recovery.
@@ -213,6 +213,8 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | --- | --- |
 | `bash-guard` | The guard's review and its refusals. The catastrophic-removal deny stays |
 | `blocker-rows` | OMCA's rows for its own refusals and held completions in the transcript; the engine's error text shows instead |
+| `brief-rows` | OMCA's rows for the brief and follow-up messages main sends a subagent in the agent view; the engine's row shows instead |
+| `notify` | The one notification OMCA sends when the last background agent of a wave finishes |
 | `refusal-recovery` | The follow-up prompt after a `reasoning_extraction` refusal |
 | `stop-gates` | Every stop gate |
 | `task-continuation`, `drift-guard` | One stop gate |
@@ -281,7 +283,7 @@ The plugin applies none of these.
 | `worktree.baseRef` | `"head"` lets worktree agents see your unpushed commits |
 | `askUserQuestionTimeout` | Leave it at `never`. A timed-out question silently answers a planning question with its default |
 | `advisorModel` | Set it with `/advisor fable` (or `opus`). Telemetry opt-outs and `CLAUDE_CODE_DISABLE_ADVISOR_TOOL` keep it off |
-| `availableModels` | An allowlist must include `sonnet`, `opus` and `fable`, or the agents on a missing tier cannot run |
+| `availableModels` | An allowlist must include `sonnet`, `opus` and `fable`, or the agents on a missing tier cannot run. Name the alias: `claude-fable-5-1` permits Fable 5.1 alone, and `fable` resolves to Fable 5.2 |
 | `permissions.deny` with `Agent(model:fable)` | Gates per-call escalations to the `fable` tier. It cannot cap an agent's declared tier, because those calls carry no `model` |
 | `subagentPromptCacheTtl` | `"1h"` keeps a long parallel run's cache warm, at a higher write price |
 | `idleCompaction` | On by default in the terminal, the Desktop app and VS Code. About an hour after the last request, a conversation over the threshold compacts before its one-hour cache expires. `false` turns it off, as does `DISABLE_AUTO_COMPACT` |
@@ -342,9 +344,10 @@ reads, the ledger and notepads, and links the JSON Schema for the ledger.
 | Status line | Yes | Not documented | No | Not documented | Unless `allowManagedHooksOnly` or `disableAllHooks` |
 
 Where the built-in `sec-default` guard loads (a machine whose managed settings set at least one
-key, or a session signed in with `/login` on a Team or Enterprise plan, not a long-lived
-`CLAUDE_CODE_OAUTH_TOKEN`), it runs ahead of OMCA's mod. OMCA's mod only denies, so
-the guard leaves its decisions in place. A Desktop session in WSL loads no plugins.
+key or that has a `managed-mcp.json` file, or a session signed in with `/login` on a Team or
+Enterprise plan, not a long-lived `CLAUDE_CODE_OAUTH_TOKEN`), it runs ahead of OMCA's mod.
+OMCA's mod only denies, so the guard leaves its decisions in place. A Desktop session in WSL
+loads no plugins.
 
 ## Platform support
 
