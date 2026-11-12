@@ -1,14 +1,14 @@
 
- ▐▛███▛█   Claude Code v2.1.319
+ ▐▛███▛█   Claude Code v2.1.322
 ▝▜██████▀  Sonnet 5.5 with high effort · API Usage Billing
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
 
 
 › From main
-❯ Find every caller of the shared router and say which ones bypass the harness.
+❯ explorer · sonnet-5-5 · high · 77 chars · 1 line
+  Find every caller of the shared router and say which ones bypass the harness.
 
   Searched for 2 patterns, listed 1 directory
-
 
 
 

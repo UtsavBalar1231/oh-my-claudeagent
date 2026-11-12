@@ -1,5 +1,5 @@
                                                                   │                                                   ✕
- ▐▛███▛█   Claude Code v2.1.319                                   │1: Agents  2: Evidence  3: Notepad
+ ▐▛███▛█   Claude Code v2.1.322                                   │1: Agents  2: Evidence  3: Notepad
 ▝▜██████▀  Opus 5.5 · API Usage Billing                           │──────────────────────────────────────────────────
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd              │   ▄▄▀▀▀▀▀▀▄▄     explorer        running      Ns
                                                                   │     ▀▀  ▀▀ ▀▄▄▀  Map the router callers
@@ -9,7 +9,7 @@
 ● 3 background agents launched (↓ to manage)                      │    ▄▀▀▀▀▀▀▄ ▀    architect       running      Ns
    ├ oh-my-claudeagent:executor (Fix the heading parser)          │     ▀▀  ▀▀   ▀   Review the ledger design
    ├ oh-my-claudeagent:explorer (Map the router callers)          │    ▀▀▀▀▀▀▀▀      ✻ notepad_list            1 call
-   └ oh-my-claudeagent:architect (Review the ledger design)       │    ▀▀▀▀▀▀▀▀      fable-5-1 · xhigh · NN.Nk tokens
+   └ oh-my-claudeagent:architect (Review the ledger design)       │    ▀▀▀▀▀▀▀▀      fable-5-2 · xhigh · NN.Nk tokens
                                                                   │Finished
 ● Three agents are on it.                                         │    ▄▀ ▀▀ ▀▄ ▄▄▄  executor        done         1s
                                                                   │ ▀   ▀▀   ▀       Fix the heading parser
