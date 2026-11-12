@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-11-12
+
 ### Added
 
 - **Brief rows:** in the agent view on the terminal, the brief Claude sends a subagent and every
@@ -3436,6 +3438,7 @@ for multi-agent orchestration.
 - Shellcheck fixes applied across all hook scripts
 - Ruff fixes applied to Python MCP servers
 
+[4.2.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.5.1...v4.0.0
 [3.5.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.5.0...v3.5.1
