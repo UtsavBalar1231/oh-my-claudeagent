@@ -12,6 +12,7 @@ import { keywordPaint } from "./keyword-paint.ts";
 import type { Host, Options } from "./host.ts";
 import { metrics } from "./metrics.ts";
 import { modMarker } from "./mod-marker.ts";
+import { notify } from "./notify.ts";
 import { router } from "./omca-router.ts";
 import { refusalRecovery } from "./refusal-recovery.ts";
 import { pane } from "./pane.ts";
@@ -67,6 +68,8 @@ function bindHost($: EngineInterface, options: Options): Host {
       resolve: (e) => $.ui.resolve(e),
       copy: (args) => $.ui.copy(args),
       toast: (text, toastOptions) => $.ui.toast(text, toastOptions),
+      notify: (text, options) => $.ui.notify(text, options),
+      cancelNotify: (key) => $.ui.cancelNotify(key),
       blit: (args) => $.ui.blit(args),
       view: (args) => $.ui.view(args),
       status: (text) => $.ui.status(text),
@@ -189,8 +192,8 @@ export const register: Register = (on, pluginOptions) => {
   const promptSubmit = featuresFor("prompt.submit", { refusalRecovery, keywordPaint });
   const turnStart = featuresFor("turn.start", { refusalRecovery, footer, modMarker, serverCheck, taskRows });
   const turnStep = featuresFor("turn.step", { metrics, agentsTracker, briefRows });
-  const turnComplete = featuresFor("turn.complete", { agentsTracker, agentRows, metrics, pane, footer, refusalRecovery, taskList, band, taskRows });
-  const agentSpawn = featuresFor("agent.spawn", { agentsTracker, metrics, briefRows });
+  const turnComplete = featuresFor("turn.complete", { agentsTracker, agentRows, metrics, pane, footer, refusalRecovery, taskList, band, taskRows, notify });
+  const agentSpawn = featuresFor("agent.spawn", { agentsTracker, metrics, briefRows, notify });
   const promptEdit = featuresFor("prompt.edit", { band, refusalRecovery, keywordPaint });
   const promptChange = featuresFor("prompt.change", { band, keywordPaint });
   const promptAutocomplete = featuresFor("prompt.autocomplete", { completion });

@@ -62,6 +62,8 @@ export type Host = {
     resolve: Engine["ui"]["resolve"];
     copy: Engine["ui"]["copy"];
     toast: Engine["ui"]["toast"];
+    notify: Engine["ui"]["notify"];
+    cancelNotify: Engine["ui"]["cancelNotify"];
     blit: Engine["ui"]["blit"];
     view: Engine["ui"]["view"];
     status: Engine["ui"]["status"];

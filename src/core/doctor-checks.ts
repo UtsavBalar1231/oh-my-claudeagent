@@ -52,14 +52,14 @@ const ENGINE_FLOOR = "2.1.300";
 export const BUN_FLOOR = "1.4.2";
 const FRESH_MS = 10 * 60_000;
 
-type Version = readonly [number, number, number];
+export type Version = readonly [number, number, number];
 
-function parseVersion(text: string): Version | undefined {
+export function parseVersion(text: string): Version | undefined {
   const match = /^v?(\d+)\.(\d+)\.(\d+)/.exec(text.trim());
   return match === null ? undefined : [Number(match[1]), Number(match[2]), Number(match[3])];
 }
 
-function isOlder(version: Version, floor: string): boolean {
+export function isOlder(version: Version, floor: string): boolean {
   const [a, b, c] = parseVersion(floor) ?? [0, 0, 0];
   return version[0] !== a ? version[0] < a : version[1] !== b ? version[1] < b : version[2] < c;
 }
