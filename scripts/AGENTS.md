@@ -13,8 +13,9 @@ under `servers/hooks/`. Every file is TypeScript on bun.
   the shared pieces: the check types, `Run` for a finished child process, `envWithout` for a
   child environment, and the tracked-file listing. The depersonalization check scans every
   shipped file, and `validate/allowlist.txt` holds its exceptions; an entry that matches nothing
-  fails. `engine` packages a copy of the tree and runs `claude plugin validate --strict` on it,
-  and skips without the claude CLI. `mcp` runs the omca server through the handshake fixtures, and
+  fails. `engine` packages a copy of the tree and runs `claude plugin validate --json` on it,
+  failing on any error or warning except the type check's TS5097 finding for a relative `.ts`
+  import, and skips without the claude CLI. `mcp` runs the omca server through the handshake fixtures, and
   `qa/install-verify.ts` reuses it on a packaged copy. The `tree` group fails a tracked python,
   bash or sh script, by its shebang or by a `.py`, `.sh` or `.bash` name. The `formats` group reads every committed state fixture (ledgers and notepads) through the shared parsers. `workflow.spec.ts`
   parses `.github/workflows/` and checks both directions: CI runs every command of every `just ci`

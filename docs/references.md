@@ -171,7 +171,7 @@ returns an allow, which would skip the auto-mode classifier.
 
 Other refusal categories, such as `cyber`, `bio` and `frontier_llm`, get no follow-up. The
 engine validator allows `$.prompt.submit` only in that follow-up and its `Host` binding, and
-rejects `model.fork`, `http.fetch` and `store.*`.
+rejects every `model.*` call, `http.fetch` and `store.*`.
 
 ### Settings hook events
 
