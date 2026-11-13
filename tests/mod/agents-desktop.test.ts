@@ -73,6 +73,25 @@ test("on Desktop every lane draws however short the pane, where the terminal win
   expect((await drawnOn("terminal")).some((row) => row.includes("more"))).toBe(true);
 });
 
+test("a seat other than inline, such as the desktop app's widget, draws as docked", async ($, on) => {
+  const w = world(on, {});
+  engine(on);
+  await $.command.run(run(""));
+  for (let n = 1; n <= 8; n += 1) await $.agent.spawn(spawnOf(n, "executor", `Port module ${n}`));
+  w.agents = Array.from({ length: 8 }, (_, n) => ({ id: `a-${n + 1}`, description: "", type: "x", status: "running" }));
+  const docked = pane("terminal", { columns: 120, rows: 16, placement: "dock" });
+  const drawnAt = async (placement: "dock" | "inline" | "widget") => {
+    const ui = await $.ui.mount({ ...docked, props: { ...docked.props, placement } });
+    const drawn = JSON.stringify(await ui.drawn(), (key, value: unknown) => (key === "press" ? undefined : value));
+    await ui.unmount();
+    return drawn;
+  };
+
+  const dock = await drawnAt("dock");
+  expect(await drawnAt("widget")).toEqual(dock);
+  expect(await drawnAt("inline")).not.toEqual(dock);
+});
+
 test("on desktop opening an agent's page focuses its Back key, and Back focuses the lane again", async ($, on) => {
   const w = world(on, {});
   w.surfaces = ["desktop"];

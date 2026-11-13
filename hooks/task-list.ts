@@ -646,7 +646,7 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
   const { home, platform, glyphTier } = resolvedSession();
   const kit = kitOf(host.ui.resolve(e), e.surface, { tier: glyphTier });
   const width = usableColumns(e.props.bodyColumns);
-  const isInline = e.props.placement !== "dock";
+  const isInline = e.props.placement === "inline";
   const rows = bodyRows(host, e, isInline);
   const g = glyphs(glyphTier);
   const layout = newLayout(0, e.props.scroll.offset);
