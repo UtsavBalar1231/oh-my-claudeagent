@@ -1,5 +1,5 @@
                                                                   │                                                   ✕
- ▐▛███▛█   Claude Code v2.1.322                                   │1: Agents  2: Evidence  3: Notepad
+ ▐▛███▛█   Claude Code v2.1.325                                   │1: Agents  2: Evidence  3: Notepad
 ▝▜██████▀  Sonnet 5.5 with high effort · API Usage Billing        │──────────────────────────────────────────────────
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd              │                   explorer · Map the router cal…
                                                                   │      ▄▄▄▄         running · Ns · NN.Nk tokens
