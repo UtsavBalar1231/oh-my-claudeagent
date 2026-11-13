@@ -39,10 +39,15 @@ describe("SHOTS", () => {
     expect(still("mascots")?.ready([...lanes.slice(0, 2), "architect             ◆ running     1s\nfable-5-1"].join("\n"))).toBe(false);
   });
 
-  test("the statusline scene is ready only once both agents' rows show their context share", () => {
-    const rows = ["executor · Sonnet 5.5 · running · high · 1% ctx · Check the types", "executor · Sonnet 5.5 · running · high · 1% ctx · Check the lint rules"];
-    expect(still("statusline")?.ready(rows.join("\n"))).toBe(true);
-    expect(still("statusline")?.ready(rows.map((row) => row.replace(" · 1% ctx", "")).join("\n"))).toBe(false);
+  test("the statusline scene is ready only once the turn line waits on both agents and their rows show tokens", () => {
+    const turn = "✻ Waiting for executor ×2 · 25.2k in 13 out · $0.2346";
+    const rows = [
+      "  ◯ oh-my-claudeagent:executor  Check the types                          2s · ↓ 8.2k tokens",
+      "  ◯ oh-my-claudeagent:executor  Check the lint rules                     2s · ↓ 8.2k tokens",
+    ];
+    expect(still("statusline")?.ready([turn, ...rows].join("\n"))).toBe(true);
+    expect(still("statusline")?.ready(rows.join("\n"))).toBe(false);
+    expect(still("statusline")?.ready([turn, rows[0], "  ◯ oh-my-claudeagent:executor  Check the lint rules"].join("\n"))).toBe(false);
   });
 
   test("only the pane scenes crop to the pane", () => {
