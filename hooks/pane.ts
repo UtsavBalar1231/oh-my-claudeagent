@@ -291,7 +291,7 @@ async function draw(host: Host, e: Input<"ui.render Pane">): Promise<RenderEleme
   const kit = kitOf(host.ui.resolve(e), e.surface, { tier: glyphTier, isStill: mascots.still() });
   const { Box, Text, Button } = kit;
   const width = usableColumns(e.props.bodyColumns);
-  const isInline = e.props.placement !== "dock";
+  const isInline = e.props.placement === "inline";
   const rows = bodyRows(host, e, isInline);
   const pane = await host.state.pane.get();
   const g = glyphs(glyphTier);

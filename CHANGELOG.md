@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.1] - 2026-11-14
+
+### Changed
+
+- **Main agent:** Claude Code 2.1.323 deprecates a plugin's `agent` setting and warns at startup
+  that OMCA set the session's agent, so the plugin no longer ships a `settings.json`.
+  `/oh-my-claudeagent:omca-setup` has a main agent step that shows a diff and, on your yes, adds
+  `"agent": "oh-my-claudeagent:orchestrator"` to `~/.claude/settings.json`. It leaves an agent you
+  set to something else alone, and `--uninstall` removes only OMCA's. The key applies to every
+  session you start, and in a project where OMCA is turned off Claude Code falls back to its
+  default agent. `claude --agent oh-my-claudeagent:orchestrator` starts one session as the
+  orchestrator without it. `/omca doctor` warns when no settings file names an agent, and `g` on
+  that row fills the prompt with setup. After upgrading, run setup once, or sessions start as
+  Claude Code's default agent.
+- **Claude Code 2.1.325:** OMCA is tested with Claude Code 2.1.325, and the engine types come from
+  it. The floor stays 2.1.300. The engine validator group reads `claude plugin validate --json`
+  and fails on every error and warning except TS5097, which the validator's new type check reports
+  for each relative `.ts` import because it ignores the plugin's own tsconfig. It also rejects
+  every `$.model` call, `$.model.complete` and `$.model.classify` included, since the mod makes no
+  model call of its own. OMCA declines the rest of what 2.1.323 to 2.1.325 add:
+  `engines["claude-code"]` (it acts only on 2.1.323 and later, all above the floor), the
+  `Progress` element (only a mobile client draws it; every other client gets the engine's own Box
+  and Text in place of the run line), `AbovePromptList` (the band is one row), a widget's glance
+  form, `isPromptCovered` and `mcp.connect` holds. Code Mode does not start while a mod checks
+  tool calls, which OMCA's guard does (from the 2.1.323 docs, not probed).
+
+### Removed
+
+- **Subagent status line:** Claude Code 2.1.323 removed the `subagentStatusLine` setting, so OMCA's
+  subagent row renderer is gone and setup no longer writes the key. Running setup again removes
+  the one it wrote. On Claude Code 2.1.300 to 2.1.322 the tasks panel shows Claude Code's own rows.
+
+### Fixed
+
+- **Cost tiers:** `agents_list` reads an agent's cost tier from its model family, so a full model id
+  such as `claude-mythos-5-2`, `claude-haiku-5-5` or `claude-opus-4-6` gets premium, free or
+  expensive where only the ids it listed did and the rest fell back to cheap. Mythos counts as
+  premium, as Fable does.
+- **Subagent compaction:** from Claude Code 2.1.323 a subagent's compaction names the subagent,
+  and OMCA no longer injects the main conversation's guidance into the compacting subagent or
+  counts it as the main conversation's compaction. Claude Code 2.1.300 to 2.1.322 still send no
+  agent id, so there the guidance lands in the subagent as before.
+
 ## [4.2.0] - 2026-11-12
 
 ### Added
@@ -3438,6 +3481,7 @@ for multi-agent orchestration.
 - Shellcheck fixes applied across all hook scripts
 - Ruff fixes applied to Python MCP servers
 
+[4.2.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.2.0...v4.2.1
 [4.2.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v3.5.1...v4.0.0

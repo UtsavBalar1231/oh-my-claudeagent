@@ -76,7 +76,7 @@ describe("hooks.json against the registry", () => {
     SubagentStart: ["agent_type"],
     TaskCompleted: ["agent_id", "task_id"],
     Stop: ["transcript_path", "stop_hook_active", "last_assistant_message", "background_tasks"],
-    SessionStart: ["source"],
+    SessionStart: ["source", "agent_id"],
   };
 
   test("hooks.json registers exactly the registry's events, and the table covers each one", () => {

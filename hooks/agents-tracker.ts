@@ -36,8 +36,8 @@ async function masked(host: Host, text: string, cells: number): Promise<string> 
   return fitEnd(redact(oneLine(text), "", g.mask).text, cells, g.ellipsis);
 }
 
-// A fork copies the loop that spawned it. The main loop runs as the `agent` setting, which OMCA's
-// own settings make the orchestrator; merged settings carry a plugin's value as well as the user's.
+// A fork copies the loop that spawned it. The main loop runs as the `agent` setting, which
+// OMCA's setup makes the orchestrator.
 async function forkedFrom(host: Host, parentAgentId: string | undefined): Promise<string | undefined> {
   if (parentAgentId === undefined) {
     const main = (await host.settings.read())["agent"];

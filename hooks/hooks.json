@@ -13,7 +13,8 @@
             "input": {
               "event": "SessionStart",
               "session_id": "${session_id}",
-              "source": "${source}"
+              "source": "${source}",
+              "agent_id": "${agent_id}"
             }
           }
         ]

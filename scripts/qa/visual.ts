@@ -41,6 +41,7 @@ import { parseScript, type Script, startServer } from "./mock-model.ts";
 const FIXTURE_AGE_MS = 3_600_000;
 const MKDTEMP_SUFFIX = 6;
 const SESSION_ID = "00000000-0000-4000-8000-000000000001";
+const MAIN_AGENT = "oh-my-claudeagent:orchestrator";
 const SIZES = [
   [80, 40],
   [120, 40],
@@ -171,6 +172,7 @@ export function sessionSettings(view: View, inline: boolean): Record<string, unk
   return {
     ...(inline ? {} : { tui: "fullscreen" }),
     prefersReducedMotion: true,
+    agent: MAIN_AGENT,
     ...view.settings,
     ...(view.options === undefined ? {} : { pluginConfigs: { [INLINE_PLUGIN_KEY]: { options: view.options } } }),
   };

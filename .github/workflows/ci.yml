@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CLAUDE_CODE_VERSION: 2.1.322
+  CLAUDE_CODE_VERSION: 2.1.325
 
 # A macOS minute costs ten Linux minutes and a Windows minute two, so pull requests and pushes to
 # main run on Linux. A release tag and a manual run (`gh workflow run ci.yml --ref <branch>`) add
@@ -262,7 +262,7 @@ jobs:
         run: |
           {
             echo "### What this job checks ($RUNNER_OS)"
-            echo "The mod tests and the engine checks on Claude Code $CLAUDE_CODE_VERSION, the latter running \`claude plugin validate --strict\` on a packaged copy and comparing the committed engine types with the ones the plugin-authoring skill writes, then a real \`claude -p\` session with the packaged plugin loaded, against the mock model with a scratch project and config directory: the server answers omca_hook calls and the mod's tool.check guard denies a recursive removal (through PowerShell as well on Windows, when the session offers that tool). Mirrors \`just test-mod\`, \`validate --check engine\` and \`smoke\`."
+            echo "The mod tests and the engine checks on Claude Code $CLAUDE_CODE_VERSION, the latter running \`claude plugin validate --json\` on a packaged copy and comparing the committed engine types with the ones the plugin-authoring skill writes, then a real \`claude -p\` session with the packaged plugin loaded, against the mock model with a scratch project and config directory: the server answers omca_hook calls and the mod's tool.check guard denies a recursive removal (through PowerShell as well on Windows, when the session offers that tool). Mirrors \`just test-mod\`, \`validate --check engine\` and \`smoke\`."
             echo ""
             echo "### If this fails"
             echo "A failing mod test, a manifest or hooks-module validation error, or the plugin did not load in a real session on this OS, or its guard did not run. Run the matching \`just\` recipe locally with Claude Code $CLAUDE_CODE_VERSION on PATH; the smoke check quotes the debug log it reads."
@@ -288,22 +288,24 @@ jobs:
         with:
           node-version: 24
 
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.4
+          no-cache: true
+
       - name: Install Claude Code CLI
         run: npm i -g @anthropic-ai/claude-code # zizmor: ignore[adhoc-packages]
 
-      - name: Validate the marketplace
-        run: claude plugin validate . --strict
-
-      - name: Validate the plugin manifest, its skills, agents and hooks module
-        run: claude plugin validate .claude-plugin/plugin.json --strict
+      - name: Validate the marketplace and the plugin with the latest client
+        run: bun scripts/validate.ts --check engine
 
       - name: Job summary
         if: always()
         run: |
           {
             echo "### What this job checks"
-            echo "The marketplace and the plugin manifest, with its skills, agents and hooks module, against the latest published client's schema, via \`claude plugin validate . --strict\` and \`claude plugin validate .claude-plugin/plugin.json --strict\`."
+            echo "The marketplace and the plugin manifest, with its skills, agents and hooks module, against the latest published client's schema, via \`just validate --check engine\`: \`claude plugin validate --json\` on a packaged copy, failing on every error and warning except the type check's TS5097 finding for a relative \`.ts\` import."
             echo ""
             echo "### If this fails"
-            echo "A field in \`.claude-plugin/plugin.json\` or \`.claude-plugin/marketplace.json\`, or a skill, agent or hooks module, is malformed or unknown to the newest client. Run both commands locally with the latest claude CLI to see the exact failure."
+            echo "A field in \`.claude-plugin/plugin.json\` or \`.claude-plugin/marketplace.json\`, or a skill, agent or hooks module, is malformed or unknown to the newest client. Run \`just validate --check engine\` locally with the latest claude CLI to see the exact failure."
           } >> "$GITHUB_STEP_SUMMARY"

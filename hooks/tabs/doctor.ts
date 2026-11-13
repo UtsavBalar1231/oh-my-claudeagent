@@ -19,7 +19,7 @@ const GAP = 3;
 const CHIP = 9;
 const WORDS: Readonly<Record<Check["level"], string>> = { ok: "OK", warn: "WARN", fail: "FAIL", info: "INFO" };
 // One key per check that names a command to run; r, i and o are taken, and digits switch tabs.
-const PROMPT_KEYS: Readonly<Record<string, string>> = { server: "m", style: "y", advisor: "a", statusline: "s", installs: "p" };
+const PROMPT_KEYS: Readonly<Record<string, string>> = { server: "m", style: "y", agent: "g", advisor: "a", statusline: "s", installs: "p" };
 const PASSING_KEY = "o";
 // Below this a detail column would be too narrow for the longest variable name it quotes.
 const MIN_DETAIL = 50;

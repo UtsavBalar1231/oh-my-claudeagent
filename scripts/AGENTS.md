@@ -13,8 +13,9 @@ under `servers/hooks/`. Every file is TypeScript on bun.
   the shared pieces: the check types, `Run` for a finished child process, `envWithout` for a
   child environment, and the tracked-file listing. The depersonalization check scans every
   shipped file, and `validate/allowlist.txt` holds its exceptions; an entry that matches nothing
-  fails. `engine` packages a copy of the tree and runs `claude plugin validate --strict` on it,
-  and skips without the claude CLI. `mcp` runs the omca server through the handshake fixtures, and
+  fails. `engine` packages a copy of the tree and runs `claude plugin validate --json` on it,
+  failing on any error or warning except the type check's TS5097 finding for a relative `.ts`
+  import, and skips without the claude CLI. `mcp` runs the omca server through the handshake fixtures, and
   `qa/install-verify.ts` reuses it on a packaged copy. The `tree` group fails a tracked python,
   bash or sh script, by its shebang or by a `.py`, `.sh` or `.bash` name. The `formats` group reads every committed state fixture (ledgers and notepads) through the shared parsers. `workflow.spec.ts`
   parses `.github/workflows/` and checks both directions: CI runs every command of every `just ci`
@@ -51,10 +52,11 @@ under `servers/hooks/`. Every file is TypeScript on bun.
 - `benchmarks/compare/` (outside this directory, packaging-excluded): the harness behind
   `just compare`, which measures OMCA against similar plugins in Docker with a mock model.
   Its README has the stages and the files.
-- `setup-statusline.ts`: the status line setup behind `/oh-my-claudeagent:omca-setup`, and the one
+- `setup-statusline.ts`: the settings setup behind `/oh-my-claudeagent:omca-setup`, and the one
   file under `scripts/` that ships. It copies `statusline/launcher.ts` to the config directory,
-  prints a diff of the settings file and, after confirmation, sets `statusLine` and
-  `subagentStatusLine`. `--uninstall` removes them.
+  prints a diff of the settings file and, after confirmation, sets `statusLine` and drops a
+  `subagentStatusLine` that runs the launcher; `--main-agent` sets `agent` to the orchestrator
+  instead, and `--glyphs-only` sets `env.OMCA_GLYPHS`. `--uninstall` removes what it wrote.
 - `postedit-check.ts`: runs `just typecheck` after an edit to a `.ts` file and reports the
   first lines of a failure as hook context. A contributor wires it as a `PostToolUse` entry in
   their own `.claude/settings.json`; `CONTRIBUTING.md` has the entry.

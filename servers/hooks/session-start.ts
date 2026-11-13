@@ -3,6 +3,7 @@ import { guidanceContext } from "./guidance.ts";
 import type { Handler } from "./registry.ts";
 
 export const handle: Handler = (payload, { root, now, session }) => {
+  if (payload.source === "compact" && typeof payload.agent_id === "string" && payload.agent_id !== "") return;
   if (payload.source === "compact" && session !== undefined) session.compactedAt = now;
   if (isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "session-start")) return;
   if (payload.source !== "compact") return;

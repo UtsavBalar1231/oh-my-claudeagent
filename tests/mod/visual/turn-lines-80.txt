@@ -32,7 +32,7 @@
 
 ● ok
 
-✻ Worked for 2s · done HH:MM · NN.Nk in N out · $X.XX
+✻ Worked for 3s · done HH:MM · NN.Nk in N out · $X.XX
                                                             ◐ medium · /effort
 ─────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 

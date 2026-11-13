@@ -13,28 +13,28 @@
 ✻ Waiting for 3 background agents to finish
   NN.Nk in NN out · $X.XX ·  just test not logged
 
- explorer  Map the totals callers                                           0s · 2 calls · 7.4k tok
+ explorer  Map the totals callers                                           1s · 2 calls · 7.4k tok
   ⎿  Only src/cart.ts defines total(); nothing else calls it yet.
 
 ● ok
 
 ✻ Waiting for executor, architect · NN.Nk in N out · $X.XX
 
- architect  Review the rounding rule                                        1s · 1 call · 10.8k tok
+ architect  Review the rounding rule                                        2s · 1 call · 10.8k tok
   ⎿  Rounding at the end is right; rounding each line would drift by a cent.
 
 ● ok
 
 ✻ Waiting for executor · NN.Nk in N out · $X.XX
 
- executor  Wire the order summary panel                                     2s · 2 calls · 8.6k tok
+ executor  Wire the order summary panel                                     3s · 2 calls · 8.6k tok
   ⎿  The summary panel reads the totals module now.
 
 ● ok
 
-✻ Worked for 2s · done HH:MM · NN.Nk in N out · $X.XX
-                                                                                                    ◐ medium · /effort
+✻ Worked for 6s · done HH:MM · NN.Nk in N out · $X.XX
+
 ─────────────────────────────────────────────────────────────────────────────────────── oh-my-claudeagent:orchestrator ─
 ❯ 
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  ⏸ manual mode on · /tasks to see subagents · ← for agents
+  ⏸ manual mode on · /tasks to see subagents

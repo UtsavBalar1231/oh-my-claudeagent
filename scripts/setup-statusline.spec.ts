@@ -65,6 +65,9 @@ const statusLine = (indent: string) =>
 const subagentStatusLine = (indent: string) =>
   [`"subagentStatusLine": {`, `${indent}"type": "command",`, `${indent}"command": "${command(bun, launcher, " --subagent")}"`, `}`];
 
+const configured = () => fixtureText("omca-statusline.json");
+const withAgent = (text: string, agent: string) => text.replace(/\n}\n$/, `,\n  "agent": ${JSON.stringify(agent)}\n}\n`);
+
 const header = () => [`--- ${settings}`, `+++ ${settings}`];
 const copyLine = () => `copy ${LAUNCHER_SOURCE} to ${launcher}`;
 const NOT_WRITTEN = "Nothing was written. Run again with --yes to apply.";
@@ -79,8 +82,7 @@ const NO_STATUSLINE_AFTER = () =>
     '    "oh-my-claudeagent@omca": true',
     "  },",
     '  "theme": "dark",',
-    ...statusLine("  ").map((line, i, all) => `  ${line}${i === all.length - 1 ? "," : ""}`),
-    ...subagentStatusLine("  ").map((line) => `  ${line}`),
+    ...statusLine("  ").map((line) => `  ${line}`),
     "}",
     "",
   ].join("\n");
@@ -90,7 +92,6 @@ const OTHER_STATUSLINE_AFTER = () =>
     "{",
     '    "model": "opus",',
     ...statusLine("    ").map((line, i, all) => `    ${line}${i === all.length - 1 ? "," : ""}`),
-    ...subagentStatusLine("    ").map((line, i, all) => `    ${line}${i === all.length - 1 ? "," : ""}`),
     '    "env": {',
     '        "FOO": "1"',
     "    }",
@@ -107,11 +108,11 @@ test("--glyph-test prints the four Nerd Font icons and nothing else, with no set
 });
 
 describe("install", () => {
-  test("settings without a statusLine gain both entries after the last key", () => {
+  test("settings without a statusLine gain it after the last key", () => {
     const before = fixture("no-statusline.json");
     const diff = [
       ...header(),
-      "@@ -5,5 +5,16 @@",
+      "@@ -5,5 +5,12 @@",
       '   "enabledPlugins": {',
       '     "oh-my-claudeagent@omca": true',
       "   },",
@@ -119,7 +120,7 @@ describe("install", () => {
       '+  "theme": "dark",',
       ...NO_STATUSLINE_AFTER()
         .split("\n")
-        .slice(8, 19)
+        .slice(8, 15)
         .map((line) => `+${line}`),
       " }",
     ];
@@ -162,14 +163,14 @@ describe("install", () => {
     const before = fixture("other-statusline.json");
     const diff = [
       ...header(),
-      "@@ -2,7 +2,14 @@",
+      "@@ -2,7 +2,10 @@",
       '     "model": "opus",',
       '     "statusLine": {',
       '         "type": "command",',
       '-        "command": "~/bin/my-statusline.sh"',
       ...OTHER_STATUSLINE_AFTER()
         .split("\n")
-        .slice(4, 12)
+        .slice(4, 8)
         .map((line) => `+${line}`),
       "     },",
       '     "env": {',
@@ -190,7 +191,7 @@ describe("install", () => {
     mkdirSync(join(home, ".claude", "omca"), { recursive: true });
     writeFileSync(launcher, readFileSync(LAUNCHER_SOURCE));
 
-    expect(run("--yes")).toEqual({ stdout: `Already configured: ${settings} runs both status lines through ${launcher}.\n`, stderr: "", exitCode: 0 });
+    expect(run("--yes")).toEqual({ stdout: `Already configured: ${settings} runs the status line through ${launcher}.\n`, stderr: "", exitCode: 0 });
     expect(readFileSync(settings, "utf8")).toBe(before);
     expect(existsSync(`${settings}.omca-bak`)).toBe(false);
   });
@@ -205,7 +206,7 @@ describe("install", () => {
     expect(run("--yes").exitCode).toBe(0);
     expect(readFileSync(settings, "utf8")).toBe(quoted);
     expect(readFileSync(`${settings}.omca-bak`, "utf8")).toBe(unquoted);
-    expect(run("--yes")).toEqual({ stdout: `Already configured: ${settings} runs both status lines through ${launcher}.\n`, stderr: "", exitCode: 0 });
+    expect(run("--yes")).toEqual({ stdout: `Already configured: ${settings} runs the status line through ${launcher}.\n`, stderr: "", exitCode: 0 });
   });
 
   test("CLAUDE_CONFIG_DIR moves the launcher and the commands that name it", () => {
@@ -216,7 +217,6 @@ describe("install", () => {
     expect(runWith({ ...homeEnv(home), CLAUDE_CONFIG_DIR: config, PATH: join(root, "bin") }, "--yes").exitCode).toBe(0);
     const written = JSON.parse(readFileSync(settings, "utf8"));
     expect(written.statusLine.command).toBe(`"${posix(bun)}" "${posix(moved)}"`);
-    expect(written.subagentStatusLine.command).toBe(`"${posix(bun)}" "${posix(moved)}" --subagent`);
     expect(readFileSync(moved, "utf8")).toBe(readFileSync(LAUNCHER_SOURCE, "utf8"));
     expect(existsSync(launcher)).toBe(false);
   });
@@ -251,11 +251,26 @@ describe("install", () => {
   });
 
   test("a missing settings file is created without a backup", () => {
-    const created = ["{", ...statusLine("  ").map((line, i, all) => `  ${line}${i === all.length - 1 ? "," : ""}`), ...subagentStatusLine("  ").map((line) => `  ${line}`), "}", ""].join("\n");
+    const created = ["{", ...statusLine("  ").map((line) => `  ${line}`), "}", ""].join("\n");
 
     expect(run("--yes").exitCode).toBe(0);
     expect(readFileSync(settings, "utf8")).toBe(created);
     expect(existsSync(`${settings}.omca-bak`)).toBe(false);
+  });
+
+  test("a subagentStatusLine that runs OMCA's launcher is removed, and one that runs another command stays", () => {
+    mkdirSync(join(home, ".claude", "omca"), { recursive: true });
+    writeFileSync(launcher, readFileSync(LAUNCHER_SOURCE));
+    const ours = configured().replace('  "theme"', `${subagentStatusLine("    ").map((line, i, all) => `  ${line}${i === all.length - 1 ? "," : ""}`).join("\n")}\n  "theme"`);
+    writeFileSync(settings, ours);
+
+    expect(run("--yes").exitCode).toBe(0);
+    expect(readFileSync(settings, "utf8")).toBe(configured());
+
+    const other = configured().replace('  "theme"', '  "subagentStatusLine": { "type": "command", "command": "~/bin/rows.sh" },\n  "theme"');
+    writeFileSync(settings, other);
+    expect(run("--yes")).toEqual({ stdout: `Already configured: ${settings} runs the status line through ${launcher}.\n`, stderr: "", exitCode: 0 });
+    expect(readFileSync(settings, "utf8")).toBe(other);
   });
 
   test("the backup is written before the settings, so a failed backup leaves them untouched", () => {
@@ -293,7 +308,7 @@ describe("refusals", () => {
   test("a missing --settings prints the usage", () => {
     const result = Bun.spawnSync([process.execPath, SCRIPT], { env: specEnv({ ...homeEnv(home), PATH: join(root, "bin") }) });
     expect(result.stderr.toString()).toBe(
-      "omca setup: usage: bun scripts/setup-statusline.ts --settings <path> [--glyphs nerd|unicode|ascii [--glyphs-only]] [--yes] [--uninstall]\n" +
+      "omca setup: usage: bun scripts/setup-statusline.ts --settings <path> [--glyphs nerd|unicode|ascii [--glyphs-only] | --main-agent] [--yes] [--uninstall]\n" +
         "       bun scripts/setup-statusline.ts --glyph-test\n",
     );
     expect(result.exitCode).toBe(2);
@@ -307,11 +322,11 @@ describe("uninstall", () => {
     writeFileSync(launcher, readFileSync(LAUNCHER_SOURCE));
     const diff = [
       ...header(),
-      "@@ -1,14 +1,3 @@",
+      "@@ -1,10 +1,3 @@",
       " {",
       ...before
         .split("\n")
-        .slice(1, 12)
+        .slice(1, 8)
         .map((line) => `-${line}`),
       '   "theme": "dark"',
       " }",
@@ -335,7 +350,7 @@ describe("uninstall", () => {
 
   test("a statusLine that is not OMCA's is left alone", () => {
     const before = fixture("other-statusline.json");
-    expect(run("--uninstall", "--yes")).toEqual({ stdout: `Nothing to remove: no OMCA status line in ${settings} and no ${launcher}.\n`, stderr: "", exitCode: 0 });
+    expect(run("--uninstall", "--yes")).toEqual({ stdout: `Nothing to remove: no OMCA status line or agent in ${settings} and no ${launcher}.\n`, stderr: "", exitCode: 0 });
     expect(readFileSync(settings, "utf8")).toBe(before);
   });
 });
@@ -359,5 +374,61 @@ describe("glyphs", () => {
     writeFileSync(settings, "{}\n");
     expect(run("--glyphs", "nerdy").stderr).toStartWith("omca setup: --glyphs takes nerd, unicode or ascii\n");
     expect(run("--glyphs-only").stderr).toStartWith("omca setup: --glyphs-only needs --glyphs and no --uninstall\n");
+  });
+});
+
+describe("main agent", () => {
+  test("--main-agent adds agent after the last key and leaves the status line and the launcher alone", () => {
+    const before = fixture("no-statusline.json");
+    const diff = [
+      ...header(),
+      "@@ -5,5 +5,6 @@",
+      '   "enabledPlugins": {',
+      '     "oh-my-claudeagent@omca": true',
+      "   },",
+      '-  "theme": "dark"',
+      '+  "theme": "dark",',
+      '+  "agent": "oh-my-claudeagent:orchestrator"',
+      " }",
+    ];
+
+    expect(run("--main-agent")).toEqual({ stdout: [...diff, NOT_WRITTEN, ""].join("\n"), stderr: "", exitCode: 0 });
+    expect(readFileSync(settings, "utf8")).toBe(before);
+
+    expect(run("--main-agent", "--yes").exitCode).toBe(0);
+    expect(readFileSync(settings, "utf8")).toBe(withAgent(before, "oh-my-claudeagent:orchestrator"));
+    expect(existsSync(launcher)).toBe(false);
+    expect(run("--main-agent")).toEqual({ stdout: `Already configured: ${settings} starts sessions as oh-my-claudeagent:orchestrator.\n`, stderr: "", exitCode: 0 });
+  });
+
+  test("an empty agent counts as unset and is filled in place", () => {
+    writeFileSync(settings, withAgent(fixtureText("no-statusline.json"), ""));
+    expect(run("--main-agent", "--yes").exitCode).toBe(0);
+    expect(readFileSync(settings, "utf8")).toBe(withAgent(fixtureText("no-statusline.json"), "oh-my-claudeagent:orchestrator"));
+  });
+
+  test("an agent the user chose is left as it is", () => {
+    const before = withAgent(fixtureText("no-statusline.json"), "code-reviewer");
+    writeFileSync(settings, before);
+
+    expect(run("--main-agent", "--yes")).toEqual({ stdout: `Left as it is: ${settings} sets agent to "code-reviewer".\n`, stderr: "", exitCode: 0 });
+    expect(readFileSync(settings, "utf8")).toBe(before);
+  });
+
+  test("uninstall removes the orchestrator agent with the status line, and keeps any other agent", () => {
+    writeFileSync(settings, withAgent(configured(), "oh-my-claudeagent:orchestrator"));
+    expect(run("--uninstall", "--yes").exitCode).toBe(0);
+    expect(readFileSync(settings, "utf8")).toBe('{\n  "theme": "dark"\n}\n');
+
+    const other = withAgent(fixtureText("no-statusline.json"), "code-reviewer");
+    writeFileSync(settings, other);
+    expect(run("--uninstall", "--yes").stdout).toBe(`Nothing to remove: no OMCA status line or agent in ${settings} and no ${launcher}.\n`);
+    expect(readFileSync(settings, "utf8")).toBe(other);
+  });
+
+  test("--main-agent with --glyphs or --uninstall prints the usage", () => {
+    writeFileSync(settings, "{}\n");
+    expect(run("--main-agent", "--glyphs", "ascii").stderr).toStartWith("omca setup: --main-agent takes no --glyphs or --uninstall\n");
+    expect(run("--main-agent", "--uninstall")).toMatchObject({ exitCode: 2 });
   });
 });

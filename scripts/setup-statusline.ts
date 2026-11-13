@@ -10,11 +10,12 @@ import { type GlyphTier, isGlyphTier } from "../src/core/ui-kit.ts";
 type Member = { key: string; start: number; valueStart: number; end: number };
 
 const USAGE =
-  "usage: bun scripts/setup-statusline.ts --settings <path> [--glyphs nerd|unicode|ascii [--glyphs-only]] [--yes] [--uninstall]\n" +
+  "usage: bun scripts/setup-statusline.ts --settings <path> [--glyphs nerd|unicode|ascii [--glyphs-only] | --main-agent] [--yes] [--uninstall]\n" +
   "       bun scripts/setup-statusline.ts --glyph-test";
 // A check in a circle, gears, an eye and a terminal prompt, all in Nerd Font's private-use range.
 const GLYPH_TEST = "   ";
 const GLYPHS_KEY = "OMCA_GLYPHS";
+const MAIN_AGENT = "oh-my-claudeagent:orchestrator";
 const LAUNCHER_SOURCE = join(import.meta.dir, "..", "statusline", "launcher.ts");
 
 function fail(message: string, code = 1): never {
@@ -93,7 +94,15 @@ function isOurs(entry: unknown, suffix: string): boolean {
   return entry.command.replaceAll("\\", "/").replaceAll('"', "").endsWith(suffix);
 }
 
-let options: { settings?: string | undefined; glyphs?: string | undefined; "glyphs-only": boolean; "glyph-test": boolean; yes: boolean; uninstall: boolean };
+let options: {
+  settings?: string | undefined;
+  glyphs?: string | undefined;
+  "glyphs-only": boolean;
+  "glyph-test": boolean;
+  "main-agent": boolean;
+  yes: boolean;
+  uninstall: boolean;
+};
 try {
   options = parseArgs({
     options: {
@@ -101,6 +110,7 @@ try {
       glyphs: { type: "string" },
       "glyphs-only": { type: "boolean", default: false },
       "glyph-test": { type: "boolean", default: false },
+      "main-agent": { type: "boolean", default: false },
       yes: { type: "boolean", default: false },
       uninstall: { type: "boolean", default: false },
     },
@@ -117,16 +127,16 @@ const glyphs: GlyphTier | undefined =
   options.glyphs === undefined ? undefined : isGlyphTier(options.glyphs) ? options.glyphs : fail(`--glyphs takes nerd, unicode or ascii\n${USAGE}`, 2);
 const isGlyphsOnly = options["glyphs-only"];
 if (isGlyphsOnly && (glyphs === undefined || options.uninstall)) fail(`--glyphs-only needs --glyphs and no --uninstall\n${USAGE}`, 2);
+const isAgentOnly = options["main-agent"];
+if (isAgentOnly && (glyphs !== undefined || options.uninstall)) fail(`--main-agent takes no --glyphs or --uninstall\n${USAGE}`, 2);
+const isStatusLine = !isGlyphsOnly && !isAgentOnly;
 const bun = Bun.which("bun") ?? fail("bun is not on PATH");
 const launcher = join(configDir(process.env) ?? join(homedir(), ".claude"), "omca", "statusline.ts");
 const platform = toPlatform(process.platform);
 const launcherPath = toPosix(platform, launcher);
 const bunArg = `"${toPosix(platform, bun)}"`;
 const launcherArg = `"${launcherPath}"`;
-const wanted = {
-  statusLine: { type: "command", command: `${bunArg} ${launcherArg}`, padding: 1, refreshInterval: 5, hideVimModeIndicator: true },
-  subagentStatusLine: { type: "command", command: `${bunArg} ${launcherArg} --subagent` },
-};
+const statusLine = { type: "command", command: `${bunArg} ${launcherArg}`, padding: 1, refreshInterval: 5, hideVimModeIndicator: true };
 
 const exists = existsSync(path);
 const raw = exists ? readFileSync(path, "utf8") : "";
@@ -144,16 +154,23 @@ if (typeof settings !== "object" || settings === null || Array.isArray(settings)
 const current: Record<string, unknown> = { ...settings };
 const expected: Record<string, unknown> = { ...settings };
 let after = base;
-for (const [key, value] of Object.entries(isGlyphsOnly ? {} : wanted)) {
-  const sibling = key === "statusLine" ? "subagentStatusLine" : "statusLine";
-  if (options.uninstall && isOurs(current[key], key === "statusLine" ? launcherPath : `${launcherPath} --subagent`)) {
-    after = removeMember(after, key);
-    delete expected[key];
-  } else if (!options.uninstall && !Bun.deepEquals(current[key], value, true)) {
-    after = setMember(after, key, value, sibling);
-    expected[key] = value;
-  }
+const remove = (key: string) => {
+  after = removeMember(after, key);
+  delete expected[key];
+};
+const set = (key: string, value: unknown, sibling: string) => {
+  after = setMember(after, key, value, sibling);
+  expected[key] = value;
+};
+if (isStatusLine) {
+  if (options.uninstall) {
+    if (isOurs(current["statusLine"], launcherPath)) remove("statusLine");
+  } else if (!Bun.deepEquals(current["statusLine"], statusLine, true)) set("statusLine", statusLine, "statusLine");
+  // Claude Code ignores subagentStatusLine, so the one that names the launcher goes.
+  if (isOurs(current["subagentStatusLine"], `${launcherPath} --subagent`)) remove("subagentStatusLine");
 }
+if (isAgentOnly && (current["agent"] === undefined || current["agent"] === "")) set("agent", MAIN_AGENT, "agent");
+if (options.uninstall && current["agent"] === MAIN_AGENT) remove("agent");
 // The glyph set lives in `env`, which the mod and the status line both read; setup adds or removes only its own key there.
 if (current["env"] !== undefined && !isRecord(current["env"])) fail(`${path} holds an env that is not an object; nothing was written`);
 const env: Record<string, unknown> = isRecord(current["env"]) ? { ...current["env"] } : {};
@@ -168,17 +185,23 @@ if (options.uninstall && Object.hasOwn(env, GLYPHS_KEY)) {
   }
 } else if (!options.uninstall && glyphs !== undefined && env[GLYPHS_KEY] !== glyphs) {
   env[GLYPHS_KEY] = glyphs;
-  after = setMember(after, "env", env, "subagentStatusLine");
+  after = setMember(after, "env", env, "statusLine");
   expected["env"] = env;
 }
 if (!Bun.deepEquals(JSON.parse(after), expected, true)) fail(`could not edit ${path} without touching its other keys; nothing was written`);
 
 const launcherInstalled = existsSync(launcher);
 const launcherChanges =
-  !isGlyphsOnly && (options.uninstall ? launcherInstalled : !launcherInstalled || readFileSync(launcher, "utf8") !== readFileSync(LAUNCHER_SOURCE, "utf8"));
+  isStatusLine && (options.uninstall ? launcherInstalled : !launcherInstalled || readFileSync(launcher, "utf8") !== readFileSync(LAUNCHER_SOURCE, "utf8"));
 if (after === base && !launcherChanges) {
-  const done = isGlyphsOnly ? `Already configured: ${path} sets ${GLYPHS_KEY} to ${glyphs}.` : `Already configured: ${path} runs both status lines through ${launcher}.`;
-  console.log(options.uninstall ? `Nothing to remove: no OMCA status line in ${path} and no ${launcher}.` : done);
+  const agentDone =
+    current["agent"] === MAIN_AGENT ? `Already configured: ${path} starts sessions as ${MAIN_AGENT}.` : `Left as it is: ${path} sets agent to ${JSON.stringify(current["agent"])}.`;
+  const done = isGlyphsOnly
+    ? `Already configured: ${path} sets ${GLYPHS_KEY} to ${glyphs}.`
+    : isAgentOnly
+      ? agentDone
+      : `Already configured: ${path} runs the status line through ${launcher}.`;
+  console.log(options.uninstall ? `Nothing to remove: no OMCA status line or agent in ${path} and no ${launcher}.` : done);
   process.exit(0);
 }
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
-// Pipes fixture payloads into both statusline renderers of a packaged copy of the plugin and
-// asserts the markers they draw. No model session runs, so nothing here touches a config dir.
+// Pipes fixture payloads into the status line renderer of a packaged copy of the plugin and
+// asserts the markers it draws. No model session runs, so nothing here touches a config dir.
 //
 // Usage: bun scripts/qa/statusline-probe.ts
 // Exit: 0 pass, 1 a check failed, 2 the run could not be set up.
@@ -36,17 +36,6 @@ if (import.meta.main) {
         "main line: no effort marker when the field is absent",
         `main line: effort marker rendered without the field: ${bare}`,
       );
-
-      const task = { id: "t1", name: "oh-my-claudeagent:executor", status: "running", model: "sonnet", effort: "high" };
-      const rows = (await render(pluginDir, "subagent.ts", { columns: 200, tasks: [task, { name: "no-id" }] }))
-        .split("\n")
-        .filter(Boolean)
-        .map((line) => JSON.parse(line) as { id: string; content: string });
-      checks.check(rows.length === 1 && rows[0]?.id === "t1", "subagent rows: one row, for the task that has an id", `subagent rows: expected one row for t1, got ${JSON.stringify(rows)}`);
-      const content = rows[0]?.content ?? "";
-      for (const marker of ["A: executor", "> Sonnet", "running", "E: high"]) {
-        checks.check(content.includes(marker), `subagent row: ${marker} rendered`, `subagent row: ${marker} missing from ${JSON.stringify(content)}`);
-      }
     },
     { watchRealConfig: false },
   );

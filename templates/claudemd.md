@@ -47,7 +47,7 @@ Pipeline: **planner → analyzer → reviewer → user approval → tasks on the
 2. `analyzer` gap-analyzes the document.
 3. `reviewer` reviews the document and the proposed tasks for clarity, verifiability, completeness.
 4. **User approves** (ExitPlanMode or confirmation). Only then does the planner create the run's tasks on Claude Code's task list, ending with a `Final verification` task blocked by all the others. The tasks hold the work, and the document holds the why.
-5. `/oh-my-claudeagent:start-work` executes the open run end-to-end at depth 0. The main session (orchestrator identity) spawns `executor` for each task (parallel when tasks do not depend on each other), reviews each result, logs evidence per task, completes the tasks itself, and runs a completeness review on the final task before reporting back to the user. Completing the final task is refused until its verdict is logged.
+5. `/oh-my-claudeagent:start-work` executes the open run end-to-end at depth 0. The main session spawns `executor` for each task (parallel when tasks do not depend on each other), reviews each result, logs evidence per task, completes the tasks itself, and runs a completeness review on the final task before reporting back to the user. Completing the final task is refused until its verdict is logged.
 
 User runs `/oh-my-claudeagent:start-work`. Do not auto-start execution.
 

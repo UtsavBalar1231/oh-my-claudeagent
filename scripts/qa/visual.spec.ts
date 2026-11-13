@@ -87,8 +87,8 @@ describe("sessionSettings", () => {
   const base = parseView('{"command":"x"}');
 
   test("a plain view keeps the fullscreen settings, and --inline drops tui only", () => {
-    expect(sessionSettings(base, false)).toEqual({ tui: "fullscreen", prefersReducedMotion: true });
-    expect(sessionSettings(base, true)).toEqual({ prefersReducedMotion: true });
+    expect(sessionSettings(base, false)).toEqual({ tui: "fullscreen", prefersReducedMotion: true, agent: "oh-my-claudeagent:orchestrator" });
+    expect(sessionSettings(base, true)).toEqual({ prefersReducedMotion: true, agent: "oh-my-claudeagent:orchestrator" });
   });
 
   test("options go under the --plugin-dir key and settings merge in", () => {
@@ -97,6 +97,7 @@ describe("sessionSettings", () => {
     expect(sessionSettings(view, false)).toEqual({
       tui: "fullscreen",
       prefersReducedMotion: true,
+      agent: "oh-my-claudeagent:orchestrator",
       permissions: { allow: ["Bash"] },
       pluginConfigs: { "oh-my-claudeagent@inline": { options: { guardMode: "deny" } } },
     });

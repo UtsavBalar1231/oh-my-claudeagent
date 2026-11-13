@@ -1,11 +1,12 @@
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { isRecord } from "../../src/core/tool-input.ts";
 import { packageTree } from "../package.ts";
-import { type Check, type Context, envWithout, type Outcome, pass, run, type Run, skip, verdict } from "./core.ts";
+import { asList, asRecord, type Check, type Context, envWithout, type Outcome, pass, run, type Run, skip, text, verdict } from "./core.ts";
 import { ENGINE_TYPES, writerVersion } from "./manifest.ts";
 
-const FORBIDDEN_CALL = /^(?:model\.fork|http\.fetch|store\..+)$/;
+const FORBIDDEN_CALL = /^(?:model\..+|http\.fetch|store\..+)$/;
 
 export function forbiddenCalls(output: string): string[] {
   const calls = output.split(/\r?\n/).filter((line) => line.includes("calls:"));
@@ -14,17 +15,40 @@ export function forbiddenCalls(output: string): string[] {
   );
 }
 
+// The validator's type check of the hooks module ignores the plugin's own tsconfig, so it reports
+// every relative `.ts` import, which the engine loads (probed on 2.1.323).
+const IMPORT_EXTENSION = "error TS5097:";
+
+function parsed(stdout: string): unknown {
+  try {
+    return JSON.parse(stdout);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Fails on every error and warning in a `--json` report except the type check's import-extension finding. */
 export function judgeValidate(result: Run, subject = "the manifest and the hooks module"): Outcome {
-  if (result.code === 0) return pass(`claude plugin validate accepts ${subject}`);
-  const reason = (result.stderr.trim() || result.stdout.trim()).split(/\r?\n/).slice(0, 8).join(" | ");
-  return { status: "fail", detail: `claude plugin validate exited ${result.code}: ${reason}` };
+  const report = parsed(result.stdout);
+  if (!isRecord(report)) {
+    const reason = (result.stderr.trim() || result.stdout.trim()).split(/\r?\n/).slice(0, 8).join(" | ");
+    return { status: "fail", detail: `claude plugin validate exited ${result.code} without a JSON report: ${reason}` };
+  }
+  const messages = (list: unknown) => asList(list).flatMap((finding) => text(asRecord(finding)["message"]) ?? []);
+  const problems = [report["manifest"], ...asList(report["contents"])].flatMap((section) => {
+    const { file, errors, warnings } = asRecord(section);
+    const found = [...messages(errors), ...messages(warnings).filter((message) => !message.startsWith(IMPORT_EXTENSION))];
+    return found.map((message) => `${text(file) ?? "?"}: ${message}`);
+  });
+  if (problems.length === 0 && (result.code !== 0 || report["success"] !== true)) problems.push(`claude plugin validate exited ${result.code} and reported no finding`);
+  return verdict(problems.slice(0, 8), `claude plugin validate accepts ${subject}`);
 }
 
 export function judgeCalls(result: Run): Outcome {
   const found = forbiddenCalls(`${result.stdout}\n${result.stderr}`);
   return verdict(
     found.map((name) => `the mod calls $.${name}`),
-    "the mod's calls: line holds no model.fork, store.* or http.fetch",
+    "the mod's calls: line holds no model.*, store.* or http.fetch",
   );
 }
 
@@ -54,7 +78,7 @@ type Runs = { manifest: Run; marketplace: Run };
 
 const runs = new WeakMap<Context, Runs>();
 
-// The checkout holds an untracked CLAUDE.md that --strict rejects, so the runs read a packaged
+// The checkout holds an untracked CLAUDE.md the validator warns on, so the runs read a packaged
 // copy, which is also what an install reads. The manifest path validates the plugin alone; the
 // plugin root validates the marketplace and the plugin it lists.
 function validated(ctx: Context): Runs {
@@ -65,8 +89,8 @@ function validated(ctx: Context): Runs {
     const packaged = join(scratch, "plugin");
     packageTree(ctx.root, packaged, ctx.tracked());
     const result = {
-      manifest: run(["claude", "plugin", "validate", ".claude-plugin/plugin.json", "--strict"], packaged),
-      marketplace: run(["claude", "plugin", "validate", ".", "--strict"], packaged),
+      manifest: run(["claude", "plugin", "validate", ".claude-plugin/plugin.json", "--json"], packaged),
+      marketplace: run(["claude", "plugin", "validate", ".", "--json"], packaged),
     };
     runs.set(ctx, result);
     return result;
@@ -151,8 +175,8 @@ const needsClaude = (check: (ctx: Context) => Outcome) => (ctx: Context): Outcom
   Bun.which("claude") === null ? skip("claude CLI not on PATH") : check(ctx);
 
 export const checks: readonly Check[] = [
-  { name: "validate manifest", run: needsClaude((ctx) => judgeValidate(validated(ctx).manifest, "the packaged manifest and hooks module under --strict")) },
-  { name: "validate marketplace", run: needsClaude((ctx) => judgeValidate(validated(ctx).marketplace, "the packaged marketplace under --strict")) },
+  { name: "validate manifest", run: needsClaude((ctx) => judgeValidate(validated(ctx).manifest, "the packaged manifest and hooks module with no error or warning")) },
+  { name: "validate marketplace", run: needsClaude((ctx) => judgeValidate(validated(ctx).marketplace, "the packaged marketplace with no error or warning")) },
   { name: "mod calls line", run: needsClaude((ctx) => judgeCalls(validated(ctx).manifest)) },
   { name: "prompt submit source boundary", run: promptSubmitSources },
   { name: "engine types match the skill", run: needsClaude(skillTypes) },

@@ -82,6 +82,20 @@ describe("compaction", () => {
   test("a compact payload that carries no session id re-injects the template alone", async () => {
     expect(await dispatch({ event: "SessionStart", source: "compact" }, project(), NOW)).toEqual(context(TEMPLATE));
   });
+
+  test("a subagent's compaction injects nothing and leaves the main conversation's compaction time unset", async () => {
+    const root = project();
+    const id = crypto.randomUUID();
+    writeRun(id);
+    expect(await dispatch({ event: "SessionStart", session_id: id, cwd: root, source: "compact", agent_id: "a1b2c3" }, root, NOW)).toEqual({});
+    expect(findSession(id)?.compactedAt).toBeUndefined();
+  });
+
+  test("the empty agent_id the client substitutes for the main conversation still re-injects", async () => {
+    const id = crypto.randomUUID();
+    expect(await dispatch({ event: "SessionStart", session_id: id, cwd: project(), source: "compact", agent_id: "" }, project(), NOW)).toEqual(context(`${TEMPLATE}\nSession ${id}`));
+    expect(findSession(id)?.compactedAt).toBe(NOW);
+  });
 });
 
 describe("clear", () => {

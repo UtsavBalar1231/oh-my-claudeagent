@@ -12,32 +12,71 @@ const REAL_OUTPUT = [
 const withCalls = (...calls: string[]) =>
   `  ❯ ./register.ts calls: ${calls.map((call) => `$.${call} (via bindHost)`).join(", ")}\n`;
 
+const IMPORT_FINDING = { path: "line 1, column 24", message: "error TS5097: An import path can only end with a '.ts' extension when 'allowImportingTsExtensions' is enabled.", code: null };
+
+const report = (contents: readonly object[], success = true) =>
+  JSON.stringify({
+    success,
+    manifest: { file: "/p/.claude-plugin/plugin.json", type: "plugin", errors: [], warnings: [], notes: [] },
+    contents,
+  });
+
+const section = (file: string, findings: { errors?: object[]; warnings?: object[] }) => ({ file, type: "hooks", errors: [], warnings: [], notes: [], ...findings });
+
 describe("engine checks", () => {
-  test("a strict marketplace run that exits 0 passes and names what it accepted", () => {
-    expect(judgeValidate({ code: 0, stdout: "", stderr: "" }, "the marketplace under --strict")).toEqual({
+  test("a clean report passes and names what it accepted", () => {
+    expect(judgeValidate({ code: 0, stdout: report([]), stderr: "" }, "the marketplace")).toEqual({
       status: "pass",
-      detail: "claude plugin validate accepts the marketplace under --strict",
+      detail: "claude plugin validate accepts the marketplace",
     });
   });
 });
 
 describe("validate manifest", () => {
-  test("a zero exit passes", () => {
-    expect(judgeValidate({ code: 0, stdout: REAL_OUTPUT, stderr: "" })).toMatchObject({ status: "pass" });
+  test("a report whose only warnings are the type check's import-extension finding passes", () => {
+    const stdout = report([section("/p/hooks/register.ts", { warnings: [IMPORT_FINDING, IMPORT_FINDING] })]);
+    expect(judgeValidate({ code: 0, stdout, stderr: "" })).toMatchObject({ status: "pass" });
   });
 
-  test("a non-zero exit fails with the first lines of the output", () => {
-    const stderr = Array.from({ length: 12 }, (_, i) => `line ${i + 1}`).join("\n");
-    expect(judgeValidate({ code: 1, stdout: "", stderr })).toEqual({
+  test("any other warning beside the import-extension finding fails, naming its file", () => {
+    const other = { path: "line 3, column 1", message: "error TS2741: Property 'Progress' is missing", code: null };
+    const stdout = report([section("/p/hooks/register.ts", { warnings: [IMPORT_FINDING, other] })]);
+    expect(judgeValidate({ code: 0, stdout, stderr: "" })).toEqual({
       status: "fail",
-      detail: `claude plugin validate exited 1: ${Array.from({ length: 8 }, (_, i) => `line ${i + 1}`).join(" | ")}`,
+      detail: "/p/hooks/register.ts: error TS2741: Property 'Progress' is missing",
     });
   });
 
-  test("a failing run that printed only to stdout still explains itself", () => {
+  test("an unrecognized field warning in the manifest fails", () => {
+    const stdout = JSON.stringify({
+      success: true,
+      manifest: { file: "/p/.claude-plugin/plugin.json", errors: [], warnings: [{ path: "engines", message: "Unrecognized field: engines" }] },
+      contents: [],
+    });
+    expect(judgeValidate({ code: 0, stdout, stderr: "" })).toEqual({ status: "fail", detail: "/p/.claude-plugin/plugin.json: Unrecognized field: engines" });
+  });
+
+  test("an error fails even when it is the import-extension text", () => {
+    const stdout = report([section("/p/hooks/register.ts", { errors: [IMPORT_FINDING] })], false);
+    expect(judgeValidate({ code: 1, stdout, stderr: "" })).toMatchObject({ status: "fail" });
+  });
+
+  test("a failed run that names no finding still fails", () => {
+    expect(judgeValidate({ code: 1, stdout: report([], false), stderr: "" })).toEqual({
+      status: "fail",
+      detail: "claude plugin validate exited 1 and reported no finding",
+    });
+  });
+
+  test("output that is not a JSON report fails with its first lines", () => {
+    const stderr = Array.from({ length: 12 }, (_, i) => `line ${i + 1}`).join("\n");
+    expect(judgeValidate({ code: 1, stdout: "", stderr })).toEqual({
+      status: "fail",
+      detail: `claude plugin validate exited 1 without a JSON report: ${Array.from({ length: 8 }, (_, i) => `line ${i + 1}`).join(" | ")}`,
+    });
     expect(judgeValidate({ code: 1, stdout: "bad module", stderr: "" })).toEqual({
       status: "fail",
-      detail: "claude plugin validate exited 1: bad module",
+      detail: "claude plugin validate exited 1 without a JSON report: bad module",
     });
   });
 });
@@ -47,7 +86,7 @@ describe("mod calls line", () => {
     expect(judgeCalls({ code: 0, stdout: REAL_OUTPUT, stderr: "" })).toMatchObject({ status: "pass" });
   });
 
-  test.each(["model.fork", "http.fetch", "store.get", "store.set"])("%s on the calls line fails", (call) => {
+  test.each(["model.fork", "model.complete", "model.classify", "http.fetch", "store.get", "store.set"])("%s on the calls line fails", (call) => {
     expect(judgeCalls({ code: 0, stdout: withCalls("fs.read", call), stderr: "" })).toEqual({
       status: "fail",
       detail: `the mod calls $.${call}`,
@@ -60,7 +99,13 @@ describe("mod calls line", () => {
   });
 
   test("each forbidden call is reported once, and similar names are not forbidden", () => {
-    expect(forbiddenCalls(withCalls("http.fetch", "http.fetch", "prompt.fill", "storefront.x", "model.list"))).toEqual(["http.fetch"]);
+    expect(forbiddenCalls(withCalls("http.fetch", "http.fetch", "prompt.fill", "storefront.x", "modelling.x"))).toEqual(["http.fetch"]);
+  });
+
+  test("the calls note of a JSON report is read, one note per line as the CLI prints it", () => {
+    const notes = ["./register.ts hooks: session.start", "./register.ts calls: $.fs.read (via bindHost), $.http.fetch (via bindHost)", "./register.ts env reads: HOME"];
+    const stdout = JSON.stringify({ success: true, manifest: { errors: [], warnings: [], notes }, contents: [] }, null, 2);
+    expect(judgeCalls({ code: 0, stdout, stderr: "" })).toEqual({ status: "fail", detail: "the mod calls $.http.fetch" });
   });
 
   test("the calls line on stderr is read as well", () => {

@@ -204,7 +204,7 @@ overflowing region, a row, a page (`bodyRows`) or an end (`contentRows`) at a ti
   recovered. Every other category (`cyber`, `bio`, `frontier_llm`) is left to the person, and
   `OMCA_DISABLED_HOOKS=refusal-recovery` turns the feature off. The engine validator allows
   `prompt.submit` only through the Host binding in `register.ts` and this feature;
-  `model.fork`, `http.fetch` and `store.*` remain forbidden.
+  every `model.*` call, `http.fetch` and `store.*` remain forbidden.
 
 - `UserPromptSubmit` and `UserPromptExpansion` route to the server's `keyword-detector` and
   `slash-mode-detector` handlers, and both to its `guidance` handler, which injects the
@@ -262,6 +262,7 @@ overflowing region, a row, a page (`bodyRows`) or an end (`contentRows`) at a ti
   `type: mcp_tool` handlers whose `tool` is `omca_hook`, and every registered handler is of that
   type. Start-up pruning runs in the server process, outside any hook.
 - Engine surfaces the mod declines, so a later sync does not raise them again. `$.theme` (its
-  `set` backdrop) is decoration for desktop and mobile with no OMCA state to show. The `effort` on
-  `$.model.fork` has no use because the mod never forks a model call, and the engine validator
-  asserts the mod's `calls:` line holds no `model.fork`.
+  `set` backdrop) is decoration for desktop and mobile with no OMCA state to show. `$.model`
+  (`fork`, `complete`, `classify`) has no use because the mod makes no model call of its own, so no
+  request is billed outside the conversation, and the engine validator asserts the mod's `calls:`
+  line holds no `model.*`.
