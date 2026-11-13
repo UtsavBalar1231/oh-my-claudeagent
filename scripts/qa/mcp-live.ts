@@ -1,7 +1,8 @@
 #!/usr/bin/env bun
 // Drives one interactive Claude Code session in tmux against the scripted mock model and the
-// packaged plugin's real MCP server, once with MCP_PROTOCOL_NEGOTIATION=auto (the client sends
-// server/discover first) and once without (it sends initialize). ast-grep is a fake that sleeps,
+// packaged plugin's real MCP server, once by default and once with MCP_PROTOCOL_NEGOTIATION=auto
+// (the client sends server/discover first and settles on 2026-07-28 either way), and once with
+// MCP_SDK_GENERATION=v1 (the earlier initialize handshake on 2025-11-25). ast-grep is a fake that sleeps,
 // so a call stays in flight long enough to watch and to cancel. Per mode it checks that
 //   - the client's debug log names the expected handshake,
 //   - a progress line shows on the tool call while it runs and then updates,
@@ -27,10 +28,12 @@ const WAIT_MS = 30_000;
 const POLL_MS = 150;
 const SHOW_SCREENS = process.env.MCP_LIVE_SCREENS === "1";
 
-type Mode = { name: string; negotiation: "auto" | undefined; handshake: string };
+type Mode = { name: string; env: readonly string[]; handshake: string };
+const MODERN = '"protocolEra":"modern","negotiatedProtocolVersion":"2026-07-28"';
 const MODES: readonly Mode[] = [
-  { name: "initialize (default)", negotiation: undefined, handshake: '"protocolEra":"legacy","negotiatedProtocolVersion":"2025-11-25"' },
-  { name: "server/discover (MCP_PROTOCOL_NEGOTIATION=auto)", negotiation: "auto", handshake: '"protocolEra":"modern","negotiatedProtocolVersion":"2026-07-28"' },
+  { name: "server/discover (default)", env: [], handshake: MODERN },
+  { name: "server/discover (MCP_PROTOCOL_NEGOTIATION=auto)", env: ["MCP_PROTOCOL_NEGOTIATION=auto"], handshake: MODERN },
+  { name: "initialize (MCP_SDK_GENERATION=v1)", env: ["MCP_SDK_GENERATION=v1"], handshake: '"protocolEra":"legacy","negotiatedProtocolVersion":"2025-11-25"' },
 ];
 
 type Annotations = { title: string; readOnlyHint: boolean; destructiveHint?: boolean };
@@ -113,7 +116,7 @@ async function runMode(mode: Mode, checks: Checks, scratch: Scratch): Promise<vo
       "new-session", "-d", "-s", tmux.target, "-x", "140", "-y", "50", "-c", project,
       "-e", `CLAUDE_CONFIG_DIR=${config}`,
       "-e", `AST_GREP_BIN=${fake}`,
-      ...(mode.negotiation === undefined ? [] : ["-e", `MCP_PROTOCOL_NEGOTIATION=${mode.negotiation}`]),
+      ...mode.env.flatMap((variable) => ["-e", variable]),
       ...mockSessionEnv(mock.port),
       `claude --plugin-dir ${quote(plugin)} --session-id ${SESSION_ID} --debug mcp --debug-file ${quote(debugFile)}`,
     ]);
