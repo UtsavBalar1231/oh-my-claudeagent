@@ -491,7 +491,7 @@ export const SHOTS: readonly Still[] = [
       main: [{ content: [bash("just test", "Run the tests"), TASK_7] }, { content: [text("The tests pass, and the executor is on task 7.")] }],
       subagent: [{ content: [tool("Read", { file_path: "src/steps/summary.ts" })] }, { content: [WATCH_SUMMARY] }],
     },
-    ready: (screen) => screen.includes("6/14") && screen.includes("just test · 42 passed"),
+    ready: (screen) => screen.includes("6/14") && screen.includes("just test · 42 passed") && screen.includes("just test not logged") && screen.includes("1: Task list"),
   },
   {
     name: "transcript",

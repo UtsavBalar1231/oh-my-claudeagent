@@ -39,6 +39,13 @@ describe("SHOTS", () => {
     expect(still("mascots")?.ready([...lanes.slice(0, 2), "architect             ◆ running     1s\nfable-5-1"].join("\n"))).toBe(false);
   });
 
+  test("the band scene is ready only once the turn line and the band's button are drawn", () => {
+    const screen = ["just test · 42 passed", "Waiting for executor · 24.9k in 19 out · $0.2162 · just test not logged", "checkout-redesign 6/14", "1: Task list"];
+    expect(still("band")?.ready(screen.join("\n"))).toBe(true);
+    expect(still("band")?.ready([screen[0], screen[2]].join("\n"))).toBe(false);
+    expect(still("band")?.ready(screen.slice(0, 3).join("\n"))).toBe(false);
+  });
+
   test("the statusline scene is ready only once the turn line waits on both agents and their rows show tokens", () => {
     const turn = "✻ Waiting for executor ×2 · 25.2k in 13 out · $0.2346";
     const rows = [
