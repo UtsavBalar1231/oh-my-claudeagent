@@ -650,8 +650,8 @@ export const SHOTS: readonly Still[] = [
         { content: [bash("ls", "Run the linter")], delayMs: 600_000 },
       ],
     },
-    // The context share needs a finished model call, so an agent's row waits on its first reply.
-    ready: (screen) => screen.includes(" · Check the lint rules") && (screen.match(/executor · .*\d+% ctx/g) ?? []).length === 2,
+    // Claude Code's own agent row shows a token count once that agent's first reply is in.
+    ready: (screen) => screen.includes("Waiting for executor ×2") && (screen.match(/◯ oh-my-claudeagent:executor .*↓ [\d.]+k? tokens/g) ?? []).length === 2,
   },
   { name: "guard-dialog", format: "gif", cols: 120, rows: 26, command: "Clean the build", keys: [], script: GUARD_SCRIPT, ready: guardReady },
 ];
@@ -1069,8 +1069,8 @@ async function captureShot(shot: Shot, outDir: string): Promise<string> {
         tui: "fullscreen",
         prefersReducedMotion: true,
         ...(withPlugin && {
+          agent: ORCHESTRATOR,
           statusLine: { type: "command", command: statusline("main.ts"), padding: 1, refreshInterval: 5, hideVimModeIndicator: true },
-          subagentStatusLine: { type: "command", command: statusline("subagent.ts") },
         }),
         ...shot.settings,
       }),

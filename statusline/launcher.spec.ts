@@ -24,11 +24,7 @@ function installAll(configDir: string, installs: readonly Install[], enabledPlug
   for (const { id, label, updated, renderer = true } of installs) {
     const path = join(configDir, "plugins", "cache", id.split("@")[1] ?? "x", "oh-my-claudeagent", label);
     mkdirSync(join(path, "statusline"), { recursive: true });
-    if (renderer) {
-      for (const entry of ["main", "subagent"]) {
-        writeFileSync(join(path, "statusline", `${entry}.ts`), `console.log(${JSON.stringify(`${entry} ${label}`)}, await Bun.stdin.text());\n`);
-      }
-    }
+    if (renderer) writeFileSync(join(path, "statusline", "main.ts"), `console.log(${JSON.stringify(`main ${label}`)}, await Bun.stdin.text());\n`);
     plugins[id] = [...(plugins[id] ?? []), { scope: "user", installPath: path, version: label, lastUpdated: updated }];
   }
   mkdirSync(join(configDir, "plugins"), { recursive: true });
@@ -49,11 +45,6 @@ const RELEASED = { id: "oh-my-claudeagent@omca", label: "3.0.0", updated: "2026-
 test("the recorded install's main renderer runs, and stdin reaches it", () => {
   installAll(join(root, ".claude"), [RELEASED]);
   expect(run([], homeEnv(root))).toEqual({ stdout: "main 3.0.0 payload\n", exitCode: 0 });
-});
-
-test("--subagent runs the subagent renderer of that install", () => {
-  installAll(join(root, ".claude"), [RELEASED]);
-  expect(run(["--subagent"], homeEnv(root))).toEqual({ stdout: "subagent 3.0.0 payload\n", exitCode: 0 });
 });
 
 test("any marketplace name and any version string resolve, the most recently updated install first", () => {
@@ -97,7 +88,6 @@ test("a config directory with a space, a hash and a percent sign still reaches t
   const configDir = join(root, "my config #1 100%");
   installAll(configDir, [{ ...RELEASED, label: "3.1.0" }]);
   expect(run([], { ...homeEnv(root), CLAUDE_CONFIG_DIR: configDir })).toEqual({ stdout: "main 3.1.0 payload\n", exitCode: 0 });
-  expect(run(["--subagent"], { ...homeEnv(root), CLAUDE_CONFIG_DIR: configDir })).toEqual({ stdout: "subagent 3.1.0 payload\n", exitCode: 0 });
 });
 
 test("an unreadable registry or settings file is treated as empty", () => {
@@ -110,8 +100,4 @@ test("an unreadable registry or settings file is treated as empty", () => {
 
 test("with no registry the main line prints a notice and exits cleanly", () => {
   expect(run([], homeEnv(root))).toEqual({ stdout: "omca: no installed plugin version found\n", exitCode: 0 });
-});
-
-test("with no registry the subagent rows stay empty", () => {
-  expect(run(["--subagent"], homeEnv(root))).toEqual({ stdout: "", exitCode: 0 });
 });

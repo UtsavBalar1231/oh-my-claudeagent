@@ -28,6 +28,7 @@ import {
 
 const NOW_S = Date.UTC(2026, 9, 2, 12, 0, 0) / 1000;
 const USER = {
+  agent: "oh-my-claudeagent:orchestrator",
   advisorModel: "fable",
   statusLine: { type: "command", command: "omca-statusline" },
 };
@@ -94,6 +95,7 @@ const CHECKS = [
   " ✓ OK    Mod policy    Mods you install may load",
   " ✓ OK    Hooks         Neither disableAllHooks nor allowManagedHooksOnly is set",
   " ✓ OK    Output style  OMCA Default is forced by the plugin",
+  " ✓ OK    Main agent    Sessions start as oh-my-claudeagent:orchestrator",
   " ✓ OK    Advisor       advisorModel fable, and nothing here keeps it off",
 ];
 const STATUS_ROW = ` ! WARN  Status line   No refreshInterval, so it redraws on events only and goes stale while${PAD}agents run${PAD}i: Add refreshInterval 5`;
@@ -120,14 +122,14 @@ for (const layout of LAYOUTS) {
 
     expect(w.opened).toEqual([{ id: "omca", title: "OMCA", focus: true, closeOnEscape: true, rows: 12, columns: 56 }]);
     expect(body(await ui.drawn())).toEqual([
-      `r: Run again   ! 2 warn  ✓ 12 ok  checked ${local(NOW_S)}`,
+      `r: Run again   ! 2 warn  ✓ 13 ok  checked ${local(NOW_S)}`,
       " ! WARN  OMCA          Could not read this mod's version from its manifest",
       STATUS_ROW,
-      "o: Show passing   ✓ 12 ok · Claude Code, bun, omca server, ast-grep, Options, Task tools, Agen…",
+      "o: Show passing   ✓ 13 ok · Claude Code, bun, omca server, ast-grep, Options, Task tools, Agen…",
     ]);
     await ui.press({ key: "o" });
     expect(body(await ui.drawn())).toEqual([
-      `r: Run again   ! 2 warn  ✓ 12 ok  checked ${local(NOW_S)}`,
+      `r: Run again   ! 2 warn  ✓ 13 ok  checked ${local(NOW_S)}`,
       " ! WARN  OMCA          Could not read this mod's version from its manifest",
       STATUS_ROW,
       "o: Hide passing",
@@ -141,9 +143,9 @@ for (const layout of LAYOUTS) {
     write(w, manifest, '{ "name": "oh-my-claudeagent", "version": "3.0.0" }');
     await ui.press({ key: "r" });
     expect(body(await ui.drawn()).slice(0, 3)).toEqual([
-      `r: Run again   ! 1 warn  ✓ 13 ok  checked ${local(NOW_S)}`,
+      `r: Run again   ! 1 warn  ✓ 14 ok  checked ${local(NOW_S)}`,
       STATUS_ROW,
-      "o: Show passing   ✓ 13 ok · OMCA, Claude Code, bun, omca server, ast-grep, Options, Task tools…",
+      "o: Show passing   ✓ 14 ok · OMCA, Claude Code, bun, omca server, ast-grep, Options, Task tools…",
     ]);
     await ui.unmount();
   });
@@ -164,7 +166,7 @@ for (const layout of LAYOUTS) {
       "  Backup: ~/.claude/settings.json.omca-bak",
       "  --- ~/.claude/settings.json.omca-bak",
       "  +++ ~/.claude/settings.json",
-      "  @@ -2,6 +2,7 @@",
+      "  @@ -3,6 +3,7 @@",
       "   \"advisorModel\": \"fable\",",
       "   \"statusLine\": {",
       "     \"type\": \"command\",",
@@ -331,8 +333,8 @@ for (const layout of LAYOUTS) {
     const ui = await $.ui.mount(pane("terminal", WIDE));
     await ui.press({ key: "r" });
 
-    const head = `r: Run again   ✓ 14 ok  checked ${local(NOW_S)}`;
-    const folded = "o: Show passing   ✓ 14 ok · OMCA, Claude Code, bun, omca server, ast-grep, Options, Task tools…";
+    const head = `r: Run again   ✓ 15 ok  checked ${local(NOW_S)}`;
+    const folded = "o: Show passing   ✓ 15 ok · OMCA, Claude Code, bun, omca server, ast-grep, Options, Task tools…";
     expect(body(await ui.drawn())).toEqual([head, folded]);
 
     await ui.press({ key: "o" });
@@ -363,7 +365,7 @@ for (const layout of LAYOUTS) {
     expect(closed[1]).toStartWith(" ! WARN  OMCA ");
     expect(closed[2]).toStartWith(" ! WARN  Status line ");
     expect(closed[2]).toEndWith("i: Add refreshInterval 5");
-    expect(closed[3]).toBe("o: Show passing   ✓ 12 ok · Claude Code, bun, omca server, ast-grep, Options, Task tools, Agen…");
+    expect(closed[3]).toBe("o: Show passing   ✓ 13 ok · Claude Code, bun, omca server, ast-grep, Options, Task tools, Agen…");
 
     await ui.press({ key: "o" });
     expect(body(await ui.drawn()).slice(3)).toEqual(["o: Hide passing", ...CHECKS]);
@@ -375,13 +377,13 @@ for (const layout of LAYOUTS) {
     await $.command.run(run("doctor", 80));
     const ui = await $.ui.mount(pane("terminal", { columns: 80, rows: 40, placement: "inline" }));
     const drawn = body(await ui.drawn());
-    expect(drawn[0]).toBe(`r: Run again   ! 2 warn  + 12 ok  checked ${local(NOW_S)}`);
+    expect(drawn[0]).toBe(`r: Run again   ! 2 warn  + 13 ok  checked ${local(NOW_S)}`);
     expect(drawn[1]).toBe(`[! WARN] OMCA          Could not read this mod's version from its${PAD}manifest`);
-    expect(drawn[3]).toBe("o: Show passing   + 12 ok - Claude Code, bun, omca server, ast-grep, O...");
+    expect(drawn[3]).toBe("o: Show passing   + 13 ok - Claude Code, bun, omca server, ast-grep, O...");
     await ui.press({ key: "o" });
     const opened = body(await ui.drawn());
     expect(opened).toContain("[+ OK]   Claude Code   2.1.300 meets the 2.1.300 floor");
-    expect(opened.at(-2)).toBe("  v 10 more - ^v scroll");
+    expect(opened.at(-2)).toBe("  v 11 more - ^v scroll");
       expect(rows(await ui.drawn()).filter((row) => !isAscii(row))).toEqual([]);
     await ui.unmount();
   });
@@ -424,10 +426,10 @@ for (const [placement, columns, expectedCut] of [
       const below = drawn.filter((row) => row.includes("more")).at(-1);
       cut.push(below !== undefined);
       if (below === undefined) {
-        expect(checks).toBe(14);
+        expect(checks).toBe(15);
         expect(drawn.length).toBeLessThanOrEqual(bodyRows);
       } else {
-        expect(below).toBe(`  ↓ ${15 - checks - folds} more · ↑↓ scroll`);
+        expect(below).toBe(`  ↓ ${16 - checks - folds} more · ↑↓ scroll`);
         expect(drawn.length, "the body, and the row that lets the engine scroll").toBe(bodyRows + 1);
       }
       await ui.unmount();
@@ -450,21 +452,21 @@ test("the arrows, a page key and the wheel move the Doctor list by whole checks,
   const edges = async () => bodyLines(await ui.drawn()).filter((row) => row.includes("more"));
 
   expect((await titles())[0]).toBe("check-mod");
-  expect(await edges()).toEqual(["  ↓ 6 more · ↑↓ scroll"]);
+  expect(await edges()).toEqual(["  ↓ 9 more · ↑↓ scroll"]);
 
   await scroll(1);
   expect((await titles())[0]).toBe("check-server");
-  expect(await edges()).toEqual(["  ↑ 1 more", "  ↓ 5 more · ↑↓ scroll"]);
+  expect(await edges()).toEqual(["  ↑ 1 more", "  ↓ 8 more · ↑↓ scroll"]);
 
   await scroll(26);
-  expect(await edges()).toEqual(["  ↑ 5 more"]);
+  expect(await edges()).toEqual(["  ↑ 6 more"]);
   expect((await titles()).at(-1)).toBe("check-style");
 
   await scroll(1);
-  expect(await edges()).toEqual(["  ↑ 5 more"]);
+  expect(await edges()).toEqual(["  ↑ 6 more"]);
 
   await scroll(-3);
-  expect(await edges()).toEqual(["  ↑ 3 more", "  ↓ 2 more · ↑↓ scroll"]);
+  expect(await edges()).toEqual(["  ↑ 4 more", "  ↓ 2 more · ↑↓ scroll"]);
 
   await scroll(-100);
   expect((await titles())[0]).toBe("check-mod");
@@ -486,18 +488,18 @@ test("Home and End send the Doctor list to its first and last check even when on
 
   expect(contentRows).toBe(9);
   expect(await titles()).toEqual(["check-mod", "check-server"]);
-  expect(await edges()).toEqual(["  ↓ 13 more · ↑↓ scroll"]);
+  expect(await edges()).toEqual(["  ↓ 14 more · ↑↓ scroll"]);
 
   await key(contentRows);
   expect(await titles()).toEqual(["check-style"]);
-  expect(await edges()).toEqual(["  ↑ 14 more"]);
+  expect(await edges()).toEqual(["  ↑ 15 more"]);
 
   await key(-contentRows);
   expect(await titles()).toEqual(["check-mod", "check-server"]);
-  expect(await edges()).toEqual(["  ↓ 13 more · ↑↓ scroll"]);
+  expect(await edges()).toEqual(["  ↓ 14 more · ↑↓ scroll"]);
 
   await key(contentRows - 1);
-  expect(await titles()).toEqual(["check-statusline"]);
+  expect(await titles()).toEqual(["check-advisor"]);
   expect(await edges()).toHaveLength(2);
   await ui.unmount();
 });
@@ -513,7 +515,7 @@ test("a body too short for two checks windows the list down to one check and nam
   const drawn = bodyLines(await ui.drawn());
 
   expect(titles).toEqual(["check-mod"]);
-  expect(drawn.at(-2)).toBe("  ↓ 14 more · ↑↓ scroll");
+  expect(drawn.at(-2)).toBe("  ↓ 15 more · ↑↓ scroll");
   await ui.unmount();
 });
 
@@ -617,7 +619,7 @@ test("a row is a chip with the level's glyph and word on its tone, the label bol
       piece({}, " 2 warn"),
       piece({}, "  "),
       piece({ color: "success" }, "✓"),
-      piece({}, " 12 ok"),
+      piece({}, " 13 ok"),
       piece({ color: "inactive" }, `  checked ${local(NOW_S)}`),
     ),
   );
@@ -671,6 +673,7 @@ test("a check that names a command offers it on its own key, which fills the pro
   });
   expect(rows(await ui.drawn()).filter((row) => row.includes(": Use /"))).toEqual([
     ` ! WARN  omca server   No hook has reached the server in this session yet${PAD}m: Use /mcp`,
+    ` ! WARN  Main agent    No settings file sets agent, so a session starts as Claude Code's${PAD}default unless it is launched with --agent${PAD}oh-my-claudeagent:orchestrator${PAD}g: Use /oh-my-claudeagent:omca-setup`,
     ` i INFO  Advisor       No advisorModel; /advisor fable turns the advisor on${PAD}a: Use /advisor fable`,
     ` i INFO  Status line   No statusLine is set${PAD}s: Use /oh-my-claudeagent:omca-setup`,
   ]);
@@ -678,11 +681,12 @@ test("a check that names a command offers it on its own key, which fills the pro
   const offered = (await ui.findAll({ type: "Button" })).flatMap((found) => (found.key?.startsWith("prompt-") === true ? [[found.key, found.props["hotkey"]]] : []));
   expect(offered).toEqual([
     ["prompt-server", "m"],
+    ["prompt-agent", "g"],
     ["prompt-advisor", "a"],
     ["prompt-statusline", "s"],
   ]);
-  for (const key of ["prompt-advisor", "prompt-server", "prompt-statusline"]) await ui.press({ key });
-  expect(fills).toEqual(["/advisor fable", "/mcp", "/oh-my-claudeagent:omca-setup"]);
+  for (const key of ["prompt-advisor", "prompt-server", "prompt-agent", "prompt-statusline"]) await ui.press({ key });
+  expect(fills).toEqual(["/advisor fable", "/mcp", "/oh-my-claudeagent:omca-setup", "/oh-my-claudeagent:omca-setup"]);
   await ui.unmount();
 });
 
@@ -753,11 +757,11 @@ test("on Desktop a body too short for two checks still draws every check, with n
   const ui = await $.ui.mount(pane("desktop", { columns: 120, rows: 8, placement: "dock" }));
   const checkKeys = async () => (await ui.findAll({ type: "Box" })).flatMap((box) => (box.key?.startsWith("check-") === true ? [box.key] : []));
 
-  expect(await checkKeys()).toHaveLength(4);
+  expect(await checkKeys()).toHaveLength(5);
   expect(nodeByKey(await ui.drawn(), "passing")).toBeDefined();
   await ui.press({ key: "o" });
 
-  expect(await checkKeys()).toHaveLength(14);
+  expect(await checkKeys()).toHaveLength(15);
   expect(bodyLines(await ui.drawn()).filter((row) => row.includes("more"))).toEqual([]);
   await ui.unmount();
 });
@@ -774,7 +778,7 @@ test("the folded line is the key, then the ok glyph in its tone and the count an
       { type: "Button", props: { key: "o", hotkey: "o", label: "Show passing", plain: true }, press: expect.anything() },
       line(
         piece({ color: "success" }, "✓"),
-        piece({ dimColor: true }, " 11 ok · Claude Code, bun, ast-grep, Options, Task tools, Agent models, Eff…"),
+        piece({ dimColor: true }, " 12 ok · Claude Code, bun, ast-grep, Options, Task tools, Agent models, Eff…"),
       ),
     ],
   });
@@ -789,7 +793,7 @@ test("at 56 columns the folded line ends in the ellipsis within the room the key
   const drawn = await ui.drawn();
   const folded = body(drawn).at(-1) ?? "";
 
-  expect(folded).toBe("o: Show passing   ✓ 11 ok · Claude Code, bun, ast-grep,…");
+  expect(folded).toBe("o: Show passing   ✓ 12 ok · Claude Code, bun, ast-grep,…");
   expect(displayWidth(folded)).toBeLessThanOrEqual(56);
   for (const child of topRows(drawn)) expect(cellsAcross(child)).toBeLessThanOrEqual(56);
   await ui.unmount();

@@ -15,6 +15,7 @@ const BASE: Inputs = {
   now: NOW,
   questionTimeout: undefined,
   settings: {
+    agent: "oh-my-claudeagent:orchestrator",
     advisorModel: "fable",
     statusLine: { ...STATUS_LINE, refreshInterval: 5 },
   },
@@ -47,6 +48,7 @@ test("the checks come in a fixed order with their labels, all ok or info on a he
     ["mods", "Mod policy", "ok"],
     ["hooks", "Hooks", "ok"],
     ["style", "Output style", "ok"],
+    ["agent", "Main agent", "ok"],
     ["advisor", "Advisor", "ok"],
     ["statusline", "Status line", "ok"],
   ]);
@@ -64,6 +66,26 @@ test("an OMCA_GLYPHS value that names no tier warns after the model check; unset
   expect(run({ env: { OMCA_GLYPHS: " Unicode " } }, "glyphs")).toBeUndefined();
   expect(run({ env: { OMCA_GLYPHS: "0" } }, "glyphs")).toEqual({ level: "warn", detail: 'OMCA_GLYPHS="0" is not nerd, unicode or ascii, so Nerd Font glyphs draw' });
   expect(doctorChecks({ ...BASE, env: { OMCA_GLYPHS: "0" } }).map(({ id }) => id).slice(7, 10)).toEqual(["model-force", "glyphs", "effort"]);
+});
+
+describe("main agent", () => {
+  test("the orchestrator as the agent setting passes", () => {
+    expect(run({}, "agent")).toEqual({ level: "ok", detail: "Sessions start as oh-my-claudeagent:orchestrator" });
+  });
+
+  test("no agent setting warns, names --agent and offers setup", () => {
+    const { agent: _agent, ...settings } = BASE.settings;
+    expect(run({ settings }, "agent")).toEqual({
+      level: "warn",
+      detail: "No settings file sets agent, so a session starts as Claude Code's default unless it is launched with --agent oh-my-claudeagent:orchestrator",
+      prompt: SETUP_COMMAND,
+    });
+    expect(run({ settings: { ...settings, agent: "" } }, "agent")?.level).toBe("warn");
+  });
+
+  test("another agent the user chose is reported, with no fix offered", () => {
+    expect(run({ settings: { ...BASE.settings, agent: "code-reviewer" } }, "agent")).toEqual({ level: "info", detail: "Sessions start as code-reviewer, not OMCA's orchestrator" });
+  });
 });
 
 describe("output style", () => {

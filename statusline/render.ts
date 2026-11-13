@@ -62,18 +62,18 @@ export interface Payload {
 
 export const FALLBACK = "[claude]";
 
-export const RST = "\x1b[0m";
-export const DIM = "\x1b[90m";
+const RST = "\x1b[0m";
+const DIM = "\x1b[90m";
 const CYAN = "\x1b[36m";
-export const GREEN = "\x1b[32m";
-export const YELLOW = "\x1b[33m";
-export const RED = "\x1b[31m";
+const GREEN = "\x1b[32m";
+const YELLOW = "\x1b[33m";
+const RED = "\x1b[31m";
 const MAGENTA = "\x1b[35m";
 const BLUE = "\x1b[34m";
-export const BOLD = "\x1b[1m";
-export const separator = (dot: string): string => ` ${DIM}${dot}${RST} `;
+const BOLD = "\x1b[1m";
+const separator = (dot: string): string => ` ${DIM}${dot}${RST} `;
 const SEP = separator("·");
-// The plugin's settings.json starts every session on this agent, so naming it tells nothing.
+// OMCA's setup starts every session on this agent, so naming it tells nothing.
 export const DEFAULT_MAIN_AGENT = "oh-my-claudeagent:orchestrator";
 const DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
@@ -112,7 +112,7 @@ export const NERD_GLYPHS = {
   cache: "\u{f00e8}",
 };
 
-export type Glyphs = Record<keyof typeof NERD_GLYPHS, string>;
+type Glyphs = Record<keyof typeof NERD_GLYPHS, string>;
 
 // The Unicode tier is the line without Nerd Font icons; the ASCII tier also trades its bars and dots.
 export const UNICODE_GLYPHS: Glyphs = {
@@ -370,7 +370,7 @@ export function composePr(data: Payload, tier: GlyphTier): string {
   return `${CYAN}${pr.url ? osc8(pr.url, number) : number}${RST}${stateSuffix}`;
 }
 
-export function agentGlyph(name: string, tier: GlyphTier): string {
+function agentGlyph(name: string, tier: GlyphTier): string {
   if (tier !== "nerd") return "A:";
   const short = name.replace(/^oh-my-claudeagent:/, "");
   return (Object.hasOwn(AGENT_ICONS, short) ? AGENT_ICONS[short] : undefined) ?? DEFAULT_AGENT_GLYPH;

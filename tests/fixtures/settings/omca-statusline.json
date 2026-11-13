@@ -6,9 +6,5 @@
     "refreshInterval": 5,
     "hideVimModeIndicator": true
   },
-  "subagentStatusLine": {
-    "type": "command",
-    "command": "\"@BUN@\" \"@HOME@/.claude/omca/statusline.ts\" --subagent"
-  },
   "theme": "dark"
 }

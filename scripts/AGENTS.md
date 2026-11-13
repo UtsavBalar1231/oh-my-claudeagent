@@ -52,10 +52,11 @@ under `servers/hooks/`. Every file is TypeScript on bun.
 - `benchmarks/compare/` (outside this directory, packaging-excluded): the harness behind
   `just compare`, which measures OMCA against similar plugins in Docker with a mock model.
   Its README has the stages and the files.
-- `setup-statusline.ts`: the status line setup behind `/oh-my-claudeagent:omca-setup`, and the one
+- `setup-statusline.ts`: the settings setup behind `/oh-my-claudeagent:omca-setup`, and the one
   file under `scripts/` that ships. It copies `statusline/launcher.ts` to the config directory,
-  prints a diff of the settings file and, after confirmation, sets `statusLine` and
-  `subagentStatusLine`. `--uninstall` removes them.
+  prints a diff of the settings file and, after confirmation, sets `statusLine` and drops a
+  `subagentStatusLine` that runs the launcher; `--main-agent` sets `agent` to the orchestrator
+  instead, and `--glyphs-only` sets `env.OMCA_GLYPHS`. `--uninstall` removes what it wrote.
 - `postedit-check.ts`: runs `just typecheck` after an edit to a `.ts` file and reports the
   first lines of a failure as hook context. A contributor wires it as a `PostToolUse` entry in
   their own `.claude/settings.json`; `CONTRIBUTING.md` has the entry.

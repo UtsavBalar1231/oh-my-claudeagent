@@ -29,7 +29,7 @@ OMCA neither writes nor overrides them:
 
 | Key | What it does to OMCA |
 | --- | --- |
-| `allowManagedHooksOnly` | Stops OMCA's settings hooks and its mod unless your organization installed the plugin. The stop checks, guidance and guard are then gone, and Claude Code reads `statusLine` and `subagentStatusLine` from managed settings only, so OMCA's status lines stop too |
+| `allowManagedHooksOnly` | Stops OMCA's settings hooks and its mod unless your organization installed the plugin. The stop checks, guidance and guard are then gone, and Claude Code reads `statusLine` from managed settings only, so OMCA's status line stops too |
 | `disableAllHooks` | Stops every hook and mod, OMCA's included |
 | `allowManagedModsOnly` | An option on Claude Code's built-in guard. Stops OMCA's mod (band, pane, doctor, guard) and leaves its settings hooks running |
 | `allowManagedPermissionRulesOnly` | Only managed permission rules apply. OMCA adds none, so nothing of OMCA's changes |
@@ -48,7 +48,7 @@ your provider's model for that family, so the roster never pins a model id. Spaw
 
 | Agent | Tier | Effort | Role | Limits |
 | --- | --- | --- | --- | --- |
-| orchestrator | opus | high | The main-session orchestrator. The plugin's `settings.json` makes it the session agent. It does small work itself and delegates the rest; under `start-work` it works through the open tasks | Runs at the session's effort as the main agent |
+| orchestrator | opus | high | The main-session orchestrator. The `agent` key that `omca-setup` writes to your settings makes it the session agent. It does small work itself and delegates the rest; under `start-work` it works through the open tasks | Runs at the session's effort as the main agent |
 | planner | opus | high | Interviews you and writes the plan, consulting analyzer and reviewer. Asked to help you understand or research a problem, it returns findings instead of a plan | No Bash |
 | analyzer | opus | high | Gap analysis of a request or draft plan: hidden requirements, scope risks | Read-only, no Bash |
 | reviewer | opus | high | Reviews a plan for clarity, verifiability and completeness; answers OKAY or REJECT | No Bash. Writes or edits a file only when asked to |
@@ -245,7 +245,6 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | `OMCA_TRANSCRIPTS_ROOT` | The directory `session_search` reads instead of `~/.claude/projects` |
 | `AST_GREP_BIN` | The ast-grep binary the `ast_*` tools run, looked up on `PATH`, before `ast-grep` and `sg` |
 | `OMCA_HOOK_TRACE` | `1` appends every hook call to `.omca/state/hook-trace.jsonl` |
-| `OMCA_SUBAGENT_STATUSLINE_DUMP` | A file to append each raw subagent status line payload to |
 
 ## Configuration
 
@@ -260,7 +259,7 @@ a project's `.claude/settings.json`.
 | `showBand` | `true` | `false` hides the band above the prompt |
 | `guardMode` | `dialog` | `dialog` asks before a held command where a dialog can show. `deny` never asks: a held git command is refused, and any other recursive removal or a force push to another branch runs |
 | `enableKeywordTriggers` | `false` | `true` lets plain phrases point at a skill |
-| `statuslineMode` | `on` | `off` makes `omca-setup` leave your status lines alone |
+| `statuslineMode` | `on` | `off` makes `omca-setup` leave your status line alone |
 | `disableForceOrchestrationStyle` | `false` | `true` makes `omca-setup` remove `force-for-plugin` from the installed `output-styles/omca-default.md`, so your own `outputStyle` applies. Run setup again after each update |
 
 ```json
@@ -304,8 +303,8 @@ there a command that fails in the sandbox retries outside it without a prompt.
 OMCA keeps its state in the project's `.omca/` directory, which it gitignores except for
 `.omca/rules/`. Outside the project it writes:
 
-- through `omca-setup`, the status line keys in `~/.claude/settings.json`, a backup of that file
-  as `settings.json.omca-bak`, and the status line launcher;
+- through `omca-setup`, the `agent` and `statusLine` keys in `~/.claude/settings.json`, a backup
+  of that file as `settings.json.omca-bak`, and the status line launcher;
 - through the Doctor page's `i` fix, `refreshInterval` in the same `settings.json`, with the same
   backup;
 - through `omca-setup` with `disableForceOrchestrationStyle` on, the installed copy of

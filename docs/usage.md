@@ -15,12 +15,22 @@ Code 2.1.300 or later and bun 1.4.2 or later. `ast-grep` (or `sg`) is optional: 
 
 Run `/oh-my-claudeagent:omca-setup` once after installing. It checks the Claude Code and bun
 versions, looks for ast-grep, asks the `omca` server whether it is running, and then offers to
-point your status line and subagent status line at OMCA's renderer. Before it changes
-`~/.claude/settings.json` it prints the diff and asks; the previous file is kept as
-`~/.claude/settings.json.omca-bak`. It writes nothing into any `CLAUDE.md`: the `omca` server
-gives each session OMCA's guidance on its first prompt.
+start your sessions as OMCA's orchestrator and to point your status line at OMCA's renderer.
+Before it changes `~/.claude/settings.json` it prints the diff and asks; the previous file is
+kept as `~/.claude/settings.json.omca-bak`. It writes nothing into any `CLAUDE.md`: the `omca`
+server gives each session OMCA's guidance on its first prompt.
 
-`/oh-my-claudeagent:omca-setup --uninstall` removes the status line entries and the launcher.
+Claude Code deprecates a plugin choosing the agent a session runs as, so the orchestrator comes
+from the `agent` key in your own settings, which setup adds as
+`"agent": "oh-my-claudeagent:orchestrator"`.
+Setup leaves an `agent` you set to something else alone. The key applies to every session you
+start, and in a project where OMCA is turned off Claude Code falls back to its default agent. To
+run one session as the orchestrator without the key, start it with
+`claude --agent oh-my-claudeagent:orchestrator`. `/omca doctor` warns when no settings file
+names an agent.
+
+`/oh-my-claudeagent:omca-setup --uninstall` removes the status line entry, the orchestrator
+`agent` key and the launcher.
 `--check` and `--doctor` send you to `/omca doctor`.
 
 `/oh-my-claudeagent:omca-setup --migrate` moves a project's agent memories, and the agent ids in
@@ -534,6 +544,8 @@ server's whole normalized name followed by `__*`. A shorter prefix such as
   `permissions.denyInsteadOfPrompting`, which takes the interview's questions away altogether;
 - `allowManagedModsOnly`, `disableAllHooks` and `allowManagedHooksOnly`;
 - which output style applies;
+- whether a settings file starts sessions as `oh-my-claudeagent:orchestrator` (the page cannot see
+  `--agent`, so a session launched with it still warns when no file names an agent);
 - whether the advisor can run, and which setting keeps it off when it cannot;
 - the status line's `refreshInterval`.
 
@@ -542,8 +554,9 @@ them; `o` shows their OK rows and hides them again, and each run folds them. Pre
 checks again. When the status
 line has no `refreshInterval`, press `i` to add `refreshInterval: 5`; the doctor shows the diff it
 wrote and keeps a backup. A check with a known remedy offers a key that fills the prompt with it,
-without sending: `m` for `/mcp`, `a` for `/advisor fable`, `y` for `/config`, `s` for
-`/oh-my-claudeagent:omca-setup` and `p` for `/plugin`.
+without sending: `m` for `/mcp`, `a` for `/advisor fable`, `y` for `/config`, `g` on the main
+agent row and `s` on the status line row for `/oh-my-claudeagent:omca-setup`, and `p` for
+`/plugin`.
 
 ## The status line
 
@@ -562,9 +575,6 @@ The usage limits appear for Claude.ai Pro, Max and Ultra subscribers. The cost s
 absent and the cost is above zero, since a subscription is not billed by the token. Behind a
 Claude apps gateway that reports only a spend limit, the cost shows, followed by the dollars spent
 against that limit.
-
-The subagent status line gives each running agent a row with its model, state, effort and
-context use.
 
 The status line, the transcript rows and the `/omca` pane draw solid Nerd Font icons, and the
 status line's cache and clock icons and its usage rings need Nerd Fonts v3. Set `OMCA_GLYPHS=unicode` when the terminal font has none or is an

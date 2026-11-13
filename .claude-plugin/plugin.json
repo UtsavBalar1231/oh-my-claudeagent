@@ -41,7 +41,7 @@
         "off",
         "on"
       ],
-      "description": "on lets /oh-my-claudeagent:omca-setup point your status line and the subagent status line at OMCA's renderer; off makes setup leave both alone.",
+      "description": "on lets /oh-my-claudeagent:omca-setup point your status line at OMCA's renderer; off makes setup leave it alone.",
       "sensitive": false
     },
     "disableForceOrchestrationStyle": {

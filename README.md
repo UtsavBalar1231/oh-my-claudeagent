@@ -34,7 +34,10 @@ lockfile, so installing fetches no npm dependencies.
 
 Inside a session, the same steps are `/plugin marketplace add UtsavBalar1231/oh-my-claudeagent`
 and `/plugin install oh-my-claudeagent@omca`. Then run `/oh-my-claudeagent:omca-setup`, which
-checks the requirements above and offers to point your status line at OMCA's renderer.
+checks the requirements above and offers to start your sessions as OMCA's orchestrator and to
+point your status line at OMCA's renderer. Claude Code deprecates a plugin choosing a session's
+agent, so the orchestrator comes from an `agent` key setup adds to your own settings, or from
+`claude --agent oh-my-claudeagent:orchestrator` for one session.
 
 ### OpenCode V2
 
@@ -109,10 +112,9 @@ the passing checks fold into one line that `o` opens.
 
 The status line shows the session (model, effort and agent), the workspace
 (context window and git state) and usage (duration, usage limits, and cost for accounts billed
-by the token) on rows of their own, and fits itself to the terminal's width. The subagent status
-line gives each running agent a row.
+by the token) on rows of their own, and fits itself to the terminal's width.
 
-<img src=".github/assets/statusline.png" width="900" alt="The OMCA status line under the prompt shows three rows: the model and effort; a context bar, the git branch with change counts and the project; and the session cost and duration. Below it, one row for each of two running subagents shows its type, model, state, effort, context and task. Above, the turn line waits on the two executors.">
+<img src=".github/assets/statusline.png" width="900" alt="The OMCA status line under the prompt shows three rows: the model and effort; a context bar, the git branch with change counts and the project; and the session cost and duration. Below it, Claude Code lists the two running executors with their tasks, times and tokens. Above, the turn line waits on the two executors and the band shows the checkout-redesign run at 6 of 14.">
 
 The guard dialog arrives the moment the model asks for a destructive command.
 
@@ -157,8 +159,8 @@ the UI. It reads these environment variables: `CLAUDE_AFK_TIMEOUT_MS`,
 `USERPROFILE`. At `session.start` it writes two,
 `CLAUDE_CODE_ENABLE_TODO_TOOLS` and `CLAUDE_CODE_TASK_LIST_ID`, when nothing has set them.
 
-**What `omca-setup` writes.** Only after it prints a diff and you confirm, it sets `statusLine`
-and `subagentStatusLine` in `~/.claude/settings.json`, optionally `env.OMCA_GLYPHS`, and copies
+**What `omca-setup` writes.** Only after it prints a diff and you confirm, it sets `agent` and
+`statusLine` in `~/.claude/settings.json`, optionally `env.OMCA_GLYPHS`, and copies
 a launcher to `~/.claude/omca/statusline.ts`. The previous file is kept as
 `settings.json.omca-bak`. `--uninstall` removes those entries and the launcher. The Doctor page's
 `i` fix adds `refreshInterval: 5` the same way, with a backup.

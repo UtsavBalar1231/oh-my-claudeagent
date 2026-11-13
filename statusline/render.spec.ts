@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { basename, join } from "node:path";
 import { AGENT_ICONS, displayWidth, type GlyphTier } from "../src/core/ui-kit.ts";
 import { NO_REPO } from "./git.ts";
@@ -350,9 +350,9 @@ describe("segments", () => {
     expect(shipped.filter((name) => !Object.hasOwn(AGENT_ICONS, name))).toEqual([]);
   });
 
-  test("the plugin's default main agent shows nothing, and that default is the one settings.json sets", () => {
+  test("the orchestrator, the main agent setup writes, shows nothing", () => {
+    expect(DEFAULT_MAIN_AGENT).toBe("oh-my-claudeagent:orchestrator");
     expect(rows({ model, agent: { name: DEFAULT_MAIN_AGENT } })).toEqual([MODEL, WAITING, ZERO]);
-    expect(JSON.parse(readFileSync(join(import.meta.dir, "..", "settings.json"), "utf8")).agent).toBe(DEFAULT_MAIN_AGENT);
   });
 
   test("an agent without a name shows nothing", () => {
