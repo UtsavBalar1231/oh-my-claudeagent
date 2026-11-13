@@ -106,8 +106,8 @@ a wide character such as a CJK glyph counts as two.
   branch, dropping from the right when they do not fit. With Nerd Font glyphs a ring leads the
   percentage.
 - **Colors and links.** Bars and percentages are green below 60%, yellow from 60% to 84% and red
-  from 85%, fixed values. The branch and a subagent row's name draw in the terminal's default
-  foreground, the name in bold, never in white, so they read on light and dark backgrounds.
+  from 85%, fixed values. The branch draws in the terminal's default foreground, never in white,
+  so it reads on light and dark backgrounds.
   Links use OSC 8 and always close with their text.
 - **A model name wider than a line** is the one case that is cut, because the line must still fit.
 
@@ -135,8 +135,7 @@ in forward-slash form and double-quoted, so a path with spaces or a Windows driv
 }
 ```
 
-A plugin `settings.json` cannot carry `statusLine` (Claude Code drops the key), so the command
-goes through the launcher. It reads where Claude Code installed the plugin from
+A plugin cannot set `statusLine`, so the command goes through the launcher. It reads where Claude Code installed the plugin from
 `~/.claude/plugins/installed_plugins.json`, under any marketplace name and version, skips an
 install that `enabledPlugins` in `~/.claude/settings.json` switches off or that has no renderer
 (an older install without `statusline/main.ts`), and runs `main.ts` from the most recently updated of the rest. The status line
@@ -162,7 +161,6 @@ seconds) are fixed in the code. These environment variables are read:
 | `OMCA_GLYPHS` | `nerd` | `nerd` draws Nerd Fonts v3 glyphs, `unicode` the text labels below with box-drawing bars and Unicode separators, `ascii` plain text throughout. An unknown value means `nerd`. The `/omca` pane reads the same variable. |
 | `COLUMNS` | `80` | Terminal width in cells. Claude Code sets it. A value that is not a positive integer is ignored. |
 | `LINES` | tall | Terminal height. Claude Code sets it. Under 20 the status line takes at most two lines. |
-| `OMCA_SUBAGENT_STATUSLINE_DUMP` | unset | Path. Appends each raw `subagentStatusLine` stdin payload to this file as JSONL. Opt-in capture for answering platform-payload questions; no rotation. |
 
 Without Nerd Font glyphs the renderer uses text labels: `*` for the branch, `>` for the model
 and folder, `~` for the clock, `E:` for effort, `V:` for vim mode, `W:` for the worktree, `5h`
@@ -227,7 +225,6 @@ Status and remote run at the same time.
 | `main.ts` | Entry point: reads stdin, reads git, prints the render. |
 | `render.ts` | Payload types, the segments, the layout (`arrange`), and every formatting helper. |
 | `git.ts` | Branch, status counts, remote, and the cache. |
-| `subagent.ts` | Entry point for the subagent rows. |
 | `launcher.ts` | Copied to `~/.claude/omca/statusline.ts`; runs the renderer of the enabled install Claude Code updated last. |
 | `*.spec.ts` | `bun test statusline`. |
 
@@ -243,54 +240,6 @@ affected `.txt` files and review the diff.
 
 Rounding follows round-half-to-even for exact binary ties (`72.5%` reads `72%`, `$0.125` reads
 `$0.12`), which `toFixed` and `Math.round` do not.
-
----
-
-## Per-subagent status line
-
-`subagentStatusLine` is separate from `statusLine`: it renders one row per active subagent in the
-tasks panel instead of one line for the main session. `subagent.ts` renders it, reached through
-the same launcher with `--subagent`, which setup writes beside `statusLine`:
-
-```json
-"subagentStatusLine": {
-  "type": "command",
-  "command": "\"/home/you/.bun/bin/bun\" \"/home/you/.claude/omca/statusline.ts\" --subagent"
-}
-```
-
-A plugin `settings.json` does keep `subagentStatusLine`. From Claude Code 2.1.319 it substitutes
-`${CLAUDE_PLUGIN_ROOT}` in that command, so a plugin-relative command finds its script there. Setup
-keeps writing the user setting while the supported floor is below 2.1.319.
-
-**Input** (stdin): one JSON object with a `tasks` array (each task carries `id`, `name`, `type`,
-`agentType`, `status`, `description`, `label`, `startTime`, `model`, `effort`,
-`contextWindowSize`, `tokenCount`, `tokenSamples`, `cwd`) and a `columns` field. `agentType` is
-the subagent type, such as `oh-my-claudeagent:executor` or `Explore`; `name` is only the name a
-subagent is addressed by, and `type` is the kind of task (`local_agent`).
-
-`effort` is the reasoning effort configured for that subagent. Its shape differs from the main
-status line's `effort`, which is a `{"level": "high"}` dict: the per-task field is a bare value,
-either one of `low`/`medium`/`high`/`xhigh`/`max` or a numeric token budget. It is absent when
-the subagent inherits the session level, and the row renders no effort token then since the main
-line already shows the session value.
-
-`contextWindowSize` is the resolved model's context window in tokens, omitted while the task's
-model is unresolved. When present, the row shows `tokenCount` as a percentage of it, which is
-comparable across rows running on different windows. When absent, the row falls back to the raw
-compact token count.
-
-**Output** (stdout): one JSON line per task to override its row,
-`{"id": "<task id>", "content": "<row body>"}`.
-
-Each row shows the agent's type (its `agentType`, else its `name`) with any namespace prefix
-stripped and its themed glyph, the model, the status, the configured effort, context usage, and
-last the task's `label`. A task with neither shows its `label`, then its `type`. The model is the
-task's own `model` field; when that is absent, a task of type `oh-my-claudeagent:<agent>` takes
-the tier from that agent's frontmatter. A row fits the payload's `columns`, then `COLUMNS`, then
-80, on one line: segments are added in the order name, model, status, effort, context, label,
-and the first one that does not fit is dropped along with every later one. Only a name wider than the row is cut. Any unreadable input prints nothing, so the tasks
-panel keeps its default rows.
 
 ---
 

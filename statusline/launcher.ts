@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const configDir = process.env["CLAUDE_CONFIG_DIR"] || join(homedir(), ".claude");
-const entry = process.argv.includes("--subagent") ? "subagent.ts" : "main.ts";
+const entry = "main.ts";
 
 type Json = Record<string, unknown>;
 const isRecord = (value: unknown): value is Json => typeof value === "object" && value !== null && !Array.isArray(value);
@@ -38,4 +38,4 @@ const installs = Object.entries(plugins)
 
 const chosen = installs[0];
 if (chosen !== undefined) await import(pathToFileURL(join(chosen.path, "statusline", entry)).href);
-else if (entry === "main.ts") console.log("omca: no installed plugin version found");
+else console.log("omca: no installed plugin version found");

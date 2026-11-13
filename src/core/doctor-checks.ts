@@ -283,6 +283,22 @@ function outputStyleCheck(settings: Inputs["settings"], isForced: boolean | null
   );
 }
 
+const MAIN_AGENT = "oh-my-claudeagent:orchestrator";
+
+// The mod reads settings only, so a session launched with --agent looks the same as one without it.
+function mainAgentCheck(settings: Inputs["settings"]): Check {
+  const agent = settings["agent"];
+  if (agent === MAIN_AGENT) return check("agent", "Main agent", "ok", `Sessions start as ${MAIN_AGENT}`);
+  if (typeof agent === "string" && agent !== "") return check("agent", "Main agent", "info", `Sessions start as ${agent}, not OMCA's orchestrator`);
+  return check(
+    "agent",
+    "Main agent",
+    "warn",
+    `No settings file sets agent, so a session starts as Claude Code's default unless it is launched with --agent ${MAIN_AGENT}`,
+    { prompt: SETUP_COMMAND },
+  );
+}
+
 function advisorCheck(settings: Inputs["settings"], env: DoctorEnv): Check {
   const blockers: readonly (readonly [string, boolean])[] = [
     ["CLAUDE_CODE_DISABLE_ADVISOR_TOOL", isOn(env.CLAUDE_CODE_DISABLE_ADVISOR_TOOL)],
@@ -358,6 +374,7 @@ export function doctorChecks(inputs: Inputs): Check[] {
     hooksCheck(inputs.settings),
     ...installsCheck(inputs.settings),
     outputStyleCheck(inputs.settings, inputs.isStyleForced),
+    mainAgentCheck(inputs.settings),
     advisorCheck(inputs.settings, inputs.env),
     ...questionsCheck(inputs.env, inputs.settings, inputs.questionTimeout),
     statusLineCheck(inputs.settings, inputs.userSettings),
