@@ -20,13 +20,15 @@ const HOOKS_INACTIVE =
 const MOD_ABSENT =
   "The OMCA mod has not marked this session since the last prompt, so it is not running: an organization policy sets `allowManagedModsOnly`, the session started with `--safe-mode`, or the mod worker crashed three times and was unloaded.";
 
-const COST_TIERS: Array<[tier: string, models: string[]]> = [
-  ["premium", ["claude-fable-5-2", "claude-fable-5-1", "claude-fable-5", "fable"]],
-  ["expensive", ["claude-opus-5-5", "claude-opus-5", "claude-opus-4-8", "opus"]],
-  ["cheap", ["claude-sonnet-5-5", "claude-sonnet-5", "sonnet"]],
-  ["free", ["claude-haiku-4-5", "haiku"]],
-];
-const costTier = (model: string): string => COST_TIERS.find(([, models]) => models.includes(model))?.[0] ?? "cheap";
+const COST_TIERS = new Map([
+  ["fable", "premium"],
+  ["mythos", "premium"],
+  ["opus", "expensive"],
+  ["sonnet", "cheap"],
+  ["haiku", "free"],
+]);
+// An alias (`opus`) and a full id (`claude-opus-4-8`) both name the family first.
+const costTier = (model: string): string => COST_TIERS.get(/^(?:claude-)?([a-z]+)/.exec(model)?.[1] ?? "") ?? "cheap";
 
 const CATEGORIES_MISSING = '{"error": "categories.json not found"}';
 const CATEGORIES_MALFORMED = '{"error": "categories.json is malformed"}';
@@ -135,7 +137,7 @@ export const tools: Tool[] = [
   {
     name: "agents_list",
     description:
-      'Return a JSON array with one entry per agent file in the plugin\'s agents/ directory: name, description (the frontmatter description), default_model (the frontmatter model alias, "sonnet" when absent), and cost_tier (premium for fable, expensive for opus, cheap for sonnet and unknown values, free for haiku). The Agent tool\'s own agent list already carries names and descriptions; use this when the model or cost tier matters.',
+      'Return a JSON array with one entry per agent file in the plugin\'s agents/ directory: name, description (the frontmatter description), default_model (the frontmatter model alias, "sonnet" when absent), and cost_tier (premium for fable and mythos, expensive for opus, cheap for sonnet and unknown values, free for haiku). The Agent tool\'s own agent list already carries names and descriptions; use this when the model or cost tier matters.',
     inputSchema: { type: "object", properties: {} },
     annotations: { title: "List agents", readOnlyHint: true, idempotentHint: true, openWorldHint: false },
     _meta: { "anthropic/searchHint": "agent roster with descriptions, default model and cost tier, for delegation routing" },

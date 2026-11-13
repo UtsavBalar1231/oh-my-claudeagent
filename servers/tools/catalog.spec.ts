@@ -322,6 +322,10 @@ test("agents_list returns each agent file's name, description, model and cost ti
     "agents/f-full-id.md": agent("name: eff", "model: claude-opus-4-8"),
     "agents/g-quoted.md": agent("name: gee", 'description: "Quoted"', "model: claude-sonnet-5-5"),
     "agents/h-empty-model.md": agent("name: aitch", "model:"),
+    "agents/i-mythos.md": agent("name: eye", "model: claude-mythos-5-2"),
+    "agents/j-haiku-id.md": agent("name: jay", "model: claude-haiku-5-5"),
+    "agents/k-older-opus.md": agent("name: kay", "model: claude-opus-4-6"),
+    "agents/l-older-sonnet.md": agent("name: ell", "model: claude-sonnet-4-6"),
   });
   const expected = [
     { name: "ay", description: "Does A", default_model: "fable", cost_tier: "premium" },
@@ -332,6 +336,10 @@ test("agents_list returns each agent file's name, description, model and cost ti
     { name: "eff", description: "", default_model: "claude-opus-4-8", cost_tier: "expensive" },
     { name: "gee", description: "Quoted", default_model: "claude-sonnet-5-5", cost_tier: "cheap" },
     { name: "aitch", description: "", default_model: "sonnet", cost_tier: "cheap" },
+    { name: "eye", description: "", default_model: "claude-mythos-5-2", cost_tier: "premium" },
+    { name: "jay", description: "", default_model: "claude-haiku-5-5", cost_tier: "free" },
+    { name: "kay", description: "", default_model: "claude-opus-4-6", cost_tier: "expensive" },
+    { name: "ell", description: "", default_model: "claude-sonnet-4-6", cost_tier: "cheap" },
   ];
   expect(await callIn(root, "agents_list")).toBe(JSON.stringify(expected, null, 2));
 });
