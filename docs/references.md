@@ -177,7 +177,7 @@ rejects every `model.*` call, `http.fetch` and `store.*`.
 
 | Event | Matcher | Handlers |
 | --- | --- | --- |
-| `SessionStart` | `clear`, `compact` | `session-start`: after a compaction, re-injects the guidance and the run's next task; after `/clear`, hands the guidance to the next prompt |
+| `SessionStart` | `clear`, `compact` | `session-start`: after the main conversation compacts, re-injects the guidance and the run's next task, and stays silent when a subagent compacts; after `/clear`, hands the guidance to the next prompt |
 | `UserPromptSubmit` | any | `mod-notice` (on the launch session's first prompt, a message when the mod is not running), `guidance` (first prompt: guidance, session id, the open run, and the session title `OMCA: <run>`), `keyword-detector` |
 | `UserPromptExpansion` | any | `guidance`, `slash-mode-detector` |
 | `SubagentStart` | any | `subagent-context`: protocol, date, output contract and run context for each subagent |
