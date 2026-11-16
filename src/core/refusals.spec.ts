@@ -30,7 +30,7 @@ const wrappers: readonly [string, (reason: string) => string][] = [
   ["a TaskCompleted hook feedback", (reason) => `TaskCompleted hook feedback:\n${reason}`],
 ];
 
-const slop = judgeWrite("deny", { file_path: "/r/src/a.py", content: "# obviously the user name\nuser_name = input_value" }, new Map());
+const slop = judgeWrite("deny", { file_path: "/r/src/a.py", content: "# TODO fix this\nuser_name = input_value" }, new Map());
 const attribution = judgeWrite("deny", { file_path: "/r/src/a.py", content: "# AI-generated helper\nx = 1" }, new Map());
 const reasonOf = (verdict: unknown): string => {
   if (typeof verdict !== "object" || verdict === null || !("reason" in verdict) || typeof verdict.reason !== "string") throw new Error("no deny");
@@ -77,7 +77,7 @@ const cases: readonly [string, string, Refusal][] = [
       kind: "comment",
       title: "comment slop",
       remedy: "delete the quoted comment, or rewrite it as the reason the code is the way it is",
-      detail: "obviously the user name",
+      detail: "TODO fix this",
     },
   ],
   [
@@ -105,7 +105,7 @@ describe("refusalOf", () => {
       kind: "comment",
       title: "comment slop",
       remedy: "delete the quoted comment, or rewrite it as the reason the code is the way it is",
-      detail: "obviously the user name",
+      detail: "TODO fix this",
     });
     expect(refusalOf(`Error: ${reasonOf(attribution)}`)).toMatchObject({ kind: "comment", title: "AI-attribution or placeholder comment" });
     expect(refusalOf(`Error: Exit code 1\n${reasonOf(slop)}`)).toBeUndefined();

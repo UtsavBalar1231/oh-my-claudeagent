@@ -210,13 +210,13 @@ describe("a force push to the default branch", () => {
 })
 
 describe("the comment gate", () => {
-  const RESTATES = 'Comment restates the following code line ("set the user name"): delete it, or replace it with the non-obvious why.'
-  const slop = '# set the user name\nuser_name="$input_value"'
+  const SEPARATOR = 'Decorative separator comment ("----------"): delete it.'
+  const slop = '# ----------\nuser_name="$input_value"'
 
-  test("a restating comment in a written file is denied when the gate is deny", () => {
+  test("a decorative separator in a written file is denied when the gate is deny", () => {
     process.env.OMCA_COMMENT_GATE = "deny"
     const result = checkEdit("write", { path: "/repo/scripts/denied.sh", content: slop }, tmp)
-    expect(result).toEqual({ deny: true, reason: expect.stringContaining(`Blocked: comment slop. ${RESTATES} The convention:`) })
+    expect(result).toEqual({ deny: true, reason: expect.stringContaining(`Blocked: comment slop. ${SEPARATOR} The convention:`) })
     expect(errorSpy).toHaveBeenCalledTimes(0)
   })
 
@@ -234,10 +234,10 @@ describe("the comment gate", () => {
     expect(attempt()).toEqual(denied)
   })
 
-  test("a restating comment in a source-file patch is denied", () => {
+  test("a decorative separator in a source-file patch is denied", () => {
     process.env.OMCA_COMMENT_GATE = "deny"
-    const patchText = `*** Begin Patch\n*** Add File: scripts/patched.sh\n+# set the user name\n+user_name="$input_value"\n*** End Patch`
-    expect(checkEdit("patch", { patchText }, tmp)).toEqual({ deny: true, reason: expect.stringContaining(RESTATES) })
+    const patchText = `*** Begin Patch\n*** Add File: scripts/patched.sh\n+# ----------\n+user_name="$input_value"\n*** End Patch`
+    expect(checkEdit("patch", { patchText }, tmp)).toEqual({ deny: true, reason: expect.stringContaining(SEPARATOR) })
     expect(errorSpy).toHaveBeenCalledTimes(0)
   })
 

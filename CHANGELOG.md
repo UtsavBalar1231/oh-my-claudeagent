@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Comment gate:** it keeps only the rules that matched real problems: AI attribution or
+  authorship, placeholder and context-free TODOs, and decorative separator lines. The restates,
+  filler, run-length, density and doc-adds-nothing rules are gone, so doc comments (Rust `///`,
+  kernel-doc, docstrings) and file headers are never flagged.
 - **OpenCode effort:** a tier in `options.models` named without a `#variant` runs each agent at
   the effort its definition declares (`xhigh` for `omca-architect`, `medium` for
   `omca-build-fixer` and `omca-viewer`, `high` for the rest). A `#variant` still sets one effort

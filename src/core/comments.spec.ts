@@ -3,9 +3,8 @@ import { type CommentGateMode, commentGateMode, type DenyOnce, judgeWrite, type 
 
 const HEAD =
   "[COMMENT CHECK] Detected AI slop comment patterns. Remove the quoted comments with a follow-up Edit unless they encode a non-obvious why.";
-const restates = (text: string) => `Comment restates the following code line ("${text}"): delete it, or replace it with the non-obvious why.`;
-const trivialDoc = (text: string) => `Doc comment adds nothing beyond the function name ("${text}"): delete it.`;
-const filler = (text: string) => `Filler-word comment ("${text}"): delete it.`;
+const separator = (text: string) => `Decorative separator comment ("${text}"): delete it.`;
+const contextFree = (text: string) => `Context-free TODO/FIXME ("${text}"): add an issue ref or TODO(owner):.`;
 
 const advised = (wouldDeny: "tier1" | "tier2" | undefined, ...findings: string[]): Verdict => ({
   kind: "advise",
@@ -30,7 +29,7 @@ describe("commentGateMode", () => {
 });
 
 describe("the comment marker follows the file", () => {
-  const narration = (marker: string) => `${marker} set the user name\nuser_name = input_value`;
+  const narration = (marker: string) => `${marker} ----\nuser_name = input_value`;
 
   test.each([
     ["/r/a.sh", "#"],
@@ -64,7 +63,7 @@ describe("the comment marker follows the file", () => {
     ["/c/proj/a.lua", "--"],
     ["/Users/Me/Proj/a.rb", "#"],
   ])("%p reads %p as a comment", (path, marker) => {
-    expect(judge(path, narration(marker))).toEqual(advised("tier2", restates("set the user name")));
+    expect(judge(path, narration(marker))).toEqual(advised("tier2", separator("----")));
   });
 
   test.each([
@@ -92,7 +91,7 @@ describe("the comment marker follows the file", () => {
 });
 
 describe("a test directory is exempt", () => {
-  const narration = "# set the user name\nuser_name = input_value";
+  const narration = "# ----\nuser_name = input_value";
 
   test.each(["/r/tests/a.py", "C:\\r\\tests\\a.py", "C:/r/tests/a.py", "\\\\srv\\share\\tests\\a.py", "/c/r/tests/a.py", "/Users/Me/r/tests/a.py"])(
     "%p is not judged",
@@ -102,84 +101,35 @@ describe("a test directory is exempt", () => {
   );
 
   test.each(["/r/testsuite/a.py", "C:\\r\\testsuite\\a.py"])("%p is judged", (path) => {
-    expect(judge(path, narration)).toEqual(advised("tier2", restates("set the user name")));
-  });
-});
-
-describe("the one-line function check", () => {
-  test("a doc comment over a one-line brace function names the camelCase words it repeats", () => {
-    const content = "// returns the user id\nfunction getUserId() {\n  return this.id;\n}";
-    expect(judge("/r/a.ts", content)).toEqual(advised("tier2", trivialDoc("returns the user id")));
-  });
-
-  test("a doc comment over a function with a longer body is not flagged", () => {
-    const content = "// returns the user id\nfunction getUserId() {\n  const id = load();\n  return id;\n}";
-    expect(judge("/r/a.ts", content)).toBeUndefined();
-  });
-
-  test("a doc comment over a one-line Python function with a blank line before the body is flagged", () => {
-    const content = "# returns the user id\ndef get_user_id():\n\n    return self.id\n\nclass Other:\n    pass\n";
-    expect(judge("/r/a.py", content)).toEqual(advised("tier2", restates("returns the user id"), trivialDoc("returns the user id")));
-  });
-
-  test("a doc comment over a Python function with two body lines is not flagged", () => {
-    const content = "# returns the user id\ndef get_user_id():\n    x = 1\n    return self.id\n";
-    expect(judge("/r/a.py", content)).toEqual(advised("tier2", restates("returns the user id")));
-  });
-});
-
-describe("restating", () => {
-  test.each([
-    ["a TypeScript const", "/r/a.ts", "// 5 minutes in ms\nconst FIVE_MINUTES_MS = 300_000;"],
-    ["an exported const", "/r/a.ts", "// 300 seconds of decay\nexport const DECAY_SECONDS = 300;"],
-    ["a Rust typed const", "/r/a.rs", "// 5 minutes in ms\nconst FIVE_MINUTES_MS: u64 = 300_000;"],
-    ["a pub static", "/r/a.rs", "// 5 minutes in ms\npub static FIVE_MINUTES_MS: u64 = 300_000;"],
-    ["a Python assignment", "/r/a.py", "# 5 minutes in ms\nFIVE_MINUTES_MS = 300_000"],
-  ])("the derivation of a magic number is exempt: %s", (_label, path, content) => {
-    expect(judge(path, content)).toBeUndefined();
-  });
-
-  test("a const whose value is not a number is still judged", () => {
-    expect(judge("/r/a.ts", "// 5 minutes in ms\nconst FIVE_MINUTES_MS = compute(5);")).toEqual(
-      advised("tier2", restates("5 minutes in ms")),
-    );
-    expect(judge("/r/a.ts", "// the default retry count\nconst DEFAULT_RETRY_COUNT = 3;")).toEqual(
-      advised("tier2", restates("the default retry count")),
-    );
-  });
-
-  test("a comment with digits over a line that is not a numeric constant is still judged", () => {
-    expect(judge("/r/a.py", "# 3600 seconds in an hour\nhour_seconds = compute(hour)")).toEqual(advised("tier2", restates("3600 seconds in an hour")));
-  });
-
-  test("a comment whose words are all stopwords or short never restates", () => {
-    expect(judge("/r/a.py", "# do it\nvalue = do_it()")).toBeUndefined();
-  });
-
-  test("a comment above a blank line and then code is compared with that code", () => {
-    expect(judge("/r/a.py", "# set the user name\n\nuser_name = input_value")).toEqual(advised("tier2", restates("set the user name")));
-  });
-
-  test("a comment above another comment is compared with neither", () => {
-    expect(judge("/r/a.py", "# set the user name\n# for later\nuser_name = input_value")).toBeUndefined();
+    expect(judge(path, narration)).toEqual(advised("tier2", separator("----")));
   });
 });
 
 describe("findings", () => {
   test("only the first five findings are reported", () => {
-    const content = Array.from({ length: 7 }, (_, i) => `# obviously ${"abcdefg"[i]}`).join("\n");
+    const content = Array.from({ length: 7 }, (_, i) => `# ${"-".repeat(i + 3)}`).join("\n");
     expect(judge("/r/a.py", content)).toEqual(
-      advised(
-        "tier2",
-        ...["a", "b", "c", "d", "e"].map((letter) => filler(`obviously ${letter}`)),
-        "Excessive consecutive comment lines (7 in a row) detected.",
-      ),
+      advised("tier2", ...[3, 4, 5, 6, 7].map((length) => separator("-".repeat(length)))),
     );
   });
 
+  test.each([
+    ["dashes", "# ----------"],
+    ["equals signs", "# =========="],
+    ["stars spaced out", "# * * * * *"],
+    ["tildes", "# ~~~~"],
+  ])("a separator of %s is flagged", (_label, comment) => {
+    expect(judge("/r/a.py", `${comment}\nx = 1`)).toEqual(advised("tier2", separator(comment.slice(2))));
+  });
+
   test("a bare FIXME is context-free and a FIXME with an owner is not", () => {
-    expect(judge("/r/a.py", "# FIXME\nx = 1")).toEqual(advised("tier2", 'Context-free TODO/FIXME ("FIXME"): add an issue ref or TODO(owner):.'));
+    expect(judge("/r/a.py", "# FIXME\nx = 1")).toEqual(advised("tier2", contextFree("FIXME")));
     expect(judge("/r/a.py", "# FIXME @alice\nx = 1")).toBeUndefined();
+  });
+
+  test("a TODO with an issue reference is not context-free", () => {
+    expect(judge("/r/a.py", "# TODO #123\nx = 1")).toBeUndefined();
+    expect(judge("/r/a.py", "# TODO PROJ-42\nx = 1")).toBeUndefined();
   });
 
   test("a word that holds todo or fixme, such as autodoc, is not a TODO", () => {
@@ -191,42 +141,115 @@ describe("findings", () => {
     expect(judge("/r/a.py", "# TODO: handle the retry\nx = 1")).toBeUndefined();
   });
 
-  test("a tier-3 finding alone names no tier it would have denied", () => {
-    const content = "# a\n# b\n# c\n# d\n# e\n# f\nx = 1";
-    expect(judge("/r/a.py", content)).toEqual(
-      advised(
-        undefined,
-        "Excessive consecutive comment lines (6 in a row) detected.",
-        "High comment density (6 comment lines to 1 code lines): likely line-by-line narration rather than documentation.",
-      ),
-    );
+  test("a line marked @allow is not judged", () => {
+    expect(judge("/r/a.py", "# ---- @allow\nx = 1")).toBeUndefined();
   });
 
-  test("a hunk of only comments has no density finding", () => {
-    expect(judge("/r/a.py", "# a\n# b\n# c\n# d\n# e")).toBeUndefined();
+  test("an AI attribution, an authorship line and a placeholder are named, and tier 1 wins beside tier 2", () => {
+    expect(judge("/r/a.py", "# AI-generated helper\nx = 1")).toEqual(advised("tier1", "AI attribution comment detected."));
+    expect(judge("/r/a.py", "# This code was written by a model\nx = 1")).toEqual(advised("tier1", "AI authorship comment detected."));
+    expect(judge("/r/a.py", "# TODO: implement\nx = 1")).toEqual(
+      advised("tier1", "Unimplemented TODO placeholder detected.", contextFree("TODO: implement")),
+    );
+    expect(judge("/r/a.py", "# AI-generated helper\n# ----\nx = 1")).toEqual(advised("tier1", "AI attribution comment detected.", separator("----")));
+  });
+});
+
+describe("comments the gate leaves alone", () => {
+  const cases: [string, string, string][] = [
+    [
+      "a kernel C file with an SPDX line, a header and kernel-doc",
+      "/r/drivers/gpu/rockchip_hdmi.c",
+      [
+        "// SPDX-License-Identifier: GPL-2.0",
+        "//",
+        "// Rockchip HDMI driver",
+        "// Copyright (C) 2026 Example",
+        "// Author: A. Person",
+        "// Derived from the dw-hdmi bridge",
+        "",
+        "#include <linux/module.h>",
+        "#include <linux/platform_device.h>",
+        "",
+        "/**",
+        " * rockchip_hdmi_probe - probe the hdmi device",
+        " * @pdev: the platform device",
+        " *",
+        " * Return: 0 on success, a negative errno otherwise.",
+        " */",
+        "static int rockchip_hdmi_probe(struct platform_device *pdev)",
+        "{",
+        "\treturn 0;",
+        "}",
+      ].join("\n"),
+    ],
+    [
+      "a kernel C one-line comment naming the function below it",
+      "/r/drivers/gpu/rockchip_hdmi.c",
+      "// rockchip_hdmi_probe - probe the hdmi device\nstatic int rockchip_hdmi_probe(struct platform_device *pdev)\n{\n\treturn 0;\n}",
+    ],
+    [
+      "a Rust file with module docs and item docs",
+      "/r/src/config.rs",
+      [
+        "//! Configuration loading.",
+        "//!",
+        "//! Reads the file and returns a [`Config`].",
+        "",
+        "/// Parses the configuration text.",
+        "///",
+        "/// # Examples",
+        "///",
+        "/// ```",
+        '/// let config = parse_config("timeout = 5").unwrap();',
+        "/// ```",
+        "pub fn parse_config(text: &str) -> Result<Config, Error> {",
+        "    Config::from_text(text)",
+        "}",
+        "",
+        "pub struct Config {",
+        "    /// The timeout in seconds.",
+        "    pub timeout: u64,",
+        "}",
+      ].join("\n"),
+    ],
+    ["a Go doc comment", "/r/user.go", "// GetUser returns the user by id.\nfunc GetUser(id int) *User {\n\treturn users[id]\n}"],
+    [
+      "Python module and function docstrings",
+      "/r/a.py",
+      '"""Load the user table."""\n\n\ndef get_user(user_id):\n    """Return the user with this id."""\n    return USERS[user_id]\n',
+    ],
+    ["a JSDoc block", "/r/a.ts", "/**\n * Returns the user id.\n * @returns the id\n */\nfunction getUserId() {\n  return this.id;\n}"],
+    ["a comment that uses just for time", "/r/a.ts", "// just before the rename\nrename(from, to);"],
+    ["a comment that restates the line below it", "/r/a.py", "# set the user name\nuser_name = input_value"],
+    ["a long run of comment lines", "/r/a.py", "# a\n# b\n# c\n# d\n# e\n# f\n# g\nx = 1"],
+    ["a dense hunk", "/r/a.py", "# a\nx = 1\n# b\n# c\n# d\n# e\n# f\n"],
+    ["a filler-word comment", "/r/a.py", "# obviously this handles the edge case\nfoo()"],
+  ];
+
+  test.each(cases)("%s, in advise mode", (_label, path, content) => {
+    expect(judge(path, content)).toBeUndefined();
   });
 
-  test("a tier-1 finding names tier1 even beside a tier-2 finding", () => {
-    expect(judge("/r/a.py", "# AI-generated helper\n# obviously this\nx = 1")).toEqual(
-      advised("tier1", "AI attribution comment detected.", filler("obviously this")),
-    );
+  test.each(cases)("%s, in deny mode", (_label, path, content) => {
+    expect(judgeWrite("deny", { file_path: path, content }, new Map())).toBeUndefined();
   });
 });
 
 describe("deny mode", () => {
-  const slop = { file_path: "/r/a.py", content: "# set the user name\nuser_name = input_value" };
+  const slop = { file_path: "/r/a.py", content: "# ----\nuser_name = input_value" };
 
   test("a deny names the finding and a retry passes and empties the memory", () => {
     const slot: DenyOnce = new Map();
     const verdict = judgeWrite("deny", slop, slot);
-    expect(verdict).toMatchObject({ kind: "deny", reason: expect.stringContaining(restates("set the user name")) });
+    expect(verdict).toMatchObject({ kind: "deny", reason: expect.stringContaining(separator("----")) });
     expect(slot.size).toBe(1);
-    expect(judgeWrite("deny", slop, slot)).toEqual(advised(undefined, restates("set the user name")));
+    expect(judgeWrite("deny", slop, slot)).toEqual(advised(undefined, separator("----")));
     expect(slot.size).toBe(0);
   });
 
   test("with no memory a tier-2 finding advises rather than denies", () => {
-    expect(judgeWrite("deny", slop, undefined)).toEqual(advised(undefined, restates("set the user name")));
+    expect(judgeWrite("deny", slop, undefined)).toEqual(advised(undefined, separator("----")));
   });
 
   test("each file keeps its own denial, so interleaved writers each get their retry", () => {
@@ -238,7 +261,7 @@ describe("deny mode", () => {
 
   test("a different finding on the same file is denied again", () => {
     const slot: DenyOnce = new Map();
-    const changed = { file_path: slop.file_path, content: "# obviously this\nx = 1" };
+    const changed = { file_path: slop.file_path, content: "# FIXME\nx = 1" };
     expect([slop, changed, changed].map((input) => judgeWrite("deny", input, slot)?.kind)).toEqual(["deny", "deny", "advise"]);
   });
 
@@ -268,7 +291,7 @@ describe("deny mode", () => {
 
 describe("what is read", () => {
   test("an Edit new_string and a Write content are read alike", () => {
-    const text = "# set the user name\nuser_name = input_value";
+    const text = "# ----\nuser_name = input_value";
     expect(judgeWrite("advise", { file_path: "/r/a.py", new_string: text }, undefined)).toEqual(judgeWrite("advise", { file_path: "/r/a.py", content: text }, undefined));
   });
 
@@ -285,7 +308,7 @@ describe("what is read", () => {
   describe("the disable marker window", () => {
     const marker = "comment-gate-disable-file";
     const body = Array.from({ length: 4 }, () => "x = 1").join("\n");
-    const slop = "# set the user name\nuser_name = input_value";
+    const slop = "# ----\nuser_name = input_value";
 
     test.each(["content", "new_string"])("a marker on line 5 of a %s passes, so a Write and an Edit read alike", (field) => {
       expect(judgeWrite("deny", { file_path: "/r/a.py", [field]: `${body}\n# ${marker}\n${slop}` }, new Map())).toBeUndefined();

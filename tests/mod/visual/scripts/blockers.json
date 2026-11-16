@@ -7,7 +7,7 @@
           "name": "Write",
           "input": {
             "file_path": "src/sum.ts",
-            "content": "// simply add the two numbers together\nexport function addNumbers(a: number, b: number): number {\n  return a + b;\n}\n"
+            "content": "// TODO fix this\nexport function addNumbers(a: number, b: number): number {\n  return a + b;\n}\n"
           }
         }
       ]

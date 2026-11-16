@@ -9,16 +9,13 @@ const NOW = 1_786_000_000_000;
 const HEAD =
   "[COMMENT CHECK] Detected AI slop comment patterns. Remove the quoted comments with a follow-up Edit unless they encode a non-obvious why.";
 const KEEP =
-  "The convention: names, types, and structure carry the what, so a comment earns its place only by carrying something the code cannot state, the non-obvious why, an invariant, a constraint, or the derivation of a magic number. A correct fix deletes the quoted comment, or rewrites it as the reason the code is the way it is. A clearer name beats a comment that restates the line below it. Do NOT remove other comments while fixing this: file headers, non-obvious function contracts, invariant notes, and magic-number derivation comments may be required by the project's own convention. Resubmit the same code change with only the quoted comments fixed. Genuine exceptions: put @allow on a comment line to exempt that line from the slop checks, or put comment-gate-disable-file in the first 5 lines of the hunk.";
+  "The convention: names, types, and structure carry the what, so a comment earns its place only by carrying something the code cannot state, the non-obvious why, an invariant, a constraint, or the derivation of a magic number. A correct fix deletes the quoted comment, or rewrites it as the reason the code is the way it is. Do NOT remove other comments while fixing this: file headers, non-obvious function contracts, invariant notes, and magic-number derivation comments may be required by the project's own convention. Resubmit the same code change with only the quoted comments fixed. Genuine exceptions: put @allow on a comment line to exempt that line from the slop checks, or put comment-gate-disable-file in the first 5 lines of the hunk.";
 
 const ATTRIBUTION = "AI attribution comment detected.";
 const AUTHORSHIP = "AI authorship comment detected.";
 const PLACEHOLDER = "Unimplemented TODO placeholder detected.";
-const restates = (text: string) => `Comment restates the following code line ("${text}"): delete it, or replace it with the non-obvious why.`;
-const filler = (text: string) => `Filler-word comment ("${text}"): delete it.`;
 const separator = (text: string) => `Decorative separator comment ("${text}"): delete it.`;
 const bareTodo = (text: string) => `Context-free TODO/FIXME ("${text}"): add an issue ref or TODO(owner):.`;
-const trivialDoc = (text: string) => `Doc comment adds nothing beyond the function name ("${text}"): delete it.`;
 
 const advice = (...findings: string[]): Output => ({
   hookSpecificOutput: { hookEventName: "PreToolUse", additionalContext: [HEAD, ...findings].join(" ") },
@@ -74,39 +71,17 @@ describe("tier 1 and tier 2 findings in the default advise mode", () => {
     expect(await gate({ old_string: "", new_string: "function foo() {\n  return 1;\n}" }, "Edit")).toEqual({});
   });
 
-  test("warns on code-restating comment", async () => {
-    const content = "# set user name to input value\nuser_name = input_value";
-    expect(await gate({ content })).toEqual(advice(restates("set user name to input value")));
+  test("no warning for a comment that restates the line below it", async () => {
+    expect(await gate({ content: "# set user name to input value\nuser_name = input_value" })).toEqual({});
   });
 
-  // Real narration carries a word the code line lacks, so a restating check that demanded zero
-  // extra words only ever matched hand-built cases.
-  test("warns on narrating comment that adds one word", async () => {
-    expect(await gate({ content: "# Set the path attribute\nself.path = path" })).toEqual(advice(restates("Set the path attribute")));
+  test("no warning for a run of comment lines or a dense hunk", async () => {
+    expect(await gate({ content: "# a\n# b\n# c\n# d\n# e\n# f\nx = 1" })).toEqual({});
   });
 
-  test("warns on line-by-line narration via density", async () => {
-    const content = [
-      "# Define the configuration class",
-      "class Config:",
-      "    # Initialize the configuration",
-      "    def __init__(self, path):",
-      "        # Store the path",
-      "        self.path = path",
-      "        # Create an empty dict",
-      "        self.values = {}",
-      "    # Load the config file",
-      "    def load(self):",
-      "        # Open and parse it",
-      "        return json.load(open(self.path))",
-    ].join("\n");
-    expect(await gate({ content })).toEqual(
-      advice(
-        restates("Store the path"),
-        restates("Open and parse it"),
-        "High comment density (6 comment lines to 6 code lines): likely line-by-line narration rather than documentation.",
-      ),
-    );
+  test("no warning for a filler word, including just meaning shortly before", async () => {
+    expect(await gate({ content: "# obviously this handles the edge case\nfoo()" })).toEqual({});
+    expect(await gate({ content: "# just before the rename\nfoo()" })).toEqual({});
   });
 
   test("no warning for magic-number derivation comment", async () => {
@@ -127,38 +102,12 @@ describe("tier 1 and tier 2 findings in the default advise mode", () => {
     expect(await gate({ content: "# cache the previous input value for diffing on next call\nuser_name = input_value" })).toEqual({});
   });
 
-  test("warns on filler-word qualifier comment", async () => {
-    expect(await gate({ content: "# obviously this handles the edge case\nfoo()" })).toEqual(advice(filler("obviously this handles the edge case")));
-  });
-
-  test("no warning for comment without filler qualifiers", async () => {
-    expect(await gate({ content: "# handles the edge case for empty input\nfoo()" })).toEqual({});
-  });
-
-  test("a filler word inside a code span is a command name, not a qualifier", async () => {
-    expect(await gate({ content: "# CI runs `just ci` on every push\nfoo()" })).toEqual({});
-  });
-
-  test("a filler word outside the code span still warns", async () => {
-    expect(await gate({ content: "# just run `make` on every push\nfoo()" })).toEqual(advice(filler("just run `make` on every push")));
-  });
-
   test("warns on decorative separator comment", async () => {
     expect(await gate({ content: "# ====================\nfoo()" })).toEqual(advice(separator("====================")));
   });
 
   test("no warning for a labeled section-banner comment", async () => {
     expect(await gate({ content: "# === Section: Setup ===\nfoo()" })).toEqual({});
-  });
-
-  test("warns on trivial doc comment above a one-line function", async () => {
-    const content = "# returns the user id\ndef get_user_id():\n    return self.id\n";
-    expect(await gate({ content })).toEqual(advice(restates("returns the user id"), trivialDoc("returns the user id")));
-  });
-
-  test("no warning for a doc comment that adds real information", async () => {
-    const content = "# validates against the external billing service and retries on timeout\ndef get_user_id():\n    return self.id\n";
-    expect(await gate({ content })).toEqual({});
   });
 
   test("warns on context-free TODO with no ref/owner/explanation", async () => {
@@ -170,35 +119,24 @@ describe("tier 1 and tier 2 findings in the default advise mode", () => {
   });
 
   test("@allow bypasses slop-pattern checks on that line", async () => {
-    expect(await gate({ content: "# obviously simple @allow\nfoo()" })).toEqual({});
+    expect(await gate({ content: "# ==================== @allow\nfoo()" })).toEqual({});
   });
 
   test("a disable-file marker in the first five lines exempts the whole write", async () => {
-    const content = "# comment-gate-disable-file\n# obviously this is bad\nfoo()";
+    const content = "# comment-gate-disable-file\n# ====================\nfoo()";
     expect(await gate({ content })).toEqual({});
   });
 
   test("a disable-file marker after the fifth line exempts nothing", async () => {
-    const content = "a()\nb()\nc()\nd()\ne()\n# comment-gate-disable-file\n# obviously this is bad\nfoo()";
-    expect(await gate({ content })).toEqual(advice(filler("obviously this is bad")));
+    const content = "a()\nb()\nc()\nd()\ne()\n# comment-gate-disable-file\n# ====================\nfoo()";
+    expect(await gate({ content })).toEqual(advice(separator("====================")));
   });
 });
 
 describe("what counts as a comment depends on the language", () => {
-  test("shellcheck source directive is not a restatement", async () => {
+  test("denies a decorative separator in a shell script", async () => {
     inDenyMode();
-    const content = '# shellcheck source=lib/common.sh\nsource "$(dirname "$0")/lib/common.sh"';
-    expect(await write("/repo/scripts/foo.sh", content)).toEqual({});
-  });
-
-  test("still denies a genuine restatement in a shell script", async () => {
-    inDenyMode();
-    expect(await write("/repo/scripts/foo.sh", '# set the user name\nuser_name="$input_value"')).toEqual(blockedForSlop(restates("set the user name")));
-  });
-
-  test("pragma keyword mid-comment is not exempt", async () => {
-    inDenyMode();
-    expect(await write("/repo/x.py", "# the path for noqa\nself.path = path")).toEqual(blockedForSlop(restates("the path for noqa")));
+    expect(await write("/repo/scripts/foo.sh", '# ----------\nuser_name="$input_value"')).toEqual(blockedForSlop(separator("----------")));
   });
 
   test("C preprocessor directives are not comments", async () => {
@@ -207,14 +145,36 @@ describe("what counts as a comment depends on the language", () => {
     expect(await write("/repo/ta/pamir_ks_ta.c", content)).toEqual({});
   });
 
-  test("still catches a restating // comment in C", async () => {
+  test("still catches a separator // comment in C", async () => {
     inDenyMode();
-    expect(await write("/repo/ta/x.c", "// set the user name\nuser_name = input_value;")).toEqual(blockedForSlop(restates("set the user name")));
+    expect(await write("/repo/ta/x.c", "// ----------\nuser_name = input_value;")).toEqual(blockedForSlop(separator("----------")));
+  });
+
+  test("a new kernel C file with a header, an SPDX line and a name-first comment passes in deny mode", async () => {
+    inDenyMode();
+    const content = [
+      "// SPDX-License-Identifier: GPL-2.0",
+      "// Rockchip HDMI driver",
+      "// Copyright (C) 2026 Example",
+      "#include <linux/module.h>",
+      "// rockchip_hdmi_probe - probe the hdmi device",
+      "static int rockchip_hdmi_probe(struct platform_device *pdev)",
+      "{",
+      "\treturn 0;",
+      "}",
+    ].join("\n");
+    expect(await write("/repo/drivers/rockchip_hdmi.c", content)).toEqual({});
   });
 
   test("reads -- as the comment marker in Lua", async () => {
     inDenyMode();
-    expect(await write("/repo/x.lua", "-- set the user name\nuser_name = input_value")).toEqual(blockedForSlop(restates("set the user name")));
+    expect(await write("/repo/x.lua", "-- ----------\nuser_name = input_value")).toEqual(blockedForSlop(separator("----------")));
+  });
+
+  test("a Rust file with module docs and item docs passes in deny mode", async () => {
+    inDenyMode();
+    const content = "//! Config loading.\n\n/// Parses the text.\n///\n/// # Examples\npub fn parse_config() {}\n\npub struct Config {\n    /// The timeout in seconds.\n    pub timeout: u64,\n}";
+    expect(await write("/repo/src/config.rs", content)).toEqual({});
   });
 
   test("skips non-source files so Markdown headings are not comments", async () => {
@@ -289,7 +249,7 @@ describe("enforcement level", () => {
 
   test("advise mode names the tier it would have denied on the server log", async () => {
     await write("/tmp/x.sh", "# AI-generated helper\nfoo() { :; }");
-    await write("/tmp/x.sh", "# obviously this handles the edge case\nfoo");
+    await write("/tmp/x.sh", "# ----------\nfoo");
     await write("/tmp/x.sh", "# === Section ===\nfoo");
     expect(errors.mock.calls).toEqual([
       ["omca: comment-gate would deny (tier1) /tmp/x.sh"],
@@ -300,17 +260,6 @@ describe("enforcement level", () => {
   test("deny mode blocks tier-1 literal patterns", async () => {
     inDenyMode();
     expect(await write("/tmp/x.sh", "# AI-generated helper\nfoo() { :; }")).toEqual(blockedForAttribution(ATTRIBUTION));
-  });
-
-  test("a tier-3 finding alone only advises, even in deny mode", async () => {
-    inDenyMode();
-    const content = "// a\n// b\n// c\n// d\n// e\n// f\nfoo();";
-    expect(await write("/repo/x.ts", content)).toEqual(
-      advice(
-        "Excessive consecutive comment lines (6 in a row) detected.",
-        "High comment density (6 comment lines to 1 code lines): likely line-by-line narration rather than documentation.",
-      ),
-    );
   });
 
   test("gate off exits silently", async () => {
@@ -328,8 +277,8 @@ describe("enforcement level", () => {
 });
 
 describe("a tier-2 denial is given once per file and finding", () => {
-  const slop = "# set the user name\nuser_name = input_value";
-  const sentence = restates("set the user name");
+  const slop = "# ----------\nuser_name = input_value";
+  const sentence = separator("----------");
 
   test("the first denial blocks, the identical retry passes with advice, and the third blocks again", async () => {
     inDenyMode();
@@ -355,7 +304,7 @@ describe("a tier-2 denial is given once per file and finding", () => {
   test("another finding in the same file is denied", async () => {
     inDenyMode();
     expect(await write("/repo/a.py", slop)).toEqual(blockedForSlop(sentence));
-    expect(await write("/repo/a.py", "# set the path name\npath_name = input_value")).toEqual(blockedForSlop(restates("set the path name")));
+    expect(await write("/repo/a.py", "# ==========\npath_name = input_value")).toEqual(blockedForSlop(separator("==========")));
   });
 
   test("a retry in another session is denied again", async () => {

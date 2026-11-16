@@ -14,7 +14,7 @@ const SCENARIOS: Record<string, { tool: string; args: Json }> = {
   "prompt-fidelity": { tool: "subagent", args: { agent: "omca-executor", description: "Read task contract", prompt: "OMCA-SCENARIO:warm-up\n\nTask: Read `src/audio helper.ts` without editing files.\nConstraints: No network, hardware access, or commits.\nReference only: `printf '%s\\n' 'two words'`.\nKeep the 200–250 ms interval and the 30 s deadline." } },
   "prompt-joined": { tool: "subagent", args: { agent: "omca-executor", description: "Joined prompt", prompt: "OMCA-SCENARIO:write-file\n\nKeep scope narrowexceptwhereplanrequires and reportunresolvedtechnicalrisks." } },
   "skill-load": { tool: "skill", args: { id: "omca-handoff" } },
-  "slop-write": { tool: "write", args: { path: "slop.sh", content: '# set the user name\nuser_name="$input_value"\n' } },
+  "slop-write": { tool: "write", args: { path: "slop.sh", content: '# ----------\nuser_name="$input_value"\n' } },
   "explore-write": { tool: "subagent", args: { description: "omca stub", prompt: "OMCA-SCENARIO:write-file" } },
   "plan-worker": { tool: "subagent", args: { agent: "omca-executor", description: "forbidden plan worker", prompt: "OMCA-SCENARIO:write-file" } },
   "plan-general": { tool: "subagent", args: { agent: "general", description: "forbidden general worker", prompt: "OMCA-SCENARIO:write-file" } },

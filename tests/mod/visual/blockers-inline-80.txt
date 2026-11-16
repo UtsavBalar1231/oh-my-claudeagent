@@ -6,7 +6,7 @@
 ❯ Add a sum helper, set up the review task, then push
 
 ● Write(src/sum.ts)
-    OMCA comment check held this write · simply add the two numbers together
+    OMCA comment check held this write · TODO fix this
      delete the quoted comment, or rewrite it as the reason the code is the wa…
     #1 Review the sum helper · final task has no logged verdict
      record the verdict first with evidence_log

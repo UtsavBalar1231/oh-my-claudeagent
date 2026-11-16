@@ -49,7 +49,7 @@ async function rowsOf($: Engine, { tool = "Bash", output, isErrored = true, ...r
   return rows;
 }
 
-const slop = judgeWrite("deny", { file_path: "/work/src/a.py", content: "# obviously the user name\nuser_name = input_value" }, new Map());
+const slop = judgeWrite("deny", { file_path: "/work/src/a.py", content: "# TODO fix this\nuser_name = input_value" }, new Map());
 const slopReason = slop?.kind === "deny" ? slop.reason : "";
 
 const REMEDY_AT_80 = "     delete the quoted comment, or rewrite it as the reason the code is the wa…";
@@ -88,14 +88,14 @@ const ROWS: readonly { name: string; result: Result; at80: string[]; at120?: str
   {
     name: "a comment check deny",
     result: { tool: "Write", output: `${HOOK_ERROR("Write")}${slopReason}` },
-    at80: ["  !  OMCA comment check held this write · obviously the user name", REMEDY_AT_80],
-    at120: ["  !  OMCA comment check held this write · obviously the user name", REMEDY_AT_120],
+    at80: ["  !  OMCA comment check held this write · TODO fix this", REMEDY_AT_80],
+    at120: ["  !  OMCA comment check held this write · TODO fix this", REMEDY_AT_120],
   },
   {
     name: "a comment check deny in the bare Error form",
     result: { tool: "Write", output: `Error: ${slopReason}` },
-    at80: ["  !  OMCA comment check held this write · obviously the user name", REMEDY_AT_80],
-    at120: ["  !  OMCA comment check held this write · obviously the user name", REMEDY_AT_120],
+    at80: ["  !  OMCA comment check held this write · TODO fix this", REMEDY_AT_80],
+    at120: ["  !  OMCA comment check held this write · TODO fix this", REMEDY_AT_120],
   },
   {
     name: "a guard deny of a Monitor command",

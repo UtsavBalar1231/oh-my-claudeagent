@@ -231,7 +231,7 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
 
   test("slop-write: the comment gate denial reaches the model and the file is not written", async () => {
     const scenario = await ran("slop-write")
-    verify(toolResults(scenario).includes("omca guard: Blocked: comment slop."), "slop-write: no comment gate denial reached the model")
+    verify(toolResults(scenario).includes("omca guard: Blocked: comment slop. Decorative separator comment ("), "slop-write: no comment gate denial reached the model")
     verify(!existsSync(join(need().ws, "slop.sh")), "slop-write: slop.sh was written")
   }, SLOW)
 
