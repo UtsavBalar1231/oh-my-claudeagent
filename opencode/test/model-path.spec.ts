@@ -101,7 +101,7 @@ function ran(name: string): Promise<Scenario> {
 }
 
 async function ranAll(): Promise<void> {
-  for (const name of ["shell-reset", "subagent", "skill-load", "explore-write"]) await ran(name)
+  for (const name of ["shell-no-verify", "subagent", "skill-load", "explore-write"]) await ran(name)
 }
 
 describe.skipIf(!opencodeBin)("opencode model path", () => {
@@ -168,10 +168,10 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
 
   const head = () => git(need().ws, "rev-parse", "HEAD")
 
-  test("shell-reset: the guard denial reaches the model and HEAD stays", async () => {
-    const scenario = await ran("shell-reset")
-    verify(head() === scenario.headBefore, "shell-reset: HEAD moved")
-    verify(toolResults(scenario).includes("omca guard:"), "shell-reset: no omca guard denial reached the model")
+  test("shell-no-verify: the guard denial reaches the model and HEAD stays", async () => {
+    const scenario = await ran("shell-no-verify")
+    verify(head() === scenario.headBefore, "shell-no-verify: HEAD moved")
+    verify(toolResults(scenario).includes("omca guard:"), "shell-no-verify: no omca guard denial reached the model")
   }, SLOW)
 
   test("subagent: the omca-executor child session sees the guard denial", async () => {
@@ -231,7 +231,7 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
 
   test("slop-write: the comment gate denial reaches the model and the file is not written", async () => {
     const scenario = await ran("slop-write")
-    verify(toolResults(scenario).includes("omca guard: Blocked: comment slop."), "slop-write: no comment gate denial reached the model")
+    verify(toolResults(scenario).includes("omca guard: Blocked: comment slop. Decorative separator comment ("), "slop-write: no comment gate denial reached the model")
     verify(!existsSync(join(need().ws, "slop.sh")), "slop-write: slop.sh was written")
   }, SLOW)
 
@@ -241,6 +241,13 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
     verify(explorer.length > 0, "explore-write: no request carried the omca-explorer system")
     verify(explorer.every((request) => !toolNames(request).some((name) => ["write", "edit", "patch", "shell"].includes(name))), "explore-write: omca-explorer was offered a write tool or unrestricted shell")
     verify(!existsSync(join(need().ws, "explored.txt")), "explore-write: explored.txt was written")
+  }, SLOW)
+
+  test("prompt-joined: a delegation prompt with words run together is refused before the child starts", async () => {
+    const scenario = await ran("prompt-joined")
+    verify(toolResults(scenario).includes("omca guard: Delegation prompt blocked: 2 of its tokens run words together, such as narrowexceptwhereplanrequires, reportunresolvedtechnicalrisks."), "prompt-joined: the refusal did not reach the model")
+    verify(!during(scenario).some((request) => system(request).includes(EXECUTOR)), "prompt-joined: the executor started")
+    verify(!existsSync(join(need().ws, "explored.txt")), "prompt-joined: the child wrote a file")
   }, SLOW)
 
   test("skill-load: the skill returns its concise manual-only body without untranslated text", async () => {

@@ -83,9 +83,9 @@ The adapter supports OpenCode 2.2.5 or later in the 2.x release line. Add the pa
       "package": "oh-my-claudeagent@git+https://github.com/UtsavBalar1231/oh-my-claudeagent.git",
       "options": {
         "models": {
-          "opus": "openai/gpt-6.1-sol#high",
-          "sonnet": "openai/gpt-6.1-sol#high",
-          "fable": "openai/gpt-6.1-sol#xhigh"
+          "opus": "openai/gpt-6.1-sol",
+          "sonnet": "openai/gpt-6.1-terra",
+          "fable": "openai/gpt-6-astra"
         }
       }
     }
@@ -99,7 +99,10 @@ to `cli.json`.
 
 `options.models` maps OMCA's `opus`, `sonnet` and `fable` tiers to OpenCode model ids, in
 `provider/model` form with an optional `#variant`. Without it, every `omca-*` subagent runs on
-the parent session's model. To override one agent, set `agents.omca-<name>.model` in your own
+the parent session's model. A model named without a `#variant` runs each agent at the effort its
+definition declares, used as the variant: `xhigh` for `omca-architect`, `medium` for
+`omca-build-fixer` and `omca-viewer`, `high` for the rest. A `#variant` sets one effort for the
+whole tier. To override one agent, set `agents.omca-<name>.model` in your own
 config. The `ast_*` tools need ast-grep on `PATH`.
 
 Choose `omca` from the primary-agent selector for coordination. Build and Plan
@@ -141,7 +144,12 @@ The adapter registers native `omca_*` evidence, notepad, AST, task and file
 tools. It does not start a duplicate OMCA MCP process. Custom filesystem tools
 still check native read/edit permissions; they do not bypass an external-directory
 deny. The shell guard uses the actual command directory. The comment gate blocks
-only with `OMCA_COMMENT_GATE=deny`.
+only with `OMCA_COMMENT_GATE=deny`. A `subagent` call whose prompt runs words together is
+refused with a request to resend it with a space between every word. The check splits each
+token missing from an English word list into listed words, and counts a join that holds a
+function word or three or more words. It refuses at 5 missing spaces that are also 1% of the
+prompt's words. Code, URLs, paths, flags and names inside a sentence are skipped.
+`OMCA_DISABLED_HOOKS=delegation-guard` turns the refusal off.
 
 **Limits:** OpenCode has no OMCA Stop veto, so nothing keeps a session working. A
 run's final task does refuse to complete until a passing verdict names it, and refuses
@@ -282,8 +290,6 @@ the work happens:
   own in place of Claude Code's error text, which names every plugin with a check hook:
   - `OMCA guard refused · <title>`, with what to do instead beneath it, for a command the guard
     refused.
-  - `you refused this in the OMCA guard`, then `Claude asks how to proceed`, after you pick Refuse
-    in the review dialog.
   - `#<id> <subject> · stays the run's final task` or `· final task has no logged verdict` when
     the final-task guard refuses to delete, block or unmark it.
   - `#<id> <subject> · completion held: no passing verdict names it`, or `· completion held: a
@@ -477,44 +483,59 @@ to another interpreter: `bash -c`, `sh -c`, `eval`, a heredoc fed to a shell, `p
 `sudo`, `env`, `timeout`, `nice`, `nohup`, `stdbuf`, `ionice`, `chrt`, `setsid`, `time` and
 `xargs`.
 
+The guard denies only a command that destroys something, with no dialog, in every permission mode
+including bypassPermissions. Every other command goes on to Claude Code's own permission checks.
+The deny reason names the cause, so Claude can rewrite the command.
+
 A recursive removal of the filesystem root, your home, the project or a folder directly under
-root or home is always refused, in every permission mode.
+root or home is always denied. The guard reads the command the way the shell runs it:
 
-A force push to the default branch and `git commit --no-verify` (or `-n`) are held for your
-review, and refused wherever no dialog can show, in every permission mode including
-bypassPermissions. The same goes for the git commands that discard work: `git reset --hard`,
-`git stash`, `git clean`, `git restore`, a recursive `git rm`, and `git checkout` with a `--`
-path. `git restore --staged` without `--worktree` touches only the index and runs. The guard
-reads `rm` and git options wherever they stand, so `rm ~ -rf` and `git reset HEAD --hard` count.
-The default branch is the one `origin/HEAD` names, or `main` and `master` when it names none,
-read from local refs without a network call.
+- A variable assigned earlier in the same command, as a statement of its own
+  (`S=/srv/scratch; rm -rf "$S/build"`), is read as its value. A variable the command does not
+  set reads as empty, so `rm -rf $S/build` is denied as a removal of `/build`. So does one set
+  only for a single command (`S=/tmp/x rm -rf $S/y`, where the shell expands `$S` first), after
+  `&&` or `||`, in a pipeline or a subshell, or inside a block or loop that may not run.
+- `${S:?}` stops the shell when `S` is unset or empty, so a target built on it is never the empty
+  variable's.
+- `$(mktemp ...)` reads as a new temporary path. Any other command substitution or backtick in a
+  target is denied, since it can name any path.
+- `cd dir && rm -rf *` is judged in `dir` when `dir` is a literal path or a variable assigned in the
+  same command. With `;` or a newline between them, the rm also runs in the original directory when
+  the `cd` fails, so a glob that would empty the project is denied and the reason says to join
+  them with `&&`.
+- A redirection such as `2>/dev/null` or `< file` is not a target.
 
-A force push to any other branch, any other recursive removal, and an `xargs rm -rf` whose
-targets can't be known in advance are held for your review in an interactive session and allowed
-to run where no dialog can be shown.
+In PowerShell, a variable assigned earlier with `$name = '...'` is read the same way. Any other
+recursive removal runs.
 
-Set `OMCA_DISABLED_HOOKS=bash-guard` to turn off everything except the catastrophic-removal
-check.
+A git command that discards work is denied only when it would discard something, checked against
+the repository it runs in: the session's directory, the directory `git -C` names, or the one a
+`cd` before it enters.
 
-### The review dialog
+- `git reset --hard`, `git checkout .`, `git checkout -- .` and `git restore .` are denied when
+  `git status` lists an uncommitted change to a tracked file.
+- `git clean` without `-n` or `--dry-run` is denied when the same clean run as a dry run lists
+  anything.
+- `git stash drop` and `git stash clear` are denied when `git stash list` holds an entry.
 
-The dialog shows the command and what it would touch: each removal target with its kind and
-entry count, the uncommitted changes a hard reset discards, or the commits a force push drops
-from the remote. The command wraps onto up to four rows, and each list ends in `and N more` where
-it would push the dialog past a 24-row terminal. Choose **Run it** to hand the command back to the
-normal permission checks.
-**Refuse**, a dismissed dialog, or a failed one refuses it, and Claude is told not to retry. After
-Refuse, Claude reads that you refused the command and asks how to proceed, and text you type under
-Other reaches it as your own words.
+On a clean repository they run. Outside a repository git fails on its own, so they run there too.
+When the guard cannot read the repository (git is missing, a read times out, or the directory is
+only known once the command runs), it denies the command and says so. Its reads take no lock and
+turn off a configured fsmonitor hook, so checking runs nothing from the repository's configuration.
 
-The dialog shows in the terminal and the Desktop app. In `claude -p`, the Agent SDK and the VS
-Code chat panel nothing can show it, so a held command is decided without you, as above.
+Reverting named paths (`git checkout -- <paths>`, `git restore <paths>`) runs, and so do
+`git stash`, `git stash push`, `pop` and `apply`, and `git rm -r`, which git refuses on its own
+when it would drop uncommitted changes. `git restore --staged` without `--worktree` touches only
+the index and runs.
 
-### `guardMode`
+A force push to the default branch, or with `--all` or `--mirror`, and `git commit --no-verify`
+(or `-n`) are always denied. A force push to another branch runs. The default branch is the one
+`origin/HEAD` names, or `main` and `master` when it names none, read from local refs without a
+network call. The guard reads `rm` and git options wherever they stand, so `rm ~ -rf` and
+`git reset HEAD --hard` count.
 
-The `guardMode` option is `dialog` by default. Set it to `deny` to skip the dialog everywhere:
-the work-discarding git commands, a force push to the default branch and `--no-verify` are
-refused, and a force push to another branch or any other recursive removal runs.
+Set `OMCA_DISABLED_HOOKS=bash-guard` to turn off the git rules. The catastrophic-removal deny has
+no switch.
 
 ### Permissions
 
@@ -534,7 +555,7 @@ server's whole normalized name followed by `__*`. A shorter prefix such as
 - whether bun 1.4.2 or later is on the session's `PATH`;
 - when a hook last reached the `omca` server;
 - whether `ast-grep` or `sg` is on `PATH`;
-- the `showBand` and `guardMode` options;
+- the `showBand` option;
 - `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`, which puts every agent on one model;
 - a `maxEffortLevel` cap that holds agents below their declared effort;
 - `CLAUDE_CODE_EFFORT_LEVEL`, which sets one effort for every agent whatever it declares;
@@ -600,7 +621,7 @@ missing. Make bun reachable from the app's `PATH`, for example
 by linking it into a directory the app searches, and restart the app.
 
 The Code tab in Desktop runs its own bundled copy of Claude Code. OMCA's mod
-(the guard, transcript rows, band, pane, toasts and guard dialog) runs there only when that copy is 2.1.300 or
+(the guard, transcript rows, band, pane and toasts) runs there only when that copy is 2.1.300 or
 later; `/status` in a Code-tab session shows its version. On an older copy the agents, skills,
 MCP tools and stop gates still work and the mod does not load. Desktop for Linux is a beta for
 Debian and Ubuntu that updates through the package manager, so a newer bundled copy arrives with
@@ -629,8 +650,8 @@ On Desktop the mod draws differently:
 - The transcript keeps Desktop's own rows: Desktop draws its own turn footer, so the turn's
   figures and receipt arrive as a text row beneath the answer.
 
-The VS Code chat panel runs OMCA's hooks but draws none of its interface: no band, no pane and
-no guard dialog ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)).
+The VS Code chat panel runs OMCA's hooks and its guard but draws none of its interface: no band
+and no pane ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)).
 The [availability table](references.md#where-each-feature-works) lists each feature by app.
 
 ## Troubleshooting

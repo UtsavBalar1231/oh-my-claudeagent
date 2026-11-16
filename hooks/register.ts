@@ -62,7 +62,6 @@ function bindHost($: EngineInterface, options: Options): Host {
       say: (text) => $.ui.log(text),
       open: (args) => $.ui.open(args),
       panes: () => $.ui.panes(),
-      ask: (question, choices) => $.ui.ask(question, choices),
       invalidate: () => $.ui.invalidate("ui.render"),
       focus: (args) => $.ui.focus(args),
       resolve: (e) => $.ui.resolve(e),
@@ -172,7 +171,6 @@ function bindHost($: EngineInterface, options: Options): Host {
 export function readOptions(options: PluginOptions): Options {
   return {
     showBand: options["showBand"] !== false,
-    guardMode: options["guardMode"] === "deny" ? "deny" : "dialog",
     enableKeywordTriggers: options["enableKeywordTriggers"] === true,
   };
 }

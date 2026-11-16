@@ -80,7 +80,6 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
         "state.get",
         "state.set",
         "tool.list",
-        "ui.ask",
         "ui.blit",
         "ui.cancelNotify",
         "ui.copy",
@@ -299,16 +298,8 @@ test("the router splits the first word from the rest and keeps the rest verbatim
   expect(split("doctor\tnow")).toEqual({ name: "doctor", rest: "now" });
 });
 
-test("options default to a shown band and the dialog guard, and take the stored values", async () => {
-  expect(readOptions({})).toEqual({ showBand: true, guardMode: "dialog", enableKeywordTriggers: false });
-  expect(readOptions({ showBand: false, guardMode: "deny", enableKeywordTriggers: true })).toEqual({
-    showBand: false,
-    guardMode: "deny",
-    enableKeywordTriggers: true,
-  });
-  expect(readOptions({ showBand: "false", guardMode: "DENY", enableKeywordTriggers: "true" })).toEqual({
-    showBand: true,
-    guardMode: "dialog",
-    enableKeywordTriggers: false,
-  });
+test("options default to a shown band, and take the stored values", async () => {
+  expect(readOptions({})).toEqual({ showBand: true, enableKeywordTriggers: false });
+  expect(readOptions({ showBand: false, enableKeywordTriggers: true })).toEqual({ showBand: false, enableKeywordTriggers: true });
+  expect(readOptions({ showBand: "false", enableKeywordTriggers: "true" })).toEqual({ showBand: true, enableKeywordTriggers: false });
 });

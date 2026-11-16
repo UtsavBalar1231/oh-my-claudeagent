@@ -98,7 +98,7 @@ test("/omca opens the pane focused and closable by Esc on the Agents tab, sized 
 
   expect(await $.command.run(run(""))).toEqual({});
 
-  expect(w.opened).toEqual([{ id: "omca", title: "OMCA", focus: true, closeOnEscape: true, rows: 12, columns: 56 }]);
+  expect(w.opened).toEqual([{ id: "omca", title: "OMCA", focus: true, closeOnEscape: true, backgroundColor: "transparent", rows: 12, columns: 56 }]);
   const ui = await $.ui.mount(pane("terminal", { columns: 120, rows: 40, placement: "dock" }));
   expect(rows(await ui.drawn()).slice(0, 3)).toEqual([
     BAR,
@@ -590,7 +590,7 @@ test("a subagent spawn opens no pane: the transcript reports agents, and /omca o
   expect(w.opened).toEqual([]);
 
   await $.command.run(run(""));
-  expect(w.opened).toEqual([{ id: "omca", title: "OMCA", focus: true, closeOnEscape: true, rows: 12, columns: 56 }]);
+  expect(w.opened).toEqual([{ id: "omca", title: "OMCA", focus: true, closeOnEscape: true, backgroundColor: "transparent", rows: 12, columns: 56 }]);
 });
 
 const metric = (agentId: string) =>

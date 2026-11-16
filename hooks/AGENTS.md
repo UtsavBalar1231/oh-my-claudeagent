@@ -116,8 +116,7 @@ after the send. From 2.1.321 the call carries `key: "agents-done"`, `delayMs: 60
 `untilBack: true`, so a host holds it a minute and drops it when the person returns; a terminal
 ignores all three and raises it at once. The first spawn of a wave calls
 `$.ui.cancelNotify("agents-done")` to take back a held one. A client older than 2.1.321 gets the
-title alone and no cancel. Every call is awaited in a try/catch that logs. No guard notification: Claude
-Code sends its own `permission_prompt` one while the guard dialog waits.
+title alone and no cancel. Every call is awaited in a try/catch that logs.
 `OMCA_DISABLED_HOOKS=notify` turns the feature off.
 
 `task-rows` places one row with `$.ui.place` under the turn line of a main turn that changed a run's
@@ -226,30 +225,34 @@ overflowing region, a row, a page (`bodyRows`) or an end (`contentRows`) at a ti
   both; `task-continuation` or `drift-guard` turns off one.
 - The destructive-command guard lives in the mod, on `tool.check` for Bash, PowerShell and Monitor
   (whose commands are bash: Monitor needs Git Bash on Windows)
-  (`hooks/bash-guard.ts`, with its patterns in `src/core/destructive.ts`). A recursive removal
-  whose target is the filesystem root, home, the working directory, or a directory directly
-  under root or home is denied outright. The destructive git family (hard reset, stash, clean,
-  a restore that writes the working tree, recursive `git rm`, path checkout), a force push to the
-  default branch and `git commit --no-verify` are held for review and denied wherever no dialog
-  can show. Any other recursive removal, an `xargs rm -rf` whose targets are not known, and a
-  force push to another branch are held for review and run where no dialog can show. Where a
-  dialog can show and the `guardMode` option is `dialog`, the guard asks the user, and only
-  "Run it" lets the call continue. With `guardMode` set to `deny`, no dialog shows. The default
-  branch is the one `origin/HEAD` names, or `main` and `master` when it names none, read from
-  local refs. `OMCA_DISABLED_HOOKS=bash-guard` turns the review off and never the outright deny.
+  (`hooks/bash-guard.ts`, with its patterns in `src/core/destructive.ts`, the shell state it reads
+  in `src/core/shell-state.ts` and the repository reads in `src/core/git-state.ts`). It denies or
+  stays silent: it never asks. A recursive removal whose target is the filesystem root, home, the
+  working directory, or a directory directly under root or home is denied, with a reason that
+  names the cause. The target is read the way the shell expands it: a variable the command
+  assigns in a statement of its own takes its value, one it does not set reads as empty, `${VAR:?}`
+  is never empty, `$(mktemp ...)` is a temporary path, any other substitution is unknown, a glob
+  after `cd dir &&` is judged in `dir`, and a redirection is not a target. Any other recursive
+  removal runs. `git reset --hard`, `git checkout .`, `git restore .`, `git clean` and
+  `git stash drop` or `clear` are denied only when the repository they run in holds work they
+  would discard: the guard runs `git status`, a `git clean --dry-run` or `git stash list` there
+  through `host.process.run`, and denies when such a read fails. A force push to the default
+  branch and `git commit --no-verify` are denied outright, and every other git command runs. The
+  default branch is the one `origin/HEAD` names, or `main` and `master` when it names none, read
+  from local refs. `OMCA_DISABLED_HOOKS=bash-guard` turns the git rules off and never the
+  catastrophic deny.
 
   The patterns match at any command position: string start, after a separator, or inside a
   subshell or command substitution, behind wrappers such as `sudo`, `env`, `command`, `timeout`
-  and `xargs` and `VAR=value` prefixes. `rm` options and the options of `git reset`, `git rm`,
-  `git restore` and `git commit` count wherever they stand before `--`. The guard also reads
+  and `xargs` and `VAR=value` prefixes. `rm` options and the options of `git reset`,
+  `git restore`, `git checkout`, `git clean` and `git commit` count wherever they stand before `--`. The guard also reads
   commands handed to another interpreter: `bash -c`, `sh -c`, `eval`, a heredoc fed to a shell,
   `pwsh -Command`, `cmd /c` and `Invoke-Expression` with a literal string. Anchoring on command position keeps a literal
   mention out of scope, since the `rm` in `grep -rn "rm -rf" scripts/` follows a quote rather than
-  a separator. `tool.check` runs before every Bash, PowerShell and Monitor call in every permission mode,
-  so the guard never depends on a dialog being shown. The platform's critical-path check on `rm`
+  a separator. `tool.check` runs before every Bash, PowerShell and Monitor call in every permission mode. The platform's critical-path check on `rm`
   and `rmdir` asks in the terminal or denies in auto mode, and the classifier does not review
   those removals. That check covers critical paths only, while the guard also covers the
-  destructive git family, force pushes and other recursive removals, so it must not be deleted
+  git commands that discard work, force pushes and `--no-verify`, so it must not be deleted
   as duplicated platform behavior.
 - `tool.check` never returns an allow, because an allow there skips the auto-mode classifier.
   No OMCA hook returns an allow on any event: hooks deny, ask or steer, and allow decisions come

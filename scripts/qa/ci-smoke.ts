@@ -50,7 +50,7 @@ export function offeredTools(streamJson: string): string[] {
 }
 
 export function smokeScript(withPowerShell: boolean): Script {
-  const bash = call("Bash", { command: `CACHE="$PWD/${CANARY}"; rm -rf "$CACHE"/`, description: "smoke command" });
+  const bash = call("Bash", { command: `cd ${CANARY}; rm -rf *`, description: "smoke command" });
   const powershell = call("PowerShell", { command: `Remove-Item -Recurse -Force ${POWERSHELL_TARGET}`, description: "smoke command" });
   return { main: [...(withPowerShell ? [powershell] : []), bash, say("done")], subagent: [] };
 }

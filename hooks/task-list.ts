@@ -693,7 +693,7 @@ function stopReading(): void {
 async function openPane(host: Host, e: Input<"command.run">): Promise<CommandRunResult> {
   await sessionOf(host);
   await sync(host);
-  const opened = await host.ui.open({ id: TASK_PANE, title: "Tasks", focus: true, closeOnEscape: true, rows: INLINE_REQUEST_ROWS, columns: dockColumns(e.presentation.columns) });
+  const opened = await host.ui.open({ id: TASK_PANE, title: "Tasks", focus: true, closeOnEscape: true, backgroundColor: "transparent", rows: INLINE_REQUEST_ROWS, columns: dockColumns(e.presentation.columns) });
   startReading(host);
   if (opened.isPlaced) return {};
   if (opened.reason.startsWith("no-surface")) return { text: "No surface is attached to this session, as under claude -p, so the task list is not drawn. Run /tasklist in a terminal or the Desktop app." };

@@ -30,7 +30,7 @@ export const Progress = () => {
     <Canvas>
       <Shot clip={F8} border={color.omcaBorder} box={BOX} keyframes={[{ frame: 0, ...VIEW }]} segments={plan.t.segments} />
       <CornerLabel />
-      <Chapter name="Work" beatDuration={plan.duration} leaves />
+      <Chapter name="Work" beatDuration={plan.duration} />
       <Timed {...plan.caption}>
         <Caption text="Progress where you type." />
       </Timed>

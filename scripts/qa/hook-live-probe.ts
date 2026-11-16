@@ -111,7 +111,7 @@ const FAMILIES: Family[] = [
   },
   {
     name: "Bash guard",
-    script: () => ({ main: [bash(`rm ${CANARY}/decoy.txt`), bash(`CACHE="$PWD/${CANARY}"; rm -rf "$CACHE"/`), say("done")], subagent: [] }),
+    script: () => ({ main: [bash(`rm ${CANARY}/decoy.txt`), bash(`cd ${CANARY}; rm -rf *`), say("done")], subagent: [] }),
     seed(project) {
       seedFile(project, join(CANARY, "stale.o"), "stale artifact\n");
       seedFile(project, join(CANARY, "decoy.txt"), "decoy\n");

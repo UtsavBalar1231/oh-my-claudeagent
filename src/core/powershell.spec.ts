@@ -1,11 +1,23 @@
 import { describe, expect, test } from "bun:test";
 import { classify, type Context } from "./destructive.ts";
-import { neutralizePowershell, powershellWords } from "./powershell.ts";
+import { neutralizePowershell, powershellRemovals, powershellWords } from "./powershell.ts";
+import { SESSION_STATE } from "./shell-state.ts";
 
 const PS: Context = { shell: "powershell" };
 const SESSION: Context = { shell: "powershell", home: "C:\\Users\\x", cwd: "C:\\Users\\x\\proj", root: "C:\\Users\\x\\proj" };
 
-const classOf = (command: string, ctx: Context = PS) => classify(command, ctx)?.kind ?? "none";
+/** `catastrophic`, `removal` for one that runs, `denied` for a git rule's outright deny, `checked` for a whole-tree git operation, else `none`. */
+const classOf = (command: string, ctx: Context = PS) => {
+  const finding = classify(command, ctx);
+  if (finding === undefined || finding.kind !== "git") return finding?.kind ?? "none";
+  if (finding.reason !== undefined) return "denied";
+  return finding.checks.length > 0 ? "checked" : "none";
+};
+const operationsOf = (command: string) => {
+  const finding = classify(command, PS);
+  return finding?.kind === "git" ? finding.checks.map((check) => check.operation) : finding?.kind;
+};
+const targetsOf = (command: string) => powershellRemovals(command, neutralizePowershell(command), () => SESSION_STATE).map((removal) => removal.targets);
 
 describe("the removal commands and their parameters", () => {
   test.each([
@@ -99,11 +111,8 @@ describe("cmd forms", () => {
   );
 
   test("the flags of a cmd removal are not its targets", () => {
-    expect(classify("cmd /c rd /s /q build\\out", PS)).toEqual({
-      kind: "advisory",
-      removals: [{ targets: ["build\\out"] }],
-      git: [],
-    });
+    expect(targetsOf("rd /s /q build\\out")).toEqual([["build\\out"]]);
+    expect(classOf("cmd /c rd /s /q build\\out")).toBe("removal");
   });
 });
 
@@ -174,27 +183,15 @@ describe("targets", () => {
     "ri -r x",
     "rd /s /q build",
     "del /s /q build\\*.o",
-  ])("%s is held for review", (command) => expect(classOf(command)).toBe("advisory"));
+  ])("%s runs", (command) => expect(classOf(command)).toBe("removal"));
 
   test("a removal names its targets, with quotes and commas read as PowerShell reads them", () => {
-    expect(classify("Remove-Item -Recurse -Force 'my build', dist -ErrorAction Stop -Include *.o", PS)).toEqual({
-      kind: "advisory",
-      removals: [{ targets: ["my build", "dist"] }],
-      git: [],
-    });
-    expect(classify("Remove-Item -Path a, b -Recurse -Filter *.o", PS)).toEqual({
-      kind: "advisory",
-      removals: [{ targets: ["a", "b"] }],
-      git: [],
-    });
+    expect(targetsOf("Remove-Item -Recurse -Force 'my build', dist -ErrorAction Stop -Include *.o")).toEqual([["my build", "dist"]]);
+    expect(targetsOf("Remove-Item -Path a, b -Recurse -Filter *.o")).toEqual([["a", "b"]]);
   });
 
   test("a removal is reported for each statement in command order", () => {
-    expect(classify("Remove-Item -Recurse a; if ($x) { rm -r b }", PS)).toEqual({
-      kind: "advisory",
-      removals: [{ targets: ["a"] }, { targets: ["b"] }],
-      git: [],
-    });
+    expect(targetsOf("Remove-Item -Recurse a; if ($x) { rm -r b }")).toEqual([["a"], ["b"]]);
   });
 });
 
@@ -207,64 +204,59 @@ describe("home, the working directory and its parents", () => {
     ["Remove-Item -Recurse C:\\Users\\x\\proj", "catastrophic"],
     ["Remove-Item -Recurse C:\\Users\\x\\proj\\sub\\..", "catastrophic"],
     ["rd /s /q C:\\Users\\x\\proj\\", "catastrophic"],
-    ["Remove-Item -Recurse C:\\Users\\x\\proj\\build", "advisory"],
-    ["Remove-Item -Recurse C:\\Users\\x\\Documents\\old", "advisory"],
-    ["Remove-Item -Recurse C:\\Users\\xavier", "advisory"],
-    ["Remove-Item -Recurse D:\\Users\\x", "advisory"],
+    ["Remove-Item -Recurse C:\\Users\\x\\proj\\build", "removal"],
+    ["Remove-Item -Recurse C:\\Users\\x\\Documents\\old", "removal"],
+    ["Remove-Item -Recurse C:\\Users\\xavier", "removal"],
+    ["Remove-Item -Recurse D:\\Users\\x", "removal"],
   ])("%s is %s", (command, expected) => expect(classOf(command, SESSION)).toBe(expected));
 
-  test("without a session, a home spelling stays held for review", () => {
-    expect(classOf("Remove-Item -Recurse -Force C:\\Users\\x")).toBe("advisory");
+  test("without a session, a home spelling runs", () => {
+    expect(classOf("Remove-Item -Recurse -Force C:\\Users\\x")).toBe("removal");
   });
 });
 
 describe("git", () => {
   test.each([
-    ["git reset --hard", "reset --hard"],
-    ["git.exe reset --hard", "reset --hard"],
-    ["GIT.EXE reset --hard", "reset --hard"],
-    ["& git stash", "stash"],
-    ['& "C:\\Program Files\\Git\\cmd\\git.exe" reset --hard', "reset --hard"],
-    ["& 'C:\\Program Files\\Git\\cmd\\git.exe' clean -fd", "clean"],
-    ['"C:\\Program Files\\Git\\cmd\\git.exe" restore .', "restore"],
-    ['git -C "C:\\My Repo" reset --hard', "reset --hard"],
-    ["git -C 'C:\\My Repo' stash", "stash"],
-    ['git --git-dir "C:\\My Repo\\.git" clean -fdx', "clean"],
-    ['git --work-tree="C:\\My Repo" checkout -- .', "checkout --"],
-    ["git status; git reset --hard", "reset --hard"],
-    ["if ($dirty) { git stash }", "stash"],
-    ["Get-Date | Out-Null; git clean -fd", "clean"],
-    ["cmd /c git reset --hard", "reset --hard"],
-    ['cmd /c "git reset --hard"', "reset --hard"],
-    ["git rm -rf .", "rm -r"],
-  ] as const)("%s is blocking", (command, operation) =>
-    expect(classify(command, PS)).toEqual({ kind: "blocking", removals: [], git: [{ operation }] }),
+    ["git reset --hard", "git reset --hard"],
+    ["git.exe reset --hard", "git reset --hard"],
+    ["GIT.EXE reset --hard", "git reset --hard"],
+    ["& git stash drop", "git stash drop"],
+    ['& "C:\\Program Files\\Git\\cmd\\git.exe" reset --hard', "git reset --hard"],
+    ["& 'C:\\Program Files\\Git\\cmd\\git.exe' clean -fd", "git clean"],
+    ['"C:\\Program Files\\Git\\cmd\\git.exe" restore .', "git restore ."],
+    ['git -C "C:\\My Repo" reset --hard', "git reset --hard"],
+    ["git -C 'C:\\My Repo' stash clear", "git stash clear"],
+    ['git --git-dir "C:\\My Repo\\.git" clean -fdx', "git clean"],
+    ['git --work-tree="C:\\My Repo" checkout -- .', "git checkout ."],
+    ["git status; git reset --hard", "git reset --hard"],
+    ["if ($dirty) { git stash drop }", "git stash drop"],
+    ["Get-Date | Out-Null; git clean -fd", "git clean"],
+    ["cmd /c git reset --hard", "git reset --hard"],
+    ['cmd /c "git reset --hard"', "git reset --hard"],
+  ] as const)("%s is checked against the repository", (command, operation) => expect(operationsOf(command)).toEqual([operation]));
+
+  test.each(["git stash", "git stash pop", "git rm -rf .", "git checkout -- src", "git restore src\\a.ts"])("%s runs", (command) =>
+    expect(classOf(command)).toBe("none"),
   );
 
-  test("a force push to another branch is advisory and a blocking operation outranks it", () => {
-    expect(classify("git.exe push --force origin dev", PS)).toEqual({
-      kind: "advisory",
-      removals: [],
-      git: [{ operation: "push --force", remote: "origin", branch: "dev" }],
-    });
-    expect(classOf("git push -f; git stash")).toBe("blocking");
+  test("a force push to another branch runs, and a whole-tree operation beside it is still checked", () => {
+    expect(classify("git.exe push --force origin dev", PS)).toEqual({ kind: "git", checks: [], isForcePush: true });
+    expect(classOf("git push -f; git reset --hard")).toBe("checked");
   });
 
-  test("a force push to the default branch is blocking, by name, by origin/HEAD or as the checked-out branch", () => {
-    const main = { operation: "push --force", remote: "origin", branch: "main" } as const;
-    expect(classify("git.exe push --force origin main", PS)).toEqual({ kind: "blocking", removals: [], git: [main] });
-    expect(classify("& git push origin +main", PS)).toEqual({ kind: "blocking", removals: [], git: [main] });
-    expect(classOf("git push --force-with-lease origin master")).toBe("blocking");
-    expect(classOf("git push -f", { shell: "powershell", branch: "main" })).toBe("blocking");
-    expect(classOf("git push -f", { shell: "powershell", branch: "dev" })).toBe("advisory");
-    expect(classOf("git push -f origin trunk", { shell: "powershell", defaultBranch: "trunk" })).toBe("blocking");
-    expect(classOf("git push -f origin main", { shell: "powershell", defaultBranch: "trunk" })).toBe("advisory");
+  test("a force push to the default branch is denied, by name, by origin/HEAD or as the checked-out branch", () => {
+    expect(classOf("git.exe push --force origin main")).toBe("denied");
+    expect(classOf("& git push origin +main")).toBe("denied");
+    expect(classOf("git push --force-with-lease origin master")).toBe("denied");
+    expect(classOf("git push -f", { shell: "powershell", branch: "main" })).toBe("denied");
+    expect(classOf("git push -f", { shell: "powershell", branch: "dev" })).toBe("none");
+    expect(classOf("git push -f origin trunk", { shell: "powershell", defaultBranch: "trunk" })).toBe("denied");
+    expect(classOf("git push -f origin main", { shell: "powershell", defaultBranch: "trunk" })).toBe("none");
   });
 
-  test("a commit that skips its hooks is blocking, and a message naming the flag is not", () => {
-    const commit = { operation: "commit --no-verify" } as const;
-    expect(classify("git commit --no-verify -m 'x'", PS)).toEqual({ kind: "blocking", removals: [], git: [commit] });
-    expect(classify("git.exe commit -nm 'x'", PS)).toEqual({ kind: "blocking", removals: [], git: [commit] });
+  test("a commit that skips its hooks is denied, and a message naming the flag is not", () => {
+    expect(classOf("git commit --no-verify -m 'x'")).toBe("denied");
+    expect(classOf("git.exe commit -nm 'x'")).toBe("denied");
     expect(classOf("git commit -m 'skip -n and --no-verify'")).toBe("none");
   });
 
@@ -306,9 +298,9 @@ describe("a mention is not the command running", () => {
     expect(classOf("@'\nbody\n'@ | Set-Content x.ps1\nRemove-Item -Recurse C:\\")).toBe("catastrophic");
     expect(classOf("Remove-Item -Recurse a <# note #>\nRemove-Item -Recurse C:\\")).toBe("catastrophic");
     expect(classOf("Get-Date # note\nRemove-Item -Recurse C:\\")).toBe("catastrophic");
-    expect(classOf("Write-Host \"$(Get-Date)\"; git stash")).toBe("blocking");
-    expect(classOf("git commit -m 'x'; git reset --hard")).toBe("blocking");
-    expect(classOf('@"\nbody\n"@ | Set-Content x.ps1\ngit stash')).toBe("blocking");
+    expect(classOf("Write-Host \"$(Get-Date)\"; git stash drop")).toBe("checked");
+    expect(classOf("git commit -m 'x'; git reset --hard")).toBe("checked");
+    expect(classOf('@"\nbody\n"@ | Set-Content x.ps1\ngit stash drop')).toBe("checked");
   });
 
   test("a hash inside a token is not a comment", () => {
@@ -332,12 +324,10 @@ describe("a subexpression inside double quotes", () => {
   ])("%s is catastrophic", (command) => expect(classOf(command)).toBe("catastrophic"));
 
   test.each([
-    ['Write-Host "$(git stash)"', "stash"],
-    ['git commit -m "$(git clean -fd)"', "clean"],
-    ['@"\n$(git reset --hard)\n"@', "reset --hard"],
-  ] as const)("%s is blocking", (command, operation) =>
-    expect(classify(command, PS)).toEqual({ kind: "blocking", removals: [], git: [{ operation }] }),
-  );
+    ['Write-Host "$(git stash drop)"', "git stash drop"],
+    ['git commit -m "$(git clean -fd)"', "git clean"],
+    ['@"\n$(git reset --hard)\n"@', "git reset --hard"],
+  ] as const)("%s is checked against the repository", (command, operation) => expect(operationsOf(command)).toEqual([operation]));
 
   test("a mention beside a subexpression, or in a single-quoted string, is not a match", () => {
     expect(classOf("Write-Host '$(Remove-Item -Recurse C:\\)'")).toBe("none");
@@ -394,16 +384,12 @@ describe("-WhatIf", () => {
     ["Remove-Item -Recurse -Path C:\\ -Include -WhatIf", "catastrophic"],
     ["Remove-Item -Recurse a -WhatIf; Remove-Item -Recurse C:\\", "catastrophic"],
     ["Remove-Item -Recurse C:\\ -WhatIf; Remove-Item -Recurse C:\\", "catastrophic"],
-    ["Remove-Item -Recurse build -WhatIf:$false", "advisory"],
-    ["Remove-Item -Recurse build", "advisory"],
+    ["Remove-Item -Recurse build -WhatIf:$false", "removal"],
+    ["Remove-Item -Recurse build", "removal"],
   ])("%s is %s", (command, expected) => expect(classOf(command)).toBe(expected));
 
   test("a dry run beside a real removal reports only the real one", () => {
-    expect(classify("Remove-Item -Recurse a -WhatIf; Remove-Item -Recurse b", PS)).toEqual({
-      kind: "advisory",
-      removals: [{ targets: ["b"] }],
-      git: [],
-    });
+    expect(targetsOf("Remove-Item -Recurse a -WhatIf; Remove-Item -Recurse b")).toEqual([["b"]]);
   });
 
   test("a mention of -WhatIf in another command does not excuse the removal", () => {
@@ -419,14 +405,14 @@ describe("a relative target", () => {
     ["Remove-Item -Recurse -Path .\\..\\proj", "catastrophic"],
     ["Remove-Item -Recurse ../proj", "catastrophic"],
     ["Remove-Item -Recurse ..", "catastrophic"],
-    ["Remove-Item -Recurse .\\build", "advisory"],
-    ["Remove-Item -Recurse build\\out", "advisory"],
-    ["Remove-Item -Recurse -Force .\\proj", "advisory"],
-    ["Remove-Item -Recurse ..\\proj\\build", "advisory"],
+    ["Remove-Item -Recurse .\\build", "removal"],
+    ["Remove-Item -Recurse build\\out", "removal"],
+    ["Remove-Item -Recurse -Force .\\proj", "removal"],
+    ["Remove-Item -Recurse ..\\proj\\build", "removal"],
   ])("from the project root, %s is %s", (command, expected) => expect(classOf(command, SESSION)).toBe(expected));
 
-  test("without a working directory a relative path stays held for review", () => {
-    expect(classOf("Remove-Item -Recurse ..\\proj")).toBe("advisory");
+  test("without a working directory a relative path runs", () => {
+    expect(classOf("Remove-Item -Recurse ..\\proj")).toBe("removal");
   });
 });
 
@@ -449,10 +435,10 @@ describe("the working directory named as a variable or a subexpression", () => {
     "Remove-Item -Recurse $PWD\\build\\*",
     "rm -r $PWD\\build",
     "rd /s /q $PWD\\build",
-  ])("%s is held for review whether or not the working directory is known", (command) => {
-    expect(classOf(command, SESSION)).toBe("advisory");
-    expect(classOf(command, NO_CWD)).toBe("advisory");
-    expect(classOf(command)).toBe("advisory");
+  ])("%s runs whether or not the working directory is known", (command) => {
+    expect(classOf(command, SESSION)).toBe("removal");
+    expect(classOf(command, NO_CWD)).toBe("removal");
+    expect(classOf(command)).toBe("removal");
   });
 
   test.each([
@@ -553,31 +539,22 @@ describe("a nested command", () => {
   ])("%s is catastrophic", (command) => expect(classOf(command)).toBe("catastrophic"));
 
   test.each([
-    ["pwsh -c 'git reset --hard'", "reset --hard"],
-    ['cmd /c "git stash && echo done"', "stash"],
-    ["iex 'git clean -fdx'", "clean"],
-    ["bash -c 'git commit -n -m x'", "commit --no-verify"],
-  ] as const)("%s is blocking", (command, operation) =>
-    expect(classify(command, PS)).toEqual({ kind: "blocking", removals: [], git: [{ operation }] }),
-  );
+    ["pwsh -c 'git reset --hard'", "git reset --hard"],
+    ['cmd /c "git stash drop && echo done"', "git stash drop"],
+    ["iex 'git clean -fdx'", "git clean"],
+  ] as const)("%s is checked against the repository", (command, operation) => expect(operationsOf(command)).toEqual([operation]));
 
-  test("a force push to the default branch inside pwsh or cmd is blocking", () => {
-    expect(classOf("pwsh -c 'git push -f origin main'")).toBe("blocking");
-    expect(classOf('cmd /c "git push --force origin master"')).toBe("blocking");
-    expect(classOf("pwsh -c 'git push -f origin dev'")).toBe("advisory");
+  test("a commit that skips its hooks inside bash is denied", () => expect(classOf("bash -c 'git commit -n -m x'")).toBe("denied"));
+
+  test("a force push to the default branch inside pwsh or cmd is denied", () => {
+    expect(classOf("pwsh -c 'git push -f origin main'")).toBe("denied");
+    expect(classOf('cmd /c "git push --force origin master"')).toBe("denied");
+    expect(classOf("pwsh -c 'git push -f origin dev'")).toBe("none");
   });
 
-  test("a removal inside pwsh or cmd keeps its targets as written", () => {
-    expect(classify('cmd /c rd /s /q "C:\\My Dir\\build"', PS)).toEqual({
-      kind: "advisory",
-      removals: [{ targets: ["C:\\My Dir\\build"] }],
-      git: [],
-    });
-    expect(classify("pwsh -c 'Remove-Item -Recurse build, dist'", PS)).toEqual({
-      kind: "advisory",
-      removals: [{ targets: ["build", "dist"] }],
-      git: [],
-    });
+  test("a removal of a deeper path inside pwsh or cmd runs", () => {
+    expect(classOf('cmd /c rd /s /q "C:\\My Dir\\build"')).toBe("removal");
+    expect(classOf("pwsh -c 'Remove-Item -Recurse build, dist'")).toBe("removal");
   });
 
   test.each([
@@ -590,4 +567,42 @@ describe("a nested command", () => {
     "Invoke-Expression (Get-Content clean.ps1 -Raw)",
     "cmd /c dir C:\\",
   ])("%s runs nothing destructive", (command) => expect(classOf(command)).toBe("none"));
+});
+
+describe("a variable the command assigns", () => {
+  const VARIABLE = (variable: string, target: string, empty: string) =>
+    `Destructive rm -rf blocked: the target starts with a variable that can be unset or empty when the rm runs: ${variable}. Then ${target} is ${empty}. Assign ${variable} in a statement of its own before the removal, or name the path explicitly.`;
+  const reasonOf = (command: string) => {
+    const finding = classify(command, SESSION);
+    return finding?.kind === "catastrophic" ? finding.reason : finding?.kind;
+  };
+
+  test.each([
+    "$S = 'C:\\Users\\x\\.cache\\tmp\\x'; Remove-Item -Recurse -Force $S\\root",
+    '$s = "C:\\Users\\x\\.cache\\tmp"; Remove-Item -Recurse "$S\\x"',
+    "$env:OUT = 'D:\\build\\out'; Remove-Item -Recurse $env:OUT\\obj",
+    "$S = 'C:\\work\\a'\nRemove-Item -Recurse ${S}\\b",
+    "$S = 'C:\\work\\a'; foreach ($d in 1, 2) { Remove-Item -Recurse $S\\b }",
+  ])("%s runs", (command) => expect(reasonOf(command)).toBe("removal"));
+
+  test.each([
+    ["Remove-Item -Recurse $S\\x", "$S", "$S\\x", "\\x"],
+    ["$S = Get-Thing; Remove-Item -Recurse $S\\x", "$S", "$S\\x", "\\x"],
+    ["$S = ''; Remove-Item -Recurse $S\\x", undefined, "", ""],
+    ["$S = 'C:\\a'; if ($c) { $S = $null }; Remove-Item -Recurse $S\\x", "$S", "$S\\x", "\\x"],
+    ["$S = 'C:\\a'; foreach ($d in 1, 2) { Remove-Item -Recurse $S\\x; $S = '' }", "$S", "$S\\x", "\\x"],
+    ["$S = 'C:\\a' | Out-Null; Remove-Item -Recurse $S\\x", "$S", "$S\\x", "\\x"],
+  ])("%s is denied", (command, variable, target, empty) =>
+    expect(reasonOf(command)).toBe(
+      variable === undefined
+        ? "Destructive rm -rf blocked: the target is the filesystem root, home, the working directory, or a directory directly under root or home. Name a deeper path explicitly."
+        : VARIABLE(variable, target, empty),
+    ),
+  );
+
+  test("a redirection is not a target", () => {
+    expect(targetsOf("Remove-Item -Recurse build 2>$null")).toEqual([["build"]]);
+    expect(targetsOf("Remove-Item -Recurse build *> out.log")).toEqual([["build"]]);
+    expect(targetsOf("Remove-Item -Recurse build 2>&1")).toEqual([["build"]]);
+  });
 });

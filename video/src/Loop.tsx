@@ -1,18 +1,18 @@
 import { interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 import { Callout } from "./components/Callout.tsx";
-import { mark, shownTarget, target, targetRect, type Rect } from "./footage.ts";
+import { mark, shownTarget, targetRect, type Rect } from "./footage.ts";
 import { color } from "./theme.ts";
 import { F6 } from "./scenes/clips.ts";
 import { aim, Canvas, PANE_COL, Shot, Timed, timeline } from "./scenes/shot.tsx";
 
 export const LOOP = { width: 800, height: 450, fps: 15 } as const;
 
-const CHIP = shownTarget(F6, "complete-chip", mark(F6, "complete"));
-// The crop holds the verdict card's words, not its box: from the Evidence pane's edge to the cell
-// after the verdict line ends, across the loop's full width; rows 1 to 8 hold the card and the
-// ledger's first day. The band under the window holds the callout's label.
-const VERDICT = target(F6, "verdict-line");
-const COLS = { from: PANE_COL, to: VERDICT.col + VERDICT.len + 1 };
+const NO_VERDICT = mark(F6, "no-verdict");
+const PASSED = mark(F6, "passed");
+// The crop holds the final task's page from the pane's edge, across the loop's full width: 40 columns
+// take the snippet under the verdict ("13 of 14 tasks done; 42 tests passed"), and rows 1 to 8 hold
+// the title, its state, the verdict and the first link. The band under the window holds the callout's label.
+const COLS = { from: PANE_COL, to: PANE_COL + 40 };
 const ROWS = { from: 1, count: 8 };
 const SCALE = LOOP.width / ((COLS.to - COLS.from) * F6.cell.width);
 const INSET = 16;
@@ -22,16 +22,17 @@ const DIM_PEAK = 0.75;
 
 export const loopPlan = (fps: number) => {
   const t = timeline(F6, fps);
-  const missing = mark(F6, "evidence-logged") - 1;
-  const settled = mark(F6, "complete") + t.seconds(3.2);
-  t.hold(missing, 3);
-  t.play(missing, settled);
+  const settled = PASSED + t.seconds(3.2);
+  const row = shownTarget(F6, "passed-row", settled);
+  if (row.row < ROWS.from || row.row >= ROWS.from + ROWS.count || row.col + row.len > COLS.to) throw new Error("clip-verify: the verdict row falls outside the loop's crop");
+  t.hold(NO_VERDICT, 3);
+  t.play(PASSED, settled);
   const held = t.hold(settled, 5);
-  // The dim-through switches back to the MISSING frame at its midpoint, so the last frame is a
-  // dimmed MISSING frame that leads into frame 0 without repeating it.
+  // The dim-through switches back to the no-verdict frame at its midpoint, so the last frame is a
+  // dimmed no-verdict frame that leads into frame 0 without repeating it.
   const out = t.hold(settled, 0.35);
-  t.hold(missing, 0.35);
-  return { t, callout: { from: held.start, duration: held.duration }, dim: { from: out.start, duration: t.duration - out.start }, duration: t.duration };
+  t.hold(NO_VERDICT, 0.35);
+  return { t, row, callout: { from: held.start, duration: held.duration }, dim: { from: out.start, duration: t.duration - out.start }, duration: t.duration };
 };
 
 const DimThrough = () => {
@@ -48,7 +49,7 @@ export const Loop = () => {
     <Canvas>
       <Shot clip={F6} keyframes={[{ frame: 0, ...VIEW }]} segments={plan.t.segments} box={BOX}>
         <Timed {...plan.callout}>
-          <Callout target={targetRect(F6, CHIP)} label="Verdict: COMPLETE" side={{ bottom: 30 }} />
+          <Callout target={targetRect(F6, plan.row)} label="Verdict: passed" side={{ bottom: 30 }} />
         </Timed>
       </Shot>
       <Timed {...plan.dim}>

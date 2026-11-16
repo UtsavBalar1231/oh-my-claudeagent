@@ -3,7 +3,9 @@
 `index.ts` is the server plugin. `tui.tsx` is the optional terminal companion;
 `tui-panel.tsx` renders its session panel with native theme and interaction APIs.
 `rpc.ts` is its import-safe contract. `state.ts` reads checkout-local OMCA state and
-`tasks.ts` writes the task list. `tools.ts` registers native, session-aware tools. `lib.ts` projects shared
+`tasks.ts` writes the task list. `tools.ts` registers native, session-aware tools. `spacing.ts`
+finds words run together in a delegation prompt with `words.txt`, a SCOWL word list whose header
+carries its copyright notice; `guard.ts` refuses the `subagent` call on it. `lib.ts` projects shared
 Markdown bodies and metadata into native definitions; it owns no second prompt
 roster. `workflows.ts` contains OpenCode-specific coordination.
 

@@ -51,7 +51,7 @@ const closeRun = { ...run(""), command: "close-tasklist" };
 test("/tasklist opens its own pane, Tasks, focused and closable by Esc", async ($, on) => {
   const w = world(on, filesOf(...WORK));
   expect(await $.command.run(tasklist())).toEqual({});
-  expect(w.opened).toEqual([{ id: "tasklist", title: "Tasks", focus: true, closeOnEscape: true, rows: 12, columns: 56 }]);
+  expect(w.opened).toEqual([{ id: "tasklist", title: "Tasks", focus: true, closeOnEscape: true, backgroundColor: "transparent", rows: 12, columns: 56 }]);
 });
 
 test("/tasklist says why when no surface is attached or the pane is not placed", async ($, on) => {

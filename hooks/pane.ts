@@ -175,7 +175,7 @@ export async function open(host: Host, e: Input<"command.run">, tab: Tab): Promi
   const columns = dockColumns(e.presentation.columns);
   // The first drawing must already know whether the person prefers reduced motion.
   await mascots.ensure(host);
-  const opened = await host.ui.open({ id: PANE, title: "OMCA", focus: true, closeOnEscape: true, rows: INLINE_ROWS, columns });
+  const opened = await host.ui.open({ id: PANE, title: "OMCA", focus: true, closeOnEscape: true, backgroundColor: "transparent", rows: INLINE_ROWS, columns });
   await start(host);
   if (opened.isPlaced) return {};
   if (opened.reason.startsWith("no-surface")) {

@@ -1,16 +1,22 @@
-import { baseName } from "./path.ts";
+import { GIT_STASH_HEAD, GIT_TRACKED_HEAD, GIT_UNREADABLE_HEAD, GIT_UNTRACKED_HEAD, type RepoCheck, type Repository } from "./git-state.ts";
+import { baseName, joinPath } from "./path.ts";
 import {
+  expandPowershellWord,
   neutralizePowershell,
   POWERSHELL_COMMAND_POSITION,
   powershellArgumentsEnd,
+  powershellRemovalSites,
   powershellRemovals,
   powershellWordSpans,
+  walkPowershell,
   type Word,
 } from "./powershell.ts";
-import { anyCase, ARGUMENT, type Context, commandWord, NS, type Removal, S } from "./shell.ts";
-import { CWD_SUBSTITUTION, isCatastrophicTarget } from "./targets.ts";
+import { anyCase, ARGUMENT, type Context, commandWord, NS, S } from "./shell.ts";
+import { ANCHORED, type Base, expandWord, MKTEMP_SUBSTITUTION, type RawWord, rawWords, SESSION_STATE, type ShellState, walkBash, withoutRedirections } from "./shell-state.ts";
+import { CWD_SUBSTITUTION, homeRest, isCatastrophicTarget, platformOf, unknownVariable } from "./targets.ts";
 
-export type { Context, Removal } from "./shell.ts";
+export type { Context } from "./shell.ts";
+export type { RepoCheck } from "./git-state.ts";
 
 // Leading `VAR=value` assignments, shell keywords that take a command (`then`, `do`, `!`, `{`, ...)
 // and wrappers that run the command they are given (`sudo`, `env`, `command`, `timeout`, `nice`,
@@ -49,21 +55,16 @@ const PREFIX = `${KEYWORDS}${ENV_ASSIGN}(?:(?:${WRAPPERS})${ENV_ASSIGN})*`;
 const RM = new RegExp(`(^|[;&|()\`\\n\\r])${S}*${PREFIX}${commandWord("rm")}(?=${S}|$)`);
 // One invocation's arguments run to the next separator; a `)` ends them too, so a removal
 // inside `$(...)` does not swallow the rest of the outer command. A substitution that reads as
-// the working directory is part of its argument.
-const RM_ARGS = new RegExp(`^((?:${CWD_SUBSTITUTION.bash.source}|[^;&|)\`\\n\\r])*)([^]?)`);
+// the working directory or a new temporary path is part of its argument.
+const RM_ARGS = new RegExp(`^((?:${CWD_SUBSTITUTION.bash.source}|${MKTEMP_SUBSTITUTION.source}|[^;&|)\`\\n\\r])*)([^]?)`);
 
 const GIT_GLOBALS = `((-C${S}+${ARGUMENT}|-c${S}+${ARGUMENT}|-c${NS}+|--git-dir[= \\t\\n\\v\\f\\r]${ARGUMENT}|--work-tree[= \\t\\n\\v\\f\\r]${ARGUMENT}|--no-pager|--paginate|-p|--bare|--literal-pathspecs|--no-replace-objects)${S}+)*`;
-const GIT_TOKEN = "[^ \\t\\n\\v\\f\\r;&|`]+";
-// A path-restoring checkout, a stash that is not `list` or `show`, and a clean that is not a dry
-// run. Arguments are read within one line (`${H}`), so a later line's `.` or `-n` is not this command's.
-const GIT_SUBCOMMAND = `(?<subcommand>stash(?!${H}+(?:list|show)(?=${S}|$))|clean(?!(?:${H}+${GIT_TOKEN})*?${H}+(?:-[a-zA-Z]*n[a-zA-Z]*|--dry-run)(?=${S}|$))|checkout(?:${H}+${GIT_TOKEN})*${H}+(?:--|\\.(?:[\\/]${NS}*)?))`;
 
 function gitPatterns(commandPosition: string, git: string) {
-  const at = `(?<=^|${commandPosition})${S}*${PREFIX}${commandWord(git)}${S}+${GIT_GLOBALS}`;
+  const at = `(?<=^|${commandPosition})${S}*${PREFIX}${commandWord(git)}${S}+(?<globals>${GIT_GLOBALS})`;
   return {
-    git: new RegExp(`${at}["']?${GIT_SUBCOMMAND}["']?(?=[ \\t\\n\\v\\f\\r);&|<>\`]|$)`, "g"),
     push: new RegExp(`${at}push(?=${S}|$)(?<args>[^;&|)\`\\n\\r]*)`, "g"),
-    argued: new RegExp(`${at}["']?(?<word>reset|rm|restore|commit)["']?(?=${S}|$)`, "g"),
+    argued: new RegExp(`${at}["']?(?<word>reset|restore|checkout|stash|clean|commit)["']?(?=${S}|$)`, "gd"),
   };
 }
 const BASH_GIT = gitPatterns("[;&|(`\\n\\r]", "git");
@@ -84,49 +85,64 @@ const POWERSHELL_NESTED = new RegExp(
   "g",
 );
 
-export const RM_CATASTROPHIC_REASON =
-  "Destructive rm -rf blocked: the target is the filesystem root, home, the working directory, or a directory directly under root or home. Name a deeper path explicitly.";
-export const REVIEW_REFUSED_REASON =
-  "The user refused this command in OMCA's review. Do not retry it; ask the user how to proceed.";
-export const GIT_REASON =
-  "Destructive git command blocked. If the working tree is dirty, REPORT and STOP. Never modify history. Set OMCA_DISABLED_HOOKS=bash-guard to turn this check off for testing.";
+const RM_HEAD = "Destructive rm -rf blocked:";
+export const RM_CATASTROPHIC_REASON = `${RM_HEAD} the target is the filesystem root, home, the working directory, or a directory directly under root or home. Name a deeper path explicitly.`;
+export const RM_VARIABLE_HEAD = `${RM_HEAD} the target starts with a variable that can be unset or empty when the rm runs`;
+export const RM_SUBSTITUTION_REASON = `${RM_HEAD} a target holds a command substitution the guard cannot evaluate, so it can name any path. Run the substitution on its own first, then remove the path it prints by name.`;
+export const RM_CD_FAILED_HEAD = `${RM_HEAD} the rm can run after its cd failed`;
+export const RM_CD_UNKNOWN_HEAD = `${RM_HEAD} the rm follows a cd into a directory the guard cannot resolve`;
+export const RM_NO_PRESERVE_ROOT_REASON = `${RM_HEAD} --no-preserve-root lets rm remove the filesystem root. Drop the option and name the path to remove.`;
 export const FORCE_PUSH_REASON =
   "Force push to the default branch blocked: it rewrites history everyone else has pulled. Push to another branch, or ask the user to push. Set OMCA_DISABLED_HOOKS=bash-guard to turn this check off for testing.";
 export const NO_VERIFY_REASON =
   "git commit --no-verify blocked: it skips the repository's commit hooks. Fix what the hook reports and commit without the flag. Set OMCA_DISABLED_HOOKS=bash-guard to turn this check off for testing.";
 
-export type GitOperation =
-  | "reset --hard"
-  | "stash"
-  | "clean"
-  | "restore"
-  | "rm -r"
-  | "checkout --"
-  | "push --force"
-  | "commit --no-verify";
-export type GitFinding = { operation: GitOperation; remote?: string; branch?: string };
+function rmVariableReason(variable: string, target: string, state: ShellState, shell: Context["shell"]): string {
+  const name = variable.replace(/^\$\{?|\}$/g, "");
+  const empty = target.slice(variable.length);
+  const cause = state.maybe.has(name)
+    ? ` It is assigned only where the assignment may not run (after && or ||, in a pipeline, or in a block or loop), so it can still be unset.`
+    : "";
+  const remedy =
+    shell === "bash"
+      ? `Assign ${name} in a statement of its own that always runs before the rm (${name}=/path/to/dir; cd dir && rm -rf "$${name}/..."), or write \${${name}:?} so the shell stops when ${name} is unset or empty.`
+      : `Assign ${variable} in a statement of its own before the removal, or name the path explicitly.`;
+  return `${RM_VARIABLE_HEAD}: ${variable}.${cause} Then ${target} is ${empty}. ${remedy}`;
+}
 
-export const gitTitle = (operation: GitOperation): string => `git ${operation}`;
-export const RM_CATASTROPHIC_TITLE = "rm -rf on a protected path";
-export const RM_TITLE = "recursive removal";
-export const FORCE_PUSH_TITLE = "force push to the default branch";
+const rmCdFailedReason = (target: string): string =>
+  `${RM_CD_FAILED_HEAD}: a cd joined to it by ; or a newline leaves the rm in the original directory when the cd fails, and there ${target} is protected. Join them with && (cd dir && rm -rf ...) so the rm runs only after the cd succeeds.`;
+const rmCdUnknownReason = (target: string): string =>
+  `${RM_CD_UNKNOWN_HEAD}, so it judges ${target} in the working directory, where it is protected. cd into a literal path or a variable assigned in the same command, or name the full path in the rm.`;
 
-/** What each automatic deny reason is called and what it advises, for a surface that shows a refusal without the reason's full text. */
-export const GUARD_REASONS: readonly { reason: string; title: string; remedy: string }[] = [
-  { reason: RM_CATASTROPHIC_REASON, title: RM_CATASTROPHIC_TITLE, remedy: "name a deeper path explicitly" },
-  { reason: GIT_REASON, title: "destructive git command", remedy: "if the working tree is dirty, report and stop" },
-  { reason: FORCE_PUSH_REASON, title: FORCE_PUSH_TITLE, remedy: "push to another branch, or ask the user to push" },
-  { reason: NO_VERIFY_REASON, title: gitTitle("commit --no-verify"), remedy: "fix what the hook reports and commit without the flag" },
+/** How each automatic deny reason starts, what it is called and what it advises, for a surface that shows a refusal without the reason's full text. */
+export const GUARD_REASONS: readonly { head: string; title: string; remedy: string }[] = [
+  { head: RM_CATASTROPHIC_REASON, title: "rm -rf on a protected path", remedy: "name a deeper path explicitly" },
+  { head: RM_VARIABLE_HEAD, title: "rm -rf on an unset variable", remedy: "assign the variable in the same command" },
+  { head: RM_SUBSTITUTION_REASON, title: "rm -rf on a command substitution", remedy: "remove the printed path by name" },
+  { head: RM_CD_FAILED_HEAD, title: "rm -rf after a cd that can fail", remedy: "join the cd and the rm with &&" },
+  { head: RM_CD_UNKNOWN_HEAD, title: "rm -rf after an unresolved cd", remedy: "cd into a literal path, or name the full path" },
+  { head: RM_NO_PRESERVE_ROOT_REASON, title: "rm -rf --no-preserve-root", remedy: "drop the option" },
+  { head: GIT_TRACKED_HEAD, title: "git command discarding changes", remedy: "commit or stash the changes first, or report and stop" },
+  { head: GIT_UNTRACKED_HEAD, title: "git clean of untracked files", remedy: "keep what should stay first, or report and stop" },
+  { head: GIT_STASH_HEAD, title: "dropping stashed changes", remedy: "apply or commit the stash first, or report and stop" },
+  { head: GIT_UNREADABLE_HEAD, title: "repository state unreadable", remedy: "run git status yourself, then report and stop" },
+  { head: FORCE_PUSH_REASON, title: "force push to the default branch", remedy: "push to another branch, or ask the user to push" },
+  { head: NO_VERIFY_REASON, title: "git commit --no-verify", remedy: "fix what the hook reports and commit without the flag" },
 ];
-export const REVIEW_REFUSED_REMEDY = "ask the user how to proceed";
+
 /**
- * `blocking` holds a git operation that discards work in the tree or the index, a force push to
- * the default branch or a commit that skips its hooks, denied where no dialog can show it;
- * `advisory` holds only a recursive rm of a deeper path or a force push to another branch, which
- * runs where no dialog can show it.
+ * `catastrophic` is a recursive removal of a protected path, denied with no switch. `git` holds
+ * what the git rules found: `reason` when one is denied outright (a force push to the default
+ * branch, a commit that skips its hooks), the whole-tree operations to check against the
+ * repository, and whether a force push appeared at all, since only the branches decide it.
+ * `removal` is a recursive removal that runs; the session's home and directories can still make
+ * it catastrophic, so a caller that classified without them classifies again with them.
  */
-export type Reviewable = { kind: "blocking" | "advisory"; removals: Removal[]; git: GitFinding[] };
-export type Finding = { kind: "catastrophic" } | Reviewable;
+export type Finding =
+  | { kind: "catastrophic"; reason: string }
+  | { kind: "removal" }
+  | { kind: "git"; reason?: string; checks: RepoCheck[]; isForcePush: boolean };
 
 type Heredoc = { word: string; stripsTabs: boolean; isQuoted: boolean; at: number };
 /** A heredoc's body: the offset of its `<<`, where the body starts and ends, and its text. */
@@ -356,36 +372,74 @@ function splitOptions(words: readonly string[]): { options: string[]; operands: 
 }
 
 type Located<T> = T & { index: number };
-type GitHit = { finding: GitFinding; isBlocking: boolean };
-type Found = { removals: Located<Removal>[]; git: Located<GitHit>[] };
+type GitHit = { reason?: string; check?: RepoCheck; isForcePush?: boolean };
+type Found = { catastrophic?: string; removes: boolean; git: Located<GitHit>[] };
 type Span = { start: number; end: number };
+/** One rm's arguments; `opensBacktick` marks arguments cut short by a backtick substitution they start. */
+type Invocation = { start: number; end: number; scanned: string; opensBacktick: boolean };
 
-function removals(command: string, scan: string, ctx: Context): { isCatastrophic: boolean; removals: Located<Removal>[] } {
-  const found: Located<Removal>[] = [];
+function rmInvocations(scan: string): Invocation[] {
+  const found: Invocation[] = [];
   let offset = 0;
   for (let match = RM.exec(scan); match !== null; match = RM.exec(scan.slice(offset))) {
     const start = offset + match.index + match[0].length;
     const args = RM_ARGS.exec(scan.slice(start));
     const scanned = args?.[1] ?? "";
     offset = start + scanned.length;
-    // GNU rm reads options anywhere before `--`, so `rm ~ -rf` is as recursive as `rm -rf ~`.
-    const { options, operands } = splitOptions(shellWords(command.slice(start, offset)));
-    if (!options.some(isRecursiveRm)) continue;
-    if (scanned.replace(CWD_SUBSTITUTION.bash, "").includes("$(") || args?.[2] === "`") {
-      return { isCatastrophic: true, removals: [] };
-    }
-    if (options.some((option) => abbreviates(option, "--no-preserve-root", 4)) || operands.some((word) => isCatastrophicTarget(word, ctx))) {
-      return { isCatastrophic: true, removals: [] };
-    }
-    found.push({ index: start, targets: operands });
+    const closesItsSubstitution = (scan.slice(0, start).match(/`/g) ?? []).length % 2 === 1;
+    found.push({ start, end: offset, scanned, opensBacktick: args?.[2] === "`" && !closesItsSubstitution });
   }
-  return { isCatastrophic: false, removals: found };
+  return found;
 }
 
-function treeOperation(subcommand: string): GitOperation {
-  if (subcommand.startsWith("stash")) return "stash";
-  if (subcommand.startsWith("clean")) return "clean";
-  return "checkout --";
+/** A word with its quotes removed, for reading it as an option. */
+const plainWord = (raw: string): string => shellWords(raw).join(" ");
+
+/**
+ * The reason a target is catastrophic from one of the directories the command can be in there,
+ * if it is. A relative target is judged under each; under the one a failed `cd` leaves, the
+ * reason names the `cd`.
+ */
+function targetReason(target: string, state: ShellState, ctx: Context): string | undefined {
+  const judged = (path: string): string | undefined => {
+    if (!isCatastrophicTarget(path, ctx)) return undefined;
+    const variable = unknownVariable(path, ctx);
+    return variable === undefined ? RM_CATASTROPHIC_REASON : rmVariableReason(variable, path, state, ctx.shell);
+  };
+  if (ANCHORED.test(target) || target.startsWith("$")) return judged(target);
+  for (const base of state.bases) {
+    if (base.dir === undefined) {
+      if (isCatastrophicTarget(target, ctx)) return rmCdUnknownReason(target);
+      continue;
+    }
+    const reason = judged(base.dir === "" ? target : `${base.dir.replace(/[\\/]+$/, "")}/${target}`);
+    if (reason !== undefined) return base.isFallback ? rmCdFailedReason(target) : reason;
+  }
+  return undefined;
+}
+
+// GNU rm reads options anywhere before `--`, so `rm ~ -rf` is as recursive as `rm -rf ~`.
+/** A recursive removal with its deny reason, which is undefined when it runs, or undefined when the rm is not recursive. */
+function recursiveRemoval(command: string, invocation: Invocation, state: ShellState, ctx: Context): { reason: string | undefined } | undefined {
+  const options: string[] = [];
+  const operands: RawWord[] = [];
+  let isEndOfOptions = false;
+  for (const word of withoutRedirections(rawWords(command, invocation.start, invocation.end))) {
+    const text = plainWord(word.raw);
+    if (isEndOfOptions) operands.push(word);
+    else if (text === "--") isEndOfOptions = true;
+    else if (text.startsWith("-")) options.push(text);
+    else operands.push(word);
+  }
+  if (!options.some(isRecursiveRm)) return undefined;
+  const scanned = invocation.scanned.replace(CWD_SUBSTITUTION.bash, "").replace(MKTEMP_SUBSTITUTION, "");
+  if (scanned.includes("$(") || invocation.opensBacktick) return { reason: RM_SUBSTITUTION_REASON };
+  if (options.some((option) => abbreviates(option, "--no-preserve-root", 4))) return { reason: RM_NO_PRESERVE_ROOT_REASON };
+  for (const operand of operands) {
+    const reason = targetReason(expandWord(operand.raw, state) ?? plainWord(operand.raw), state, ctx);
+    if (reason !== undefined) return { reason };
+  }
+  return { reason: undefined };
 }
 
 /** Whether `word` spells the long option `option` or a prefix of it at least `shortest` characters long, as git and GNU tools accept. */
@@ -422,29 +476,20 @@ const refspecBranch = (refspec: string): string | undefined =>
   refspec.replace(/^\+/, "").split(":").at(-1)?.replace(/^refs\/heads\//, "");
 
 /**
- * A force push, blocking when a branch it forces is the default one: a refspec's destination, or
- * the checked-out branch when it names none or names `HEAD`, or every branch under `--all`.
+ * Whether a force push forces the default branch, or undefined when the push forces nothing: a
+ * refspec's destination, or the checked-out branch when it names none or names `HEAD`, or every
+ * branch under `--all`.
  */
-function forcePush(args: string, ctx: Context): GitHit | undefined {
+function forcesDefault(args: string, ctx: Context): boolean | undefined {
   const words = shellWords(args);
   const { options, operands } = splitOptions(words);
-  const [remote, ...refspecs] = operands;
+  const refspecs = operands.slice(1);
   const isForced = words.some((word) => FORCE.test(word));
   const forced = isForced ? refspecs : refspecs.filter((refspec) => refspec.startsWith("+"));
   if (forced.length === 0 && !isForced) return undefined;
   const targets = refspecs.length === 0 ? [ctx.branch] : forced.map(refspecBranch);
   const pushed = targets.map((branch) => (branch === "HEAD" || branch === "@" ? ctx.branch : branch));
-  const branch = refspecs[0] === undefined ? undefined : refspecBranch(refspecs[0]);
-  return {
-    finding: {
-      operation: "push --force",
-      ...(remote !== undefined && { remote }),
-      ...(branch !== undefined && branch !== "" && { branch }),
-    },
-    isBlocking:
-      options.some((option) => EVERY_BRANCH.test(option)) ||
-      pushed.some((target) => target !== undefined && isDefaultBranch(target, ctx)),
-  };
+  return options.some((option) => EVERY_BRANCH.test(option)) || pushed.some((target) => target !== undefined && isDefaultBranch(target, ctx));
 }
 
 // Long options of git commit whose value is the next word.
@@ -473,36 +518,130 @@ function skipsHooks(words: readonly string[]): boolean {
   return skips;
 }
 
+// A pathspec that names the whole tree, or the whole of the directory git runs in.
+const WHOLE_TREE = /^(?:\.{1,2}(?:[\\/]+\.{1,2})*[\\/]*\*?|:\/?\.?\*?|\*)$/;
+
+/**
+ * The options of a `git clean` dry run that lists what the command would delete, or undefined
+ * when the command is a dry run itself. A pathspec the shell expands first (a variable, a
+ * substitution, `~` or a glob) is dropped, so the dry run lists a superset.
+ */
+function cleanDryRun(words: readonly string[]): string[] | undefined {
+  const kept = new Set<string>();
+  const paths: string[] = [];
+  let forces = 0;
+  let isEndOfOptions = false;
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i] ?? "";
+    if (isEndOfOptions || !word.startsWith("-") || word === "-") paths.push(word);
+    else if (word === "--") isEndOfOptions = true;
+    else if (word.startsWith("--")) {
+      const name = word.split("=")[0] ?? "";
+      if (abbreviates(name, "--dry-run", 4)) return undefined;
+      if (abbreviates(name, "--force", 4)) forces++;
+      else if (abbreviates(name, "--exclude", 4) && !word.includes("=")) i++;
+    } else {
+      for (const [at, letter] of Array.from(word.slice(1)).entries()) {
+        if (letter === "n") return undefined;
+        if (letter === "f") forces++;
+        if ("dxX".includes(letter)) kept.add(`-${letter}`);
+        if (letter === "e") {
+          if (at === word.length - 2) i++;
+          break;
+        }
+      }
+    }
+  }
+  const isLiteral = paths.length > 0 && paths.every((path) => !/[$`~*?[]/.test(path));
+  return [...kept, ...Array.from({ length: forces }, () => "-f"), ...(isLiteral ? ["--", ...paths] : [])];
+}
+
+type Discard = Omit<RepoCheck, "at">;
+
 // git reads options anywhere before `--`, so these subcommands are judged on their whole argument list.
-const ARGUED: Readonly<Record<string, { operation: GitOperation; applies: (words: readonly string[]) => boolean }>> = {
-  reset: { operation: "reset --hard", applies: (words) => splitOptions(words).options.some((option) => abbreviates(option, "--hard", 4)) },
-  rm: { operation: "rm -r", applies: (words) => splitOptions(words).options.some((option) => /^-(?!-)[a-zA-Z]*[rR]/.test(option)) },
-  restore: { operation: "restore", applies: restoresWorktree },
-  commit: { operation: "commit --no-verify", applies: skipsHooks },
+const DISCARDS: Readonly<Record<string, (words: readonly string[]) => Discard | undefined>> = {
+  reset: (words) =>
+    splitOptions(words).options.some((option) => abbreviates(option, "--hard", 4)) ? { operation: "git reset --hard", query: "tracked" } : undefined,
+  restore: (words) =>
+    restoresWorktree(words) && splitOptions(words).operands.some((word) => WHOLE_TREE.test(word)) ? { operation: "git restore .", query: "tracked" } : undefined,
+  checkout: (words) => (splitOptions(words).operands.some((word) => WHOLE_TREE.test(word)) ? { operation: "git checkout .", query: "tracked" } : undefined),
+  stash: (words) => {
+    const subcommand = words.find((word) => !word.startsWith("-"));
+    return subcommand === "drop" || subcommand === "clear" ? { operation: `git stash ${subcommand}`, query: "stash" } : undefined;
+  },
+  clean: (words) => {
+    const clean = cleanDryRun(words);
+    return clean === undefined ? undefined : { operation: "git clean", query: "untracked", clean };
+  },
 };
 
-function gitFindings(command: string, scan: string, ctx: Context): Located<GitHit>[] {
-  const isPowershell = ctx.shell === "powershell";
-  const { git, push, argued } = isPowershell ? POWERSHELL_GIT : BASH_GIT;
-  const found: Located<GitHit>[] = [...scan.matchAll(git)].map((match) => ({
-    index: match.index,
-    finding: { operation: treeOperation(match.groups?.["subcommand"] ?? "") },
-    isBlocking: true,
-  }));
-  for (const match of scan.matchAll(push)) {
-    const end = match.index + match[0].length;
-    const hit = forcePush(command.slice(end - (match.groups?.["args"] ?? "").length, end), ctx);
-    if (hit !== undefined) found.push({ index: match.index, ...hit });
-  }
-  let reached = 0;
-  for (const match of scan.matchAll(argued)) {
-    if (match.index < reached) continue;
-    const start = match.index + match[0].length;
-    reached = isPowershell ? powershellArgumentsEnd(command, scan, start) : backtickEnd(scan, start, argumentsEnd(scan, start));
-    const rule = ARGUED[match.groups?.["word"] ?? ""];
-    if (rule?.applies(shellWords(command.slice(start, reached)))) {
-      found.push({ index: match.index, finding: { operation: rule.operation }, isBlocking: true });
+/** A directory a git command runs in, as git reads it: a home reference is expanded, and any other variable is unknown. */
+function resolveDir(dir: string | undefined, ctx: Context): string | undefined {
+  if (dir === undefined) return undefined;
+  const rest = homeRest(dir);
+  if (rest !== undefined) return ctx.home === undefined ? undefined : joinPath(platformOf(ctx), ctx.home, rest);
+  return dir.startsWith("$") ? undefined : dir;
+}
+
+/** The repositories a git command can run in: each directory the command can be in, moved by `-C`, with `--git-dir` and `--work-tree`. */
+function repositories(globals: string, state: ShellState, ctx: Context, expand: (raw: string) => string | undefined): Repository[] {
+  const words = rawWords(globals);
+  let dirs = state.bases.map((base) => resolveDir(base.dir, ctx));
+  const repo: Omit<Repository, "dir"> = {};
+  let isKnown = true;
+  const valueOf = (raw: string | undefined) => (raw === undefined ? undefined : resolveDir(expand(raw), ctx));
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i]?.raw ?? "";
+    const long = /^--(git-dir|work-tree)(?:=(.*))?$/s.exec(word);
+    if (word === "-C") {
+      const dir = valueOf(words[++i]?.raw);
+      dirs = dirs.map((base) => (base === undefined || dir === undefined ? undefined : ANCHORED.test(dir) || base === "" ? dir : `${base}/${dir}`));
+    } else if (word === "-c") i++;
+    else if (long !== null) {
+      const value = valueOf(long[2] ?? words[++i]?.raw);
+      if (value === undefined) isKnown = false;
+      else if (long[1] === "git-dir") repo.gitDir = value;
+      else repo.workTree = value;
     }
+  }
+  return dirs.map((dir) => ({ dir: isKnown ? dir : undefined, ...repo }));
+}
+
+type GitScan = { push: RegExpMatchArray[]; argued: RegExpMatchArray[] };
+
+function gitMatches(scan: string, ctx: Context): GitScan {
+  const { push, argued } = ctx.shell === "powershell" ? POWERSHELL_GIT : BASH_GIT;
+  return { push: [...scan.matchAll(push)], argued: [...scan.matchAll(argued)] };
+}
+
+function gitFindings(command: string, scan: string, matches: GitScan, ctx: Context, stateAt: (at: number) => ShellState, expand: (raw: string, state: ShellState) => string | undefined): Located<GitHit>[] {
+  const found: Located<GitHit>[] = [];
+  for (const match of matches.push) {
+    const end = (match.index ?? 0) + match[0].length;
+    const isDefault = forcesDefault(command.slice(end - (match.groups?.["args"] ?? "").length, end), ctx);
+    if (isDefault !== undefined) found.push({ index: match.index ?? 0, isForcePush: true, ...(isDefault && { reason: FORCE_PUSH_REASON }) });
+  }
+  // A commit's arguments are read once, so a commit nested in its own message is not read again;
+  // a tree operation inside a commit message still counts.
+  const reached = { commit: 0, tree: 0 };
+  for (const match of matches.argued) {
+    const index = match.index ?? 0;
+    const word = match.groups?.["word"] ?? "";
+    const kind = word === "commit" ? "commit" : "tree";
+    if (index < reached[kind]) continue;
+    const start = index + match[0].length;
+    reached[kind] = ctx.shell === "powershell" ? powershellArgumentsEnd(command, scan, start) : backtickEnd(scan, start, argumentsEnd(scan, start));
+    const words = shellWords(command.slice(start, reached[kind]));
+    if (word === "commit") {
+      if (skipsHooks(words)) found.push({ index, reason: NO_VERIFY_REASON });
+      continue;
+    }
+    const discard = DISCARDS[word]?.(words);
+    if (discard === undefined) continue;
+    const [globalsStart = 0, globalsEnd = 0] = match.indices?.groups?.["globals"] ?? [];
+    const state = stateAt(index);
+    const at = repositories(command.slice(globalsStart, globalsEnd), state, ctx, (raw) => expand(raw, state));
+    found.push({ index, check: { ...discard, at } });
   }
   return found;
 }
@@ -623,86 +762,71 @@ function outside<T extends { index: number }>(items: readonly T[], spans: readon
     });
 }
 
-function analyze(command: string, ctx: Context, depth: number): Found | "catastrophic" {
+function analyze(command: string, ctx: Context, depth: number, bases: readonly Base[]): Found {
   const trimmed = trimLines(command);
   const isPowershell = ctx.shell === "powershell";
   const { scan, bodies } = isPowershell ? { scan: neutralizePowershell(trimmed), bodies: [] } : neutralize(trimmed);
-  const rm = isPowershell ? powershellRemovals(trimmed, scan, ctx) : removals(trimmed, scan, ctx);
-  if (rm.isCatastrophic) return "catastrophic";
-  const git = gitFindings(trimmed, scan, ctx);
-  if (depth === NESTING_LIMIT) return { removals: rm.removals, git };
-  const spans: Span[] = [];
-  const inner: Found = { removals: [], git: [] };
-  for (const nested of nestedScripts(trimmed, scan, bodies, ctx.shell)) {
-    const found = analyze(nested.text, { ...ctx, shell: nested.shell }, depth + 1);
-    if (found === "catastrophic") return found;
-    spans.push(...nested.spans);
-    inner.removals.push(...found.removals.map((removal) => ({ ...removal, index: nested.index })));
-    inner.git.push(...found.git.map((hit) => ({ ...hit, index: nested.index })));
+  const invocations = isPowershell ? [] : rmInvocations(scan);
+  const sites = isPowershell ? powershellRemovalSites(scan) : [];
+  const matches = gitMatches(scan, ctx);
+  const nested = depth === NESTING_LIMIT ? [] : nestedScripts(trimmed, scan, bodies, ctx.shell);
+  const queries = [
+    ...new Set([
+      ...invocations.map((invocation) => invocation.start),
+      ...sites,
+      ...matches.argued.map((match) => match.index ?? 0),
+      ...nested.map((script) => script.index),
+    ]),
+  ].sort((a, b) => a - b);
+  const states = isPowershell ? walkPowershell(trimmed, scan, queries) : walkBash(trimmed, scan, queries, ctx.home, bases, bodies);
+  const stateAt = (at: number): ShellState => states.get(at) ?? SESSION_STATE;
+  let removes = false;
+  for (const invocation of invocations) {
+    const removal = recursiveRemoval(trimmed, invocation, stateAt(invocation.start), ctx);
+    if (removal?.reason !== undefined) return { catastrophic: removal.reason, removes: true, git: [] };
+    removes ||= removal !== undefined;
   }
-  const byIndex = (a: { index: number }, b: { index: number }) => a.index - b.index;
-  return {
-    removals: [...outside(rm.removals, spans), ...inner.removals].sort(byIndex),
-    git: [...outside(git, spans), ...inner.git].sort(byIndex),
-  };
+  for (const removal of isPowershell ? powershellRemovals(trimmed, scan, stateAt) : []) {
+    if (removal.isSubstituted) return { catastrophic: RM_SUBSTITUTION_REASON, removes: true, git: [] };
+    for (const target of removal.targets) {
+      const reason = targetReason(target, SESSION_STATE, ctx);
+      if (reason !== undefined) return { catastrophic: reason, removes: true, git: [] };
+    }
+    removes = true;
+  }
+  const git = gitFindings(trimmed, scan, matches, ctx, stateAt, isPowershell ? expandPowershellWord : expandWord);
+  const spans: Span[] = [];
+  const inner: Located<GitHit>[] = [];
+  for (const script of nested) {
+    const found = analyze(script.text, { ...ctx, shell: script.shell }, depth + 1, script.shell === "bash" ? stateAt(script.index).bases : SESSION_STATE.bases);
+    if (found.catastrophic !== undefined) return found;
+    removes ||= found.removes;
+    spans.push(...script.spans);
+    inner.push(...found.git.map((hit) => ({ ...hit, index: script.index })));
+  }
+  return { removes, git: [...outside(git, spans), ...inner].sort((a, b) => a.index - b.index) };
 }
 
 /**
- * Classifies a Bash or PowerShell command: a recursive removal of a machine-wide target (or with
- * a substituted target, or `--no-preserve-root`) is catastrophic; a hard reset, stash, clean,
- * restore, recursive git rm, path checkout, force push to the default branch or commit that skips
- * its hooks is blocking; any other recursive removal and a force push to another branch are
- * advisory. A match needs a command position, so a quoted mention is not one, and a script handed
- * to a shell, `eval`, `pwsh -Command`, `cmd /c` or `Invoke-Expression` is classified as commands of
- * its own. `ctx` names the shell and what is known of the session: its home, working directory,
- * project root and branches.
+ * Classifies a Bash or PowerShell command. A recursive removal of a machine-wide target is
+ * catastrophic, with a reason that names the cause: the path itself, a variable the command does
+ * not set, a command substitution, or a `cd` that may fail or cannot be resolved. A force push to
+ * the default branch and a commit that skips its hooks carry their deny reason; a hard reset, a
+ * whole-tree checkout or restore, a clean that is not a dry run and a stash drop or clear are
+ * checks to run against the repository. A match needs a command position, so a quoted mention is
+ * not one, and a script handed to a shell, `eval`, `pwsh -Command`, `cmd /c` or
+ * `Invoke-Expression` is classified as commands of its own. `ctx` names the shell and what is
+ * known of the session: its home, working directory, project root and branches.
  */
 export function classify(command: string, ctx: Context = BASH): Finding | undefined {
-  const found = analyze(command, ctx, 0);
-  if (found === "catastrophic") return { kind: "catastrophic" };
-  if (found.removals.length === 0 && found.git.length === 0) return undefined;
+  const found = analyze(command, ctx, 0, SESSION_STATE.bases);
+  if (found.catastrophic !== undefined) return { kind: "catastrophic", reason: found.catastrophic };
+  if (found.git.length === 0) return found.removes ? { kind: "removal" } : undefined;
+  const reason = found.git.find((hit) => hit.reason !== undefined)?.reason;
   return {
-    kind: found.git.some((hit) => hit.isBlocking) ? "blocking" : "advisory",
-    removals: found.removals.map(({ targets }) => ({ targets })),
-    git: found.git.map((hit) => hit.finding),
+    kind: "git",
+    ...(reason !== undefined && { reason }),
+    checks: found.git.flatMap((hit) => (hit.check === undefined ? [] : [hit.check])),
+    isForcePush: found.git.some((hit) => hit.isForcePush === true),
   };
-}
-
-const firstBlockingOperation = (finding: Reviewable): GitOperation | undefined =>
-  finding.git.find((git) => git.operation !== "push --force")?.operation;
-
-/**
- * The deny reason for each kind; an advisory match is denied only by a refusal. A blocking match
- * is named by its first finding that is not a force push, since a force push is blocking only to
- * the default branch.
- */
-export function reasonFor(finding: Finding): string {
-  switch (finding.kind) {
-    case "catastrophic":
-      return RM_CATASTROPHIC_REASON;
-    case "blocking": {
-      const operation = firstBlockingOperation(finding);
-      if (operation === undefined) return FORCE_PUSH_REASON;
-      return operation === "commit --no-verify" ? NO_VERIFY_REASON : GIT_REASON;
-    }
-    case "advisory":
-      return REVIEW_REFUSED_REASON;
-  }
-}
-
-/** The short name of what a finding matched, following the choice `reasonFor` makes; an advisory match is named by its first git operation. */
-export function titleFor(finding: Finding): string {
-  switch (finding.kind) {
-    case "catastrophic":
-      return RM_CATASTROPHIC_TITLE;
-    case "blocking": {
-      const operation = firstBlockingOperation(finding);
-      return operation === undefined ? FORCE_PUSH_TITLE : gitTitle(operation);
-    }
-    case "advisory": {
-      const first = finding.git[0];
-      if (first === undefined) return RM_TITLE;
-      return first.operation === "push --force" && first.branch !== undefined ? `force push to ${first.branch}` : gitTitle(first.operation);
-    }
-  }
 }

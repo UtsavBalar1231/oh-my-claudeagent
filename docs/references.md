@@ -156,7 +156,7 @@ server's `omca_hook` tool, which dispatches through `servers/hooks/registry.ts`.
 
 | Event | Feature |
 | --- | --- |
-| `tool.check` for Bash, PowerShell and Monitor | The destructive-command guard and its review dialog; a Monitor command is read as bash |
+| `tool.check` for Bash, PowerShell and Monitor | The destructive-command guard, which denies or stays silent and never asks; a Monitor command is read as bash |
 | `session.start` | Registers `/omca`, writes the session's mod marker, draws the band's first state, and writes a transcript line when the `omca` server is not connected, naming a missing bun or the server's error, with a status line under the prompt until it connects |
 | `prompt.submit` | Tracks user-origin submissions and cancels a pending refusal recovery when new user input arrives; notes which keyword modes have fired so the prompt stops underlining them |
 | `turn.start`, `turn.complete` | The turn's tokens, cost and verification receipt for its closing line, a finished agent's notice, the band and its Task list button, the notification sent when the last agent of a wave ends, the pane's refresh. At a main turn's start, the mod asks whether the `omca` server is still connected, and one that has stopped gets the same transcript line and status line. A main turn you started in an interactive session that still ends in a `reasoning_extraction` refusal, after Claude Code's own retry, gets at most one follow-up prompt from OMCA; the refusal itself stands |
@@ -211,7 +211,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 
 | Name | Turns off |
 | --- | --- |
-| `bash-guard` | The guard's review and its refusals. The catastrophic-removal deny stays |
+| `bash-guard` | The guard's git rules: the whole-tree checks, the force push to the default branch and `git commit --no-verify`. The catastrophic-removal deny stays |
 | `blocker-rows` | OMCA's rows for its own refusals and held completions in the transcript; the engine's error text shows instead |
 | `brief-rows` | OMCA's rows for the brief and follow-up messages main sends a subagent in the agent view; the engine's row shows instead |
 | `notify` | The one notification OMCA sends when the last background agent of a wave finishes |
@@ -224,6 +224,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | `verification-recorder` | Recording each agent's verification commands and its own `evidence_log` calls, which the turn line, the Stats page and the task check read |
 | `context-injector` | `AGENTS.md`, `README.md` and rule injection when a file is read or edited |
 | `comment-gate` | The comment check on writes |
+| `delegation-guard` | The OpenCode adapter's refusal of a delegation prompt that runs words together |
 | `empty-task-response` | The note on an empty or transitional agent report; concise findings need no fixed headers |
 | `failure-recovery` | Advice after a failed tool call |
 | `subagent-context` | The context each subagent gets at start |
@@ -237,8 +238,8 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | --- | --- |
 | `CLAUDE_CODE_ENABLE_TODO_TOOLS` | Set to `1` by the mod at session start when nothing has set it, which brings `TaskCreate` and `TaskUpdate` to every model. Another value keeps the task tools off, and `health_check` then reports `task_tools_absent` |
 | `CLAUDE_CODE_TASK_LIST_ID` | Set by the mod at session start when nothing has set it, to a list named for the checkout, so a run's tasks outlive `/clear` and a new session in the same checkout. Set it yourself to use another list |
-| `OMCA_COMMENT_GATE` | `advise` (default) lets a write through with a note; `deny` blocks it; `off` skips the check |
-| `OMCA_GLYPHS` | The glyph set of the pane, band, transcript rows, dialog and status line: `nerd` (default, Nerd Font icons; the status line's cache and clock icons and its rings need Nerd Fonts v3), `unicode` (no Nerd Font needed) or `ascii` (plain text) |
+| `OMCA_COMMENT_GATE` | `advise` (default) lets a write through with a note; `deny` blocks it; `off` skips the check. The check reads comments in a Write or Edit. It flags AI attribution or authorship comments and bare `TODO: implement` placeholders, which `deny` always blocks, and context-free TODO or FIXME comments and decorative separator lines, which `deny` blocks once per file and finding. A `@allow` on a comment line or `comment-gate-disable-file` in the first five lines exempts it |
+| `OMCA_GLYPHS` | The glyph set of the pane, band, transcript rows and status line: `nerd` (default, Nerd Font icons; the status line's cache and clock icons and its rings need Nerd Fonts v3), `unicode` (no Nerd Font needed) or `ascii` (plain text) |
 | `CLAUDE_CODE_EFFORT_LEVEL` | Read by the doctor. A level other than `auto` or `unset`, which send no level, runs every agent at it, whatever the agent declares, and the doctor warns |
 | `CLAUDE_AFK_TIMEOUT_MS` | Read by the doctor. A whole number of milliseconds after which an unanswered question continues on its own, so a plan interview can settle on its defaults; it outranks `askUserQuestionTimeout`. Claude Code ignores it in project and local settings, and so does the doctor |
 | `OMCA_NATIVE_AGENTS_MD` | `1` stops the context injector from adding `AGENTS.md` where Claude Code already loads it natively and no project `CLAUDE.md` is on the path |
@@ -257,7 +258,6 @@ a project's `.claude/settings.json`.
 | Option | Default | Effect |
 | --- | --- | --- |
 | `showBand` | `true` | `false` hides the band above the prompt |
-| `guardMode` | `dialog` | `dialog` asks before a held command where a dialog can show. `deny` never asks: a held git command is refused, and any other recursive removal or a force push to another branch runs |
 | `enableKeywordTriggers` | `false` | `true` lets plain phrases point at a skill |
 | `statuslineMode` | `on` | `off` makes `omca-setup` leave your status line alone |
 | `disableForceOrchestrationStyle` | `false` | `true` makes `omca-setup` remove `force-for-plugin` from the installed `output-styles/omca-default.md`, so your own `outputStyle` applies. Run setup again after each update |
@@ -266,7 +266,7 @@ a project's `.claude/settings.json`.
 {
   "pluginConfigs": {
     "oh-my-claudeagent@omca": {
-      "options": { "guardMode": "dialog", "showBand": true, "enableKeywordTriggers": false }
+      "options": { "showBand": true, "enableKeywordTriggers": false }
     }
   }
 }
@@ -337,7 +337,6 @@ reads, the ledger and notepads, and links the JSON Schema for the ledger.
 | `omca` MCP tools | Yes | When bun is on the app's `PATH` | Yes | When bun is on the app's `PATH` | Unless `allowManagedMcpServersOnly` |
 | Stop checks, guidance, context injection | Yes | When bun is on the app's `PATH` | Yes | When bun is on the app's `PATH` | Unless `allowManagedHooksOnly` or `disableAllHooks` |
 | Guard decisions | Yes | When the app's Claude Code is 2.1.300 or later | Yes | Yes | Unless `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks` |
-| Guard review dialog | Yes | As guard decisions | No: held commands are decided without you | No: decided as in `-p` | As the guard |
 | Band, pane, Tasks pane, doctor | Yes | As guard decisions, with [Desktop's differences](usage.md#desktop-and-vs-code) | No | No ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)) | As the guard |
 | Turn line, agent rows, receipts and image previews in the transcript | Yes, pictures where the terminal draws them (kitty, Ghostty, iTerm2 3.5 or later, and tmux 3.3 or later with passthrough on) | No: Desktop keeps its own rows, and the turn's figures and receipt arrive as a text row beneath the answer | No | No | As the guard |
 | Status line | Yes | Not documented | No | Not documented | Unless `allowManagedHooksOnly` or `disableAllHooks` |
@@ -436,7 +435,8 @@ state, not whose gate is better. OMCA's was the only scripted stop that was cont
 | wshobson/agents | +2,894 | +2,894 | +17 ms | +0.6 ms | +1.0 ms | 521.5 KiB, 85 files |
 
 Guard corpus, each command issued twice in a session under bypassPermissions, so only hooks can
-stop it. Offline ruflo got one call per session under a 90 s limit.
+stop it. The project holds an uncommitted change to a tracked file, so `git reset --hard` would
+discard it. Offline ruflo got one call per session under a 90 s limit.
 
 | Arm | `rm -rf /` | `rm -rf ~` | `git reset --hard` | `git push --force origin main` | `git commit --no-verify` | `ls` |
 | --- | --- | --- | --- | --- | --- | --- |

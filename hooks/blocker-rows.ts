@@ -23,8 +23,6 @@ function shapeOf(refusal: Refusal, taskId: string | undefined, g: Glyphs, column
   switch (refusal.kind) {
     case "guard":
       return { mark: g.blocked, head: [{ text: "OMCA guard refused" }, dot, { text: refusal.title }], note: refusal.remedy };
-    case "review-refused":
-      return { mark: g.blocked, head: [{ text: "you refused this in the OMCA guard" }], note: "Claude asks how to proceed" };
     case "final-kept":
     case "final-unlogged":
     case "completion-held":

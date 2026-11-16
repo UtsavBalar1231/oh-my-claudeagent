@@ -1,6 +1,7 @@
 import { baseName } from "./path.ts";
-import { anyCase, type Context, commandWord, type Removal, S } from "./shell.ts";
-import { CWD_SUBSTITUTION, isCatastrophicTarget } from "./targets.ts";
+import { anyCase, commandWord, S } from "./shell.ts";
+import { SESSION_STATE, type ShellState } from "./shell-state.ts";
+import { CWD_SUBSTITUTION } from "./targets.ts";
 
 export const POWERSHELL_COMMAND_POSITION = "[;&|(){}\\n\\r]";
 
@@ -189,6 +190,9 @@ export function powershellArgumentsEnd(command: string, scan: string, from: numb
   return scan.length;
 }
 
+// A redirection operator, alone or with its file attached (`2>$null`, `*>&1`).
+const REDIRECTION = /^(?:[1-6*]?>>?|[1-6*]>&[1-6])(.*)$/s;
+
 const isWhatIf = (name: string): boolean =>
   [...PARAMETERS.keys()].filter((full) => full.startsWith(name.toLowerCase())).join() === "whatif";
 
@@ -202,6 +206,11 @@ function parse(
   const targets: string[] = [];
   for (let i = 0; i < words.length; i++) {
     const word = words[i] ?? "";
+    const redirection = REDIRECTION.exec(word);
+    if (redirection !== null) {
+      if (redirection[1] === "" && !/&[1-6]$/.test(word)) i++;
+      continue;
+    }
     const parameter = /^-([A-Za-z]+)(?::(.*))?$/s.exec(word);
     if (parameter !== null) {
       const kind = parameterKind(parameter[1] ?? "");
@@ -221,17 +230,117 @@ function parse(
   return { isRecursive, isDryRun, targets };
 }
 
+const VARIABLE_REFERENCE = /\$(?:\{((?:env:)?[A-Za-z_][\w]*)\}|((?:env:)?[A-Za-z_][\w]*))/gi;
+
+/** A word with each variable the command assigned replaced by its value; one it did not stays as written. */
+const substitute = (word: string, state: ShellState): string =>
+  word.replace(VARIABLE_REFERENCE, (reference, braced: string | undefined, bare: string | undefined) =>
+    state.vars.get((braced ?? bare ?? "").toLowerCase()) ?? reference,
+  );
+
+/** A word as written, quotes removed and assigned variables substituted, or undefined when it holds a subexpression. */
+export function expandPowershellWord(raw: string, state: ShellState): string | undefined {
+  if (raw.includes("$(")) return undefined;
+  return substitute(powershellWords(raw).join(" "), state);
+}
+
 /**
- * The recursive removals in a PowerShell command, each at the offset of its command word:
+ * The value an assignment gives: a quoted string or another variable, with assigned variables
+ * substituted, or undefined for anything it would have to run, since a bare word is a command.
+ */
+function assignedValue(raw: string, state: ShellState): string | undefined {
+  const text = raw.trim();
+  if (/^'(?:[^']|'')*'$/s.test(text)) return text.slice(1, -1).replaceAll("''", "'");
+  if (/^"[^"`]*"$/s.test(text) && !text.includes("$(")) return substitute(text.slice(1, -1), state);
+  return /^\$(?:\{[^}]+\}|(?:env:)?[A-Za-z_]\w*)$/.test(text) ? substitute(text, state) : undefined;
+}
+
+const ASSIGNMENT = /^\$(?:\{)?(?:(?:script|global|local|private):)?((?:env:)?[A-Za-z_][\w]*)\}?[ \t]*=(?!=)([^]*)$/i;
+
+/**
+ * The variables a PowerShell command assigned where each of `queries` starts, read once left to
+ * right: an assignment counts only as a statement of its own, not in a pipeline or after `||`,
+ * and one after `&&` only while that chain lasts. A value set inside a `{...}` block is unknown
+ * after the block, and inside the block at a query the block reaches before setting it, since a
+ * loop's next pass reaches the query with that value.
+ */
+export function walkPowershell(command: string, scan: string, queries: readonly number[]): Map<number, ShellState> {
+  const env = new Map<string, string | undefined>();
+  type Block = { start: number; writes: { at: number; name: string }[] };
+  const blocks: Block[] = [];
+  const snapshots: { at: number; vars: Map<string, string | undefined> }[] = [];
+  let statement = -1;
+  let prev = "start";
+  let chained: string[] = [];
+  const set = (name: string, value: string | undefined, at: number) => {
+    env.set(name, value);
+    blocks.at(-1)?.writes.push({ at, name });
+  };
+  const settle = () => {
+    for (const name of chained) set(name, undefined, statement);
+    chained = [];
+  };
+  const end = (at: number, next: string) => {
+    if (statement !== -1 && prev !== "|" && prev !== "||" && next !== "|") {
+      const assignment = ASSIGNMENT.exec(command.slice(statement, at).trim());
+      if (assignment !== null) {
+        const name = (assignment[1] ?? "").toLowerCase();
+        set(name, assignedValue(assignment[2] ?? "", { ...SESSION_STATE, vars: env }), statement);
+        if (prev === "&&") chained.push(name);
+      }
+    }
+    statement = -1;
+    prev = next;
+  };
+  let query = 0;
+  for (let i = 0; i < scan.length; i++) {
+    while (query < queries.length && (queries[query] ?? 0) <= i) snapshots.push({ at: queries[query++] ?? 0, vars: new Map(env) });
+    const ch = scan.charAt(i);
+    const pair = scan.slice(i, i + 2);
+    if (pair === "${") {
+      if (statement === -1) statement = i;
+      i = Math.max(i, scan.indexOf("}", i));
+    } else if (pair === "&&" || pair === "||") {
+      end(i, pair);
+      if (pair === "||") settle();
+      i++;
+    } else if (ch === "|") end(i, "|");
+    else if (ch === ";" || ch === "\n" || ch === "\r") {
+      end(i, "start");
+      settle();
+    } else if (ch === "{") {
+      end(i, "start");
+      settle();
+      blocks.push({ start: i, writes: [] });
+    } else if (ch === "}") {
+      end(i, "start");
+      settle();
+      const block = blocks.pop();
+      for (const snapshot of snapshots) {
+        if (block === undefined || snapshot.at <= block.start) continue;
+        for (const write of block.writes) if (write.at > snapshot.at) snapshot.vars.set(write.name, undefined);
+      }
+      for (const name of new Set(block?.writes.map((write) => write.name))) set(name, undefined, i);
+    } else if (statement === -1 && !/[ \t]/.test(ch)) statement = i;
+  }
+  while (query < queries.length) snapshots.push({ at: queries[query++] ?? 0, vars: new Map(env) });
+  return new Map(snapshots.map((snapshot) => [snapshot.at, { ...SESSION_STATE, vars: snapshot.vars }]));
+}
+
+/** Where each removal command's arguments start. */
+export const powershellRemovalSites = (scan: string): number[] => [...scan.matchAll(REMOVAL)].map((match) => match.index + match[0].length);
+
+/**
+ * The recursive removals in a PowerShell command, each with its targets, variables substituted:
  * `Remove-Item` and its aliases with `-Recurse` (any unambiguous prefix of it), and the cmd forms
- * `rd /s`, `rmdir /s` and `del /s`. A substituted target is catastrophic, as in sh.
+ * `rd /s`, `rmdir /s` and `del /s`. `isSubstituted` marks a target that holds a subexpression.
  */
 export function powershellRemovals(
   command: string,
   scan: string,
-  ctx: Context,
-): { isCatastrophic: boolean; removals: (Removal & { index: number })[] } {
-  const found: (Removal & { index: number })[] = [];
+  stateAt: (at: number) => ShellState,
+): { isSubstituted: boolean; targets: string[] }[] {
+  const found: { isSubstituted: boolean; targets: string[] }[] = [];
   for (const match of scan.matchAll(REMOVAL)) {
     const start = match.index + match[0].length;
     const end = powershellArgumentsEnd(command, scan, start);
@@ -239,11 +348,11 @@ export function powershellRemovals(
     const name = baseName("win32", word).toLowerCase().replace(/\.exe$/, "");
     const { isRecursive, isDryRun, targets } = parse(name, powershellWords(command.slice(start, end)));
     if (!isRecursive || isDryRun) continue;
-    const isSubstituted = scan.slice(start, end).replace(CWD_SUBSTITUTION.powershell, "").includes("$(");
-    if (isSubstituted || targets.some((target) => isCatastrophicTarget(target, ctx))) {
-      return { isCatastrophic: true, removals: [] };
-    }
-    found.push({ index: start - (match.groups?.["word"] ?? "").length, targets });
+    const state = stateAt(start);
+    found.push({
+      isSubstituted: scan.slice(start, end).replace(CWD_SUBSTITUTION.powershell, "").includes("$("),
+      targets: targets.map((target) => substitute(target, state)),
+    });
   }
-  return { isCatastrophic: false, removals: found };
+  return found;
 }

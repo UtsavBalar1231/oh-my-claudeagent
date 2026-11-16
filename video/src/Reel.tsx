@@ -98,7 +98,7 @@ export const Reel: FC<ReelProps> = () => {
             <LowerThird items={["interview", "gap check", "review"]} />
           </Sequence>
           <Sequence from={f(1)} durationInFrames={f(2.83)} premountFor={fps}>
-            <StatChip value="5 of 5" label="test commands blocked" source="Measured 2026-10-03 · Claude Code 2.1.288" />
+            <StatChip value="Refused" label="with changes to lose; runs when clean" source="Measured 2026-11-17 · Claude Code 2.1.325" />
           </Sequence>
         </Series.Sequence>
         <Series.Sequence durationInFrames={f(REEL.keys)} premountFor={fps}>

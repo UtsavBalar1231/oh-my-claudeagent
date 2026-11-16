@@ -92,7 +92,7 @@ function str(data: Frontmatter, key: string, file: string): string {
   return value;
 }
 
-type PromptAgent = { id: string; tier: string; description: string; system: string; color?: string; deny: string[] };
+type PromptAgent = { id: string; tier: string; effort?: string; description: string; system: string; color?: string; deny: string[] };
 type PromptSkill = { id: string; name: string; description: string; relPath: string; content: string; autoinvoke?: boolean };
 type PromptCommand = { name: string; description: string; template: string };
 export type Prompts = { agents: PromptAgent[]; skills: PromptSkill[]; commands: PromptCommand[]; outputStyle: string };
@@ -115,6 +115,7 @@ export function generate(root: string): Prompts {
       agents.push({
         id,
         tier: str(data, "model", src.relPath),
+        ...(typeof data.effort === "string" ? { effort: data.effort } : {}),
         description,
         system: `${text}\n${REFUSAL_RULE}\n`,
         ...(color ? { color } : {}),

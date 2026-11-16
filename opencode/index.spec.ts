@@ -152,13 +152,33 @@ async function fireContext(fake: ReturnType<typeof fakeContext>, agent: string) 
   return event
 }
 
-test("a valid sonnet model ref sets the agent model", async () => {
+test("a valid sonnet model ref sets the agent model at the agent's declared effort", async () => {
   const fake = fakeContext({ models: { sonnet: "anthropic/claude-sonnet-5-5" } })
   await plugin.setup(fake.ctx)
-  expect(fake.agents.get("omca-explorer")?.model).toEqual({ providerID: "anthropic", id: "claude-sonnet-5-5" })
+  expect(fake.agents.get("omca-explorer")?.model).toEqual({ providerID: "anthropic", id: "claude-sonnet-5-5", variant: "high" })
   expect(fake.agents.get("omca-explorer")?.mode).toBe("subagent")
   expect(fake.agents.get("omca-explorer")?.permissions).toContainEqual({ action: "edit", resource: "*", effect: "deny" })
   expect(errorSpy).not.toHaveBeenCalled()
+})
+
+test("each agent runs its tier's model at its own declared effort", async () => {
+  const fake = fakeContext({ models: { opus: "openai/gpt-6.1-sol", sonnet: "openai/gpt-6.1-terra", fable: "openai/gpt-6-astra" } })
+  await plugin.setup(fake.ctx)
+  const models = Object.fromEntries(["omca-architect", "omca-build-fixer", "omca-viewer", "omca-analyzer", "omca-executor"].map((id) => [id, fake.agents.get(id)?.model]))
+  expect(models).toEqual({
+    "omca-architect": { providerID: "openai", id: "gpt-6-astra", variant: "xhigh" },
+    "omca-build-fixer": { providerID: "openai", id: "gpt-6.1-sol", variant: "medium" },
+    "omca-viewer": { providerID: "openai", id: "gpt-6.1-sol", variant: "medium" },
+    "omca-analyzer": { providerID: "openai", id: "gpt-6.1-sol", variant: "high" },
+    "omca-executor": { providerID: "openai", id: "gpt-6.1-terra", variant: "high" },
+  })
+  expect(fake.agents.get("omca")?.model).toEqual({ providerID: "openai", id: "gpt-6.1-sol" })
+})
+
+test("a variant in the tier mapping wins over the agent's declared effort", async () => {
+  const fake = fakeContext({ models: { opus: "openai/gpt-6.1-sol#xhigh" } })
+  await plugin.setup(fake.ctx)
+  expect(fake.agents.get("omca-build-fixer")?.model).toEqual({ providerID: "openai", id: "gpt-6.1-sol", variant: "xhigh" })
 })
 
 test("an invalid model ref fails plugin setup explicitly", async () => {
@@ -229,11 +249,11 @@ test("command arguments are substituted literally", async () => {
   expect(String(fake.prompts[0]?.text)).toContain("p.md $& $$")
 })
 
-test("the tool hook denies a destructive git command and allows git status", async () => {
+test("the tool hook denies a commit that skips its hooks and allows git status", async () => {
   const fake = fakeContext()
   await plugin.setup(fake.ctx)
   const fire = (command: string) => hook(fake, "tool.execute.before")({ sessionID: "ses_one", tool: "shell", input: { command } })
-  await expect(fire("git reset --hard HEAD~1")).rejects.toThrow("omca guard: ")
+  await expect(fire("git commit --no-verify -m x")).rejects.toThrow("omca guard: git commit --no-verify blocked")
   await expect(fire("git status")).resolves.toBeUndefined()
 })
 

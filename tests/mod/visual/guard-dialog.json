@@ -1,6 +1,0 @@
-{
-  "command": "Clean the build",
-  "mockScript": "guard-dialog",
-  "fixture": "guard-dialog",
-  "waitFor": "OMCA guard"
-}

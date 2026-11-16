@@ -1,18 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { COMMENT_ATTRIBUTION_HEAD, COMMENT_SLOP_HEAD, judgeWrite } from "./comments.ts";
-import {
-  classify,
-  FORCE_PUSH_REASON,
-  FORCE_PUSH_TITLE,
-  GIT_REASON,
-  gitTitle,
-  NO_VERIFY_REASON,
-  REVIEW_REFUSED_REASON,
-  RM_CATASTROPHIC_REASON,
-  RM_CATASTROPHIC_TITLE,
-  RM_TITLE,
-  titleFor,
-} from "./destructive.ts";
+import { classify, type Context, FORCE_PUSH_REASON, NO_VERIFY_REASON, RM_CATASTROPHIC_REASON } from "./destructive.ts";
+import { type DiscardOperation, type GitAnswer, gitQueries, gitVerdict, type RepoCheck } from "./git-state.ts";
 import {
   internalFinalReason,
   noPassingVerdictReason,
@@ -30,19 +19,64 @@ const wrappers: readonly [string, (reason: string) => string][] = [
   ["a TaskCompleted hook feedback", (reason) => `TaskCompleted hook feedback:\n${reason}`],
 ];
 
-const slop = judgeWrite("deny", { file_path: "/r/src/a.py", content: "# obviously the user name\nuser_name = input_value" }, new Map());
+const slop = judgeWrite("deny", { file_path: "/r/src/a.py", content: "# TODO fix this\nuser_name = input_value" }, new Map());
 const attribution = judgeWrite("deny", { file_path: "/r/src/a.py", content: "# AI-generated helper\nx = 1" }, new Map());
 const reasonOf = (verdict: unknown): string => {
   if (typeof verdict !== "object" || verdict === null || !("reason" in verdict) || typeof verdict.reason !== "string") throw new Error("no deny");
   return verdict.reason;
 };
 
+const SESSION: Context = { shell: "bash", home: "/home/user", cwd: "/home/user/proj" };
+const catastrophicReason = (command: string): string => {
+  const finding = classify(command, SESSION);
+  if (finding?.kind !== "catastrophic") throw new Error(`not catastrophic: ${command}`);
+  return finding.reason;
+};
+const verdictOf = (operation: DiscardOperation, query: RepoCheck["query"], answer: GitAnswer | undefined, dir: string | undefined = ""): string => {
+  const reason = gitVerdict(gitQueries([{ operation, query, at: [{ dir }] }]), [answer]);
+  if (reason === undefined) throw new Error(`no verdict for ${operation}`);
+  return reason;
+};
+const listed = (stdout: string): GitAnswer => ({ exitCode: 0, stdout, stderr: "" });
+
 const cases: readonly [string, string, Refusal][] = [
-  ["rm catastrophic", RM_CATASTROPHIC_REASON, { kind: "guard", title: RM_CATASTROPHIC_TITLE, remedy: "name a deeper path explicitly" }],
-  ["git", GIT_REASON, { kind: "guard", title: "destructive git command", remedy: "if the working tree is dirty, report and stop" }],
-  ["force push", FORCE_PUSH_REASON, { kind: "guard", title: FORCE_PUSH_TITLE, remedy: "push to another branch, or ask the user to push" }],
-  ["no verify", NO_VERIFY_REASON, { kind: "guard", title: gitTitle("commit --no-verify"), remedy: "fix what the hook reports and commit without the flag" }],
-  ["review refused", REVIEW_REFUSED_REASON, { kind: "review-refused", title: "the user refused this command", remedy: "ask the user how to proceed" }],
+  ["rm catastrophic", RM_CATASTROPHIC_REASON, { kind: "guard", title: "rm -rf on a protected path", remedy: "name a deeper path explicitly" }],
+  ["rm variable", catastrophicReason("rm -rf $UNSET/usr"), { kind: "guard", title: "rm -rf on an unset variable", remedy: "assign the variable in the same command" }],
+  ["rm substitution", catastrophicReason("rm -rf $(foo)"), { kind: "guard", title: "rm -rf on a command substitution", remedy: "remove the printed path by name" }],
+  ["rm after a cd that can fail", catastrophicReason("cd /srv/x; rm -rf *"), { kind: "guard", title: "rm -rf after a cd that can fail", remedy: "join the cd and the rm with &&" }],
+  [
+    "rm after an unresolved cd",
+    catastrophicReason("cd $X && rm -rf *"),
+    { kind: "guard", title: "rm -rf after an unresolved cd", remedy: "cd into a literal path, or name the full path" },
+  ],
+  ["rm --no-preserve-root", catastrophicReason("rm -rf --no-preserve-root /srv/x/y"), { kind: "guard", title: "rm -rf --no-preserve-root", remedy: "drop the option" }],
+  [
+    "git discarding tracked changes",
+    verdictOf("git reset --hard", "tracked", listed(" M a.ts\n")),
+    { kind: "guard", title: "git command discarding changes", remedy: "commit or stash the changes first, or report and stop" },
+  ],
+  [
+    "git clean",
+    verdictOf("git clean", "untracked", listed("Would remove x\n")),
+    { kind: "guard", title: "git clean of untracked files", remedy: "keep what should stay first, or report and stop" },
+  ],
+  [
+    "git stash drop",
+    verdictOf("git stash drop", "stash", listed("stash@{0}: WIP\n")),
+    { kind: "guard", title: "dropping stashed changes", remedy: "apply or commit the stash first, or report and stop" },
+  ],
+  [
+    "git state unreadable",
+    verdictOf("git reset --hard", "tracked", { error: "timed out" }),
+    { kind: "guard", title: "repository state unreadable", remedy: "run git status yourself, then report and stop" },
+  ],
+  [
+    "git state in an unknown directory",
+    verdictOf("git reset --hard", "tracked", undefined, undefined),
+    { kind: "guard", title: "repository state unreadable", remedy: "run git status yourself, then report and stop" },
+  ],
+  ["force push", FORCE_PUSH_REASON, { kind: "guard", title: "force push to the default branch", remedy: "push to another branch, or ask the user to push" }],
+  ["no verify", NO_VERIFY_REASON, { kind: "guard", title: "git commit --no-verify", remedy: "fix what the hook reports and commit without the flag" }],
   ["stays final", stayFinalReason("7", "plan"), { kind: "final-kept", taskId: "7", title: "stays the run's final task" }],
   ["internal", internalFinalReason("7", "plan"), { kind: "final-kept", taskId: "7", title: "stays the run's final task" }],
   [
@@ -77,7 +111,7 @@ const cases: readonly [string, string, Refusal][] = [
       kind: "comment",
       title: "comment slop",
       remedy: "delete the quoted comment, or rewrite it as the reason the code is the way it is",
-      detail: "obviously the user name",
+      detail: "TODO fix this",
     },
   ],
   [
@@ -105,7 +139,7 @@ describe("refusalOf", () => {
       kind: "comment",
       title: "comment slop",
       remedy: "delete the quoted comment, or rewrite it as the reason the code is the way it is",
-      detail: "obviously the user name",
+      detail: "TODO fix this",
     });
     expect(refusalOf(`Error: ${reasonOf(attribution)}`)).toMatchObject({ kind: "comment", title: "AI-attribution or placeholder comment" });
     expect(refusalOf(`Error: Exit code 1\n${reasonOf(slop)}`)).toBeUndefined();
@@ -162,33 +196,5 @@ describe("refusalOf", () => {
     expect(refusalOf("TaskCompleted hook feedback:\n")).toBeUndefined();
     expect(refusalOf("command not found")).toBeUndefined();
     expect(refusalOf("")).toBeUndefined();
-  });
-});
-
-describe("titleFor", () => {
-  const at = (command: string) => {
-    const finding = classify(command);
-    if (finding === undefined) throw new Error(`no finding for ${command}`);
-    return finding;
-  };
-
-  test("a catastrophic finding takes the protected-path title", () => {
-    expect(titleFor(at("rm -rf /"))).toBe(RM_CATASTROPHIC_TITLE);
-  });
-
-  test("a blocking finding takes its first git operation other than a force push", () => {
-    expect(titleFor(at("git stash"))).toBe("git stash");
-    expect(titleFor(at("git push --force origin main && git clean -fd"))).toBe("git clean");
-    expect(titleFor(at("git commit --no-verify -m x"))).toBe("git commit --no-verify");
-  });
-
-  test("a blocking force push takes the default-branch title", () => {
-    expect(titleFor(at("git push --force origin main"))).toBe(FORCE_PUSH_TITLE);
-  });
-
-  test("an advisory finding takes its first git operation, else recursive removal", () => {
-    expect(titleFor(at("git push --force origin dev"))).toBe("force push to dev");
-    expect(titleFor(at("git push -f"))).toBe(gitTitle("push --force"));
-    expect(titleFor(at("rm -rf build/cache"))).toBe(RM_TITLE);
   });
 });

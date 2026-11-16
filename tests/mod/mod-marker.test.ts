@@ -23,7 +23,7 @@ test("session start writes the marker with its time, the plugin version and the 
   const w = engine(on);
   await start($);
   const manifest = w.reads.find((path) => path.endsWith("/.claude-plugin/plugin.json")) ?? "";
-  expect(marker(w)).toEqual({ written_at: STARTED_MS, version: null, options: { showBand: true, guardMode: "dialog", enableKeywordTriggers: false }, task_tools: true, task_list: null });
+  expect(marker(w)).toEqual({ written_at: STARTED_MS, version: null, options: { showBand: true, enableKeywordTriggers: false }, task_tools: true, task_list: null });
   expect(w.logs.filter((line) => line.startsWith("cannot read"))).toEqual([`cannot read the plugin version: ENOENT: no such file, ${manifest}`]);
 
   write(w, manifest, '{ "name": "oh-my-claudeagent", "version": "3.0.0" }');
@@ -32,7 +32,7 @@ test("session start writes the marker with its time, the plugin version and the 
   expect(marker(w)).toEqual({
     written_at: STARTED_MS + 60_000,
     version: "3.0.0",
-    options: { showBand: true, guardMode: "dialog", enableKeywordTriggers: false },
+    options: { showBand: true, enableKeywordTriggers: false },
     task_tools: true,
     task_list: null,
   });

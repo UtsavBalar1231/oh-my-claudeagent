@@ -23,7 +23,8 @@ Claude Code's OMCA server, mod and status line make no network calls themselves.
 
 OMCA's hooks read the prompt text, the inputs and outputs of Read, Write, Edit, Agent, Bash and
 PowerShell calls, and the tail of the transcript when a session tries to stop. It runs local
-`git` for its drift check. Its mod reads your settings file, a few environment variables and the
+`git` for its drift check, and its guard runs read-only `git` (the status, a `git clean` dry run,
+the stash list and the branch refs) in the repository a destructive git command would change. Its mod reads your settings file, a few environment variables and the
 session's task list under `tasks/` in Claude Code's config directory (`CLAUDE_CONFIG_DIR`, or
 `~/.claude`), and writes none of them. It sets two variables for
 the session when nothing has set them: `CLAUDE_CODE_ENABLE_TODO_TOOLS=1` and

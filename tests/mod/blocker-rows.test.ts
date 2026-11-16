@@ -1,7 +1,7 @@
 import type { On, RenderSurface, ToolGroupCall } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
 import { judgeWrite } from "../../src/core/comments.ts";
-import { FORCE_PUSH_REASON, GIT_REASON, REVIEW_REFUSED_REASON } from "../../src/core/destructive.ts";
+import { FORCE_PUSH_REASON, RM_CATASTROPHIC_REASON } from "../../src/core/destructive.ts";
 import { noPassingVerdictReason, noVerdictReason, stayFinalReason } from "../../src/core/refusals.ts";
 import { unloggedReason } from "../../src/core/verification.ts";
 import { INVALID_LEDGER_REASON } from "../../src/core/verification.ts";
@@ -49,7 +49,7 @@ async function rowsOf($: Engine, { tool = "Bash", output, isErrored = true, ...r
   return rows;
 }
 
-const slop = judgeWrite("deny", { file_path: "/work/src/a.py", content: "# obviously the user name\nuser_name = input_value" }, new Map());
+const slop = judgeWrite("deny", { file_path: "/work/src/a.py", content: "# TODO fix this\nuser_name = input_value" }, new Map());
 const slopReason = slop?.kind === "deny" ? slop.reason : "";
 
 const REMEDY_AT_80 = "     delete the quoted comment, or rewrite it as the reason the code is the wa…";
@@ -60,11 +60,6 @@ const ROWS: readonly { name: string; result: Result; at80: string[]; at120?: str
     name: "a guard deny",
     result: { output: `${DENIED("Bash")}${FORCE_PUSH_REASON}` },
     at80: ["  ⊗  OMCA guard refused · force push to the default branch", "     push to another branch, or ask the user to push"],
-  },
-  {
-    name: "a refusal in the guard's dialog",
-    result: { output: `${DENIED("Bash")}${REVIEW_REFUSED_REASON} OMCA held it as: force push to the default branch.` },
-    at80: ["  ⊗  you refused this in the OMCA guard", "     Claude asks how to proceed"],
   },
   {
     name: "a final task kept final",
@@ -88,19 +83,19 @@ const ROWS: readonly { name: string; result: Result; at80: string[]; at120?: str
   {
     name: "a comment check deny",
     result: { tool: "Write", output: `${HOOK_ERROR("Write")}${slopReason}` },
-    at80: ["  !  OMCA comment check held this write · obviously the user name", REMEDY_AT_80],
-    at120: ["  !  OMCA comment check held this write · obviously the user name", REMEDY_AT_120],
+    at80: ["  !  OMCA comment check held this write · TODO fix this", REMEDY_AT_80],
+    at120: ["  !  OMCA comment check held this write · TODO fix this", REMEDY_AT_120],
   },
   {
     name: "a comment check deny in the bare Error form",
     result: { tool: "Write", output: `Error: ${slopReason}` },
-    at80: ["  !  OMCA comment check held this write · obviously the user name", REMEDY_AT_80],
-    at120: ["  !  OMCA comment check held this write · obviously the user name", REMEDY_AT_120],
+    at80: ["  !  OMCA comment check held this write · TODO fix this", REMEDY_AT_80],
+    at120: ["  !  OMCA comment check held this write · TODO fix this", REMEDY_AT_120],
   },
   {
     name: "a guard deny of a Monitor command",
-    result: { tool: "Monitor", output: `${DENIED("Monitor")}${GIT_REASON}` },
-    at80: ["  ⊗  OMCA guard refused · destructive git command", "     if the working tree is dirty, report and stop"],
+    result: { tool: "Monitor", output: `${DENIED("Monitor")}${RM_CATASTROPHIC_REASON}` },
+    at80: ["  ⊗  OMCA guard refused · rm -rf on a protected path", "     name a deeper path explicitly"],
   },
 ];
 
