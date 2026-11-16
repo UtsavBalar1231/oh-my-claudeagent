@@ -57,17 +57,6 @@
       "default": true,
       "description": "When false, the band with the open run and its task list button, and any status file error, is not drawn.",
       "sensitive": false
-    },
-    "guardMode": {
-      "title": "Destructive Bash guard mode",
-      "type": "string",
-      "default": "dialog",
-      "options": [
-        "dialog",
-        "deny"
-      ],
-      "description": "dialog asks before a risky Bash or PowerShell command runs where a dialog can show; deny, and any session where none can show, refuses a blocking command and lets an advisory one run. A catastrophic removal is refused in both modes.",
-      "sensitive": false
     }
   }
 }

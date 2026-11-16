@@ -133,11 +133,6 @@ const TASK_SCRIPT: Script = {
   ],
 };
 const NO_SCRIPT: Script = { main: [], subagent: [] };
-const GUARD_SCRIPT: Script = {
-  main: [{ content: [bash("rm -rf build", "Remove the build output")] }, { content: [text("The build is clean.")] }],
-  subagent: [],
-};
-const guardReady = (screen: string) => /^● Removing/m.test(screen) && screen.includes("OMCA held this command");
 
 // A dock takes at most 45% of the terminal. At 214 columns its body holds a task title on one line.
 const CLIP_COLS = 214;
@@ -374,22 +369,6 @@ export const CLIPS: readonly Clip[] = [
     ],
   },
   {
-    name: "clip-guard",
-    format: "clip",
-    cols: PAIR_COLS,
-    rows: PAIR_ROWS,
-    font: PAIR_FONT,
-    args: BYPASS_ARGS,
-    settings: BYPASS_SETTINGS,
-    script: resetScript("Understood. Your changes stay as they are."),
-    steps: [
-      ...command(CLEAN_UP),
-      { until: has("OMCA held this command", "Run it?"), mark: "dialog", hold: 3_000, targets: { "discard-lines": /git reset --hard discards[^\n]*(\n[^\n]*\|[^\n]*)*/ } },
-      { key: "Enter", gap: 0 },
-      { until: has("Your changes stay as they are."), mark: "refused" },
-    ],
-  },
-  {
     name: "clip-verify",
     format: "clip",
     cols: CLIP_COLS,
@@ -611,7 +590,6 @@ export const SHOTS: readonly Still[] = [
       (screen.match(/\S+-\d+-\d+ · \w+ · [\d.]+k tokens/g) ?? []).length === 3,
     crop: "pane",
   },
-  { name: "guard", format: "png", cols: 120, rows: 26, command: "Clean the build", keys: [], script: GUARD_SCRIPT, ready: guardReady },
   {
     name: "doctor",
     format: "png",
@@ -653,7 +631,6 @@ export const SHOTS: readonly Still[] = [
     // Claude Code's own agent row shows a token count once that agent's first reply is in.
     ready: (screen) => screen.includes("Waiting for executor ×2") && (screen.match(/◯ oh-my-claudeagent:executor .*↓ [\d.]+k? tokens/g) ?? []).length === 2,
   },
-  { name: "guard-dialog", format: "gif", cols: 120, rows: 26, command: "Clean the build", keys: [], script: GUARD_SCRIPT, ready: guardReady },
 ];
 
 function run(argv: readonly string[], env: Record<string, string>, timeout = RUN_TIMEOUT_MS): string {

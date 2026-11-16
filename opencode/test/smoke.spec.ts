@@ -150,7 +150,7 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
     expect(response.body!.data!.some((mcp) => mcp.name === "omca")).toBe(false)
   }, SLOW)
 
-  test("shell guard blocked the reset, kept HEAD, and allowed git status", async () => {
+  test("shell guard blocked the hook-skipping commit, kept HEAD, and allowed git status", async () => {
     const { server, a } = need()
     await registeredIn(a)
     const created = await server.api<Session>("POST", "/api/session", a, { title: "smoke", location: { directory: a } })
@@ -158,8 +158,8 @@ describe.skipIf(!opencodeBin)("opencode plugin smoke", () => {
     const session = created.body?.data?.id
     expect(session).toBeString()
     const before = git(a, "rev-parse", "HEAD")
-    const reset = await server.api<unknown>("POST", `/api/session/${session}/shell`, a, { command: "git reset --hard HEAD~1" })
-    expect(reset.status).toBeGreaterThanOrEqual(400)
+    const commit = await server.api<unknown>("POST", `/api/session/${session}/shell`, a, { command: "git commit --allow-empty --no-verify -m smoke" })
+    expect(commit.status).toBeGreaterThanOrEqual(400)
     expect(git(a, "rev-parse", "HEAD")).toBe(before)
     const status = await server.api<unknown>("POST", `/api/session/${session}/shell`, a, { command: "git status" })
     expect(status.status).toBeGreaterThanOrEqual(200)

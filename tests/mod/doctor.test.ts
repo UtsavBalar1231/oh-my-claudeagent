@@ -88,7 +88,7 @@ const CHECKS = [
   " ✓ OK    bun           bun 1.4.2 is on PATH",
   " ✓ OK    omca server   Last hook call 2 min ago",
   " ✓ OK    ast-grep      sg 0.39.0 is on PATH",
-  " ✓ OK    Options       showBand on, guardMode deny",
+  " ✓ OK    Options       showBand on",
   " ✓ OK    Task tools    On, as OMCA requires",
   " ✓ OK    Agent models  Each agent keeps the model tier it declares",
   " ✓ OK    Effort cap    No maxEffortLevel, so agents run at the effort they declare",
@@ -110,7 +110,7 @@ for (const layout of LAYOUTS) {
     [SETTINGS]: USER_TEXT,
   };
 
-  test(`/omca doctor opens the Doctor page, draws the loading state while the checks run, then the problem rows and one folded line for the passing checks${suffix}`, { options: { guardMode: "deny" } }, async ($, on) => {
+  test(`/omca doctor opens the Doctor page, draws the loading state while the checks run, then the problem rows and one folded line for the passing checks${suffix}`, async ($, on) => {
     const w = engine(on, world(on, FILES, structuredClone(USER), {}, layout), { hold: true });
 
     const pending = $.command.run(run("doctor", 120));
@@ -324,7 +324,7 @@ for (const layout of LAYOUTS) {
     expect(w.writes).toEqual([`${SETTINGS}.omca-bak`, SETTINGS]);
   });
 
-  test(`when every check passes the tab is the head row and the folded line, and o shows the rows and hides them again${suffix}`, { options: { guardMode: "deny" } }, async ($, on) => {
+  test(`when every check passes the tab is the head row and the folded line, and o shows the rows and hides them again${suffix}`, async ($, on) => {
     const fixed = { ...structuredClone(USER), statusLine: { ...USER.statusLine, refreshInterval: 5 } };
     const w = engine(on, world(on, FILES, fixed, {}, layout));
     await $.command.run(run("doctor", 120));
@@ -355,7 +355,7 @@ for (const layout of LAYOUTS) {
     await ui.unmount();
   });
 
-  test(`Desktop folds the passing checks under the problem rows, and o shows them${suffix}`, { options: { guardMode: "deny" } }, async ($, on) => {
+  test(`Desktop folds the passing checks under the problem rows, and o shows them${suffix}`, async ($, on) => {
     engine(on, world(on, FILES, structuredClone(USER), {}, layout));
     await $.command.run(run("doctor", 120));
     const ui = await $.ui.mount(pane("desktop", WIDE));
@@ -372,7 +372,7 @@ for (const layout of LAYOUTS) {
     await ui.unmount();
   });
 
-  test(`OMCA_GLYPHS=ascii draws the doctor's marks and separators from the ASCII set${suffix}`, { options: { guardMode: "deny" } }, async ($, on) => {
+  test(`OMCA_GLYPHS=ascii draws the doctor's marks and separators from the ASCII set${suffix}`, async ($, on) => {
     engine(on, world(on, FILES, structuredClone(USER), { OMCA_GLYPHS: "ascii" }, layout));
     await $.command.run(run("doctor", 80));
     const ui = await $.ui.mount(pane("terminal", { columns: 80, rows: 40, placement: "inline" }));
@@ -390,13 +390,13 @@ for (const layout of LAYOUTS) {
 }
 
 test("the Options row reports the options the mod loaded with, whatever settings.json holds", { options: { showBand: false } }, async ($, on) => {
-  const configs = { pluginConfigs: { "oh-my-claudeagent@omca": { options: { showBand: true, guardMode: "deny" } } } };
+  const configs = { pluginConfigs: { "oh-my-claudeagent@omca": { options: { showBand: true } } } };
   engine(on, world(on, {}, configs));
   await $.command.run(run("doctor", 120));
   const ui = await $.ui.mount(pane("terminal", WIDE));
 
   await ui.press({ key: "o" });
-  expect(body(await ui.drawn()).find((row) => row.includes("Options"))).toBe(" ✓ OK    Options       showBand off, guardMode dialog");
+  expect(body(await ui.drawn()).find((row) => row.includes("Options"))).toBe(" ✓ OK    Options       showBand off");
   await ui.unmount();
 });
 

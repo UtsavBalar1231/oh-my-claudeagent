@@ -100,9 +100,11 @@ failed verifications and a completed run.
 
 <img src=".github/assets/mascots.png" width="680" alt="The Agents tab with three agents running at once, each lane led by its pixel mascot: a green executor in a yellow hard hat with a hammer, a blue explorer in a safari hat with a spyglass, and a purple architect with a lit bulb beside its head. Beside each mascot, four rows give the agent's name with its running time, its task, its running Bash command with one call, and its model, effort and tokens, with a blank row between agents.">
 
-The guard holds a destructive shell command for your review and shows what it would touch.
-
-<img src=".github/assets/guard.png" width="680" alt="A dialog headed OMCA guard says OMCA held rm -rf build for review, that it would remove the build directory with 4 entries, and offers Refuse or Run it.">
+The guard denies a shell command that would destroy something: a recursive removal of the root,
+your home or the project; a git command that would discard uncommitted changes, untracked files or
+a stash in the repository it runs in; a force push to the default branch; and
+`git commit --no-verify`. Its reason names the cause, so Claude can rewrite the command, and every
+other command goes on to Claude Code's own permission checks.
 
 `/omca doctor` checks the client, bun, the server, ast-grep, the options and the settings that
 change how OMCA runs. A check with a known fix offers a key that fills the prompt with it, and
@@ -115,10 +117,6 @@ The status line shows the session (model, effort and agent), the workspace
 by the token) on rows of their own, and fits itself to the terminal's width.
 
 <img src=".github/assets/statusline.png" width="900" alt="The OMCA status line under the prompt shows three rows: the model and effort; a context bar, the git branch with change counts and the project; and the session cost and duration. Below it, Claude Code lists the two running executors with their tasks, times and tokens. Above, the turn line waits on the two executors and the band shows the checkout-redesign run at 6 of 14.">
-
-The guard dialog arrives the moment the model asks for a destructive command.
-
-<img src=".github/assets/guard-dialog.gif" width="680" alt="An animation: the prompt Clean the build is typed and sent, the model asks to run rm -rf build, and the OMCA guard dialog appears holding the command, listing the build directory it would remove, with Refuse selected.">
 
 ## What OMCA runs, reads and writes
 

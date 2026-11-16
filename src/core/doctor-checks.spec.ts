@@ -19,7 +19,7 @@ const BASE: Inputs = {
     advisorModel: "fable",
     statusLine: { ...STATUS_LINE, refreshInterval: 5 },
   },
-  options: { showBand: false, guardMode: "deny" },
+  options: { showBand: false },
   env: {},
   hasTaskTools: true,
   userSettings: null,
@@ -195,17 +195,15 @@ test("ast-grep or sg", () => {
 });
 
 test.each<[Inputs["options"], string]>([
-  [{ showBand: true, guardMode: "dialog" }, "showBand on, guardMode dialog"],
-  [{ showBand: false, guardMode: "deny" }, "showBand off, guardMode deny"],
+  [{ showBand: true }, "showBand on"],
+  [{ showBand: false }, "showBand off"],
 ])("plugin options %p", (options, detail) => {
   expect(run({ options }, "options")).toEqual({ level: "ok", detail });
 });
 
 test("the options check ignores any pluginConfigs in settings", () => {
-  const settings = { pluginConfigs: { "oh-my-claudeagent@omca": { options: { showBand: false, guardMode: "deny" } } } };
-  expect(run({ settings, options: { showBand: true, guardMode: "dialog" } }, "options")?.detail).toBe(
-    "showBand on, guardMode dialog",
-  );
+  const settings = { pluginConfigs: { "oh-my-claudeagent@omca": { options: { showBand: false } } } };
+  expect(run({ settings, options: { showBand: true } }, "options")?.detail).toBe("showBand on");
 });
 
 test.each<[string | undefined, Omit<Check, "id" | "label">]>([

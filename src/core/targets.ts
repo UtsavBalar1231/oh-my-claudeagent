@@ -2,7 +2,9 @@ import { inferPlatform, isAbsolutePath, isInside, joinPath, normalizePath, type 
 import type { Context } from "./shell.ts";
 
 const NAME = "[A-Za-z_][A-Za-z0-9_]*";
-const VARIABLE = new RegExp(`^(?:\\$\\{(?:env:)?(${NAME})\\}|\\$(?:env:)?(${NAME})|%(${NAME})%)(.*)$`, "s");
+// `${NAME:?}` stops the shell when NAME is unset or empty, so a target built on it is never the
+// empty variable's.
+const VARIABLE = new RegExp(`^(?:\\$\\{(?:env:)?(${NAME})(:\\?[^}]*)?\\}|\\$(?:env:)?(${NAME})|%(${NAME})%)(.*)$`, "s");
 const HOME_NAMES = new Set(["HOME", "USERPROFILE", "HOMEPATH"]);
 // A variable the platform or the CI runner always sets, so a path under it is a real directory
 // and not the root it reads as when the variable is empty.
@@ -34,12 +36,12 @@ export const CWD_SUBSTITUTION: Readonly<Record<Context["shell"], RegExp>> = {
   powershell: /\$\(\s*(?:get-location|pwd)\s*\)/gi,
 };
 
-type Reference = { name: string; rest: string };
+type Reference = { name: string; rest: string; isRequired: boolean };
 
 function variableAt(text: string): Reference | undefined {
   const match = VARIABLE.exec(text);
   if (match === null) return undefined;
-  return { name: (match[1] ?? match[2] ?? match[3] ?? "").toUpperCase(), rest: match[4] ?? "" };
+  return { name: (match[1] ?? match[3] ?? match[4] ?? "").toUpperCase(), rest: match[5] ?? "", isRequired: match[2] !== undefined };
 }
 
 /**
@@ -109,11 +111,23 @@ function isCatastrophicRelative(text: string, ctx: Context): boolean {
 }
 
 /**
+ * The variable a target starts with, as written, when its value is unknown and an empty one is
+ * the hazard: not home, the working directory, a variable the platform always sets, or one
+ * written `${NAME:?}`.
+ */
+export function unknownVariable(word: string, ctx: Context): string | undefined {
+  if (homeRest(word, true) !== undefined || CWD_REFERENCE[ctx.shell].test(word)) return undefined;
+  const variable = variableAt(word);
+  if (variable === undefined || variable.isRequired || ALWAYS_SET.test(variable.name) || USER_DATA.test(variable.name)) return undefined;
+  return word.slice(0, word.length - variable.rest.length);
+}
+
+/**
  * Only a target whose loss is machine-wide is catastrophic: a filesystem or drive root, a share
  * root, a mount and the folders directly under it, home, the working directory or a parent of
  * either, and anything directly under the root or home. A leading variable reads as empty,
  * since `rm -rf "$DIR/"*` with DIR unset is the classic way to reach `/`, unless the platform
- * always sets it. A trailing glob removes its parent's contents, which is the parent's loss.
+ * always sets it or it is written `${DIR:?}`. A trailing glob removes its parent's contents, which is the parent's loss.
  */
 export function isCatastrophicTarget(word: string, ctx: Context): boolean {
   const home = homeRest(word, true);
@@ -125,10 +139,10 @@ export function isCatastrophicTarget(word: string, ctx: Context): boolean {
   }
   const variable = variableAt(word);
   if (variable !== undefined) {
-    const { name, rest } = variable;
+    const { name, rest, isRequired } = variable;
     if (USER_DATA.test(name) && !CLIMBS.test(rest)) return SEPARATED.test(rest) && partsBelow(rest, true).length === 0;
     if (!/^[\\/]/.test(rest)) return false;
-    if (ALWAYS_SET.test(name) && !CLIMBS.test(rest)) return false;
+    if ((isRequired || ALWAYS_SET.test(name)) && !CLIMBS.test(rest)) return false;
     return partsBelow(rest, true).length <= 1;
   }
   const slashed = ctx.shell === "powershell" || inferPlatform(word) === "win32" ? word.replaceAll("\\", "/") : word;

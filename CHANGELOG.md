@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Destructive-command guard:** it denies only what would destroy something, never opens a
+  dialog, and acts the same in every permission mode, `bypassPermissions` included.
+  - A recursive `rm` is refused when its target is the filesystem root, home, the working
+    directory or a directory directly under root or home. The guard now reads the command the
+    way the shell runs it: a variable assigned earlier in the same command takes its value,
+    `${VAR:?}` and `$(mktemp ...)` are never empty, `cd dir && rm -rf *` is judged under `dir`,
+    redirections and heredoc bodies are not targets. A variable that may be empty when the `rm`
+    runs, including one assigned only after a `cd` that can fail, is still refused, and the
+    reason names it with the fix. On a replay of 76,386 real shell calls, 151 refused
+    cleanups of scratch and build directories now run.
+  - `git reset --hard`, `git checkout .`, `git restore .`, `git clean` and `git stash drop` or
+    `clear` are refused only when the repository says they would discard something: a changed
+    tracked file, files `git clean -n` lists, a stash entry. Reverting named paths, `git stash`,
+    `pop` and `apply` always run. A force push to the default branch and `--no-verify` stay
+    refused. The checks run read-only git in the command's directory, on Claude Code and OpenCode.
+  - Every other recursive `rm` runs. `OMCA_DISABLED_HOOKS=bash-guard` still turns off the git
+    rules, and the removal refusal still has no switch.
 - **Comment gate:** it keeps only the rules that matched real problems: AI attribution or
   authorship, placeholder and context-free TODOs, and decorative separator lines. The restates,
   filler, run-length, density and doc-adds-nothing rules are gone, so doc comments (Rust `///`,
@@ -17,6 +34,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the effort its definition declares (`xhigh` for `omca-architect`, `medium` for
   `omca-build-fixer` and `omca-viewer`, `high` for the rest). A `#variant` still sets one effort
   for the whole tier.
+
+### Removed
+
+- The guard's review dialog, its `guardMode` option and its README screenshots.
 
 ### Fixed
 

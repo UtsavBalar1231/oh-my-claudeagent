@@ -249,11 +249,11 @@ test("command arguments are substituted literally", async () => {
   expect(String(fake.prompts[0]?.text)).toContain("p.md $& $$")
 })
 
-test("the tool hook denies a destructive git command and allows git status", async () => {
+test("the tool hook denies a commit that skips its hooks and allows git status", async () => {
   const fake = fakeContext()
   await plugin.setup(fake.ctx)
   const fire = (command: string) => hook(fake, "tool.execute.before")({ sessionID: "ses_one", tool: "shell", input: { command } })
-  await expect(fire("git reset --hard HEAD~1")).rejects.toThrow("omca guard: ")
+  await expect(fire("git commit --no-verify -m x")).rejects.toThrow("omca guard: git commit --no-verify blocked")
   await expect(fire("git status")).resolves.toBeUndefined()
 })
 

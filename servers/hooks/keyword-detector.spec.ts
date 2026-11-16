@@ -66,7 +66,7 @@ describe("the enableKeywordTriggers option", () => {
   test("a marker without the option injects nothing", async () => {
     const root = project();
     const sessionId = crypto.randomUUID();
-    writeMarker(root, sessionId, { written_at: NOW, options: { showBand: true, guardMode: "dialog" } });
+    writeMarker(root, sessionId, { written_at: NOW, options: { showBand: true } });
     await silent(root, sessionId, "handoff please");
   });
 

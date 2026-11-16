@@ -1,7 +1,7 @@
 import type { On, RenderSurface, ToolGroupCall } from "claude-code";
 import { type Engine, expect, test } from "claude-code/testing";
 import { judgeWrite } from "../../src/core/comments.ts";
-import { FORCE_PUSH_REASON, GIT_REASON, REVIEW_REFUSED_REASON } from "../../src/core/destructive.ts";
+import { FORCE_PUSH_REASON, RM_CATASTROPHIC_REASON } from "../../src/core/destructive.ts";
 import { noPassingVerdictReason, noVerdictReason, stayFinalReason } from "../../src/core/refusals.ts";
 import { unloggedReason } from "../../src/core/verification.ts";
 import { INVALID_LEDGER_REASON } from "../../src/core/verification.ts";
@@ -62,11 +62,6 @@ const ROWS: readonly { name: string; result: Result; at80: string[]; at120?: str
     at80: ["  ⊗  OMCA guard refused · force push to the default branch", "     push to another branch, or ask the user to push"],
   },
   {
-    name: "a refusal in the guard's dialog",
-    result: { output: `${DENIED("Bash")}${REVIEW_REFUSED_REASON} OMCA held it as: force push to the default branch.` },
-    at80: ["  ⊗  you refused this in the OMCA guard", "     Claude asks how to proceed"],
-  },
-  {
     name: "a final task kept final",
     result: { tool: "TaskUpdate", output: `${HOOK_ERROR("TaskUpdate")}${stayFinalReason("1", "probe-run")}` },
     at80: ["  ✗  #1 Review the probe run · stays the run's final task"],
@@ -99,8 +94,8 @@ const ROWS: readonly { name: string; result: Result; at80: string[]; at120?: str
   },
   {
     name: "a guard deny of a Monitor command",
-    result: { tool: "Monitor", output: `${DENIED("Monitor")}${GIT_REASON}` },
-    at80: ["  ⊗  OMCA guard refused · destructive git command", "     if the working tree is dirty, report and stop"],
+    result: { tool: "Monitor", output: `${DENIED("Monitor")}${RM_CATASTROPHIC_REASON}` },
+    at80: ["  ⊗  OMCA guard refused · rm -rf on a protected path", "     name a deeper path explicitly"],
   },
 ];
 

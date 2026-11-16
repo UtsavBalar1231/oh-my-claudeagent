@@ -1,7 +1,8 @@
 import { execFileSync } from "node:child_process"
 import { resolve } from "node:path"
 import { type DenyOnce, judgeWrite } from "../src/core/comments.ts"
-import { classify, type Context, type Finding, reasonFor } from "../src/core/destructive.ts"
+import { classify, type Context } from "../src/core/destructive.ts"
+import { GIT_ENV, type GitAnswer, gitQueries, gitVerdict } from "../src/core/git-state.ts"
 import { isHookDisabled } from "../src/core/kill-switch.ts"
 import { homeDir, toPlatform } from "../src/core/path.ts"
 import { spacing } from "./spacing.ts"
@@ -10,6 +11,7 @@ export type GuardResult = { deny: true; reason: string } | { deny: false }
 
 const ALLOW: GuardResult = { deny: false }
 const SH_FAMILY = ["sh", "bash", "zsh"]
+const GIT_TIMEOUT_MS = 5000
 
 export const shellKind = (shell: string): Context["shell"] =>
   SH_FAMILY.includes(shell.replace(/^.*[\\/]/, "").toLowerCase().replace(/\.exe$/, "")) ? "bash" : "powershell"
@@ -19,33 +21,53 @@ function shellContext(projectRoot: string, shell: string, cwd: string): Context 
   return { shell: shellKind(shell), cwd, root: projectRoot, platform: toPlatform(process.platform), ...(home !== undefined && { home }) }
 }
 
-function symbolicRef(projectRoot: string, name: string): string | undefined {
+function git(argv: readonly string[], cwd: string): GitAnswer {
   try {
-    const ref = execFileSync("git", ["symbolic-ref", "--quiet", "--short", name], { cwd: projectRoot, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 5000 })
-    return ref.trim() || undefined
-  } catch {
-    return undefined
+    const stdout = execFileSync(argv[0] ?? "git", argv.slice(1), {
+      cwd,
+      encoding: "utf8",
+      env: { ...process.env, ...GIT_ENV },
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: GIT_TIMEOUT_MS,
+    })
+    return { exitCode: 0, stdout, stderr: "" }
+  } catch (err) {
+    if (typeof err !== "object" || err === null || !("status" in err) || typeof err.status !== "number") {
+      return { error: err instanceof Error ? err.message : String(err) }
+    }
+    const stdout = "stdout" in err ? String(err.stdout ?? "") : ""
+    const stderr = "stderr" in err ? String(err.stderr ?? "") : ""
+    return { exitCode: err.status, stdout, stderr }
   }
 }
 
-// Read from local refs only, so deciding never waits on the network.
-function branches(projectRoot: string): Pick<Context, "branch" | "defaultBranch"> {
-  const branch = symbolicRef(projectRoot, "HEAD")
-  const originHead = symbolicRef(projectRoot, "refs/remotes/origin/HEAD")
-  return { ...(branch !== undefined && { branch }), ...(originHead !== undefined && { defaultBranch: originHead.replace(/^origin\//, "") }) }
+function symbolicRef(cwd: string, name: string): string | undefined {
+  const answer = git(["git", "symbolic-ref", "--quiet", "--short", name], cwd)
+  return "error" in answer || answer.exitCode !== 0 ? undefined : answer.stdout.trim() || undefined
 }
 
-const isPush = (finding: Finding | undefined): boolean =>
-  finding !== undefined && finding.kind !== "catastrophic" && finding.git.some((git) => git.operation === "push --force")
+// Read from local refs only, so deciding never waits on the network.
+function branches(cwd: string): Pick<Context, "branch" | "defaultBranch"> {
+  const branch = symbolicRef(cwd, "HEAD")
+  const originHead = symbolicRef(cwd, "refs/remotes/origin/HEAD")
+  return { ...(branch !== undefined && { branch }), ...(originHead !== undefined && { defaultBranch: originHead.replace(/^origin\//, "") }) }
+}
 
 export function checkShell(command: string, projectRoot: string, shell: string, cwd = projectRoot): GuardResult {
   try {
     const ctx = shellContext(projectRoot, shell, cwd)
     const first = classify(command, ctx)
-    const finding = isPush(first) ? classify(command, { ...ctx, ...branches(cwd) }) : first
-    if (finding === undefined || finding.kind === "advisory") return ALLOW
-    if (finding.kind === "blocking" && isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "bash-guard")) return ALLOW
-    return { deny: true, reason: reasonFor(finding) }
+    if (first?.kind === "catastrophic") return { deny: true, reason: first.reason }
+    if (first?.kind !== "git" || isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "bash-guard")) return ALLOW
+    const finding = first.isForcePush ? classify(command, { ...ctx, ...branches(cwd) }) : first
+    if (finding?.kind !== "git") return ALLOW
+    if (finding.reason !== undefined) return { deny: true, reason: finding.reason }
+    const queries = gitQueries(finding.checks)
+    const reason = gitVerdict(
+      queries,
+      queries.map((query) => (query.argv === undefined ? undefined : git(query.argv, cwd))),
+    )
+    return reason === undefined ? ALLOW : { deny: true, reason }
   } catch (err) {
     return { deny: true, reason: `OMCA's shell guard failed, so the command was refused: ${err instanceof Error ? err.message : String(err)}` }
   }

@@ -40,7 +40,7 @@ export type Inputs = {
   now: number;
   settings: Readonly<Record<string, unknown>>;
   questionTimeout: unknown;
-  options: { showBand: boolean; guardMode: "dialog" | "deny" };
+  options: { showBand: boolean };
   env: DoctorEnv;
   userSettings: string | null;
   isStyleForced: boolean | null;
@@ -143,8 +143,8 @@ function astGrepCheck(found: Inputs["astGrep"]): Check {
     : check("ast-grep", "ast-grep", "ok", `${found.name} ${found.version} is on PATH`);
 }
 
-function optionsCheck({ showBand, guardMode }: Inputs["options"]): Check {
-  return check("options", "Options", "ok", `showBand ${showBand ? "on" : "off"}, guardMode ${guardMode}`);
+function optionsCheck({ showBand }: Inputs["options"]): Check {
+  return check("options", "Options", "ok", `showBand ${showBand ? "on" : "off"}`);
 }
 
 function taskToolsCheck(hasTaskTools: boolean, env: DoctorEnv): Check {

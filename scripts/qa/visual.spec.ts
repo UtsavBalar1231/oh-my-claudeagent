@@ -35,7 +35,7 @@ describe("parseView", () => {
   test("reads env, options, settings, gitRemote and startDelayMs when present", () => {
     expect(
       parseView(
-        '{"command":"x","env":{"A_B":"1"},"options":{"guardMode":"deny"},"settings":{"permissions":{"allow":["Bash"]}},"gitRemote":true,"startDelayMs":4000}',
+        '{"command":"x","env":{"A_B":"1"},"options":{"showBand":false},"settings":{"permissions":{"allow":["Bash"]}},"gitRemote":true,"startDelayMs":4000}',
       ),
     ).toEqual({
       command: "x",
@@ -43,7 +43,7 @@ describe("parseView", () => {
       mockScript: null,
       fixture: null,
       env: { A_B: "1" },
-      options: { guardMode: "deny" },
+      options: { showBand: false },
       settings: { permissions: { allow: ["Bash"] } },
       gitRemote: true,
       startDelayMs: 4000,
@@ -93,13 +93,13 @@ describe("sessionSettings", () => {
 
   test("options go under the --plugin-dir key and settings merge in", () => {
     expect(INLINE_PLUGIN_KEY).toBe("oh-my-claudeagent@inline");
-    const view = parseView('{"command":"x","options":{"guardMode":"deny"},"settings":{"permissions":{"allow":["Bash"]}}}');
+    const view = parseView('{"command":"x","options":{"showBand":false},"settings":{"permissions":{"allow":["Bash"]}}}');
     expect(sessionSettings(view, false)).toEqual({
       tui: "fullscreen",
       prefersReducedMotion: true,
       agent: "oh-my-claudeagent:orchestrator",
       permissions: { allow: ["Bash"] },
-      pluginConfigs: { "oh-my-claudeagent@inline": { options: { guardMode: "deny" } } },
+      pluginConfigs: { "oh-my-claudeagent@inline": { options: { showBand: false } } },
     });
   });
 });

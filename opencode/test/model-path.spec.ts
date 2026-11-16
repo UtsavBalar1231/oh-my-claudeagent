@@ -101,7 +101,7 @@ function ran(name: string): Promise<Scenario> {
 }
 
 async function ranAll(): Promise<void> {
-  for (const name of ["shell-reset", "subagent", "skill-load", "explore-write"]) await ran(name)
+  for (const name of ["shell-no-verify", "subagent", "skill-load", "explore-write"]) await ran(name)
 }
 
 describe.skipIf(!opencodeBin)("opencode model path", () => {
@@ -168,10 +168,10 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
 
   const head = () => git(need().ws, "rev-parse", "HEAD")
 
-  test("shell-reset: the guard denial reaches the model and HEAD stays", async () => {
-    const scenario = await ran("shell-reset")
-    verify(head() === scenario.headBefore, "shell-reset: HEAD moved")
-    verify(toolResults(scenario).includes("omca guard:"), "shell-reset: no omca guard denial reached the model")
+  test("shell-no-verify: the guard denial reaches the model and HEAD stays", async () => {
+    const scenario = await ran("shell-no-verify")
+    verify(head() === scenario.headBefore, "shell-no-verify: HEAD moved")
+    verify(toolResults(scenario).includes("omca guard:"), "shell-no-verify: no omca guard denial reached the model")
   }, SLOW)
 
   test("subagent: the omca-executor child session sees the guard denial", async () => {

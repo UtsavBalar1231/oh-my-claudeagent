@@ -11,7 +11,6 @@ export type AtomHost<K extends keyof State> = {
 
 export type Options = {
   showBand: boolean;
-  guardMode: "dialog" | "deny";
   enableKeywordTriggers: boolean;
 };
 
@@ -56,7 +55,6 @@ export type Host = {
     say: (text: string) => void;
     open: Engine["ui"]["open"];
     panes: Engine["ui"]["panes"];
-    ask: Engine["ui"]["ask"];
     invalidate: () => void;
     focus: Engine["ui"]["focus"];
     resolve: Engine["ui"]["resolve"];

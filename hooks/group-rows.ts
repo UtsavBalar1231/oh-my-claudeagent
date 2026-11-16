@@ -126,7 +126,7 @@ async function previewRows(host: Host, kit: Kit, e: Input<"ui.render ToolGroup">
 function guardRefusalOf(call: ToolGroupCall): Refusal | undefined {
   if (!call.isErrored || typeof call.output !== "string") return undefined;
   const refusal = refusalOf(call.output);
-  return refusal?.kind === "guard" || refusal?.kind === "review-refused" ? refusal : undefined;
+  return refusal?.kind === "guard" ? refusal : undefined;
 }
 
 // The header the engine draws over a standalone call: its tool and the command's first line.

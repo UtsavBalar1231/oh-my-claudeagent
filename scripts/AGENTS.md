@@ -67,7 +67,7 @@ under `servers/hooks/`. Every file is TypeScript on bun.
 - `docs/`: the capture pipeline. `screenshots.ts` runs real Claude Code sessions in tmux against
   the mock model and attaches kitty to each one on a private Xvfb display. With no name it writes
   the README shots to `.github/assets/`: a PNG still per scene (ImageMagick `import`, optimized
-  with `magick`) and a GIF for `guard-dialog` (`ffmpeg` x11grab, then palettegen
+  with `magick`), or a GIF for a scene whose format is `gif` (`ffmpeg` x11grab, then palettegen
   and paletteuse). `clips` writes the video footage to `video/public/footage/`: per clip a BT.709
   MP4 at 30 fps, a `<clip>.json` manifest of the frames at which its states first appeared
   (`clip-manifest.ts`, which `video/src/footage.ts` mirrors) and a `<clip>.sheet.png` contact sheet
