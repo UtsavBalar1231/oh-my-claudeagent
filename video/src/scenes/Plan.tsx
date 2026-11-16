@@ -8,7 +8,9 @@ import { color, toFrames } from "../theme.ts";
 import { F2 } from "./clips.ts";
 import { aim, beatLength, Canvas, crossfadeFrames, marginCol, Shot, Timed, timeline, transcriptBox, Chapter } from "./shot.tsx";
 
-const DIALOG = mark(F2, "dialog");
+// The dialog paints over four frames after the frame its mark lands on (clip-plan, 2026-11-17), so the
+// hold starts once it is whole.
+const DIALOG = mark(F2, "dialog") + 5;
 const BOX = transcriptBox(F2);
 // From the prompt, nine rows above the dialog's question, through the dialog's last option; Claude
 // Code's diff panel opens at the right after the first plan write, past the window's columns.

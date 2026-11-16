@@ -221,6 +221,28 @@ const FINAL_PLAN = savedCardsPlan(
 
 const EVIDENCE_LOG = "mcp__plugin_oh-my-claudeagent_omca__evidence_log";
 
+// The run's task list while task 7 runs: the model starts it and hands it to the executor, then the
+// Task list pane opens, its focus moves down a row and the task there opens.
+const BOARD_SCRIPT: Script = {
+  main: [
+    { content: [text("Task 7 is next: tasks 1 and 6 are done. I will start it and hand it to the executor."), tool("TaskUpdate", { taskId: "7", status: "in_progress" }), TASK_7] },
+    { content: [text("The executor is on task 7. Tasks 8, 9 and 11 are open as well.")] },
+  ],
+  subagent: TASK_SCRIPT.subagent,
+};
+const BOARD_STEPS: readonly Step[] = [
+  { type: "Pick up the next task on the plan" },
+  { key: "Enter" },
+  { until: has("The executor is on task 7"), hold: 1_200 },
+  ...command("/tasklist"),
+  { until: has("Running", "Ready", "Waiting", "Wire the order summary panel"), mark: "board", targets: { "running-row": /#7 +Wire the order summary panel/ } },
+  { key: "Down" },
+  // A focus move changes only colors, which the screen text does not show, so the mark is the poll after the key.
+  { until: () => true, mark: "focus-moved", hold: 1_400 },
+  { key: "Enter", gap: 0 },
+  { until: has("b: Back"), mark: "task-open" },
+];
+
 export const CLIPS: readonly Clip[] = [
   {
     name: "clip-plain-stop",
@@ -267,8 +289,10 @@ export const CLIPS: readonly Clip[] = [
     rows: PAIR_ROWS,
     font: PAIR_FONT,
     env: RUN_GATES,
+    // The continuation gate holds only a session that has started or closed a task of the run.
     script: {
       main: [
+        { content: [tool("TaskUpdate", { taskId: "7", status: "in_progress" })] },
         { content: [text("All tasks are complete.")] },
         { content: [text("Task 7 is still open: the order summary panel is not wired yet. Starting on it now."), TASK_7] },
         { content: [text("The executor is on task 7.")] },
@@ -368,6 +392,28 @@ export const CLIPS: readonly Clip[] = [
       { until: has("just watch summary", "just watch draft", "just watch flags"), mark: "lanes", hold: 6_000, targets: { "tool-row": /\S Bash just watch \w+/, "lane-head": /executor {2,}\S+ running +\d+s/ } },
     ],
   },
+  { name: "clip-board", format: "clip", cols: CLIP_COLS, rows: CLIP_ROWS, script: BOARD_SCRIPT, steps: BOARD_STEPS },
+  { name: "clip-board-light", format: "clip", cols: CLIP_COLS, rows: CLIP_ROWS, theme: "light", script: BOARD_SCRIPT, steps: BOARD_STEPS },
+  {
+    name: "clip-guard",
+    format: "clip",
+    cols: PAIR_COLS,
+    rows: PAIR_ROWS,
+    font: PAIR_FONT,
+    args: BYPASS_ARGS,
+    settings: BYPASS_SETTINGS,
+    script: resetScript("Understood. Your changes stay as they are."),
+    steps: [
+      ...command(CLEAN_UP),
+      {
+        until: has("OMCA guard refused · git command discarding changes"),
+        mark: "refused",
+        hold: 0,
+        targets: { "refusal-row": /OMCA guard refused · git command discarding changes\n[^\n]*commit or stash the changes first[^\n]*/ },
+      },
+      { until: has("Your changes stay as they are."), mark: "kept" },
+    ],
+  },
   {
     name: "clip-verify",
     format: "clip",
@@ -396,24 +442,26 @@ export const CLIPS: readonly Clip[] = [
       ],
       subagent: [],
     }),
-    // The pane opens on the Evidence tab first, so the verdict turns COMPLETE on screen.
+    // The Task list pane opens on the final task's page before the run; the page reads the ledger as
+    // it opens, so it is opened again once the verdict is logged.
     steps: [
-      { type: "/omca" },
+      ...command("/tasklist", "list-typed"),
+      { until: has("#14", "Remove the old checkout page"), mark: "list", hold: 0 },
       { key: "Enter" },
-      { until: has("1: Agents"), hold: 0 },
-      { key: "2" },
-      { until: has("MISSING"), hold: 1_200 },
+      { until: has("#14 Remove the old checkout page", "final", "No verdict names #14 yet"), mark: "no-verdict", hold: 1_200, targets: { "no-verdict-row": /No verdict names #14 yet/ } },
       { key: "C-x" },
       { key: "Tab", gap: 300 },
       ...command("Run the final verification"),
       // Claude Code collapses a finished call to one line, so the marks wait for those lines.
       { until: has("Ran 1 shell command", "The suite passes"), mark: "tests-pass", hold: 0 },
       { until: has("Called plugin:oh-my-claudeagent:omca"), mark: "evidence-logged", hold: 0 },
-      {
-        until: (screen) => /COMPLETE\s+matches/.test(screen),
-        mark: "complete",
-        targets: { "complete-chip": /COMPLETE(?=\s+matches)/, "verdict-line": /COMPLETE\s+matches[^\n│]*· \d\d-\d\d \d\d:\d\d/ },
-      },
+      { until: has("The verdict is logged for task 14."), hold: 600 },
+      // The command gives the open pane the keyboard back on the same page.
+      ...command("/tasklist", "list-focused"),
+      { key: "b", gap: 600 },
+      { until: (screen) => !screen.includes("No verdict names #14 yet"), hold: 0 },
+      { key: "Enter", gap: 600 },
+      { until: has("Passed · exit 0"), mark: "passed", targets: { "passed-row": /\S Passed · exit 0 · [^\n│]*[^\s│]/ } },
       // The drift guard and the final-verification gate both let this stop through.
       { until: (screen) => !screen.includes("Stop hook"), hold: 1_200 },
     ],
@@ -433,12 +481,12 @@ export const CLIPS: readonly Clip[] = [
       {
         until: has("The executor is on task 7"),
         hold: 1_200,
-        targets: { band: /\d+\/\d+ · next [^\n│[]*[^\s│[]/, "cost-row": /\$\d+\.\d\d · / },
+        targets: { band: /checkout-redesign [━─]+ \d+\/\d+/, "cost-row": /\$\d+\.\d\d · / },
       },
       ...command("/omca"),
       { until: has("1: Agents", "Wire the order summary panel"), mark: "agents-tab" },
       { key: "2", gap: 0 },
-      { until: has("Final verification"), mark: "evidence-tab" },
+      { until: has("latest runs"), mark: "evidence-tab" },
       { key: "3", gap: 0 },
       { until: has("Learnings · "), mark: "notepad-tab", targets: { "notepad-section": /Learnings · \d+ entr[^\n│]*\d\d:\d\d/ } },
       { key: "Escape", gap: 0 },

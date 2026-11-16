@@ -41,13 +41,6 @@ export const transcriptBox = (clip: ClipManifest): Rect => {
 export const paneBox = (clip: ClipManifest): Rect => cellBox(clip, paneCols(clip), PANE_ROWS);
 
 /**
- * The outset that frames a chip by cells: the pane's chips pad their text by one cell either side,
- * and a row's glyphs leave its last 4 of 39 pixels empty (clip-verify, row 3), so a box 2 px
- * above the chip's row sits in that gap without touching the row above.
- */
-export const chipOutset = (clip: ClipManifest, scale: number) => ({ x: clip.cell.width * scale, y: (clip.cell.height * scale * 2) / 39 });
-
-/**
  * A window as wide as the whole terminal, for the 96x34 captures: they wrap every line inside the
  * terminal, so fitting its width crops no text. It is WINDOW_ROWS rows high at that scale.
  */

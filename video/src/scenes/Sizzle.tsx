@@ -55,8 +55,8 @@ const frame = (cut: Cut) => {
 const PANE = (clip: ClipManifest, top = 0): Framing => ({ top, left: PANE_COL, cols: paneCols(clip) });
 
 const laneHead = target(F3, "lane-head");
-const proven = target(F4, "proven-chip");
-const discard = target(F5, "discard-lines");
+const running = target(F4, "running-row");
+const refusalRow = target(F5, "refusal-row");
 const claimLine = target(F1, "claim-line");
 const stopLine = target(F1, "stop-line");
 const notepadSection = target(F8, "notepad-section");
@@ -64,9 +64,7 @@ const statsHeader = target(F8, "stats-header");
 const band = target(F8, "band");
 const costRow = target(F8, "cost-row");
 const question = target(F2, "question");
-const verdict = target(F6, "verdict-line");
-// The board's task list ends two cells after its proof chips, at the divider before the task detail.
-const LIST_COLS = proven.col + proven.len + 2 - PANE_COL;
+const passed = target(F6, "passed-row");
 // A mark lands up to four frames after its state paints, so the focus cut ends six clip frames
 // before the task-open mark and the task's detail never shows.
 const S3 = { seconds: 0.8, rate: 2 };
@@ -78,11 +76,12 @@ const CUTS: readonly Cut[] = [
   { id: "S1 pane opens", clip: F3, seconds: 0.9, framing: PANE(F3), at: mark(F3, "pane"), rate: 2, lead: 0 },
   // Below the tab bar, the lanes from their minis to the end of the first lane's head row.
   { id: "S2 lanes", clip: F3, seconds: 0.8, framing: { top: laneHead.row, left: PANE_COL, cols: laneHead.col + laneHead.len - PANE_COL }, at: mark(F3, "lanes") + 30, rate: 4 },
-  { id: "S3 focus moves", clip: F4, seconds: S3.seconds, framing: { top: proven.row - 2, left: PANE_COL, cols: LIST_COLS, scale: 1.2 }, at: mark(F4, "focus-moved"), rate: S3.rate, lead: S3_LEAD },
-  // The board has painted at its mark.
-  { id: "S4 proof chips", clip: F4, seconds: 0.7, framing: { top: proven.row - 2, left: PANE_COL, cols: LIST_COLS }, at: mark(F4, "board"), rate: 2, lead: 0 },
+  // From the Running rule down, as many columns as fit at the largest scale: the subjects, not the asides.
+  { id: "S3 focus moves", clip: F4, seconds: S3.seconds, framing: { top: running.row - 1, left: PANE_COL, cols: Math.floor(AREA.width / (F4.cell.width * MAX_SCALE)) }, at: mark(F4, "focus-moved"), rate: S3.rate, lead: S3_LEAD },
+  // The task list has painted at its mark.
+  { id: "S4 task list", clip: F4, seconds: 0.7, framing: PANE(F4), at: mark(F4, "board"), rate: 2, lead: 0 },
   // The whole terminal width: the 96-column captures wrap every line inside it.
-  { id: "S5 guard dialog", clip: F5, seconds: 0.7, framing: { top: discard.row - 11, left: 0, cols: F5.grid.cols }, at: mark(F5, "dialog"), rate: 2 },
+  { id: "S5 guard refusal", clip: F5, seconds: 0.7, framing: { top: refusalRow.row - 5, left: 0, cols: F5.grid.cols }, at: mark(F5, "refused"), rate: 2 },
   // From the claim to the row under the Stop hook's feedback, as wide as the feedback wraps. The
   // claim has painted at its mark, and the feedback lands two clip frames later.
   {
@@ -100,14 +99,14 @@ const CUTS: readonly Cut[] = [
   { id: "S9 stats", clip: F8, seconds: 0.5, framing: PANE(F8, statsHeader.row - 3), at: mark(F8, "stats-tab"), rate: 2, lead: 0 },
   // The band down to the row above the cost row, while /omca is typed in the prompt.
   { id: "S10 band", clip: F8, seconds: 0.5, framing: { top: band.row, left: 0, cols: TRANSCRIPT_COLS, rows: costRow.row - band.row }, at: mark(F8, "cmd-typed"), rate: 2, lead: 15 },
-  { id: "S11 tab key", clip: F8, seconds: 0.45, framing: PANE(F8), at: mark(F8, "plan-tab"), rate: 2 },
+  { id: "S11 tab key", clip: F8, seconds: 0.45, framing: PANE(F8), at: mark(F8, "evidence-tab"), rate: 2 },
   { id: "S12 interview", clip: F2, seconds: 0.45, framing: { top: question.row - 4, left: 0, cols: Math.floor(AREA.width / (F2.cell.width * MAX_SCALE)) }, at: mark(F2, "dialog"), rate: 2, lead: 3 },
-  // MISSING reads for 0.3 s before it turns COMPLETE, then the card holds to the cut to black.
-  { id: "S13 verdict", clip: F6, seconds: 1, framing: PANE(F6), at: mark(F6, "complete"), rate: 1, lead: 9 },
+  // The final task's page, reopened with its verdict, holds to the cut to black.
+  { id: "S13 verdict", clip: F6, seconds: 1, framing: PANE(F6), at: mark(F6, "passed"), rate: 1, lead: 0 },
 ];
 
 const S13 = frame({ id: "S13", clip: F6, seconds: 1, framing: PANE(F6), at: 0, rate: 1 });
-if (verdict.row >= S13.rows) throw new Error("clip-verify: the verdict line falls below the S13 window");
+if (passed.row >= S13.rows) throw new Error("clip-verify: the verdict row falls below the S13 window");
 
 /** Each cut's start, length and footage range in composition frames. */
 export const sizzleTimeline = (fps: number) => {

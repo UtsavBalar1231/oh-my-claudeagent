@@ -75,10 +75,13 @@ describe("CLIPS", () => {
       "clip-refusal",
       "clip-plan",
       "clip-delegate",
+      "clip-board",
+      "clip-board-light",
+      "clip-guard",
       "clip-verify",
       "clip-tour",
     ]);
-    const pairs = ["clip-plain-stop", "clip-plain-reset", "clip-refusal"];
+    const pairs = ["clip-plain-stop", "clip-plain-reset", "clip-refusal", "clip-guard"];
     for (const shot of CLIPS) expect([shot.name, shot.cols, shot.rows, shot.font]).toEqual(pairs.includes(shot.name) ? [shot.name, 96, 34, 35] : [shot.name, 214, 50, undefined]);
   });
 
@@ -93,33 +96,53 @@ describe("CLIPS", () => {
     expect(targets(clip("clip-plan"))).toEqual(["question"]);
     expect(marks(clip("clip-delegate"))).toEqual(["cmd-typed", "spawned", "pane", "lanes"]);
     expect(targets(clip("clip-delegate"))).toEqual(["tool-row", "lane-head"]);
-    expect(marks(clip("clip-verify"))).toEqual(["cmd-typed", "tests-pass", "evidence-logged", "complete"]);
+    for (const name of ["clip-board", "clip-board-light"]) {
+      expect(marks(clip(name))).toEqual(["cmd-typed", "board", "focus-moved", "task-open"]);
+      expect(targets(clip(name))).toEqual(["running-row"]);
+    }
+    expect(marks(clip("clip-guard"))).toEqual(["cmd-typed", "refused", "kept"]);
+    expect(targets(clip("clip-guard"))).toEqual(["refusal-row"]);
+    expect(marks(clip("clip-verify"))).toEqual(["list-typed", "list", "no-verdict", "cmd-typed", "tests-pass", "evidence-logged", "list-focused", "passed"]);
     expect(marks(clip("clip-tour"))).toEqual(["cmd-typed", "agents-tab", "evidence-tab", "notepad-tab", "stats-typed", "stats-tab"]);
-    expect(targets(clip("clip-verify"))).toEqual(["complete-chip", "verdict-line"]);
+    expect(targets(clip("clip-verify"))).toEqual(["no-verdict-row", "passed-row"]);
     expect(targets(clip("clip-tour"))).toEqual(["band", "cost-row", "notepad-section", "stats-header"]);
   });
 
   // Each row is a split screen: the transcript, the pane's edge at column 12, then the pane.
   test.each([
-    ["clip-tour", "band", "██ 6/14 · next 7 Wire the panel ·  6 proven  ● 1 unproven ·  1 running     [-]│pane", { row: 0, col: 3, len: 67, rows: 1 }],
+    ["clip-tour", "band", "⚑ checkout-redesign ━━━━━━──────── 6/14 · ◐ #7                     [-]│pane", { row: 0, col: 2, len: 37, rows: 1 }],
     ["clip-tour", "cost-row", "  ↯ 6/14\n  $0.04 · ⏱ 11s", { row: 1, col: 2, len: 7, rows: 1 }],
     ["clip-tour", "notepad-section", "│f: Find\n│ Learnings · 3 entries  10-03 13:47  │", { row: 1, col: 2, len: 34, rows: 1 }],
     ["clip-tour", "stats-header", "abc│  agent   runs  median  tokens  est. cost  evidence  outcomes   │", { row: 0, col: 6, len: 59, rows: 1 }],
     ["clip-delegate", "lane-head", "x │             executor                 ◆ running     7s", { row: 0, col: 16, len: 41, rows: 1 }],
-    ["clip-verify", "verdict-line", "x │  COMPLETE  matches the current plan · 10-04 13:35   │", { row: 0, col: 5, len: 48, rows: 1 }],
+    ["clip-board", "running-row", "x │ ◐ #7  Wire the order summary panel                 │", { row: 0, col: 6, len: 32, rows: 1 }],
+    ["clip-verify", "no-verdict-row", "x │No verdict names #14 yet                           │", { row: 0, col: 3, len: 24, rows: 1 }],
+    ["clip-verify", "passed-row", "x │● Passed · exit 0 · 11-17 03:09                    │", { row: 0, col: 3, len: 31, rows: 1 }],
   ])("%s's %s target finds one row", (name, targetName, screen, span) => {
     expect(locate(screen, target(clip(name), targetName) ?? /^$/)).toEqual(span);
   });
 
-  test("the plain clips leave the plugin out, and the plain stop pairs with the refusal on the same prompt", () => {
+  test("the plain clips leave the plugin out and pair with an OMCA clip on the same prompt", () => {
     expect(CLIPS.filter((shot) => shot.plugin === false).map((shot) => shot.name)).toEqual(["clip-plain-stop", "clip-plain-reset"]);
     const prompt = (shot: Clip | undefined) => shot?.steps.find((step) => "type" in step);
     expect(prompt(clip("clip-plain-stop"))).toEqual(prompt(clip("clip-refusal")));
+    expect(prompt(clip("clip-plain-reset"))).toEqual(prompt(clip("clip-guard")));
   });
 
-  test("the plain reset runs under bypassPermissions", () => {
+  test("the reset pair runs under bypassPermissions", () => {
     const bypassed = CLIPS.filter((shot) => shot.args?.join(" ").includes("--permission-mode bypassPermissions")).map((shot) => shot.name);
-    expect(bypassed).toEqual(["clip-plain-reset"]);
+    expect(bypassed).toEqual(["clip-plain-reset", "clip-guard"]);
+  });
+
+  test("the guard's refusal target spans OMCA's refusal row and its remedy", () => {
+    const screen = [
+      "● Resetting to the last commit.",
+      "",
+      "● Bash(git reset --hard)",
+      "  ✗  OMCA guard refused · git command discarding changes",
+      "     commit or stash the changes first, or report and stop",
+    ].join("\n");
+    expect(locate(screen, target(clip("clip-guard"), "refusal-row") ?? /^$/)).toEqual({ row: 3, col: 5, len: 53, rows: 2 });
   });
 
   test("only the refusal and the verification run with the Stop gates on", () => {
