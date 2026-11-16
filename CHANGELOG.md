@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the effort its definition declares (`xhigh` for `omca-architect`, `medium` for
   `omca-build-fixer` and `omca-viewer`, `high` for the rest). A `#variant` still sets one effort
   for the whole tier.
+- **Panes:** the OMCA and Tasks panes take the session's own background instead of the dock's
+  gray, so the pane reads as part of the conversation.
 
 ### Removed
 

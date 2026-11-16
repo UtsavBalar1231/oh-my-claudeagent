@@ -120,7 +120,7 @@ for (const layout of LAYOUTS) {
     w.release();
     expect(await pending).toEqual({});
 
-    expect(w.opened).toEqual([{ id: "omca", title: "OMCA", focus: true, closeOnEscape: true, rows: 12, columns: 56 }]);
+    expect(w.opened).toEqual([{ id: "omca", title: "OMCA", focus: true, closeOnEscape: true, backgroundColor: "transparent", rows: 12, columns: 56 }]);
     expect(body(await ui.drawn())).toEqual([
       `r: Run again   ! 2 warn  ✓ 13 ok  checked ${local(NOW_S)}`,
       " ! WARN  OMCA          Could not read this mod's version from its manifest",
