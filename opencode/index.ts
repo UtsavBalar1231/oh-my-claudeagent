@@ -1,4 +1,4 @@
-import { Agent, Plugin, type Skill } from "@opencode/plugin"
+import { Agent, Model, Plugin, type Skill } from "@opencode/plugin"
 import type { CommandInvocation } from "@opencode/plugin/promise/command"
 import { realpathSync } from "node:fs"
 import { dirname, join } from "node:path"
@@ -63,6 +63,9 @@ function validModels(raw: unknown): Record<string, ModelRef> {
   return out
 }
 
+const withEffort = (model: ModelRef | undefined, effort: string | undefined): ModelRef | undefined =>
+  model && effort && model.variant === undefined ? { ...model, variant: Model.VariantID.make(effort) } : model
+
 async function setup(ctx: Context) {
   const data = generate(root)
   const models = validModels(ctx.options.models)
@@ -72,7 +75,7 @@ async function setup(ctx: Context) {
 
   {
     const agents = data.agents.map((a) => {
-      const model = models[a.tier]
+      const model = withEffort(models[a.tier], a.effort)
       const fields: Partial<Agent.Info> = {
         mode: "subagent",
         hidden: false,

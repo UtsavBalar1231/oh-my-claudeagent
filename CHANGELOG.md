@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **OpenCode effort:** a tier in `options.models` named without a `#variant` runs each agent at
+  the effort its definition declares (`xhigh` for `omca-architect`, `medium` for
+  `omca-build-fixer` and `omca-viewer`, `high` for the rest). A `#variant` still sets one effort
+  for the whole tier.
+
 ### Fixed
 
 - **OpenCode delegation prompts:** in long sessions, gpt-6.1-sol drifted into delegation prompts

@@ -83,9 +83,9 @@ The adapter supports OpenCode 2.2.5 or later in the 2.x release line. Add the pa
       "package": "oh-my-claudeagent@git+https://github.com/UtsavBalar1231/oh-my-claudeagent.git",
       "options": {
         "models": {
-          "opus": "openai/gpt-6.1-sol#high",
-          "sonnet": "openai/gpt-6.1-sol#high",
-          "fable": "openai/gpt-6.1-sol#xhigh"
+          "opus": "openai/gpt-6.1-sol",
+          "sonnet": "openai/gpt-6.1-terra",
+          "fable": "openai/gpt-6-astra"
         }
       }
     }
@@ -99,7 +99,10 @@ to `cli.json`.
 
 `options.models` maps OMCA's `opus`, `sonnet` and `fable` tiers to OpenCode model ids, in
 `provider/model` form with an optional `#variant`. Without it, every `omca-*` subagent runs on
-the parent session's model. To override one agent, set `agents.omca-<name>.model` in your own
+the parent session's model. A model named without a `#variant` runs each agent at the effort its
+definition declares, used as the variant: `xhigh` for `omca-architect`, `medium` for
+`omca-build-fixer` and `omca-viewer`, `high` for the rest. A `#variant` sets one effort for the
+whole tier. To override one agent, set `agents.omca-<name>.model` in your own
 config. The `ast_*` tools need ast-grep on `PATH`.
 
 Choose `omca` from the primary-agent selector for coordination. Build and Plan
