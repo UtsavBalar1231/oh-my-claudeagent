@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   words, refuses a `subagent` call whose joins add up to 5 missing spaces and 1% of its words, and
   asks for the prompt again with a space between every word. No clean prompt from Claude Code or
   OpenCode came near the limit. `OMCA_DISABLED_HOOKS=delegation-guard` turns the refusal off.
+- **OpenCode build fixes:** `/omca-start-work` sent every file-changing task to `omca-executor` in
+  words that also covered `omca-build-fixer`, so the coordinator asked it for patch instructions
+  instead of a fix. It now sends a blocking build, type or dependency failure to
+  `omca-build-fixer` to fix.
 
 ## [4.2.1] - 2026-11-14
 
