@@ -110,7 +110,7 @@ other command goes on to Claude Code's own permission checks.
 change how OMCA runs. A check with a known fix offers a key that fills the prompt with it, and
 the passing checks fold into one line that `o` opens.
 
-<img src=".github/assets/doctor.png" width="680" alt="The Doctor page, named after the tabs in the tab bar, counts 1 warning, 1 info row and 12 passing checks. The warning says maxEffortLevel high holds the architect below the xhigh it declares, the info row offers a: Use /advisor fable, and one line beside o: Show passing folds the passing checks, naming OMCA, Claude Code, bun, the omca server, ast-grep and the options and the task tools before it is cut.">
+<img src=".github/assets/doctor.png" width="680" alt="The Doctor page, named after the tabs in the tab bar, counts 1 warning, 1 info row and 13 passing checks. The warning says maxEffortLevel high holds the architect below the xhigh it declares, the info row offers a: Use /advisor fable, and one line beside o: Show passing folds the passing checks, naming OMCA, Claude Code, bun, the omca server, ast-grep and the options and the task tools before it is cut.">
 
 The status line shows the session (model, effort and agent), the workspace
 (context window and git state) and usage (duration, usage limits, and cost for accounts billed

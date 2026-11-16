@@ -505,8 +505,13 @@ export const SHOTS: readonly Still[] = [
         ],
       },
     },
+    // Claude Code's own agent row under the prompt names each agent before it reports, so the
+    // screen is ready on the architect's reply in the transcript.
     ready: (screen) =>
-      screen.includes("just test · 42 passed") && /explorer {2}Map the validation messages/.test(screen) && /architect {2}Review the checkout flow/.test(screen),
+      screen.includes("just test · 42 passed") &&
+      /explorer {2}Map the validation messages/.test(screen) &&
+      screen.includes("They share state only through the cart store") &&
+      screen.includes("The architect's review is in."),
   },
   {
     name: "evidence",
