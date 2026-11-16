@@ -16,7 +16,6 @@ type Slop = { readonly sentence: string; readonly quoted: string };
 
 const DISABLE_FILE_MARKER = "comment-gate-disable-file";
 const DISABLE_FILE_WINDOW = 5;
-const MAX_COMMENT_RUN = 5;
 const MAX_SLOP_FINDINGS = 5;
 
 // A comment marker is chosen by language. Applying one the language lacks is a false positive
@@ -82,133 +81,38 @@ function attributionFindings(lines: readonly string[], { comment, marker }: Synt
   return findings;
 }
 
-// Whole-hunk aggregates name no line to quote, and a mandated header can reach these ratios, so
-// they only advise. Density is 40% of non-blank lines with a floor of six comments, which keeps
-// a file header or a magic-number derivation in a normal hunk clear; a hunk with no code lines
-// is a header or comment-block edit, where the ratio says nothing.
-function aggregateFindings(lines: readonly string[], { comment }: Syntax): string[] {
-  let run = 0;
-  let longest = 0;
-  let comments = 0;
-  let code = 0;
-  for (const line of lines) {
-    if (comment.test(line)) {
-      run++;
-      comments++;
-      longest = Math.max(longest, run);
-      continue;
-    }
-    run = 0;
-    if (line.trim() !== "") code++;
-  }
-  const findings: string[] = [];
-  if (longest > MAX_COMMENT_RUN) findings.push(`Excessive consecutive comment lines (${longest} in a row) detected.`);
-  if (code > 0 && comments >= 6 && comments * 10 >= (comments + code) * 4) {
-    findings.push(`High comment density (${comments} comment lines to ${code} code lines): likely line-by-line narration rather than documentation.`);
-  }
-  return findings;
-}
-
-// "return", "value" and "values" stay out: dropping them tokenized "return the values" to nothing,
-// so the restating check could never fire on the commonest narration.
-const STOPWORDS = new Set("this that these those with from into your were will should would could function method".split(" "));
-const tokensOf = (text: string): Set<string> =>
-  new Set(text.toLowerCase().split(/[^a-z0-9]+/).filter((word) => word.length >= 4 && !STOPWORDS.has(word)));
-
-// A comment echoes another text when it shares a meaningful word with it and adds at most one of
-// its own: narration nearly always carries a word the code lacks ("set the path attribute").
-function echoes(comment: ReadonlySet<string>, other: ReadonlySet<string>): boolean {
-  const shared = [...comment].filter((word) => other.has(word)).length;
-  return shared >= 1 && comment.size - shared <= 1;
-}
-
-const indentOf = (line: string): number => /^\s*/.exec(line)?.[0].length ?? 0;
-
-function nextNonBlank(lines: readonly string[], from: number): number {
-  let index = from;
-  while (index < lines.length && (lines[index] ?? "").trim() === "") index++;
-  return index;
-}
-
-function isOneLiner(lines: readonly string[], definition: number, indent: number): boolean {
-  const header = lines[definition] ?? "";
-  const body = nextNonBlank(lines, definition + 1);
-  const bodyLine = lines[body];
-  if (bodyLine === undefined) return false;
-  if (/:\s*$/.test(header)) {
-    if (indentOf(bodyLine) <= indent) return false;
-    const after = lines[nextNonBlank(lines, body + 1)];
-    return after === undefined || indentOf(after) <= indent;
-  }
-  if (!/\{\s*$/.test(header) || /^\s*\}/.test(bodyLine)) return false;
-  return /^\s*\}\s*$/.test(lines[nextNonBlank(lines, body + 1)] ?? "");
-}
-
-const DEFINITION = /^(\s*)(?:def|function|fn|func)\s+([A-Za-z_]\w*)\s*\(/;
-// A magic number's derivation comment restates its constant by construction, and the codebase
-// requires it, so the shape is exempt rather than the rule blocked.
-const NUMERIC_CONSTANT = /^\s*(?:\w+\s+)*[A-Za-z_]\w*(?:\s*:\s*[\w<>[\]]+)?\s*=\s*-?[0-9]/;
-// A tool directive addresses the tool, not a reader, so its overlap with the line below is the
-// directive naming its own target. Anchored at the comment body so a comment that merely
-// mentions a linter is still judged as prose.
-const PRAGMA = /^(?:shellcheck\s|noqa(?:[\s:]|$)|type:|pylint:|ruff:|mypy:)/;
-
 function slopFindings(lines: readonly string[], syntax: Syntax): Slop[] {
   const found: Slop[] = [];
   const add = (sentence: string, quoted: string) => found.push({ sentence, quoted });
-  for (const [index, line] of lines.entries()) {
+  for (const line of lines) {
     if (!syntax.comment.test(line) || line.includes("@allow")) continue;
     if (found.length >= MAX_SLOP_FINDINGS) break;
     const text = line.replace(syntax.marker, "");
-    const lowered = text.toLowerCase();
 
     if (/^[=\-*_~^]{3,}$/.test(text.replace(/\s/g, ""))) {
       add(`Decorative separator comment ("${text}"): delete it.`, text);
       continue;
     }
 
-    // A code span names a command or identifier, such as the task runner, not a qualifier.
-    const prose = lowered.replace(/`[^`]*`/g, " ");
-    if (/(?:^|[^a-z])(?:obviously|clearly|simply|just|basically)(?:[^a-z]|$)/.test(prose)) {
-      add(`Filler-word comment ("${text}"): delete it.`, text);
-    }
-
-    if (/\b(?:todo|fixme)\b/.test(lowered) && found.length < MAX_SLOP_FINDINGS && !hasReference(text)) {
+    if (/\b(?:todo|fixme)\b/i.test(text) && !hasReference(text)) {
       const rest = text.replace(/^.*todo/i, "").replace(/^.*fixme/i, "").replace(/^[:,-]+\s*/, "").replace(/^\s+/, "");
       if (rest.split(/\s+/).length < 3) add(`Context-free TODO/FIXME ("${text}"): add an issue ref or TODO(owner):.`, text);
-    }
-
-    const next = lines[nextNonBlank(lines, index + 1)];
-    if (found.length < MAX_SLOP_FINDINGS && next !== undefined && !syntax.comment.test(next)) {
-      const exempt = (/[0-9]/.test(text) && NUMERIC_CONSTANT.test(next)) || PRAGMA.test(text);
-      if (!exempt && echoes(tokensOf(lowered), tokensOf(next))) {
-        add(`Comment restates the following code line ("${text}"): delete it, or replace it with the non-obvious why.`, text);
-      }
-    }
-
-    const definition = DEFINITION.exec(lines[index + 1] ?? "");
-    if (found.length < MAX_SLOP_FINDINGS && definition !== null && isOneLiner(lines, index + 1, (definition[1] ?? "").length)) {
-      const nameWords = new Set(
-        (definition[2] ?? "").replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase().split(/[^a-z0-9]+/).filter((word) => word !== ""),
-      );
-      if (echoes(tokensOf(lowered), nameWords)) add(`Doc comment adds nothing beyond the function name ("${text}"): delete it.`, text);
     }
   }
   return found;
 }
 
 // Without the list of what to keep, a deny invites stripping every comment.
-export const KEEP_NOTICE = `The convention: names, types, and structure carry the what, so a comment earns its place only by carrying something the code cannot state, the non-obvious why, an invariant, a constraint, or the derivation of a magic number. A correct fix deletes the quoted comment, or rewrites it as the reason the code is the way it is. A clearer name beats a comment that restates the line below it. Do NOT remove other comments while fixing this: file headers, non-obvious function contracts, invariant notes, and magic-number derivation comments may be required by the project's own convention. Resubmit the same code change with only the quoted comments fixed. Genuine exceptions: put @allow on a comment line to exempt that line from the slop checks, or put ${DISABLE_FILE_MARKER} in the first ${DISABLE_FILE_WINDOW} lines of the hunk.`;
+export const KEEP_NOTICE = `The convention: names, types, and structure carry the what, so a comment earns its place only by carrying something the code cannot state, the non-obvious why, an invariant, a constraint, or the derivation of a magic number. A correct fix deletes the quoted comment, or rewrites it as the reason the code is the way it is. Do NOT remove other comments while fixing this: file headers, non-obvious function contracts, invariant notes, and magic-number derivation comments may be required by the project's own convention. Resubmit the same code change with only the quoted comments fixed. Genuine exceptions: put @allow on a comment line to exempt that line from the slop checks, or put ${DISABLE_FILE_MARKER} in the first ${DISABLE_FILE_WINDOW} lines of the hunk.`;
 
 export const COMMENT_ATTRIBUTION_HEAD = "Blocked: AI-attribution or placeholder comment.";
 export const COMMENT_SLOP_HEAD = "Blocked: comment slop.";
 
 /**
  * Judges the comments a Write or Edit adds. Tier-1 findings (attribution, placeholder) deny in
- * `deny` mode. Tier-2 findings (restating, filler, separators, context-free TODOs, trivial doc
- * comments) deny once per file and finding, then pass, so a lexical false positive cannot trap an
- * edit in a retry loop; with no `slot` to remember the denial they advise instead. Tier-3
- * aggregates and every finding in `advise` mode only advise.
+ * `deny` mode. Tier-2 findings (separators, context-free TODOs) deny once per file and
+ * finding, then pass, so a lexical false positive cannot trap an edit in a retry loop; with no
+ * `slot` to remember the denial they advise instead. Every finding in `advise` mode only advises.
  */
 export function judgeWrite(mode: "advise" | "deny", input: unknown, slot: DenyOnce | undefined): Verdict | undefined {
   const filePath = inputText(input, "file_path");
@@ -219,15 +123,14 @@ export function judgeWrite(mode: "advise" | "deny", input: unknown, slot: DenyOn
   const syntax = syntaxOf(markers);
   const attribution = attributionFindings(lines, syntax);
   const slop = slopFindings(lines, syntax);
-  const aggregate = aggregateFindings(lines, syntax);
-  if (attribution.length + slop.length + aggregate.length === 0) return undefined;
+  if (attribution.length + slop.length === 0) return undefined;
 
   const sentences = slop.map(({ sentence }) => sentence);
-  const text = ["[COMMENT CHECK] Detected AI slop comment patterns. Remove the quoted comments with a follow-up Edit unless they encode a non-obvious why.", ...attribution, ...sentences, ...aggregate].join(" ");
+  const text = ["[COMMENT CHECK] Detected AI slop comment patterns. Remove the quoted comments with a follow-up Edit unless they encode a non-obvious why.", ...attribution, ...sentences].join(" ");
   const advise = (wouldDeny: "tier1" | "tier2" | undefined): Verdict => ({ kind: "advise", text, wouldDeny });
-  if (mode !== "deny") return advise(attribution.length > 0 ? "tier1" : slop.length > 0 ? "tier2" : undefined);
+  if (mode !== "deny") return advise(attribution.length > 0 ? "tier1" : "tier2");
   if (attribution.length > 0) return { kind: "deny", reason: `${COMMENT_ATTRIBUTION_HEAD} ${attribution.join(" ")} ${KEEP_NOTICE}` };
-  if (slop.length === 0 || slot === undefined) return advise(undefined);
+  if (slot === undefined) return advise(undefined);
 
   const signature = slop.map(({ quoted }) => quoted).join("\n");
   if (slot.get(filePath) === signature) {

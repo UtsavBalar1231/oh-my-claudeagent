@@ -1,5 +1,5 @@
 import { COMMENT_ATTRIBUTION_HEAD, COMMENT_SLOP_HEAD, KEEP_NOTICE } from "./comments.ts";
-import { GUARD_REASONS, REVIEW_REFUSED_REASON, REVIEW_REFUSED_REMEDY } from "./destructive.ts";
+import { GUARD_REASONS } from "./destructive.ts";
 import { INVALID_LEDGER_REASON } from "./verification.ts";
 
 const finalTaskOf = (run: string): string => `is the final task of run '${run}'`;
@@ -17,7 +17,6 @@ export const noPassingVerdictReason = (id: string, subject: string, run: string)
 
 export type RefusalKind =
   | "guard"
-  | "review-refused"
   | "final-kept"
   | "final-unlogged"
   | "completion-held"
@@ -69,11 +68,8 @@ function commentHeadAt(text: string): Refusal | undefined {
 }
 
 function headAt(text: string): Refusal | undefined {
-  for (const { reason, title, remedy } of GUARD_REASONS) {
-    if (text.startsWith(reason)) return { kind: "guard", title, remedy };
-  }
-  if (text.startsWith(REVIEW_REFUSED_REASON)) {
-    return { kind: "review-refused", title: "the user refused this command", remedy: REVIEW_REFUSED_REMEDY };
+  for (const { head, title, remedy } of GUARD_REASONS) {
+    if (text.startsWith(head)) return { kind: "guard", title, remedy };
   }
   const comment = commentHeadAt(text);
   if (comment !== undefined) return comment;

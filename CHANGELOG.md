@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.2] - 2026-11-17
+
+### Changed
+
+- **Destructive-command guard:** it denies only what would destroy something, never opens a
+  dialog, and acts the same in every permission mode, `bypassPermissions` included.
+  - A recursive `rm` is refused when its target is the filesystem root, home, the working
+    directory or a directory directly under root or home. The guard now reads the command the
+    way the shell runs it: a variable assigned earlier in the same command takes its value,
+    `${VAR:?}` and `$(mktemp ...)` are never empty, `cd dir && rm -rf *` is judged under `dir`,
+    redirections and heredoc bodies are not targets. A variable that may be empty when the `rm`
+    runs, including one assigned only after a `cd` that can fail, is still refused, and the
+    reason names it with the fix. On a replay of 76,386 real shell calls, 151 refused
+    cleanups of scratch and build directories now run.
+  - `git reset --hard`, `git checkout .`, `git restore .`, `git clean` and `git stash drop` or
+    `clear` are refused only when the repository says they would discard something: a changed
+    tracked file, files `git clean -n` lists, a stash entry. Reverting named paths, `git stash`,
+    `pop` and `apply` always run. A force push to the default branch and `--no-verify` stay
+    refused. The checks run read-only git in the command's directory, on Claude Code and OpenCode.
+  - Every other recursive `rm` runs. `OMCA_DISABLED_HOOKS=bash-guard` still turns off the git
+    rules, and the removal refusal still has no switch.
+- **Comment gate:** it keeps only the rules that matched real problems: AI attribution or
+  authorship, placeholder and context-free TODOs, and decorative separator lines. The restates,
+  filler, run-length, density and doc-adds-nothing rules are gone, so doc comments (Rust `///`,
+  kernel-doc, docstrings) and file headers are never flagged.
+- **OpenCode effort:** a tier in `options.models` named without a `#variant` runs each agent at
+  the effort its definition declares (`xhigh` for `omca-architect`, `medium` for
+  `omca-build-fixer` and `omca-viewer`, `high` for the rest). A `#variant` still sets one effort
+  for the whole tier.
+- **Panes:** the OMCA and Tasks panes take the session's own background instead of the dock's
+  gray, so the pane reads as part of the conversation.
+
+### Removed
+
+- The guard's review dialog, its `guardMode` option and its README screenshots.
+
+### Fixed
+
+- **OpenCode delegation prompts:** in long sessions, gpt-6.1-sol drifted into delegation prompts
+  with words run together, and the child read that as its whole brief. The adapter splits each
+  token missing from an English word list (SCOWL, shipped as `opencode/words.txt`) into listed
+  words, refuses a `subagent` call whose joins add up to 5 missing spaces and 1% of its words, and
+  asks for the prompt again with a space between every word. No clean prompt from Claude Code or
+  OpenCode came near the limit. `OMCA_DISABLED_HOOKS=delegation-guard` turns the refusal off.
+- **OpenCode build fixes:** `/omca-start-work` sent every file-changing task to `omca-executor` in
+  words that also covered `omca-build-fixer`, so the coordinator asked it for patch instructions
+  instead of a fix. It now sends a blocking build, type or dependency failure to
+  `omca-build-fixer` to fix.
+
 ## [4.2.1] - 2026-11-14
 
 ### Changed
@@ -3481,6 +3530,7 @@ for multi-agent orchestration.
 - Shellcheck fixes applied across all hook scripts
 - Ruff fixes applied to Python MCP servers
 
+[4.2.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.2.1...v4.2.2
 [4.2.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.2.0...v4.2.1
 [4.2.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.0.0...v4.1.0

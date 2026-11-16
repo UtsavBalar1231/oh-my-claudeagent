@@ -1,7 +1,7 @@
 # Statusline
 
-The main status line and the per-subagent tasks panel renderers for Claude Code, in TypeScript
-on bun. Read `README.md` first for what they show and how they are configured.
+The status line renderer for Claude Code, in TypeScript on bun. Read `README.md` first for what it
+shows and how it is configured.
 
 ## Layout
 
