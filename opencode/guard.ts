@@ -4,6 +4,7 @@ import { type DenyOnce, judgeWrite } from "../src/core/comments.ts"
 import { classify, type Context, type Finding, reasonFor } from "../src/core/destructive.ts"
 import { isHookDisabled } from "../src/core/kill-switch.ts"
 import { homeDir, toPlatform } from "../src/core/path.ts"
+import { spacing } from "./spacing.ts"
 
 export type GuardResult = { deny: true; reason: string } | { deny: false }
 
@@ -68,6 +69,24 @@ function editInputs(tool: string, input: Record<string, unknown>, projectRoot: s
     file_path: path((header[1] ?? "").trim()),
     content: addedLines(text.slice(header.index, headers[i + 1]?.index)),
   }))
+}
+
+// Measured: no clean delegation prompt (725 from Claude Code, 171 from OpenCode) or repository
+// document went past 3 missing spaces, and with a tenth of their spaces deleted, 95% of the Claude
+// Code prompts reach both limits.
+const MIN_MISSING = 5
+const MIN_MISSING_RATE = 0.01
+const EXAMPLES = 4
+
+export function checkDelegation(prompt: string): GuardResult {
+  if (isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "delegation-guard")) return ALLOW
+  const { words, joined, missing } = spacing(prompt)
+  if (missing < MIN_MISSING || missing / (words + missing) < MIN_MISSING_RATE) return ALLOW
+  const examples = joined.toSorted((a, b) => b.words.length - a.words.length).slice(0, EXAMPLES).map(({ token }) => token)
+  return {
+    deny: true,
+    reason: `Delegation prompt blocked: ${joined.length} of its tokens run words together, such as ${examples.join(", ")}. The child reads the prompt as its whole brief, so send it again as readable sentences with a space between every word, and put identifiers, paths and commands in backticks.`,
+  }
 }
 
 // The gate lets a repeat of the finding it last denied through, so the adapter process keeps

@@ -141,7 +141,12 @@ The adapter registers native `omca_*` evidence, notepad, AST, task and file
 tools. It does not start a duplicate OMCA MCP process. Custom filesystem tools
 still check native read/edit permissions; they do not bypass an external-directory
 deny. The shell guard uses the actual command directory. The comment gate blocks
-only with `OMCA_COMMENT_GATE=deny`.
+only with `OMCA_COMMENT_GATE=deny`. A `subagent` call whose prompt runs words together is
+refused with a request to resend it with a space between every word. The check splits each
+token missing from an English word list into listed words, and counts a join that holds a
+function word or three or more words. It refuses at 5 missing spaces that are also 1% of the
+prompt's words. Code, URLs, paths, flags and names inside a sentence are skipped.
+`OMCA_DISABLED_HOOKS=delegation-guard` turns the refusal off.
 
 **Limits:** OpenCode has no OMCA Stop veto, so nothing keeps a session working. A
 run's final task does refuse to complete until a passing verdict names it, and refuses

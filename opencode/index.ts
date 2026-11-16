@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url"
 import { LEDGER } from "../src/core/omca-paths.ts"
 import { NOTEPAD_SECTIONS, toPlanName } from "../src/core/notepad.ts"
 import { projectRoot } from "../servers/io.ts"
-import { checkEdit, checkShell, type GuardResult } from "./guard.ts"
+import { checkDelegation, checkEdit, checkShell, type GuardResult } from "./guard.ts"
 import { generate, parseModelRef } from "./lib.ts"
 import { Omca } from "./rpc.ts"
 import { operationScope } from "./permissions.ts"
@@ -216,8 +216,9 @@ async function setup(ctx: Context) {
   })
 
   await ctx.tool.hook("execute.before", async (event) => {
-    if (event.tool !== "shell" && !EDIT_TOOLS.includes(event.tool)) return
     const input = (event.input ?? {}) as Record<string, unknown>
+    if (event.tool === "subagent") enforce(checkDelegation(String(input.prompt ?? "")))
+    if (event.tool !== "shell" && !EDIT_TOOLS.includes(event.tool)) return
     const session = await sessionAt(event.sessionID)
     const directory = session.location.directory
     if (event.tool === "shell") {

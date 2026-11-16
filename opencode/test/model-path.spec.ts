@@ -243,6 +243,13 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
     verify(!existsSync(join(need().ws, "explored.txt")), "explore-write: explored.txt was written")
   }, SLOW)
 
+  test("prompt-joined: a delegation prompt with words run together is refused before the child starts", async () => {
+    const scenario = await ran("prompt-joined")
+    verify(toolResults(scenario).includes("omca guard: Delegation prompt blocked: 2 of its tokens run words together, such as narrowexceptwhereplanrequires, reportunresolvedtechnicalrisks."), "prompt-joined: the refusal did not reach the model")
+    verify(!during(scenario).some((request) => system(request).includes(EXECUTOR)), "prompt-joined: the executor started")
+    verify(!existsSync(join(need().ws, "explored.txt")), "prompt-joined: the child wrote a file")
+  }, SLOW)
+
   test("skill-load: the skill returns its concise manual-only body without untranslated text", async () => {
     const result = toolResults(await ran("skill-load"))
     verify(result !== "", "skill-load: no follow-up request carried the skill result")

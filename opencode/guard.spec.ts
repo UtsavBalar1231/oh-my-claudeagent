@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, spyOn, test } from "bun:test"
 import { execFileSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import { checkEdit, checkShell, shellKind } from "./guard.ts"
+import { checkDelegation, checkEdit, checkShell, shellKind } from "./guard.ts"
 
 const BASH = "/bin/bash"
 const shell = (command: string) => checkShell(command, process.cwd(), BASH)
@@ -283,5 +283,60 @@ describe("the comment gate", () => {
   test("a tool that writes no file is allowed", () => {
     process.env.OMCA_COMMENT_GATE = "deny"
     expect(checkEdit("read", { path: "/repo/a.py", content: "# AI-generated helper" }, tmp)).toEqual({ deny: false })
+  })
+})
+
+describe("a delegation prompt", () => {
+  const GARBLED = "Read-only review of the parser change. Decide theboundaryforthenewflow andreportunresolvedrisks toparentbeforeediting, keepcurrentdependencies unchanged, and listeveryfileyouread. Workersonleaf."
+  const REWRITE = "Read-only review of the parser change. Decide the boundary for the new flow and report unresolved risks to the parent before editing. Keep the current dependencies unchanged, and list every file you read. Workers stay leaf agents."
+  const deleteEveryThirdSpace = (text: string) => {
+    let spaces = 0
+    return text.split(/(```[\s\S]*?```|`[^`\n]*`)/).map((chunk, i) => (i % 2 ? chunk : chunk.replace(/([a-z]) (?=[a-z])/g, (space, letter: string) => (++spaces % 3 === 0 ? letter : space)))).join("")
+  }
+
+  test("words run together are denied, naming the longest joins", () => {
+    expect(checkDelegation(GARBLED)).toEqual({
+      deny: true,
+      reason: "Delegation prompt blocked: 6 of its tokens run words together, such as theboundaryforthenewflow, listeveryfileyouread, andreportunresolvedrisks, toparentbeforeediting. The child reads the prompt as its whole brief, so send it again as readable sentences with a space between every word, and put identifiers, paths and commands in backticks.",
+    })
+  })
+
+  test("the same brief written as sentences is allowed", () => {
+    expect(checkDelegation(REWRITE)).toEqual({ deny: false })
+  })
+
+  test("delegation-guard in OMCA_DISABLED_HOOKS allows a prompt the guard would deny", () => {
+    process.env.OMCA_DISABLED_HOOKS = "delegation-guard"
+    expect(checkDelegation(GARBLED)).toEqual({ deny: false })
+  })
+
+  test("four missing spaces are allowed and a fifth denies", () => {
+    expect(checkDelegation("Decide toparentbeforeediting and ifdefer.").deny).toBe(false)
+    expect(checkDelegation("Decide toparentbeforeediting and ifdefer, then andwhy.").deny).toBe(true)
+  })
+
+  test("joins under one percent of a long prompt are allowed", () => {
+    const joins = " Decide toparentbeforeediting andreportunresolvedrisks."
+    expect(checkDelegation(`${REWRITE} `.repeat(20) + joins).deny).toBe(false)
+    expect(checkDelegation(`${REWRITE} `.repeat(10) + joins).deny).toBe(true)
+  })
+
+  test("real words, compounds, names, British spellings, code, paths and URLs are allowed", () => {
+    const prompt = [
+      "Report the redistributability, characterization and counterintelligence incompatibilities indiscriminately, not counterproductively.",
+      "Check the filesystem, the frontend on localhost, every worktree, the dotfiles config, the teardown and the misconfiguration.",
+      "Ask Infineon about the colour visualisation. Run `nolisten`; nolisten stays off, and -noreset too.",
+      "Audit src/commands/conflict.rs against /tmp/project/plan.md at 9906a34d640d2111f724544cbc50f7f130569ae1, then https://example.com/noapprovalroundneeded.",
+      "Keep getElementsByClassName and CLAUDE_CODE_ENABLE_TODO_TOOLS as they are.\n```\nkeepthisasitis andthisone\n```",
+    ].join("\n")
+    expect(checkDelegation(prompt)).toEqual({ deny: false })
+  })
+
+  const agents = [...new Bun.Glob("agents/*.md").scanSync({ cwd: join(import.meta.dir, "..") })].sort()
+
+  test.each(agents)("%s is allowed as written and denied with every third space deleted", (path) => {
+    const text = readFileSync(join(import.meta.dir, "..", path), "utf8")
+    expect(checkDelegation(text)).toEqual({ deny: false })
+    expect(checkDelegation(deleteEveryThirdSpace(text)).deny).toBe(true)
   })
 })

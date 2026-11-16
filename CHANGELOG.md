@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **OpenCode delegation prompts:** in long sessions, gpt-6.1-sol drifted into delegation prompts
+  with words run together, and the child read that as its whole brief. The adapter splits each
+  token missing from an English word list (SCOWL, shipped as `opencode/words.txt`) into listed
+  words, refuses a `subagent` call whose joins add up to 5 missing spaces and 1% of its words, and
+  asks for the prompt again with a space between every word. No clean prompt from Claude Code or
+  OpenCode came near the limit. `OMCA_DISABLED_HOOKS=delegation-guard` turns the refusal off.
+
 ## [4.2.1] - 2026-11-14
 
 ### Changed

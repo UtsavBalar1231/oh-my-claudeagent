@@ -224,6 +224,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | `verification-recorder` | Recording each agent's verification commands and its own `evidence_log` calls, which the turn line, the Stats page and the task check read |
 | `context-injector` | `AGENTS.md`, `README.md` and rule injection when a file is read or edited |
 | `comment-gate` | The comment check on writes |
+| `delegation-guard` | The OpenCode adapter's refusal of a delegation prompt that runs words together |
 | `empty-task-response` | The note on an empty or transitional agent report; concise findings need no fixed headers |
 | `failure-recovery` | Advice after a failed tool call |
 | `subagent-context` | The context each subagent gets at start |
