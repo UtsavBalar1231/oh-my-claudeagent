@@ -1,11 +1,9 @@
 import { useVideoConfig } from "remotion";
-import { Callout } from "../components/Callout.tsx";
 import { Caption } from "../components/Caption.tsx";
-import { CornerLabel } from "../components/CornerLabel.tsx";
-import { mark, shownTarget, target, targetRect } from "../footage.ts";
-import { color, time, toFrames } from "../theme.ts";
+import { mark, shownTarget, target } from "../footage.ts";
+import { time, toFrames } from "../theme.ts";
 import { F3 } from "./clips.ts";
-import { aim, beatLength, Canvas, captionSpan, Chapter, PANE_COL, paneBox, paneCols, Shot, Timed, timeline } from "./shot.tsx";
+import { aim, beatLength, Canvas, captionSpan, PANE_COL, paneBox, paneCols, Shot, Timed, timeline } from "./shot.tsx";
 
 const PANE = mark(F3, "pane");
 const BOX = paneBox(F3);
@@ -21,7 +19,7 @@ if (PANE_COL + paneCols(F3) / PUSH < TOOL_ROW.col + TOOL_ROW.len) throw new Erro
 export const agentsPlan = (fps: number) => {
   const f = (s: number) => toFrames(s, fps);
   const t = timeline(F3, fps);
-  // The pane opens with its lanes; the hold covers the caption's reveal, the push and the callout.
+  // The pane opens with its lanes; the hold covers the caption's reveal and the push.
   const held = t.hold(PANE, 4);
   const lanes = mark(F3, "lanes") + t.seconds(3);
   t.play(PANE, lanes);
@@ -30,7 +28,6 @@ export const agentsPlan = (fps: number) => {
   return {
     t,
     move,
-    callout: { from: move.to + f(0.1), duration: held.start + held.duration - move.to - f(0.2) },
     caption: captionSpan(t.duration, fps),
     duration: t.duration,
   };
@@ -46,13 +43,7 @@ export const Agents = () => {
   ];
   return (
     <Canvas>
-      <Shot clip={F3} border={color.omcaBorder} box={BOX} keyframes={keyframes} segments={plan.t.segments}>
-        <Timed {...plan.callout}>
-          <Callout target={targetRect(F3, TOOL_ROW)} label="Live tool call" side="right" />
-        </Timed>
-      </Shot>
-      <CornerLabel />
-      <Chapter name="Work" beatDuration={plan.duration} enters />
+      <Shot clip={F3} box={BOX} keyframes={keyframes} segments={plan.t.segments} />
       <Timed {...plan.caption}>
         <Caption text="Each task goes to a specialist." />
       </Timed>

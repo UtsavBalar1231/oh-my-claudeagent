@@ -1,11 +1,8 @@
 import { Composition, Freeze } from "remotion";
 import { Demo, demoTimeline } from "./Demo.tsx";
 import { LOOP, Loop, loopPlan } from "./Loop.tsx";
-import { Reel, type ReelProps, REEL_SECONDS } from "./Reel.tsx";
 import { PUNCH_LINE_SETTLED, PunchLine, punchLinePlan } from "./scenes/PunchLine.tsx";
 import { toFrames, VIDEO } from "./theme.ts";
-
-const reelDefaults: ReelProps = { fps: VIDEO.fps };
 
 const PosterCard = () => (
   <Freeze frame={toFrames(PUNCH_LINE_SETTLED, VIDEO.fps)}>
@@ -20,14 +17,6 @@ export const Root = () => (
       component={Demo}
       calculateMetadata={() => ({ durationInFrames: demoTimeline(VIDEO.fps).durationInFrames })}
       durationInFrames={1}
-      {...VIDEO}
-    />
-    <Composition
-      id="Components"
-      component={Reel}
-      defaultProps={reelDefaults}
-      calculateMetadata={({ props }) => ({ fps: props.fps, durationInFrames: Math.round(REEL_SECONDS * props.fps) })}
-      durationInFrames={Math.round(REEL_SECONDS * VIDEO.fps)}
       {...VIDEO}
     />
     <Composition

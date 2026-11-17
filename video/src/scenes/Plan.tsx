@@ -1,12 +1,9 @@
 import { useVideoConfig } from "remotion";
 import { Caption } from "../components/Caption.tsx";
-import { CornerLabel } from "../components/CornerLabel.tsx";
-import { KEY_PRESS_AT, KeyCaps } from "../components/KeyCaps.tsx";
-import { LowerThird } from "../components/LowerThird.tsx";
 import { mark, target } from "../footage.ts";
-import { color, toFrames } from "../theme.ts";
+import { toFrames } from "../theme.ts";
 import { F2 } from "./clips.ts";
-import { aim, beatLength, Canvas, crossfadeFrames, marginCol, Shot, Timed, timeline, transcriptBox, Chapter } from "./shot.tsx";
+import { aim, beatLength, Canvas, crossfadeFrames, marginCol, Shot, Timed, timeline, transcriptBox } from "./shot.tsx";
 
 // The dialog paints over four frames after the frame its mark lands on (clip-plan, 2026-11-17), so the
 // hold starts once it is whole.
@@ -30,15 +27,12 @@ export const planPlan = (fps: number) => {
   t.hold(DIALOG, 1.8);
   // The dialog does not change until the key press, so the cut from the hold is invisible.
   const choice = t.play(key - t.seconds(LEAD_IN), settled);
-  const rush = t.play(settled, mark(F2, "plan-written"), 3);
+  t.play(settled, mark(F2, "plan-written"), 3);
   t.fill(mark(F2, "plan-written"), beatLength(7));
-  // The caption, the keycap and the lower third share the bottom band, one after another.
   const captionFrom = edge + f(0.1);
   return {
     t,
     caption: { from: captionFrom, duration: choice.start - captionFrom },
-    keys: { from: choice.start + f(LEAD_IN - KEY_PRESS_AT), duration: f(1.6) },
-    steps: { from: rush.start, duration: t.duration - rush.start - edge },
     duration: t.duration,
   };
 };
@@ -48,17 +42,9 @@ export const Plan = () => {
   const plan = planPlan(fps);
   return (
     <Canvas>
-      <Shot clip={F2} border={color.omcaBorder} box={BOX} keyframes={[{ frame: 0, ...VIEW }]} segments={plan.t.segments} />
-      <CornerLabel />
-      <Chapter name="Plan" beatDuration={plan.duration} enters leaves />
+      <Shot clip={F2} box={BOX} keyframes={[{ frame: 0, ...VIEW }]} segments={plan.t.segments} />
       <Timed {...plan.caption}>
         <Caption text="It plans with you first." />
-      </Timed>
-      <Timed {...plan.keys}>
-        <KeyCaps keys={["↓"]} />
-      </Timed>
-      <Timed {...plan.steps}>
-        <LowerThird items={["interview", "gap check", "review"]} />
       </Timed>
     </Canvas>
   );

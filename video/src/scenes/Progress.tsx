@@ -1,10 +1,8 @@
 import { useVideoConfig } from "remotion";
 import { Caption } from "../components/Caption.tsx";
-import { CornerLabel } from "../components/CornerLabel.tsx";
 import { mark, target } from "../footage.ts";
-import { color } from "../theme.ts";
 import { F8 } from "./clips.ts";
-import { aim, beatLength, Canvas, captionSpan, cellBox, Chapter, Shot, Timed, timeline, TRANSCRIPT_COLS } from "./shot.tsx";
+import { aim, beatLength, Canvas, captionSpan, cellBox, Shot, Timed, timeline, TRANSCRIPT_COLS } from "./shot.tsx";
 
 const BAND = target(F8, "band");
 // From OMCA's band down to the row above the status line's cost row: the band, the prompt and the
@@ -28,9 +26,7 @@ export const Progress = () => {
   const plan = progressPlan(fps);
   return (
     <Canvas>
-      <Shot clip={F8} border={color.omcaBorder} box={BOX} keyframes={[{ frame: 0, ...VIEW }]} segments={plan.t.segments} />
-      <CornerLabel />
-      <Chapter name="Work" beatDuration={plan.duration} />
+      <Shot clip={F8} box={BOX} keyframes={[{ frame: 0, ...VIEW }]} segments={plan.t.segments} />
       <Timed {...plan.caption}>
         <Caption text="Progress where you type." />
       </Timed>

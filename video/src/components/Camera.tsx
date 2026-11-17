@@ -3,12 +3,14 @@ import { createContext, type ReactNode, useContext } from "react";
 import { Freeze, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
 import type { Rect } from "../footage.ts";
 import { ease, SAFE, VIDEO } from "../theme.ts";
-import { Window } from "./Window.tsx";
 
 export type CameraKeyframe = { frame: number; x: number; y: number; zoom: number };
 export type View = Omit<CameraKeyframe, "frame">;
 export type Size = { width: number; height: number };
 export type ToScreen = (rect: Rect) => Rect;
+
+const PLANE_RADIUS = 14;
+const PLANE_SHADOW = "0 16px 42px rgba(0, 0, 0, 0.26)";
 
 // Above 1.0 footage pixels per composition pixel the footage is upscaled; 1.5 is the softest allowed.
 export const MAX_SCALE = 1.5;
@@ -95,7 +97,6 @@ export type CameraProps = {
   trimBefore?: number;
   playbackRate?: number;
   box?: Rect;
-  border?: string;
   freeze?: { frame: number; active: boolean | ((frame: number) => boolean) };
   children?: ReactNode;
 };
@@ -106,7 +107,7 @@ export type CameraProps = {
 // children render in composition space above the window, so an overlay keeps its stroke width at
 // any zoom and is not clipped by the window. freeze holds only the footage, so overlays keep
 // animating while it is held.
-export const Camera = ({ src, footage, keyframes, durationInFrames, trimBefore = 0, playbackRate = 1, box, border, freeze, children }: CameraProps) => {
+export const Camera = ({ src, footage, keyframes, durationInFrames, trimBefore = 0, playbackRate = 1, box, freeze, children }: CameraProps) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const area = box ?? fitWindow(footage);
@@ -117,7 +118,18 @@ export const Camera = ({ src, footage, keyframes, durationInFrames, trimBefore =
   const t = viewTransform(view, footage, area);
   return (
     <CameraContext.Provider value={{ toScreen: projector(view, footage, area), area }}>
-      <Window box={area} {...(border === undefined ? {} : { border })}>
+      <div
+        style={{
+          position: "absolute",
+          left: area.x,
+          top: area.y,
+          width: area.width,
+          height: area.height,
+          borderRadius: PLANE_RADIUS,
+          overflow: "hidden",
+          boxShadow: PLANE_SHADOW,
+        }}
+      >
         <div
           style={{
             position: "absolute",
@@ -143,7 +155,7 @@ export const Camera = ({ src, footage, keyframes, durationInFrames, trimBefore =
             />
           </Freeze>
         </div>
-      </Window>
+      </div>
       {children}
     </CameraContext.Provider>
   );

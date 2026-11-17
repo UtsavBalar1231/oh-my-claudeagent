@@ -1,10 +1,9 @@
 import { bundle } from "@remotion/bundler";
 import { renderMedia, renderStill, RenderInternals, selectComposition } from "@remotion/renderer";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { AGENTS } from "./src/agents.ts";
 
 const here = (path: string): string => new URL(path, import.meta.url).pathname;
 const out = (name: string): string => here(`./out/${name}`);
@@ -41,17 +40,6 @@ const progress = (label: string) => {
     }
   };
 };
-
-// The capabilities beat lists the specialists from agents/*.md; a renamed, added or re-tiered agent
-// stops the render rather than ship a stale roster.
-const frontmatter = (file: string) => {
-  const head = readFileSync(file, "utf8").split("---")[1] ?? "";
-  const field = (key: string) => head.match(new RegExp(`^${key}:\\s*(.+)$`, "m"))?.[1]?.trim();
-  return `${field("name")}:${field("model")}`;
-};
-const declared = readdirSync(here("../agents")).filter((f) => f.endsWith(".md")).map((f) => frontmatter(here(`../agents/${f}`))).sort();
-const shown = AGENTS.map((a) => `${a.name}:${a.model}`).sort();
-if (declared.join() !== shown.join()) throw new Error(`video/src/agents.ts is out of date with agents/*.md:\n  agents/  ${declared.join(" ")}\n  video    ${shown.join(" ")}`);
 
 mkdirSync(here("./out"), { recursive: true });
 const serveUrl = await bundle({ entryPoint: here("./src/index.ts") });

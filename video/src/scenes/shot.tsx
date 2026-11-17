@@ -1,12 +1,10 @@
 import type { ReactNode } from "react";
 import { AbsoluteFill, Sequence, useVideoConfig } from "remotion";
-import { SideLabel } from "../components/SideLabel.tsx";
 import { baseScale, Camera, CameraOverlay, type CameraKeyframe, type View } from "../components/Camera.tsx";
 import type { ClipManifest, Rect } from "../footage.ts";
-import { color, SAFE, toFrames } from "../theme.ts";
+import { color, toFrames } from "../theme.ts";
 
-// The room for a footage window: the top band holds the side label and the corner label, the band
-// under it holds captions, so neither sits on footage.
+// The room for a footage window: the band under it holds captions, so they never sit on footage.
 const STAGE: Rect = { x: 96, y: 106, width: 1728, height: 756 };
 
 /** A window of whole cells at `scale`, centered in the stage, so its edges fall on cell boundaries. */
@@ -49,9 +47,6 @@ export const fitWidth = (clip: ClipManifest): { box: Rect; scale: number } => {
   const height = WINDOW_ROWS * clip.cell.height * scale;
   return { box: { x: STAGE.x, y: STAGE.y + (STAGE.height - height) / 2, width: STAGE.width, height }, scale };
 };
-
-// A callout label set as a bar in the top band, between the side label's slot and the corner label.
-export const TOP_BAR = { top: SAFE.top - 7 } as const;
 
 // Beats overlap by this crossfade, so text that must not double up with the next or previous
 // beat's text enters after it and leaves before it.
@@ -121,7 +116,6 @@ export const wide = (clip: ClipManifest): View => ({ x: clip.width / 2, y: clip.
 
 export type ShotProps = {
   clip: ClipManifest;
-  border?: string;
   keyframes: readonly CameraKeyframe[];
   segments: readonly Segment[];
   box?: Rect;
@@ -130,7 +124,7 @@ export type ShotProps = {
 };
 
 /** Plays a beat's segments through one camera path, so a cut or a speed change keeps the framing. */
-export const Shot = ({ clip, border, keyframes, segments, box = STAGE, children }: ShotProps) => {
+export const Shot = ({ clip, keyframes, segments, box = STAGE, children }: ShotProps) => {
   const { fps } = useVideoConfig();
   return (
     <>
@@ -144,7 +138,6 @@ export const Shot = ({ clip, border, keyframes, segments, box = STAGE, children 
             trimBefore={segment.trimBefore}
             playbackRate={segment.rate}
             box={box}
-            {...(border === undefined ? {} : { border })}
             {...(segment.hold ? { freeze: { frame: 0, active: true } } : {})}
           />
         </Sequence>
@@ -167,21 +160,4 @@ export const Timed = ({ from, duration, children }: TimedProps) => {
   );
 };
 
-export const Canvas = ({ children }: { children: ReactNode }) => <AbsoluteFill style={{ background: color.canvas }}>{children}</AbsoluteFill>;
-
-/** The span of a top-left label in a beat: it fades in after the opening crossfade or out before the closing one when the neighbouring beat shows different text there. */
-export const labelSpan = (beatDuration: number, fps: number, { enters = false, leaves = false }: { enters?: boolean; leaves?: boolean }) => {
-  const edge = crossfadeFrames(fps);
-  const from = enters ? edge : 0;
-  return { from, duration: beatDuration - from - (leaves ? edge : 0) };
-};
-
-/** The tour's chapter tag, in the side label's slot; it fades only where the chapter changes. */
-export const Chapter = ({ name, beatDuration, enters = false, leaves = false }: { name: string; beatDuration: number; enters?: boolean; leaves?: boolean }) => {
-  const { fps } = useVideoConfig();
-  return (
-    <Timed {...labelSpan(beatDuration, fps, { enters, leaves })}>
-      <SideLabel text={name} tone="omca" enters={enters} leaves={leaves} />
-    </Timed>
-  );
-};
+export const Canvas = ({ children }: { children: ReactNode }) => <AbsoluteFill style={{ background: color.stage }}>{children}</AbsoluteFill>;

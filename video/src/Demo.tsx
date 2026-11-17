@@ -4,8 +4,6 @@ import { Fragment, type FC } from "react";
 import { useVideoConfig } from "remotion";
 import { Agents, agentsPlan } from "./scenes/Agents.tsx";
 import { Board, boardPlan } from "./scenes/Board.tsx";
-import { Capabilities, capabilitiesPlan } from "./scenes/Capabilities.tsx";
-import { Everywhere, everywherePlan } from "./scenes/Everywhere.tsx";
 import { Guard, guardPlan } from "./scenes/Guard.tsx";
 import { Install, installPlan } from "./scenes/Install.tsx";
 import { Plan, planPlan } from "./scenes/Plan.tsx";
@@ -14,14 +12,12 @@ import { PlainStop, plainStopPlan } from "./scenes/PlainStop.tsx";
 import { Progress, progressPlan } from "./scenes/Progress.tsx";
 import { PunchLine, punchLinePlan } from "./scenes/PunchLine.tsx";
 import { Refusal, refusalPlan } from "./scenes/Refusal.tsx";
-import { Sizzle, sizzlePlan } from "./scenes/Sizzle.tsx";
 import { Ledger, Notepad, Stats } from "./scenes/Tour.tsx";
 import { Verify, verifyPlan } from "./scenes/Verify.tsx";
 import { crossfadeFrames } from "./scenes/shot.tsx";
 
 // `cut` joins a beat to the one before it without a crossfade.
 const BEATS: readonly { id: string; Scene: FC; duration: (fps: number) => number; cut?: boolean }[] = [
-  { id: "sizzle", Scene: Sizzle, duration: (fps) => sizzlePlan(fps).duration },
   { id: "punch-line", Scene: PunchLine, duration: (fps) => punchLinePlan(fps).duration, cut: true },
   { id: "plain-stop", Scene: PlainStop, duration: (fps) => plainStopPlan(fps).duration },
   { id: "omca-stop", Scene: Refusal, duration: (fps) => refusalPlan(fps).duration },
@@ -35,8 +31,6 @@ const BEATS: readonly { id: string; Scene: FC; duration: (fps: number) => number
   { id: "ledger", Scene: Ledger.Scene, duration: (fps) => Ledger.plan(fps).duration },
   { id: "notepad", Scene: Notepad.Scene, duration: (fps) => Notepad.plan(fps).duration },
   { id: "stats", Scene: Stats.Scene, duration: (fps) => Stats.plan(fps).duration },
-  { id: "roster", Scene: Capabilities, duration: (fps) => capabilitiesPlan(fps).duration },
-  { id: "everywhere", Scene: Everywhere, duration: (fps) => everywherePlan(fps).duration },
   { id: "end", Scene: Install, duration: (fps) => installPlan(fps).duration },
 ];
 

@@ -1,42 +1,20 @@
-import { AbsoluteFill, Freeze, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
-import { EndCard, TYPED_AT } from "../components/EndCard.tsx";
-import { toFrames } from "../theme.ts";
-import { PUNCH_LINE } from "./PunchLine.tsx";
-import { Sizzle } from "./Sizzle.tsx";
-import { Canvas, Timed } from "./shot.tsx";
+import { AbsoluteFill } from "remotion";
+import { color, mono, toFrames } from "../theme.ts";
+import { Canvas } from "./shot.tsx";
 
 const LENGTH = 10;
-const DISSOLVE = 0.5;
 
-export const installPlan = (fps: number) => {
-  const duration = toFrames(LENGTH, fps);
-  if (TYPED_AT + 1 > LENGTH - DISSOLVE) throw new Error("the install commands need a hold before the dissolve");
-  const dissolve = toFrames(DISSOLVE, fps);
-  return { duration, dissolve: { from: duration - dissolve, duration: dissolve } };
-};
+export const installPlan = (fps: number) => ({ duration: toFrames(LENGTH, fps) });
 
-// The last half second dissolves into the sizzle's frame 0, so the master loops without a seam.
-const IntoOpening = () => {
-  const frame = useCurrentFrame();
-  const { durationInFrames } = useVideoConfig();
-  return (
-    <AbsoluteFill style={{ opacity: interpolate(frame, [0, durationInFrames - 1], [0, 1]) }}>
-      <Freeze frame={0}>
-        <Sizzle />
-      </Freeze>
+const line = { fontFamily: mono, fontSize: 30, textAlign: "center" } as const;
+
+export const Install = () => (
+  <Canvas>
+    <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", gap: 28 }}>
+      <div style={{ ...line, fontSize: 56, fontWeight: 600, color: color.title }}>oh-my-claudeagent</div>
+      <div style={{ ...line, color: color.title }}>claude plugin install oh-my-claudeagent --marketplace UtsavBalar1231/oh-my-claudeagent</div>
+      <div style={{ ...line, color: color.title }}>github.com/UtsavBalar1231/oh-my-claudeagent</div>
+      <div style={{ ...line, color: color.caption }}>Real Claude Code sessions. Model replies are scripted.</div>
     </AbsoluteFill>
-  );
-};
-
-export const Install = () => {
-  const { fps } = useVideoConfig();
-  const plan = installPlan(fps);
-  return (
-    <Canvas>
-      <EndCard line={PUNCH_LINE} />
-      <Timed {...plan.dissolve}>
-        <IntoOpening />
-      </Timed>
-    </Canvas>
-  );
-};
+  </Canvas>
+);
