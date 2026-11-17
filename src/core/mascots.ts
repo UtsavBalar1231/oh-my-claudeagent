@@ -202,7 +202,7 @@ function paint(grid: (Rgb | null)[][], layer: Layer, palette: Readonly<Record<st
   }
 }
 
-function compose(spec: Spec, layers: readonly Layer[], lift: number, size: MascotSize = "full"): Frame {
+export function compose(spec: Spec, layers: readonly Layer[], lift: number, size: MascotSize = "full"): Frame {
   const { width, height } = GRID[size];
   const palette = paletteOf(spec);
   const grid: (Rgb | null)[][] = Array.from({ length: height }, () => Array<Rgb | null>(width).fill(null));
@@ -269,7 +269,7 @@ function buildFrames(name: MascotName, state: MascotState): Frame[] {
 
 const hex = (rgb: Rgb) => `#${rgb.toString(16).padStart(6, "0")}`;
 
-function rects(frame: Frame): string {
+export function rects(frame: Frame): string {
   let out = "";
   frame.forEach((row, y) => {
     let x = 0;

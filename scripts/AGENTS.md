@@ -78,7 +78,8 @@ under `servers/hooks/`. Every file is TypeScript on bun.
   username, the home path, the hostname or the scratch directory's name. It needs Xvfb, kitty,
   tmux, xdotool, ImageMagick, ffmpeg and ffprobe, and a JetBrains Mono font that fontconfig
   (`fc-list`) finds. An interrupted run tears its sessions and scratch directory down.
-  `just screenshots` runs it.
+  `just screenshots` runs it. `lottie.ts` writes the OMCA mark and
+  agent ident as Lottie to `video/public/lottie/` from `src/core/mascots.ts`.
 - `qa/`: the QA harness and the checks CI shares with it. `just qa` is the manual pre-release
   run. `ci-smoke.ts` is the CI smoke job and `just smoke`: one `claude -p` session with the
   packaged plugin loaded, in which the guard must deny a recursive removal (through PowerShell
