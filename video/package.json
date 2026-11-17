@@ -8,16 +8,19 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@remotion/bundler": "4.0.532",
-    "@remotion/cli": "4.0.532",
-    "@remotion/google-fonts": "4.0.532",
-    "@remotion/layout-utils": "4.0.532",
-    "@remotion/media": "4.0.532",
-    "@remotion/renderer": "4.0.532",
-    "@remotion/transitions": "4.0.532",
+    "@remotion/bundler": "4.0.544",
+    "@remotion/cli": "4.0.544",
+    "@remotion/google-fonts": "4.0.544",
+    "@remotion/layout-utils": "4.0.544",
+    "@remotion/lottie": "4.0.544",
+    "@remotion/media": "4.0.544",
+    "@remotion/motion-blur": "4.0.544",
+    "@remotion/renderer": "4.0.544",
+    "@remotion/transitions": "4.0.544",
+    "lottie-web": "5.13.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "remotion": "4.0.532",
+    "remotion": "4.0.544",
     "zod": "4.5.4"
   },
   "devDependencies": {
