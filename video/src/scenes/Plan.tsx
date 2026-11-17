@@ -1,64 +1,68 @@
 import { useVideoConfig } from "remotion";
 import { Caption } from "../components/Caption.tsx";
-import { CornerLabel } from "../components/CornerLabel.tsx";
-import { KEY_PRESS_AT, KeyCaps } from "../components/KeyCaps.tsx";
-import { LowerThird } from "../components/LowerThird.tsx";
-import { mark, target } from "../footage.ts";
-import { color, toFrames } from "../theme.ts";
+import { mark, shownTarget, target } from "../footage.ts";
+import { toFrames } from "../theme.ts";
 import { F2 } from "./clips.ts";
-import { aim, beatLength, Canvas, crossfadeFrames, marginCol, Shot, Timed, timeline, transcriptBox, Chapter } from "./shot.tsx";
+import { aim, Canvas, marginCol, pushIn, Shot, Timed, timeline, transcriptBox } from "./shot.tsx";
 
-// The dialog paints over four frames after the frame its mark lands on (clip-plan, 2026-11-17), so the
-// hold starts once it is whole.
-const DIALOG = mark(F2, "dialog") + 5;
 const BOX = transcriptBox(F2);
+const QUESTION = "question";
 // From the prompt, nine rows above the dialog's question, through the dialog's last option; Claude
 // Code's diff panel opens at the right after the first plan write, past the window's columns.
-const VIEW = aim(F2, BOX, { scale: 1, top: target(F2, "question").row - 9, left: marginCol(F2) });
-const LEAD_IN = 0.6;
+const VIEW = aim(F2, BOX, { scale: 1, top: target(F2, QUESTION).row - 9, left: marginCol(F2) });
+const ROTATE_Y = 7;
+const ESTABLISH = 1.8;
+const PUSH = 1.2;
+const DIALOG_HOLD = 2.1;
+const KEY_LEAD = 0.4;
+// The dialog folds into its answer 1.3 s after the key press (clip frame 454).
+const ANSWERED = 1.4;
+const SECONDS = 10;
 
 export const planPlan = (fps: number) => {
   const f = (s: number) => toFrames(s, fps);
-  const edge = crossfadeFrames(fps);
+  const push = { from: f(ESTABLISH), to: f(ESTABLISH) + f(PUSH) };
+  const end = f(SECONDS);
   const t = timeline(F2, fps);
+  const dialog = mark(F2, "dialog");
   const key = mark(F2, "key-choice");
-  const settled = key + t.seconds(1);
-  if (key - t.seconds(LEAD_IN) < DIALOG) throw new Error("clip-plan: the key choice comes too soon after the dialog for the cut");
-  // The submitted prompt reaches the transcript a second after the command is typed; until then
-  // the window is empty.
-  t.play(mark(F2, "cmd-typed") + t.seconds(1), DIALOG, 3);
-  t.hold(DIALOG, 1.8);
-  // The dialog does not change until the key press, so the cut from the hold is invisible.
-  const choice = t.play(key - t.seconds(LEAD_IN), settled);
-  const rush = t.play(settled, mark(F2, "plan-written"), 3);
-  t.fill(mark(F2, "plan-written"), beatLength(7));
-  // The caption, the keycap and the lower third share the bottom band, one after another.
-  const captionFrom = edge + f(0.1);
+  const written = mark(F2, "plan-written");
+
+  // The dialog paints as the push lands and stays unchanged until the key press, so the cut from
+  // its hold to the moment before the key shows no jump.
+  const asked = dialog + t.seconds(DIALOG_HOLD);
+  shownTarget(F2, QUESTION, asked);
+  if (key - t.seconds(KEY_LEAD) <= asked) throw new Error("clip-plan: the key choice comes too soon after the dialog for the cut");
+  const interview = t.play(dialog - t.seconds(ESTABLISH + PUSH), asked);
+  // The key moves the choice to "Provider vault", Enter folds the dialog into its answer, and the
+  // plan's rewrite plays at 3x.
+  t.play(key - t.seconds(KEY_LEAD), key + t.seconds(ANSWERED));
+  t.play(key + t.seconds(ANSWERED), written, 3);
+  const plan = t.fill(written, SECONDS);
+
   return {
     t,
-    caption: { from: captionFrom, duration: choice.start - captionFrom },
-    keys: { from: choice.start + f(LEAD_IN - KEY_PRESS_AT), duration: f(1.6) },
-    steps: { from: rush.start, duration: t.duration - rush.start - edge },
-    duration: t.duration,
+    keyframes: pushIn(VIEW, ROTATE_Y, push, QUESTION),
+    captions: {
+      interview: { from: push.to, duration: interview.duration - push.to },
+      plan: { from: plan.start, duration: end - plan.start },
+    },
+    duration: end,
   };
 };
 
+/** The plan skill interviews the user against its draft, then writes the plan with the answer in it. */
 export const Plan = () => {
   const { fps } = useVideoConfig();
   const plan = planPlan(fps);
   return (
     <Canvas>
-      <Shot clip={F2} border={color.omcaBorder} box={BOX} keyframes={[{ frame: 0, ...VIEW }]} segments={plan.t.segments} />
-      <CornerLabel />
-      <Chapter name="Plan" beatDuration={plan.duration} enters leaves />
-      <Timed {...plan.caption}>
+      <Shot clip={F2} box={BOX} keyframes={plan.keyframes} segments={plan.t.segments} />
+      <Timed {...plan.captions.interview}>
         <Caption text="It plans with you first." />
       </Timed>
-      <Timed {...plan.keys}>
-        <KeyCaps keys={["↓"]} />
-      </Timed>
-      <Timed {...plan.steps}>
-        <LowerThird items={["interview", "gap check", "review"]} />
+      <Timed {...plan.captions.plan}>
+        <Caption text="The answer goes into the plan." />
       </Timed>
     </Canvas>
   );

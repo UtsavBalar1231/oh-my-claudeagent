@@ -1,42 +1,59 @@
 import { Video } from "@remotion/media";
-import { createContext, type ReactNode, useContext } from "react";
-import { Freeze, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import type { Rect } from "../footage.ts";
+import { AbsoluteFill, Freeze, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { type ClipManifest, type Rect, target } from "../footage.ts";
 import { ease, SAFE, VIDEO } from "../theme.ts";
-import { Window } from "./Window.tsx";
 
-export type CameraKeyframe = { frame: number; x: number; y: number; zoom: number };
-export type View = Omit<CameraKeyframe, "frame">;
+/**
+ * Where the camera points: the footage pixel (`x`, `y`) at the window's center, `zoom` relative to
+ * fitting the footage in the window, and the plane's tilt in degrees. `target` names the manifest
+ * target the camera holds on from this keyframe.
+ */
+export type View = { x: number; y: number; zoom: number; rotateX?: number; rotateY?: number; target?: string };
+export type CameraKeyframe = View & { frame: number };
 export type Size = { width: number; height: number };
-export type ToScreen = (rect: Rect) => Rect;
+type Pose = Required<Omit<View, "target">>;
 
-// Above 1.0 footage pixels per composition pixel the footage is upscaled; 1.5 is the softest allowed.
-export const MAX_SCALE = 1.5;
+// The plane's radius and shadow are drawn at 1080p and scale with the frame's height.
+const PLANE_RADIUS = 14;
+const PLANE_SHADOW = (k: number): string => `0 ${16 * k}px ${42 * k}px rgba(0, 0, 0, 0.26)`;
+// The camera's distance from the plane in composition heights: about a 28 degree vertical field of view.
+const PERSPECTIVE = 2;
 
-/** The largest window inside the safe area with the footage's aspect ratio, centered in it. */
+// Composition pixels per footage pixel. Above 1.0 the footage is enlarged and its 4:2:0 colour turns
+// coarser than the output's.
+export const MAX_SCALE = 1;
+// A held target's cells are at least 1/30 of the composition height: 36 px at 1080p.
+const LEGIBLE_LINES = 30;
+// Absorbs float rounding in scales derived from cell and window sizes.
+const TOLERANCE = 1e-6;
+
 export const baseScale = (footage: Size, area: Size): number => Math.min(area.width / footage.width, area.height / footage.height);
 
-export const fitWindow = (footage: Size): Rect => {
-  const room = { width: VIDEO.width - 2 * SAFE.x, height: VIDEO.height - SAFE.top - SAFE.bottom };
-  const scale = Math.min(room.width / footage.width, room.height / footage.height);
+/** The largest window inside the safe area with the footage's aspect ratio, centered in it. SAFE is set at 1080p and scales with the frame's height. */
+export const fitWindow = (footage: Size, frame: Size): Rect => {
+  const k = frame.height / VIDEO.height;
+  const room = { width: frame.width - 2 * SAFE.x * k, height: frame.height - (SAFE.top + SAFE.bottom) * k };
+  const scale = baseScale(footage, room);
   const width = Math.round(footage.width * scale);
   const height = Math.round(footage.height * scale);
-  return { x: Math.round((VIDEO.width - width) / 2), y: Math.round(SAFE.top + (room.height - height) / 2), width, height };
+  return { x: Math.round((frame.width - width) / 2), y: Math.round(SAFE.top * k + (room.height - height) / 2), width, height };
 };
 
-// Zoom eases in log space so each doubling takes the same time; x and y are the footage pixel
-// placed at the window's center.
-export const viewAt = (keyframes: readonly CameraKeyframe[], frame: number): View => {
+// Zoom eases in log space so each doubling takes the same time.
+export const viewAt = (keyframes: readonly CameraKeyframe[], frame: number): Pose => {
   const [first] = keyframes;
   if (first === undefined) throw new Error("Camera needs at least one keyframe");
-  if (keyframes.length === 1) return first;
   const frames = keyframes.map((k) => k.frame);
-  const along = (values: number[]) =>
-    interpolate(frame, frames, values, { easing: ease.camera, extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const along = (value: (k: CameraKeyframe) => number) =>
+    keyframes.length === 1
+      ? value(first)
+      : interpolate(frame, frames, keyframes.map(value), { easing: ease.camera, extrapolateLeft: "clamp", extrapolateRight: "clamp" });
   return {
-    x: along(keyframes.map((k) => k.x)),
-    y: along(keyframes.map((k) => k.y)),
-    zoom: Math.exp(along(keyframes.map((k) => Math.log(k.zoom)))),
+    x: along((k) => k.x),
+    y: along((k) => k.y),
+    zoom: Math.exp(along((k) => Math.log(k.zoom))),
+    rotateX: along((k) => k.rotateX ?? 0),
+    rotateY: along((k) => k.rotateY ?? 0),
   };
 };
 
@@ -51,73 +68,72 @@ const viewTransform = (view: View, footage: Size, area: Size) => {
   return { scale, x: pan(area.width, footage.width, view.x), y: pan(area.height, footage.height, view.y) };
 };
 
-export const projector = (view: View, footage: Size, area: Rect): ToScreen => {
-  const t = viewTransform(view, footage, area);
-  return (rect) => ({
-    x: area.x + t.x + rect.x * t.scale,
-    y: area.y + t.y + rect.y * t.scale,
-    width: rect.width * t.scale,
-    height: rect.height * t.scale,
-  });
-};
-
-type CameraSpace = { toScreen: ToScreen; area: Rect };
-
-const CameraContext = createContext<CameraSpace | null>(null);
-
-const useCameraSpace = (): CameraSpace => {
-  const space = useContext(CameraContext);
-  if (space === null) throw new Error("camera overlays need an enclosing <Camera> or <CameraOverlay>");
-  return space;
-};
-
-/** Maps a rect in footage pixels to composition pixels at the enclosing Camera's current frame. */
-export const useCameraTransform = (): ToScreen => useCameraSpace().toScreen;
-
-/** The footage window in composition pixels. */
-export const useCameraArea = (): Rect => useCameraSpace().area;
-
-export type CameraOverlayProps = { footage: Size; keyframes: readonly CameraKeyframe[]; box?: Rect; children?: ReactNode };
-
-// Gives overlays the camera's transform without drawing footage, so one set of overlays can span
-// several Camera segments that share keyframes.
-export const CameraOverlay = ({ footage, keyframes, box, children }: CameraOverlayProps) => {
-  const frame = useCurrentFrame();
-  const area = box ?? fitWindow(footage);
-  return <CameraContext.Provider value={{ toScreen: projector(viewAt(keyframes, frame), footage, area), area }}>{children}</CameraContext.Provider>;
+// Checking keyframes covers every frame: ease.camera never overshoots, so each frame's zoom lies
+// between two keyframes' zooms.
+const assertScale = (footage: ClipManifest, keyframes: readonly CameraKeyframe[], area: Rect, frameHeight: number) => {
+  const base = baseScale(footage, area);
+  const floor = frameHeight / LEGIBLE_LINES;
+  for (const k of keyframes) {
+    const scale = base * k.zoom;
+    if (scale > MAX_SCALE + TOLERANCE) throw new Error(`${footage.scene}: scale ${scale.toFixed(3)} at frame ${k.frame} enlarges the footage past ${MAX_SCALE}`);
+    if (k.target === undefined) continue;
+    target(footage, k.target);
+    const cell = scale * footage.cell.height;
+    if (scale < floor / footage.cell.height - TOLERANCE)
+      throw new Error(
+        `${footage.scene} target "${k.target}" is held at scale ${scale.toFixed(3)} from frame ${k.frame}: a cell shows ${cell.toFixed(1)} px, under the ${floor.toFixed(1)} px floor (1/${LEGIBLE_LINES} of ${frameHeight} px)`,
+      );
+  }
 };
 
 export type CameraProps = {
   src: string;
-  footage: Size;
+  footage: ClipManifest;
   keyframes: readonly CameraKeyframe[];
   durationInFrames: number;
   trimBefore?: number;
   playbackRate?: number;
   box?: Rect;
-  border?: string;
   freeze?: { frame: number; active: boolean | ((frame: number) => boolean) };
-  children?: ReactNode;
 };
 
 // durationInFrames is composition frames; <Video> reads its own durationInFrames as media frames
 // (trimAfter = trimBefore + durationInFrames, then divided by playbackRate), so a sped-up camera
 // passes it scaled or the footage goes blank partway through.
-// children render in composition space above the window, so an overlay keeps its stroke width at
-// any zoom and is not clipped by the window. freeze holds only the footage, so overlays keep
-// animating while it is held.
-export const Camera = ({ src, footage, keyframes, durationInFrames, trimBefore = 0, playbackRate = 1, box, border, freeze, children }: CameraProps) => {
+// The plane is the part of the footage inside the window, so footage smaller than the window shows
+// its own rounded edges and shadow, and footage that overfills it is cut at the window's. It tilts
+// about its center, which the perspective looks along.
+export const Camera = ({ src, footage, keyframes, durationInFrames, trimBefore = 0, playbackRate = 1, box, freeze }: CameraProps) => {
   const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const area = box ?? fitWindow(footage);
-  const limit = MAX_SCALE / baseScale(footage, area);
-  const over = keyframes.find((k) => k.zoom > limit);
-  if (over !== undefined) throw new Error(`zoom ${over.zoom} at frame ${over.frame} exceeds ${MAX_SCALE}x footage pixels (zoom ${limit.toFixed(2)})`);
+  const { fps, width, height } = useVideoConfig();
+  const area = box ?? fitWindow(footage, { width, height });
+  assertScale(footage, keyframes, area, height);
+  const k = height / VIDEO.height;
   const view = viewAt(keyframes, frame);
   const t = viewTransform(view, footage, area);
+  const left = Math.max(0, t.x);
+  const top = Math.max(0, t.y);
+  const plane = {
+    x: area.x + left,
+    y: area.y + top,
+    width: Math.min(area.width, t.x + footage.width * t.scale) - left,
+    height: Math.min(area.height, t.y + footage.height * t.scale) - top,
+  };
   return (
-    <CameraContext.Provider value={{ toScreen: projector(view, footage, area), area }}>
-      <Window box={area} {...(border === undefined ? {} : { border })}>
+    <AbsoluteFill style={{ perspective: PERSPECTIVE * height, perspectiveOrigin: `${plane.x + plane.width / 2}px ${plane.y + plane.height / 2}px` }}>
+      <div
+        style={{
+          position: "absolute",
+          left: plane.x,
+          top: plane.y,
+          width: plane.width,
+          height: plane.height,
+          borderRadius: PLANE_RADIUS * k,
+          overflow: "hidden",
+          boxShadow: PLANE_SHADOW(k),
+          transform: `rotateX(${view.rotateX}deg) rotateY(${view.rotateY}deg)`,
+        }}
+      >
         <div
           style={{
             position: "absolute",
@@ -126,8 +142,7 @@ export const Camera = ({ src, footage, keyframes, durationInFrames, trimBefore =
             width: footage.width,
             height: footage.height,
             transformOrigin: "0 0",
-            translate: `${t.x}px ${t.y}px`,
-            scale: `${t.scale}`,
+            transform: `translate3d(${t.x - left}px, ${t.y - top}px, 0) scale(${t.scale})`,
           }}
         >
           <Freeze frame={freeze?.frame ?? 0} active={freeze?.active ?? false}>
@@ -143,8 +158,7 @@ export const Camera = ({ src, footage, keyframes, durationInFrames, trimBefore =
             />
           </Freeze>
         </div>
-      </Window>
-      {children}
-    </CameraContext.Provider>
+      </div>
+    </AbsoluteFill>
   );
 };

@@ -1,25 +1,12 @@
-import { loadFont as loadSerif } from "@remotion/google-fonts/InstrumentSerif";
 import { loadFont as loadMono } from "@remotion/google-fonts/JetBrainsMono";
 import { Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 
 export const color = {
-  canvas: "#09090b",
-  accent: "#d77757",
-  text: "#f4f4f5",
-  muted: "#a1a1aa",
-  quiet: "rgba(255, 255, 255, 0.6)",
-  green: "#4ade80",
-  red: "#f87171",
-  amber: "#fbbf24",
-  frameBorder: "rgba(255, 255, 255, 0.08)",
-  plainBorder: "rgba(255, 255, 255, 0.12)",
-  omcaBorder: "rgba(215, 119, 87, 0.4)",
-  panel: "rgba(9, 9, 11, 0.86)",
-  keyFace: "#18181b",
-  keyEdge: "#3f3f46",
+  stage: "#c8c1b5",
+  caption: "#4b4741",
+  title: "#1f1d1a",
 } as const;
 
-export const serif = loadSerif("normal", { weights: ["400"], subsets: ["latin"] }).fontFamily;
 export const mono = loadMono("normal", { weights: ["400", "600"], subsets: ["latin"] }).fontFamily;
 
 export const VIDEO = { width: 1920, height: 1080, fps: 60 } as const;
@@ -74,7 +61,9 @@ export const useMotion = () => {
   };
 };
 
-export const assertWords = (text: string, max: number): void => {
+const CAPTION_WORDS = 7;
+
+export const assertWords = (text: string): void => {
   const count = text.trim().split(/\s+/).length;
-  if (count > max) throw new Error(`"${text}" has ${count} words; the limit here is ${max}`);
+  if (count > CAPTION_WORDS) throw new Error(`"${text}" has ${count} words; a caption holds at most ${CAPTION_WORDS}`);
 };

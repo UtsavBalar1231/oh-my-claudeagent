@@ -75,10 +75,12 @@ under `servers/hooks/`. Every file is TypeScript on bun.
   theme, and `fixtures/acme-app` is the project it opens, with the run's tasks written into the
   session's task list from the plan document the fixture holds. Pixels cannot be masked afterwards, so `privacy.ts` checks the pane's plain text before
   and after each still and throughout each recording, and refuses the capture when it shows the
-  username, the home path, the hostname or the scratch directory's name. It needs Xvfb, kitty,
+  username, the home path, the hostname or the scratch directory's name, except the public slug
+  `UtsavBalar1231/oh-my-claudeagent`, which it blanks on one row before matching. It needs Xvfb, kitty,
   tmux, xdotool, ImageMagick, ffmpeg and ffprobe, and a JetBrains Mono font that fontconfig
   (`fc-list`) finds. An interrupted run tears its sessions and scratch directory down.
-  `just screenshots` runs it.
+  `just screenshots` runs it. `lottie.ts` writes the OMCA mark and
+  agent ident as Lottie to `video/public/lottie/` from `src/core/mascots.ts`.
 - `qa/`: the QA harness and the checks CI shares with it. `just qa` is the manual pre-release
   run. `ci-smoke.ts` is the CI smoke job and `just smoke`: one `claude -p` session with the
   packaged plugin loaded, in which the guard must deny a recursive removal (through PowerShell

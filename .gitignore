@@ -6,6 +6,7 @@ node_modules/
 video/node_modules/
 video/out/
 video/public/footage/
+video/public/lottie/
 
 # oh-my-claudeagent runtime state
 /.omca/

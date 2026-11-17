@@ -1,10 +1,14 @@
+<p align="center"><img src=".github/assets/omca-mark.webp" width="128" alt="The OMCA mark: a pixel-art pebble that blinks and hops."></p>
+
 # oh-my-claudeagent
 
 **Claude Code, with receipts.**
 
 [![CI](https://github.com/UtsavBalar1231/oh-my-claudeagent/actions/workflows/ci.yml/badge.svg)](https://github.com/UtsavBalar1231/oh-my-claudeagent/actions/workflows/ci.yml)
 
-<img src=".github/assets/hero.png" width="1000" alt="A Claude Code session on the left hands task 7 of the checkout run to the executor, while the OMCA pane on the right shows the Agents tab with the executor's lane on Wire the order summary panel. Above the prompt, the band shows the checkout-redesign run at 6 of 14.">
+<img src=".github/assets/omca-loop.webp" width="800" alt="An animation in three parts. Plain Claude Code in bypass mode is told to clean up the working tree and runs git reset --hard, which throws away uncommitted work in three files. The same session with OMCA then refuses the command with the message OMCA guard refused, git command discarding changes. Last, the final task's verdict page shows Passed, exit 0. The sessions are real Claude Code sessions and the model replies are scripted.">
+
+Real Claude Code sessions. Model replies are scripted.
 
 oh-my-claudeagent (OMCA) coordinates specialist agents, plans and verification evidence in
 Claude Code and OpenCode V2. Both adapters share state formats, safety checks and durable

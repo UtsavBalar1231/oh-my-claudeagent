@@ -80,9 +80,10 @@ describe("CLIPS", () => {
       "clip-guard",
       "clip-verify",
       "clip-tour",
+      "clip-install",
     ]);
     const pairs = ["clip-plain-stop", "clip-plain-reset", "clip-refusal", "clip-guard"];
-    for (const shot of CLIPS) expect([shot.name, shot.cols, shot.rows, shot.font]).toEqual(pairs.includes(shot.name) ? [shot.name, 96, 34, 35] : [shot.name, 214, 50, undefined]);
+    for (const shot of CLIPS) expect([shot.name, shot.cols, shot.rows, shot.font]).toEqual(pairs.includes(shot.name) ? [shot.name, 96, 34, 35] : shot.name === "clip-install" ? [shot.name, 120, 30, 28] : [shot.name, 214, 50, undefined]);
   });
 
   test("each clip marks the events and names the targets its beat needs", () => {
@@ -106,6 +107,8 @@ describe("CLIPS", () => {
     expect(marks(clip("clip-tour"))).toEqual(["cmd-typed", "agents-tab", "evidence-tab", "notepad-tab", "stats-typed", "stats-tab"]);
     expect(targets(clip("clip-verify"))).toEqual(["no-verdict-row", "passed-row"]);
     expect(targets(clip("clip-tour"))).toEqual(["band", "cost-row", "notepad-section", "stats-header"]);
+    expect(marks(clip("clip-install"))).toEqual(["shell-typed", "installed"]);
+    expect(targets(clip("clip-install"))).toEqual(["installed-row"]);
   });
 
   // Each row is a split screen: the transcript, the pane's edge at column 12, then the pane.
@@ -123,10 +126,16 @@ describe("CLIPS", () => {
   });
 
   test("the plain clips leave the plugin out and pair with an OMCA clip on the same prompt", () => {
-    expect(CLIPS.filter((shot) => shot.plugin === false).map((shot) => shot.name)).toEqual(["clip-plain-stop", "clip-plain-reset"]);
+    expect(CLIPS.filter((shot) => shot.plugin === false).map((shot) => shot.name)).toEqual(["clip-plain-stop", "clip-plain-reset", "clip-install"]);
     const prompt = (shot: Clip | undefined) => shot?.steps.find((step) => "type" in step);
     expect(prompt(clip("clip-plain-stop"))).toEqual(prompt(clip("clip-refusal")));
     expect(prompt(clip("clip-plain-reset"))).toEqual(prompt(clip("clip-guard")));
+  });
+
+  test("clip-install pastes its command in one step, after the bash-mode key", () => {
+    const steps = clip("clip-install")?.steps ?? [];
+    expect(steps.slice(0, 2)).toEqual([{ type: "!" }, { paste: "claude plugin install oh-my-claudeagent --marketplace UtsavBalar1231/oh-my-claudeagent" }]);
+    expect(CLIPS.filter((shot) => shot.steps.some((step) => "paste" in step)).map((shot) => shot.name)).toEqual(["clip-install"]);
   });
 
   test("the reset pair runs under bypassPermissions", () => {
