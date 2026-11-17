@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { AbsoluteFill, Sequence, useVideoConfig } from "remotion";
-import { baseScale, Camera, CameraOverlay, type CameraKeyframe, type View } from "../components/Camera.tsx";
+import { baseScale, Camera, type CameraKeyframe, type View } from "../components/Camera.tsx";
 import type { ClipManifest, Rect } from "../footage.ts";
 import { color, toFrames } from "../theme.ts";
 
@@ -18,7 +18,7 @@ export const cellBox = (clip: ClipManifest, cols: number, rows: number, scale = 
 // For the 214x50 captures: the transcript window shows the capture's left margin and 95 columns,
 // the pane window starts where the OMCA pane's background does (column 118, measured at x = 2140
 // in each pane clip). The pane window leaves out the grid's last column, which holds only the
-// pane's close mark, and is 18 rows high, so a push to 1.5 also lands on whole rows.
+// pane's close mark, and is 18 rows high.
 const WINDOW_ROWS = 19;
 export const TRANSCRIPT_COLS = 95;
 export const PANE_COL = 118;
@@ -119,12 +119,10 @@ export type ShotProps = {
   keyframes: readonly CameraKeyframe[];
   segments: readonly Segment[];
   box?: Rect;
-  /** Overlays drawn in the camera's space, above the footage; time them inside hold segments. */
-  children?: ReactNode;
 };
 
 /** Plays a beat's segments through one camera path, so a cut or a speed change keeps the framing. */
-export const Shot = ({ clip, keyframes, segments, box = STAGE, children }: ShotProps) => {
+export const Shot = ({ clip, keyframes, segments, box = STAGE }: ShotProps) => {
   const { fps } = useVideoConfig();
   return (
     <>
@@ -142,9 +140,6 @@ export const Shot = ({ clip, keyframes, segments, box = STAGE, children }: ShotP
           />
         </Sequence>
       ))}
-      <CameraOverlay footage={clip} keyframes={keyframes} box={box}>
-        {children}
-      </CameraOverlay>
     </>
   );
 };
