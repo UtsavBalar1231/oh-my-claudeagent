@@ -114,6 +114,16 @@ export const aim = (clip: ClipManifest, box: Rect, { scale, top, left }: Aim): V
 
 export const wide = (clip: ClipManifest): View => ({ x: clip.width / 2, y: clip.height / 2, zoom: 1 });
 
+/**
+ * An establish move on `view`: the plane tilted by `rotateY` and 3 degrees back at 0.84 of fit,
+ * drifting 2 degrees toward flat and 3 percent closer between frames `from` and `to`. Callers set
+ * `from` before the shot's first frame so the plane is already moving when it cuts in.
+ */
+export const establish = (view: View, rotateY: number, from: number, to: number): CameraKeyframe[] => [
+  { ...view, frame: from, zoom: 0.84, rotateY, rotateX: 3 },
+  { ...view, frame: to, zoom: 0.865, rotateY: rotateY - Math.sign(rotateY) * 2, rotateX: 2 },
+];
+
 export type ShotProps = {
   clip: ClipManifest;
   keyframes: readonly CameraKeyframe[];

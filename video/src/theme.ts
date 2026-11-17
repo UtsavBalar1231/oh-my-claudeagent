@@ -2,9 +2,9 @@ import { loadFont as loadMono } from "@remotion/google-fonts/JetBrainsMono";
 import { Easing, interpolate, useCurrentFrame, useVideoConfig } from "remotion";
 
 export const color = {
-  stage: "#f7f7f5",
-  caption: "#6b6b6b",
-  title: "#1a1a1a",
+  stage: "#c8c1b5",
+  caption: "#4b4741",
+  title: "#1f1d1a",
 } as const;
 
 export const mono = loadMono("normal", { weights: ["400", "600"], subsets: ["latin"] }).fontFamily;
