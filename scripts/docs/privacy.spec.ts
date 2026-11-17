@@ -36,6 +36,18 @@ describe("assertPrivate", () => {
     expect(() => assertPrivate("cwd /acme-app", ["acm"])).not.toThrow();
   });
 
+  test("passes the public marketplace slug on one row", () => {
+    expect(() => assertPrivate("  ✔ added marketplace: UtsavBalar1231/oh-my-claudeagent", ["utsav", "utsavbalar1231"])).not.toThrow();
+  });
+
+  test("refuses a bare username", () => {
+    expect(() => assertPrivate("signed in as utsav", ["utsav"])).toThrow(REFUSED);
+  });
+
+  test("refuses the slug wrapped right after the username", () => {
+    expect(() => assertPrivate("clone https://github.com/UtsavBalar1231/\noh-my-claudeagent.git", ["utsav"])).toThrow(REFUSED);
+  });
+
   test("passes a screen that shows only the staged values", () => {
     expect(() => assertPrivate("~/acme-app · main", [FAKE_HOME, "someone", "Ab12Cd"])).not.toThrow();
   });

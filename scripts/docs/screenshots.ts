@@ -104,6 +104,7 @@ export type Still = Scene & {
 // target is the text a pattern finds on that screen, followed for as long as it stays put.
 export type Step =
   | { type: string }
+  | { paste: string }
   | { key: string; gap?: number }
   | { until: (screen: string) => boolean; hold?: number; mark?: string; targets?: Readonly<Record<string, RegExp>> };
 
@@ -159,6 +160,7 @@ const shell = (line: string): Step[] => [
   { key: "Enter" },
 ];
 // Named, so plain Claude Code sends no title request for the mock to answer with a scripted turn.
+const INSTALL = "claude plugin install oh-my-claudeagent --marketplace UtsavBalar1231/oh-my-claudeagent";
 const PLAIN = { plugin: false, args: ["--name", "acme-app"] } as const;
 const BYPASS_ARGS = ["--permission-mode", "bypassPermissions"];
 const BYPASS_SETTINGS = { skipDangerousModePermissionPrompt: true };
@@ -492,6 +494,23 @@ export const CLIPS: readonly Clip[] = [
       { key: "Escape", gap: 0 },
       ...command("/omca stats", "stats-typed"),
       { until: has("delegations in"), mark: "stats-tab", hold: 1_200, targets: { "stats-header": /agent +runs +median +tokens[^\n│]*outcomes/ } },
+    ],
+  },
+  {
+    name: "clip-install",
+    format: "clip",
+    cols: 120,
+    rows: 30,
+    font: 28,
+    ...PLAIN,
+    script: { main: [{ content: [text("Installed. Run /reload-plugins to load it in this session.")] }], subagent: [] },
+    steps: [
+      { type: "!" },
+      // Typed character by character, the slug would show a bare username before it is complete.
+      { paste: INSTALL },
+      { until: (screen) => screen.split("\n").some((row) => /^!\s/.test(row) && row.slice(2).trimEnd() === INSTALL), mark: "shell-typed", hold: 0 },
+      { key: "Enter" },
+      { until: has("Successfully installed plugin", "Run /reload-plugins to load it", "? for shortcuts"), mark: "installed", hold: 4_000, targets: { "installed-row": /Successfully installed plugin[^\n]*/ } },
     ],
   },
 ];
@@ -979,6 +998,9 @@ async function playClip(shot: Clip, tmux: Tmux): Promise<Played> {
           tmux.send("-l", char);
           await Bun.sleep(TYPE_MS);
         }
+      } else if ("paste" in step) {
+        since = Date.now();
+        tmux.send("-l", step.paste);
       } else if ("key" in step) {
         await Bun.sleep(step.gap ?? CLIP_KEY_GAP_MS);
         since = Date.now();
@@ -1254,6 +1276,8 @@ if (import.meta.main) {
     console.error(`usage: bun scripts/docs/screenshots.ts [<name>... | clips] [--out <dir>]\nnames: ${every.map((shot) => shot.name).join(" ")}`);
     process.exit(2);
   }
+  const claude = Bun.which("claude");
+  if (claude !== null) console.log(`claude --version: ${Bun.spawnSync([claude, "--version"], { stderr: "ignore" }).stdout.toString().trim()}`);
   for (const shot of chosen) {
     const out = values.out ?? (shot.format === "clip" ? FOOTAGE_DIR : ASSET_DIR);
     mkdirSync(out, { recursive: true });
