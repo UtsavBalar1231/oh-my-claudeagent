@@ -11,7 +11,6 @@
         "@remotion/layout-utils": "4.0.544",
         "@remotion/lottie": "4.0.544",
         "@remotion/media": "4.0.544",
-        "@remotion/motion-blur": "4.0.544",
         "@remotion/renderer": "4.0.544",
         "@remotion/transitions": "4.0.544",
         "lottie-web": "5.13.0",
@@ -175,8 +174,6 @@
     "@remotion/media": ["@remotion/media@4.0.544", "", { "dependencies": { "mediabunny": "1.66.0", "remotion": "4.0.544", "zod": "4.6.7" }, "peerDependencies": { "react": ">=16.8.0", "react-dom": ">=16.8.0" } }, "sha512-f9T6nm13yXfsDnMtNs8WtTPmAzTz2uKtaDppzBu5JxBqcMuNNX8XnXRjpof87aGfhcPLM1GZ9TL9SzEAZ0IaXw=="],
 
     "@remotion/media-utils": ["@remotion/media-utils@4.0.544", "", { "dependencies": { "mediabunny": "1.66.0", "remotion": "4.0.544" }, "peerDependencies": { "react": ">=16.8.0", "react-dom": ">=16.8.0" } }, "sha512-h4ROtJCUJkL0OmeXhItBfnue7eAD6MOsnZDGseAbTfFRqf0Si9tu/XXBRdVybDlsCFVrUKvGB5bA1nhDsrGJNg=="],
-
-    "@remotion/motion-blur": ["@remotion/motion-blur@4.0.544", "", { "dependencies": { "remotion": "4.0.544" }, "peerDependencies": { "react": ">=16.8.0", "react-dom": ">=16.8.0" } }, "sha512-p9/WNXF7uJt/4iTTvoGjQrJGu7NBUmBJHAxLKDsct5FOM+kgcZWcBElhNApME6y/RkQA08dp6Vu+vzY5cu6u7g=="],
 
     "@remotion/openai-whisper": ["@remotion/openai-whisper@4.0.544", "", { "dependencies": { "@remotion/captions": "4.0.544", "zod": "4.6.7" } }, "sha512-OBEIRGASsB/ijYDLoxkmQ+/RiChRRwMclas9mZN4rn6rKmoVHPxj4s+/kZhun0QdwNzozs9uMc6y+cQA5uZZgQ=="],
 
