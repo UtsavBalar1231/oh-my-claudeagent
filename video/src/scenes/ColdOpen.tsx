@@ -1,7 +1,7 @@
 import { Sequence, useVideoConfig } from "remotion";
 import { fitWindow } from "../components/Camera.tsx";
 import { type ClipManifest, mark } from "../footage.ts";
-import { F3, F4, F6 } from "./clips.ts";
+import { F2, F3, F4, F5, F6, F8 } from "./clips.ts";
 import { Canvas, establish, Shot, timeline, wide } from "./shot.tsx";
 
 export type ColdOpenShot = { clip: ClipManifest; at: string; seconds: number; rotateY: number };
@@ -12,6 +12,15 @@ export const SAMPLE_COLD_OPEN: readonly ColdOpenShot[] = [
   { clip: F3, at: "lanes", seconds: 1.3, rotateY: -7 },
   { clip: F4, at: "board", seconds: 1.4, rotateY: 7 },
   { clip: F6, at: "passed", seconds: 1.3, rotateY: -7 },
+];
+
+export const FILM_COLD_OPEN: readonly ColdOpenShot[] = [
+  { clip: F3, at: "lanes", seconds: 1.6, rotateY: -7 },
+  { clip: F4, at: "board", seconds: 1.8, rotateY: 7 },
+  { clip: F5, at: "refused", seconds: 1.5, rotateY: -7 },
+  { clip: F6, at: "passed", seconds: 1.7, rotateY: 7 },
+  { clip: F8, at: "evidence-tab", seconds: 1.7, rotateY: -7 },
+  { clip: F2, at: "dialog", seconds: 1.7, rotateY: 7 },
 ];
 
 export const coldOpenPlan = (shots: readonly ColdOpenShot[], fps: number) => {

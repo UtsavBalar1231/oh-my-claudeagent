@@ -107,6 +107,8 @@ const video = (file: string, fps: string) => {
 
 size(MASTER);
 video(MASTER, "60/1");
+const demoSeconds = probe(MASTER).duration;
+check(MASTER, "seconds", demoSeconds >= 85 && demoSeconds <= 95, demoSeconds.toFixed(2));
 size(WEB, UPLOAD_LIMIT);
 video(WEB, "30/1");
 size(POSTER);

@@ -20,7 +20,7 @@ export const cellBox = (clip: ClipManifest, cols: number, rows: number, scale = 
 // in each pane clip). The pane window leaves out the grid's last column, which holds only the
 // pane's close mark, and is 18 rows high.
 const WINDOW_ROWS = 19;
-export const TRANSCRIPT_COLS = 95;
+const TRANSCRIPT_COLS = 95;
 export const PANE_COL = 118;
 const PANE_ROWS = 18;
 export const paneCols = (clip: ClipManifest): number => clip.grid.cols - 1 - PANE_COL;
@@ -48,20 +48,16 @@ export const fitWidth = (clip: ClipManifest): { box: Rect; scale: number } => {
   return { box: { x: STAGE.x, y: STAGE.y + (STAGE.height - height) / 2, width: STAGE.width, height }, scale };
 };
 
-// Beats overlap by this crossfade, so text that must not double up with the next or previous
-// beat's text enters after it and leaves before it.
+// The film crossfades only into its end card.
 const CROSSFADE = 0.33;
 export const crossfadeFrames = (fps: number): number => toFrames(CROSSFADE, fps);
 
-/** A beat's length for a shot-list span: every beat but the last overlaps the next by the crossfade. */
+/** A card's length for a span that a crossfade overlaps at its end. */
 export const beatLength = (span: number): number => span + CROSSFADE;
 
-/** A beat-long caption, clear of the crossfades at both ends so two captions never overlap. */
-export const captionSpan = (beatDuration: number, fps: number) => {
-  const edge = crossfadeFrames(fps);
-  const from = edge + toFrames(0.1, fps);
-  return { from, duration: beatDuration - from - edge };
-};
+// A target's `to` is the last poll that saw it in place, and the screen can start to move a frame
+// before it, so live footage that ends on a target stops this many clip frames earlier.
+export const SETTLE = 3;
 
 export type Segment = { start: number; duration: number; trimBefore: number; rate: number; hold: boolean };
 
@@ -122,6 +118,12 @@ export const wide = (clip: ClipManifest): View => ({ x: clip.width / 2, y: clip.
 export const establish = (view: View, rotateY: number, from: number, to: number): CameraKeyframe[] => [
   { ...view, frame: from, zoom: 0.84, rotateY, rotateX: 3 },
   { ...view, frame: to, zoom: 0.865, rotateY: rotateY - Math.sign(rotateY) * 2, rotateX: 2 },
+];
+
+/** A shot's camera: the establish drift until `push.from`, then the push-in that lands flat on `view` at `push.to`, aimed at `target`. */
+export const pushIn = (view: View, rotateY: number, push: { from: number; to: number }, target?: string): CameraKeyframe[] => [
+  ...establish(view, rotateY, -Math.round(push.from / 2), push.from),
+  target === undefined ? { ...view, frame: push.to } : { ...view, frame: push.to, target },
 ];
 
 export type ShotProps = {
