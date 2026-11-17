@@ -2,7 +2,8 @@ import { Lottie, type LottieAnimationData } from "@remotion/lottie";
 import { useEffect, useState } from "react";
 import { cancelRender, continueRender, delayRender, staticFile } from "remotion";
 
-export const LottieClip = ({ file }: { file: string }) => {
+// Lottie advances one animation frame per composition frame, so a composition slower than the animation's own rate passes `playbackRate`.
+export const LottieClip = ({ file, playbackRate = 1 }: { file: string; playbackRate?: number }) => {
   const [data, setData] = useState<LottieAnimationData | null>(null);
   const [handle] = useState(() => delayRender(`load ${file}`));
 
@@ -17,5 +18,5 @@ export const LottieClip = ({ file }: { file: string }) => {
   }, [file, handle]);
 
   if (data === null) return null;
-  return <Lottie animationData={data} loop={false} renderer="svg" style={{ width: "100%", height: "100%" }} />;
+  return <Lottie animationData={data} loop={false} playbackRate={playbackRate} renderer="svg" style={{ width: "100%", height: "100%" }} />;
 };

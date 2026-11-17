@@ -13,8 +13,9 @@ export type CameraKeyframe = View & { frame: number };
 export type Size = { width: number; height: number };
 type Pose = Required<Omit<View, "target">>;
 
+// The plane's radius and shadow are drawn at 1080p and scale with the frame's height.
 const PLANE_RADIUS = 14;
-const PLANE_SHADOW = "0 16px 42px rgba(0, 0, 0, 0.26)";
+const PLANE_SHADOW = (k: number): string => `0 ${16 * k}px ${42 * k}px rgba(0, 0, 0, 0.26)`;
 // The camera's distance from the plane in composition heights: about a 28 degree vertical field of view.
 const PERSPECTIVE = 2;
 
@@ -107,6 +108,7 @@ export const Camera = ({ src, footage, keyframes, durationInFrames, trimBefore =
   const { fps, width, height } = useVideoConfig();
   const area = box ?? fitWindow(footage, { width, height });
   assertScale(footage, keyframes, area, height);
+  const k = height / VIDEO.height;
   const view = viewAt(keyframes, frame);
   const t = viewTransform(view, footage, area);
   const left = Math.max(0, t.x);
@@ -126,9 +128,9 @@ export const Camera = ({ src, footage, keyframes, durationInFrames, trimBefore =
           top: plane.y,
           width: plane.width,
           height: plane.height,
-          borderRadius: PLANE_RADIUS,
+          borderRadius: PLANE_RADIUS * k,
           overflow: "hidden",
-          boxShadow: PLANE_SHADOW,
+          boxShadow: PLANE_SHADOW(k),
           transform: `rotateX(${view.rotateX}deg) rotateY(${view.rotateY}deg)`,
         }}
       >

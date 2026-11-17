@@ -2,17 +2,23 @@ import type { ReactNode } from "react";
 import { AbsoluteFill, Sequence, useVideoConfig } from "remotion";
 import { baseScale, Camera, type CameraKeyframe, type View } from "../components/Camera.tsx";
 import type { ClipManifest, Rect } from "../footage.ts";
-import { color, toFrames } from "../theme.ts";
+import { color, toFrames, VIDEO } from "../theme.ts";
 
 // The room for a footage window: the band under it holds captions, so they never sit on footage.
 const STAGE: Rect = { x: 96, y: 106, width: 1728, height: 756 };
 
+/** The stage for a frame `height` high: the 1080p stage scaled with the frame. */
+export const stageFor = (height: number): Rect => {
+  const k = height / VIDEO.height;
+  return { x: Math.round(STAGE.x * k), y: Math.round(STAGE.y * k), width: STAGE.width * k, height: STAGE.height * k };
+};
+
 /** A window of whole cells at `scale`, centered in the stage, so its edges fall on cell boundaries. */
-export const cellBox = (clip: ClipManifest, cols: number, rows: number, scale = 1): Rect => {
+export const cellBox = (clip: ClipManifest, cols: number, rows: number, scale = 1, stage: Rect = STAGE): Rect => {
   const width = cols * clip.cell.width * scale;
   const height = rows * clip.cell.height * scale;
-  if (width > STAGE.width || height > STAGE.height) throw new Error(`${cols}x${rows} cells at ${scale} do not fit the stage`);
-  return { x: STAGE.x + Math.round((STAGE.width - width) / 2), y: STAGE.y + Math.round((STAGE.height - height) / 2), width, height };
+  if (width > stage.width || height > stage.height) throw new Error(`${cols}x${rows} cells at ${scale} do not fit the stage`);
+  return { x: stage.x + Math.round((stage.width - width) / 2), y: stage.y + Math.round((stage.height - height) / 2), width, height };
 };
 
 // For the 214x50 captures: the transcript window shows the capture's left margin and 95 columns,
@@ -35,17 +41,21 @@ export const transcriptBox = (clip: ClipManifest): Rect => {
   return { ...box, x: STAGE.x + Math.round((STAGE.width - width) / 2), width };
 };
 
-/** The pane window for the 214x50 captures at 1.0. */
-export const paneBox = (clip: ClipManifest): Rect => cellBox(clip, paneCols(clip), PANE_ROWS);
+/** The pane window for the 214x50 captures, at 1.0 on the 1080p stage unless given a scale and a stage. */
+export const paneBox = (clip: ClipManifest, scale = 1, stage: Rect = STAGE): Rect => cellBox(clip, paneCols(clip), PANE_ROWS, scale, stage);
+
+/** The largest scale, to three decimals, at which the pane window fits the stage. */
+export const paneScale = (clip: ClipManifest, stage: Rect): number =>
+  Math.floor(1000 * Math.min(stage.width / (paneCols(clip) * clip.cell.width), stage.height / (PANE_ROWS * clip.cell.height))) / 1000;
 
 /**
  * A window as wide as the whole terminal, for the 96x34 captures: they wrap every line inside the
  * terminal, so fitting its width crops no text. It is WINDOW_ROWS rows high at that scale.
  */
-export const fitWidth = (clip: ClipManifest): { box: Rect; scale: number } => {
-  const scale = STAGE.width / clip.width;
+export const fitWidth = (clip: ClipManifest, stage: Rect = STAGE): { box: Rect; scale: number } => {
+  const scale = stage.width / clip.width;
   const height = WINDOW_ROWS * clip.cell.height * scale;
-  return { box: { x: STAGE.x, y: STAGE.y + (STAGE.height - height) / 2, width: STAGE.width, height }, scale };
+  return { box: { x: stage.x, y: stage.y + (stage.height - height) / 2, width: stage.width, height }, scale };
 };
 
 // The film crossfades only into its end card.

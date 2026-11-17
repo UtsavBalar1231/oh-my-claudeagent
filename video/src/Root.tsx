@@ -1,20 +1,47 @@
+import type { FC } from "react";
 import { Composition, Freeze, Series, useVideoConfig } from "remotion";
 import { LottieClip } from "./components/LottieClip.tsx";
 import { Demo, demoTimeline } from "./Demo.tsx";
-import { LOOP, Loop, loopPlan } from "./Loop.tsx";
+import { LOOP, Loop, LOOP_PROPS, loopPlan, type LoopProps } from "./Loop.tsx";
 import { ColdOpen, coldOpenPlan, SAMPLE_COLD_OPEN } from "./scenes/ColdOpen.tsx";
-import { GuardPair, guardPairPlan } from "./scenes/GuardPair.tsx";
-import { PUNCH_LINE_SETTLED, PunchLine, punchLinePlan } from "./scenes/PunchLine.tsx";
+import { BLOG_PAIR, GuardPair, guardPairPlan } from "./scenes/GuardPair.tsx";
+import { Canvas } from "./scenes/shot.tsx";
+import { TaskList, taskListPlan } from "./scenes/TaskList.tsx";
 import { Title, titlePlan } from "./scenes/Title.tsx";
 import { toFrames, VIDEO } from "./theme.ts";
 
 const MarkClip = () => <LottieClip file="lottie/omca-mark.json" />;
 const IdentClip = () => <LottieClip file="lottie/omca-ident.json" />;
 
+// All ten mascots have risen by 1.3 s into the ident (the last starts at frame 54 and rises for 24).
+const TITLE_SETTLED = 2;
+
 const PosterCard = () => (
-  <Freeze frame={toFrames(PUNCH_LINE_SETTLED, VIDEO.fps)}>
-    <PunchLine />
+  <Freeze frame={toFrames(TITLE_SETTLED, VIDEO.fps)}>
+    <Title />
   </Freeze>
+);
+
+const BLOG = { width: 1280, height: 720, fps: 30 } as const;
+const MARK_SECONDS = 4;
+// 512 px is the mark's own canvas, so its 40 px cells land on whole pixels, and it centers on whole pixels.
+const BLOG_MARK_SIZE = 512;
+
+/** The frame a poster is cut from, which the render script reads from the composition's props. */
+export type HoldProps = { hold: number };
+
+const BlogTaskList: FC<HoldProps> = () => <TaskList />;
+const BlogResetGuard: FC<HoldProps> = () => <GuardPair timing={BLOG_PAIR} />;
+
+// The mark is authored at 60 fps.
+const MARK_FPS = 60;
+
+const BlogMark = () => (
+  <Canvas>
+    <div style={{ position: "absolute", left: (BLOG.width - BLOG_MARK_SIZE) / 2, top: (BLOG.height - BLOG_MARK_SIZE) / 2, width: BLOG_MARK_SIZE, height: BLOG_MARK_SIZE }}>
+      <LottieClip file="lottie/omca-mark.json" playbackRate={MARK_FPS / BLOG.fps} />
+    </div>
+  </Canvas>
 );
 
 const SampleColdOpen = () => <ColdOpen shots={SAMPLE_COLD_OPEN} />;
@@ -50,19 +77,39 @@ export const Root = () => (
     <Composition
       id="Loop"
       component={Loop}
-      calculateMetadata={() => ({ durationInFrames: loopPlan(LOOP.fps).duration })}
+      defaultProps={LOOP_PROPS}
+      calculateMetadata={({ props }: { props: LoopProps }) => ({ fps: props.fps, durationInFrames: loopPlan(props.fps, props.proveHold).duration })}
       durationInFrames={1}
-      {...LOOP}
+      width={LOOP.width}
+      height={LOOP.height}
+      fps={LOOP.fps}
     />
-    {/* The poster is the punch-line card once its words have settled, rendered as frame 0 of a
-        composition at the Demo's rate and the card's length, because a <Still> runs at 1 fps. */}
     <Composition
-      id="Poster"
-      component={PosterCard}
-      calculateMetadata={() => ({ durationInFrames: punchLinePlan(VIDEO.fps).duration })}
+      id="BlogTaskList"
+      component={BlogTaskList}
+      defaultProps={{ hold: 0 }}
+      calculateMetadata={({ props }: { props: HoldProps }) => {
+        const plan = taskListPlan(BLOG.fps, BLOG.height);
+        return { durationInFrames: plan.duration, props: { ...props, hold: plan.hold } };
+      }}
       durationInFrames={1}
-      {...VIDEO}
+      {...BLOG}
     />
+    <Composition
+      id="BlogResetGuard"
+      component={BlogResetGuard}
+      defaultProps={{ hold: 0 }}
+      calculateMetadata={({ props }: { props: HoldProps }) => {
+        const plan = guardPairPlan(BLOG.fps, BLOG_PAIR, BLOG.height);
+        return { durationInFrames: plan.duration, props: { ...props, hold: plan.push.to + toFrames(0.3, BLOG.fps) } };
+      }}
+      durationInFrames={1}
+      {...BLOG}
+    />
+    <Composition id="BlogMark" component={BlogMark} durationInFrames={toFrames(MARK_SECONDS, BLOG.fps)} {...BLOG} />
+    {/* The poster is the title card once the ident has settled, rendered as frame 0 of a
+        composition at the Demo's rate and the card's length, because a <Still> runs at 1 fps. */}
+    <Composition id="Poster" component={PosterCard} durationInFrames={titlePlan(VIDEO.fps).duration} {...VIDEO} />
     <Composition
       id="Sample"
       component={Sample}
