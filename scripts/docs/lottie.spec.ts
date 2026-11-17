@@ -137,6 +137,8 @@ describe("ident", () => {
       expect(rise[0]?.s[0]).toBe(rise[1]?.s[0]);
       const fade = holdKeyframes(layer.ks.o);
       expect(fade.map((k) => [k.t, k.s[0]])).toEqual([[start, 0], [start + 12, 100]]);
+      // lottie-web reads a segment's easing from its first keyframe and draws nothing when it is missing there.
+      for (const [from, to] of [rise, fade]) expect([from?.o !== undefined, from?.i !== undefined, to?.o ?? to?.i]).toEqual([true, true, undefined]);
     });
   });
 

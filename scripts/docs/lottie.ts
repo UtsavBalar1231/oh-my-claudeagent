@@ -216,15 +216,15 @@ export function buildIdent(): Lottie {
       position: {
         a: 1,
         k: [
-          { t: start, s: [x, top + RISE_PX], o: { x: [0.16], y: [1] } },
-          { t: start + RISE_FRAMES, s: [x, top], i: { x: [0.3], y: [1] } },
+          { t: start, s: [x, top + RISE_PX], o: { x: [0.16], y: [1] }, i: { x: [0.3], y: [1] } },
+          { t: start + RISE_FRAMES, s: [x, top] },
         ],
       },
       opacity: {
         a: 1,
         k: [
-          { t: start, s: [0], o: { x: [0], y: [0] } },
-          { t: start + FADE_FRAMES, s: [100], i: { x: [1], y: [1] } },
+          { t: start, s: [0], o: { x: [0], y: [0] }, i: { x: [1], y: [1] } },
+          { t: start + FADE_FRAMES, s: [100] },
         ],
       },
     });

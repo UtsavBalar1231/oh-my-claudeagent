@@ -1,8 +1,12 @@
 import { Composition, Freeze } from "remotion";
+import { LottieClip } from "./components/LottieClip.tsx";
 import { Demo, demoTimeline } from "./Demo.tsx";
 import { LOOP, Loop, loopPlan } from "./Loop.tsx";
 import { PUNCH_LINE_SETTLED, PunchLine, punchLinePlan } from "./scenes/PunchLine.tsx";
 import { toFrames, VIDEO } from "./theme.ts";
+
+const MarkClip = () => <LottieClip file="lottie/omca-mark.json" />;
+const IdentClip = () => <LottieClip file="lottie/omca-ident.json" />;
 
 const PosterCard = () => (
   <Freeze frame={toFrames(PUNCH_LINE_SETTLED, VIDEO.fps)}>
@@ -35,5 +39,7 @@ export const Root = () => (
       durationInFrames={1}
       {...VIDEO}
     />
+    <Composition id="Mark" component={MarkClip} durationInFrames={240} fps={60} width={256} height={256} />
+    <Composition id="Ident" component={IdentClip} durationInFrames={210} fps={60} width={1920} height={540} />
   </>
 );
