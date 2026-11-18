@@ -17,7 +17,7 @@ function writeTask(id: string, subject: string, metadata: Record<string, unknown
 
 function terminal(...args: string[]): string {
   if (!fixture || !tmux) throw new Error("Terminal fixture is not ready")
-  const result = Bun.spawnSync([tmux, "-L", fixture.socket, ...args], { env: { ...fixture.server.env, TERM: "xterm-256color" }, stdin: "ignore", stdout: "pipe", stderr: "pipe" })
+  const result = Bun.spawnSync([tmux, "-L", fixture.socket, ...args], { env: { ...fixture.server.env, TERM: "xterm-256color", OMCA_GLYPHS: "unicode" }, stdin: "ignore", stdout: "pipe", stderr: "pipe" })
   if (result.exitCode !== 0) throw new Error(result.stderr.toString())
   return result.stdout.toString()
 }
@@ -72,6 +72,7 @@ describe.skipIf(!opencodeBin || !tmux || process.platform === "win32")("native O
     const command = [opencodeBin, "--server", fixture.server.base, "--session", fixture.sessionID, fixture.ws].map(quote).join(" ")
     terminal("new-session", "-d", "-s", "omca", "-x", "80", "-y", "32", command)
     const capture = () => terminal("capture-pane", "-p", "-t", "omca")
+    const send = (...keys: string[]) => terminal("send-keys", "-t", "omca", ...keys)
     await until("native session transcript displayed", 30_000, async () => capture().includes("OMCA-TUI-FIXTURE"), capture)
     const diagnostics = () => {
       const log = join(fixture!.root, "data", "opencode", "log", "opencode.log")
@@ -80,42 +81,67 @@ describe.skipIf(!opencodeBin || !tmux || process.platform === "win32")("native O
       return `Client: ${failures.join("\n") || "No plugin warning logged"}\nServer: ${serverFailures.join("\n") || "No plugin warning logged"}\n${capture()}`
     }
     try {
-      await until("installed package TUI footer loaded", 15_000, async () => capture().includes("OMCA: 0/3 ⊗1"), diagnostics)
+      await until("installed package TUI footer loaded", 15_000, async () => capture().includes("OMCA 0/3 ⊗ 1"), diagnostics)
     } catch (error) {
       console.error(diagnostics())
       throw error
     }
-    terminal("send-keys", "-t", "omca", "-l", "/omca")
-    await until("slash completion listed", 10_000, async () => capture().includes("Open OMCA overview"), capture)
-    // One Enter picks the completion and the next submits it, and a key can land while the popup redraws.
-    let lastEnter = 0
-    await until("OMCA panel displayed", 20_000, async () => {
-      if (capture().includes("OMCA / Overview")) return true
-      if (Date.now() - lastEnter >= 1_000) {
-        terminal("send-keys", "-t", "omca", "Enter")
-        lastEnter = Date.now()
-      }
-      return false
-    }, capture)
-    expect(capture()).toContain("Current run")
-    expect(capture()).toContain("First task")
-    expect(capture()).not.toContain("Native server-authored verification")
-    for (const width of [120, 200, 80]) {
-      terminal("resize-window", "-t", "omca", "-x", String(width), "-y", "32")
-      await until(`OMCA panel at ${width} columns`, 5_000, async () => capture().includes("OMCA / Overview"), capture)
+    const openPanel = async () => {
+      send("-l", "/omca")
+      await until("slash completion listed", 10_000, async () => capture().includes("Open OMCA overview"), capture)
+      // One Enter picks the completion and the next submits it, and a key can land while the popup redraws.
+      let lastEnter = 0
+      await until("OMCA panel displayed", 20_000, async () => {
+        if (capture().includes("1 Tasks  2 Agents")) return true
+        if (Date.now() - lastEnter >= 1_000) {
+          send("Enter")
+          lastEnter = Date.now()
+        }
+        return false
+      }, capture)
     }
-    terminal("resize-window", "-t", "omca", "-x", "160", "-y", "32")
-    terminal("send-keys", "-t", "omca", "2")
-    await until("Tasks tab", 5_000, async () => capture().includes("OMCA / Tasks") && capture().includes("Stuck task"), capture)
-    for (const text of ["#1 First task", "Ready", "Blocked: no access", "0/3 completed"]) expect(capture()).toContain(text)
-    terminal("send-keys", "-t", "omca", "6")
-    await until("Doctor tab", 5_000, async () => capture().includes("Read-only server health"), capture)
-    terminal("send-keys", "-t", "omca", "Escape")
-    await until("panel closed", 5_000, async () => !capture().includes("Read-only server health"), capture)
-    writeTask("1", "First task", {}, "completed")
-    const edited = await fixture.server.api("POST", `/api/session/${fixture.sessionID}/prompt`, fixture.ws, { text: "OMCA-SCENARIO:write-file" })
-    expect(edited.status, edited.text).toBeLessThan(400)
-    await until("footer reflects the changed list with the panel closed", 10_000, async () => capture().includes("OMCA: 1/3 ⊗1"), capture)
+    await openPanel()
+    await until("Tasks tab", 5_000, async () => capture().includes("0/3 done · 1 blocked"), capture)
+    const tasks = capture()
+    for (const text of ["OMCA · work", "│ Next #1 First task", "Ready 2", "○ #1 First task", "○ #2 Second task", "Blocked 1", "⊗ #3 Stuck task", "no access", "escape close", "enter open", "↑↓ move", "1-5 tabs"]) expect(tasks).toContain(text)
+    expect(tasks).not.toContain("Native server-authored verification")
+    expect(tasks).not.toContain("fullscreen")
+    expect(tasks).not.toContain("Overview")
+    for (const [width, hint] of [[120, "↑↓ move  r refresh\n"], [200, "r refresh  f fullscreen  escape close  1-5 tabs"]] as const) {
+      terminal("resize-window", "-t", "omca", "-x", String(width), "-y", "32")
+      await until(`OMCA panel docked at ${width} columns`, 5_000, async () => capture().includes(hint), capture)
+      expect(capture()).toContain("ctrl+x ← focus prompt")
+      expect(capture()).toContain("0/3 done · 1 blocked")
+    }
+    send("Enter")
+    await until("task detail dialog", 5_000, async () => capture().includes("Task #1"), capture)
+    expect(capture()).toContain("Status: pending")
+    send("Escape")
+    await until("dialog closed, panel kept", 5_000, async () => !capture().includes("Task #1") && capture().includes("0/3 done"), capture)
+    send("j")
+    send("Enter")
+    await until("the cursor moved to the next task", 5_000, async () => capture().includes("Task #2"), capture)
+    send("Escape")
+    await until("second dialog closed", 5_000, async () => !capture().includes("Task #2"), capture)
+    send("2")
+    await until("Agents tab", 5_000, async () => capture().includes("Sessions · 0 working"), capture)
+    expect(capture()).toContain("OMCA: OMCA terminal inspection")
+    expect(capture()).toContain("Idle")
+    send("3")
+    await until("Evidence tab", 5_000, async () => capture().includes("Recorded checks · no final verification"), capture)
+    send("5")
+    await until("Doctor tab", 5_000, async () => capture().includes("Server health · no runtime errors"), capture)
+    expect(capture()).toContain("Platform limits")
+    terminal("resize-window", "-t", "omca", "-x", "80", "-y", "32")
+    send("Escape")
+    await until("panel closed", 5_000, async () => !capture().includes("Server health"), capture)
+    const paused = await fixture.server.api("POST", `/api/session/${fixture.sessionID}/prompt`, fixture.ws, { text: "OMCA-SCENARIO:task-first-done\nPause here." })
+    expect(paused.status, paused.text).toBeLessThan(400)
+    await until("footer reflects the changed list and the held continuation with the panel closed", 20_000, async () => capture().includes("OMCA 1/3 ⊗ 1 paused"), capture)
+    await openPanel()
+    expect(capture()).not.toContain("Server health")
+    await until("/omca without an argument reopens on Tasks with the paused continuation line", 5_000, async () => capture().includes("Paused: your last message asked to pause. Send a message to resume."), capture)
+    expect(capture()).toContain("1/3 done · 1 blocked")
     expect(fixture.server.log()).not.toContain("failed to load plugin")
-  }, 90_000)
+  }, 120_000)
 })
