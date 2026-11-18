@@ -137,7 +137,7 @@ export function generate(root: string): Prompts {
         template: `Use the subagent tool to launch ${id} with this prompt and return its actual result:\n\n${text}`,
       });
     } else {
-      outputStyle = `${text}\nUse the native subagent foreground/background result and sessionID for continuation. Wait for the actual result; a launch acknowledgement is not a deliverable.\n`;
+      outputStyle = `${text}\nNative subagents run in the background and wake this session with their result; continue one with its sessionID. Wait for that result; a launch acknowledgement is not a deliverable.\n`;
     }
   }
   return { agents, skills, commands, outputStyle };

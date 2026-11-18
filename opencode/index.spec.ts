@@ -1,5 +1,6 @@
 import type { Plugin } from "@opencode/plugin"
 import { afterEach, beforeEach, expect, spyOn, test } from "bun:test"
+import { execFileSync } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { isAbsolute, join } from "node:path"
@@ -49,7 +50,9 @@ function fakeContext(options: Rec = {}, agentThrows = false) {
     return value
   }
   const rpcHandlers: Record<string, (input: Rec, context?: { signal: AbortSignal }) => Promise<unknown>> = {}
+  const stored = new Map<string, unknown>()
   let permission = (_input: Rec) => {}
+  let listed: Rec[] | Error = []
   const hookOn = (domain: string) => async (name: string, callback: Hook) => {
     hooks[`${domain}.${name}`] = callback
     return registration
@@ -63,7 +66,7 @@ function fakeContext(options: Rec = {}, agentThrows = false) {
   })
   const ctx = {
     location: { directory },
-    app: { version: "2.2.5" },
+    app: { version: "2.3.2" },
     options,
     agent: {
       transform: async (callback: (editor: { update(id: string, fn: (agent: Rec) => void): void }) => void) => {
@@ -100,6 +103,12 @@ function fakeContext(options: Rec = {}, agentThrows = false) {
         return registration
       },
     },
+    model: {
+      list: async () => {
+        if (listed instanceof Error) throw listed
+        return { data: listed }
+      },
+    },
     session: {
       hook: hookOn("session"),
       get: async ({ sessionID }: { sessionID: string }) => session(sessionID),
@@ -110,6 +119,11 @@ function fakeContext(options: Rec = {}, agentThrows = false) {
       },
     },
     shell: { hook: hookOn("shell") },
+    storage: {
+      get: async (key: string) => stored.get(key),
+      set: async (key: string, value: unknown) => { stored.set(key, value) },
+      remove: async (key: string) => { stored.delete(key) },
+    },
     permission: {
       hook: hookOn("permission"),
       assert: async (input: Rec) => { permissions.push(input); permission(input) },
@@ -131,7 +145,7 @@ function fakeContext(options: Rec = {}, agentThrows = false) {
       },
     },
   }
-  return { ctx: ctx as unknown as Plugin.Context, agents, skills, commands, mcp, hooks, prompts, gets, tools, permissions, sessions, session, rpcHandlers, interruptions, invalidations, failInvalidation: () => { failInvalidation = true }, deny: (fn: typeof permission) => { permission = fn } }
+  return { ctx: ctx as unknown as Plugin.Context, agents, skills, commands, mcp, hooks, prompts, gets, tools, permissions, sessions, session, rpcHandlers, stored, interruptions, invalidations, failInvalidation: () => { failInvalidation = true }, deny: (fn: typeof permission) => { permission = fn }, list: (models: Rec[] | Error) => { listed = models } }
 }
 
 function hook(fake: ReturnType<typeof fakeContext>, name: string): Hook {
@@ -146,39 +160,66 @@ function command(fake: ReturnType<typeof fakeContext>, name: string): Command {
   return found
 }
 
-async function fireContext(fake: ReturnType<typeof fakeContext>, agent: string) {
-  const event = { sessionID: "ses_one", agent, tools: { omca_session_search: {}, omca_omca_hook: {}, omca_health_check: {}, omca_agents_migrate: {}, omca_evidence_log: {}, omca_task_create: {}, omca_task_update: {}, omca_task_list: {}, omca_task_get: {}, todowrite: {} }, system: [] as Rec[] }
+async function fireContext(fake: ReturnType<typeof fakeContext>, agent: string, sessionID = "ses_one") {
+  const event = { sessionID, agent, tools: { omca_health_check: {}, omca_evidence_log: {}, omca_task_create: {}, omca_task_update: {}, omca_task_list: {}, omca_task_get: {}, todowrite: {}, write: {}, shell: {} }, system: [] as Rec[] }
   await hook(fake, "session.context")(event)
   return event
 }
 
-test("a valid sonnet model ref sets the agent model at the agent's declared effort", async () => {
+test("a valid sonnet model ref sets the agent model, with no variant stamped on it", async () => {
   const fake = fakeContext({ models: { sonnet: "anthropic/claude-sonnet-5-5" } })
   await plugin.setup(fake.ctx)
-  expect(fake.agents.get("omca-explorer")?.model).toEqual({ providerID: "anthropic", id: "claude-sonnet-5-5", variant: "high" })
+  expect(fake.agents.get("omca-explorer")?.model).toEqual({ providerID: "anthropic", id: "claude-sonnet-5-5" })
   expect(fake.agents.get("omca-explorer")?.mode).toBe("subagent")
   expect(fake.agents.get("omca-explorer")?.permissions).toContainEqual({ action: "edit", resource: "*", effect: "deny" })
   expect(errorSpy).not.toHaveBeenCalled()
 })
 
-test("each agent runs its tier's model at its own declared effort", async () => {
+const variants = (providerID: string, id: string, names: string[]) => ({ providerID, id, variants: names.map((name) => ({ id: name })) })
+
+async function resolved(fake: ReturnType<typeof fakeContext>, agent: string, model: Rec) {
+  const event = { sessionID: "ses_one", agent, kind: "primary", model }
+  await hook(fake, "session.experimental.model.resolve")(event)
+  return event.model
+}
+
+test("each agent runs its tier's model at its own declared effort when the model offers that variant", async () => {
   const fake = fakeContext({ models: { opus: "openai/gpt-6.1-sol", sonnet: "openai/gpt-6.1-terra", fable: "openai/gpt-6-astra" } })
   await plugin.setup(fake.ctx)
-  const models = Object.fromEntries(["omca-architect", "omca-build-fixer", "omca-viewer", "omca-analyzer", "omca-executor"].map((id) => [id, fake.agents.get(id)?.model]))
-  expect(models).toEqual({
-    "omca-architect": { providerID: "openai", id: "gpt-6-astra", variant: "xhigh" },
-    "omca-build-fixer": { providerID: "openai", id: "gpt-6.1-sol", variant: "medium" },
-    "omca-viewer": { providerID: "openai", id: "gpt-6.1-sol", variant: "medium" },
-    "omca-analyzer": { providerID: "openai", id: "gpt-6.1-sol", variant: "high" },
-    "omca-executor": { providerID: "openai", id: "gpt-6.1-terra", variant: "high" },
-  })
+  fake.list([variants("openai", "gpt-6.1-sol", ["low", "medium", "high", "xhigh"]), variants("openai", "gpt-6.1-terra", ["low", "medium", "high"]), variants("openai", "gpt-6-astra", ["high", "xhigh"])])
+  const effective = async (id: string) => resolved(fake, id, { ...(fake.agents.get(id)?.model as Rec), variant: "default" })
+  expect(await effective("omca-architect")).toEqual({ providerID: "openai", id: "gpt-6-astra", variant: "xhigh" })
+  expect(await effective("omca-build-fixer")).toEqual({ providerID: "openai", id: "gpt-6.1-sol", variant: "medium" })
+  expect(await effective("omca-analyzer")).toEqual({ providerID: "openai", id: "gpt-6.1-sol", variant: "high" })
+  expect(await effective("omca-executor")).toEqual({ providerID: "openai", id: "gpt-6.1-terra", variant: "high" })
   expect(fake.agents.get("omca")?.model).toEqual({ providerID: "openai", id: "gpt-6.1-sol" })
 })
 
-test("a variant in the tier mapping wins over the agent's declared effort", async () => {
-  const fake = fakeContext({ models: { opus: "openai/gpt-6.1-sol#xhigh" } })
+test("an effort the model does not offer leaves the request on the model's default", async () => {
+  const fake = fakeContext({ models: { fable: "stub/defaults", sonnet: "stub/noreason" } })
   await plugin.setup(fake.ctx)
+  fake.list([variants("stub", "defaults", ["low", "medium", "high"]), variants("stub", "noreason", [])])
+  expect(await resolved(fake, "omca-architect", { providerID: "stub", id: "defaults", variant: "default" })).toEqual({ providerID: "stub", id: "defaults", variant: "default" })
+  expect(await resolved(fake, "omca-explorer", { providerID: "stub", id: "noreason" })).toEqual({ providerID: "stub", id: "noreason" })
+})
+
+test("the effort applies only to the agent's own tier model, and never over a chosen variant", async () => {
+  const fake = fakeContext({ models: { opus: "openai/gpt-6.1-sol#xhigh", sonnet: "openai/gpt-6.1-terra" } })
+  await plugin.setup(fake.ctx)
+  fake.list([variants("openai", "gpt-6.1-sol", ["medium", "xhigh"]), variants("openai", "gpt-6.1-terra", ["high"]), variants("openai", "other", ["high"])])
   expect(fake.agents.get("omca-build-fixer")?.model).toEqual({ providerID: "openai", id: "gpt-6.1-sol", variant: "xhigh" })
+  expect(await resolved(fake, "omca-build-fixer", { providerID: "openai", id: "gpt-6.1-sol", variant: "xhigh" })).toEqual({ providerID: "openai", id: "gpt-6.1-sol", variant: "xhigh" })
+  expect(await resolved(fake, "omca-executor", { providerID: "openai", id: "gpt-6.1-terra", variant: "low" })).toEqual({ providerID: "openai", id: "gpt-6.1-terra", variant: "low" })
+  expect(await resolved(fake, "omca-executor", { providerID: "openai", id: "other" })).toEqual({ providerID: "openai", id: "other" })
+  expect(await resolved(fake, "build", { providerID: "openai", id: "gpt-6.1-terra" })).toEqual({ providerID: "openai", id: "gpt-6.1-terra" })
+})
+
+test("a model listing that fails is logged and leaves the request as it was", async () => {
+  const fake = fakeContext({ models: { sonnet: "openai/gpt-6.1-terra" } })
+  await plugin.setup(fake.ctx)
+  fake.list(new Error("models unavailable"))
+  expect(await resolved(fake, "omca-executor", { providerID: "openai", id: "gpt-6.1-terra" })).toEqual({ providerID: "openai", id: "gpt-6.1-terra" })
+  expect(errorSpy).toHaveBeenCalledTimes(1)
 })
 
 test("an invalid model ref fails plugin setup explicitly", async () => {
@@ -202,7 +243,7 @@ test("a command prompts the session with its template and arguments", async () =
   await plugin.setup(fake.ctx)
   await command(fake, "omca-reviewer").execute({ sessionID: "ses_1", prompt: { text: "p.md" }, delivery: "queue" })
   expect(fake.prompts).toHaveLength(1)
-  expect(fake.prompts[0]).toMatchObject({ sessionID: "ses_1", delivery: "queue" })
+  expect(fake.prompts[0]).toMatchObject({ sessionID: "ses_1", delivery: "queue", metadata: { source: "omca.command" } })
   expect(String(fake.prompts[0]?.text)).toContain("omca-reviewer")
   expect(String(fake.prompts[0]?.text)).toContain("p.md")
 })
@@ -213,10 +254,10 @@ test("a command keeps its attachments and drops mention offsets into the replace
   const mention = { start: 0, end: 5, text: "@p.md" }
   await command(fake, "omca-reviewer").execute({
     sessionID: "ses_1",
-    prompt: { text: "@p.md", files: [{ uri: "file:///p.md", name: "p.md", mention }], agents: [{ name: "omca-explorer", mention }], skills: [{ id: "omca-debugging" }] },
+    prompt: { text: "@p.md", files: [{ uri: "file:///p.md", name: "p.md", mention, source: { type: "uri", uri: "file:///p.md" } }], agents: [{ name: "omca-explorer", mention }], skills: [{ id: "omca-debugging" }] },
     delivery: "queue",
   })
-  expect(fake.prompts[0]).toMatchObject({ files: [{ uri: "file:///p.md", name: "p.md" }], agents: [{ name: "omca-explorer" }], skills: [{ id: "omca-debugging" }] })
+  expect(fake.prompts[0]).toMatchObject({ files: [{ uri: "file:///p.md", name: "p.md", source: { type: "uri", uri: "file:///p.md" } }], agents: [{ name: "omca-explorer" }], skills: [{ id: "omca-debugging" }] })
   expect(JSON.stringify(fake.prompts[0])).not.toContain('"mention"')
 })
 
@@ -227,10 +268,11 @@ test("the context hook pushes the output style only for a primary agent and hide
   const primary = await fire("build")
   expect(primary.system).toHaveLength(1)
   expect(primary.system[0]).toMatchObject({ type: "text" })
-  expect(Object.keys(primary.tools)).toEqual(["omca_health_check", "omca_evidence_log", "omca_task_list", "omca_task_get", "todowrite"])
+  expect(Object.keys(primary.tools)).toEqual(["omca_health_check", "omca_evidence_log", "omca_task_list", "omca_task_get", "todowrite", "write", "shell"])
   const sub = await fire("omca-explorer")
   expect(sub.system).toHaveLength(0)
-  expect(sub.tools).not.toHaveProperty("omca_session_search")
+  expect(Object.keys(sub.tools)).toEqual(["omca_health_check", "omca_evidence_log", "omca_task_list", "omca_task_get", "todowrite"])
+  expect(Object.keys((await fire("omca-executor")).tools)).toEqual(["omca_health_check", "omca_evidence_log", "omca_task_list", "omca_task_get", "todowrite", "write", "shell"])
 })
 
 test("the context hook looks up an agent's mode once and never for omca subagents", async () => {
@@ -240,6 +282,41 @@ test("the context hook looks up an agent's mode once and never for omca subagent
   await fireContext(fake, "build")
   await fireContext(fake, "omca-explorer")
   expect(fake.gets).toEqual(["build"])
+})
+
+function seedRun(fake: ReturnType<typeof fakeContext>, tasks: Rec[] = [{ id: "1", subject: "Work", status: "pending", metadata: { run: "work" } }]) {
+  const dir = join(fake.ctx.location.directory, ".omca", "state", "tasks")
+  mkdirSync(dir, { recursive: true })
+  for (const task of tasks) writeFileSync(join(dir, `${String(task.id)}.json`), JSON.stringify(task))
+  return dir
+}
+
+test("OMCA workers learn the open run's name once per session, read-only ones without the notepad call, and Build does not", async () => {
+  const fake = fakeContext()
+  const dir = seedRun(fake)
+  await plugin.setup(fake.ctx)
+  expect((await fireContext(fake, "omca-executor")).system).toEqual([{ type: "text", text: '[ACTIVE RUN] work. Record discoveries with omca_notepad_write, plan_name "work", in the section learnings, issues, decisions or problems.' }])
+  expect((await fireContext(fake, "omca-explorer", "ses_two")).system).toEqual([{ type: "text", text: "[ACTIVE RUN] work. Put discoveries, issues and decisions in your report for the coordinator to record; do not call omca_notepad_write." }])
+  expect((await fireContext(fake, "build", "ses_three")).system.some((part) => String(part.text).includes("[ACTIVE RUN]"))).toBe(false)
+  rmSync(dir, { recursive: true })
+  expect((await fireContext(fake, "omca-executor")).system).toHaveLength(1)
+  expect((await fireContext(fake, "omca-executor", "ses_four")).system).toEqual([])
+})
+
+test("the coordinator's own check holds its task completions until it logs evidence, and a failed shell call records nothing", async () => {
+  const fake = fakeContext()
+  seedRun(fake, [1, 2].map((id) => ({ id: String(id), subject: "Work", status: "pending", metadata: { run: "work" } })))
+  await plugin.setup(fake.ctx)
+  fake.session("ses_one").agent = "omca"
+  const context = { sessionID: "ses_one", agent: "omca", messageID: "msg_1", id: "call_1", signal: new AbortController().signal, progress: async () => {} }
+  const call = (name: string, input: Rec) => (fake.tools.get(`omca_${name}`) as unknown as { execute(input: Rec, context: Rec): Promise<Rec> }).execute(input, { ...context, id: crypto.randomUUID() })
+  const after = hook(fake, "tool.execute.after")
+  await after({ tool: "shell", sessionID: "ses_one", status: "error", input: { command: "bun test" }, error: new Error("refused") })
+  expect((await call("task_update", { taskId: "1", status: "completed" })).content).toBe("Task #1 [completed] Work")
+  await after({ tool: "shell", sessionID: "ses_one", status: "completed", input: { command: "bun test" }, result: { output: { exitCode: 1 }, content: [] } })
+  await expect(call("task_update", { taskId: "2", status: "completed" })).rejects.toThrow("You ran `bun test`")
+  await call("evidence_log", { evidence_type: "test", command: "bun test", exit_code: 1, output_snippet: "1 failing" })
+  expect((await call("task_update", { taskId: "2", status: "completed" })).content).toBe("Task #2 [completed] Work")
 })
 
 test("command arguments are substituted literally", async () => {
@@ -255,6 +332,33 @@ test("the tool hook denies a commit that skips its hooks and allows git status",
   const fire = (command: string) => hook(fake, "tool.execute.before")({ sessionID: "ses_one", tool: "shell", input: { command } })
   await expect(fire("git commit --no-verify -m x")).rejects.toThrow("omca guard: git commit --no-verify blocked")
   await expect(fire("git status")).resolves.toBeUndefined()
+})
+
+test("the tool hook holds the specialists' contract whatever the permission rules allow", async () => {
+  const fake = fakeContext()
+  await plugin.setup(fake.ctx)
+  const fire = (agent: string, tool: string, input: Rec = {}) => hook(fake, "tool.execute.before")({ sessionID: "ses_one", agent, tool, input })
+  await expect(fire("omca-explorer", "write", { path: "x.txt", content: "x" })).rejects.toThrow("omca guard: omca-explorer is read-only, so it cannot run write")
+  await expect(fire("omca-architect", "opencode_worktree_create", { name: "w" })).rejects.toThrow("omca guard: omca-architect is read-only")
+  await expect(fire("omca-executor", "subagent", { agent: "omca-explorer", prompt: "look" })).rejects.toThrow("omca guard: omca-executor is a specialist and does not delegate")
+  await expect(fire("omca", "subagent", { agent: "general", prompt: "look" })).rejects.toThrow("omca guard: OMCA delegates to its own specialists")
+  await expect(fire("omca", "subagent", { agent: "omca-explorer", prompt: "look around the repository" })).resolves.toBeUndefined()
+})
+
+test("a relative or home workdir is read in the session's directory, not the server's", async () => {
+  const fake = fakeContext()
+  await plugin.setup(fake.ctx)
+  const directory = fake.ctx.location.directory
+  execFileSync("git", ["init", "-q"], { cwd: directory })
+  mkdirSync(join(directory, "sub"))
+  writeFileSync(join(directory, "sub", "dirty.txt"), "x")
+  execFileSync("git", ["add", "."], { cwd: directory })
+  execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "-m", "x"], { cwd: directory })
+  const fire = (workdir: string) => hook(fake, "tool.execute.before")({ sessionID: "ses_one", agent: "build", tool: "shell", input: { command: "git reset --hard", workdir } })
+  await expect(fire("sub")).resolves.toBeUndefined()
+  writeFileSync(join(directory, "sub", "dirty.txt"), "changed")
+  await expect(fire("sub")).rejects.toThrow("omca guard:")
+  await expect(fire(join(directory, "sub"))).rejects.toThrow("omca guard:")
 })
 
 test("the shell hook reads the command in the shell that will run it", async () => {
@@ -338,7 +442,7 @@ test("only the coordinator is offered the task writers, and it gets one list", a
   const fake = fakeContext()
   await plugin.setup(fake.ctx)
   const coordinator = await fireContext(fake, "omca")
-  expect(Object.keys(coordinator.tools)).toEqual(["omca_health_check", "omca_evidence_log", "omca_task_create", "omca_task_update", "omca_task_list", "omca_task_get"])
+  expect(Object.keys(coordinator.tools)).toEqual(["omca_health_check", "omca_evidence_log", "omca_task_create", "omca_task_update", "omca_task_list", "omca_task_get", "write", "shell"])
   for (const agent of ["build", "plan", "omca-executor"]) {
     const { tools } = await fireContext(fake, agent)
     expect(tools).not.toHaveProperty("omca_task_create")

@@ -3,7 +3,7 @@ import { open } from "node:fs/promises";
 import { join } from "node:path";
 import { addedLines, type Candidate, hasCompletionClaim, hasStubMarker, isStubFinding } from "../../src/core/drift.ts";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
-import { FRESH_BACKOFF, spendBlock, type StopGate, stepBackoff } from "../../src/core/stop-ledger.ts";
+import { FRESH_BACKOFF, isPauseRequest, spendBlock, type StopGate, stepBackoff } from "../../src/core/stop-ledger.ts";
 import { field, isRecord, text } from "../../src/core/tool-input.ts";
 import { isMissing } from "../io.ts";
 import type { Context, Handler, Payload } from "./registry.ts";
@@ -24,10 +24,6 @@ const MAX_CHANGED_FILES = 500;
 const MAX_UNTRACKED_BYTES = 1024 * 1024;
 const BINARY_SNIFF_BYTES = 8192;
 const TERMINAL_TASK_STATUS = /^(completed?|failed|error|killed|cancell?ed|timed?_?out|done)$/;
-// A pause is a whole sentence or clause ("lets pause here for now.", "ok, stop here"), so a request
-// that only uses one of the words ("do task 2 later", "pause the music") is not one.
-const PAUSE_REQUEST =
-  /(?:^|[.!?,;]\s*)(?:(?:ok(?:ay)?|please|lets|can we|we can|you can|well)\s+)*(?:pause(?: here| now| for now)?|stop(?: here| now| for now)|thats enough(?: for now| for today)?|hold off(?: for now)?|take a break|(?:continue|resume|pick (?:this|it) up|finish (?:this|it|the rest)) (?:later|tomorrow)|later)(?: for now)?(?:\s+(?:please|thanks))?\s*(?=[.!?,;]|$)/m;
 const BLOCKING_QUESTIONS = /^[^\S\n]*#{1,6}[^\S\n]*BLOCKING QUESTIONS/im;
 const GIT_DIFF = ["-c", "diff.mnemonicPrefix=false", "-c", "diff.noprefix=false", "-c", "core.quotePath=false", "diff", "--no-ext-diff", "HEAD"];
 
@@ -171,7 +167,7 @@ const taskContinuation: Gate = async (turn) => {
     refund(session, "task-continuation");
     return undefined;
   }
-  if (PAUSE_REQUEST.test(lastText(await turn.transcript(), "user").toLowerCase().replaceAll("'", ""))) return undefined;
+  if (isPauseRequest(lastText(await turn.transcript(), "user"))) return undefined;
   if (isFreshCompaction(session, context.now)) return undefined;
   if (BLOCKING_QUESTIONS.test(await assistantText(turn)) || askedUserThisTurn(await turn.transcript())) return undefined;
   const count = run.open.length;

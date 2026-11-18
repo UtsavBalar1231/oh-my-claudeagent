@@ -73,7 +73,7 @@ keeps its `.omca/` directory until you delete it.
 
 ### Use it from OpenCode
 
-The adapter supports OpenCode 2.2.5 or later in the 2.x release line. Add the package to
+The adapter supports OpenCode 2.3.2 or later in the 2.x release line. Add the package to
 `plugins` in `~/.config/opencode/opencode.json(c)`:
 
 ```jsonc
@@ -120,7 +120,7 @@ Commands:
 
 | Command | Behavior |
 | --- | --- |
-| `/omca` | Open the terminal panel without starting work |
+| `/omca [tasks\|agents\|evidence\|notepad\|doctor]` | Open the terminal panel on a tab without starting work; run it again to close or focus the panel |
 | `/omca-plan <request>` | Discuss a plan in native Plan mode; save a file only when asked |
 | `/omca-start-work [plan or instructions]` | Ask approval, then coordinate the open run or turn the plan into tasks and run them |
 | `/omca-analyzer`, `/omca-reviewer`, `/omca-build-fixer` | Ask the primary agent to launch the specialist |
@@ -131,14 +131,21 @@ checkout's task list, in `.omca/state/tasks/`, with the same run, final-task and
 blocked-task rules as Claude Code's list. Every session in a checkout shares that
 list, so a new session picks up an open run. Stopping is OpenCode's own interrupt;
 the tasks stay. Each worktree has its own list. Only the OMCA coordinator changes the
-list: Build, Plan and child agents can read it. List reads refuse a task file over
+list: Build, Plan and child agents can read it. As on Claude Code, the coordinator cannot
+complete a task while its own last test, build or lint command has no `omca_evidence_log`
+after it; `OMCA_DISABLED_HOOKS=task-completed` turns that check off. OMCA's workers are told
+the open run's name, so their notes land in its notepad. List reads refuse a task file over
 256 KiB or a list over 1,000 tasks. Dashboard snapshots refuse state files over 4 MiB
 rather than allocating unbounded inputs.
 
-The panel shows the current run, native child sessions, evidence, notepads and
-adapter health. Selecting a child opens its native session. The interface uses
-the current theme and leaves native tabs, the composer and permission prompts
-in place. Headless clients use the same tools without the panel.
+The panel has five tabs, on keys 1 to 5: Tasks (the run, whether it continues, the next task
+and recent checks), Agents (native child sessions; selecting one opens it), Evidence, Notepad
+and Doctor. Up and down or j and k move through a list, Enter opens the row, r refreshes and
+Esc closes. The prompt footer shows the run's progress and when continuation is paused or
+stopped. Markers use Nerd Font glyphs; set `OMCA_GLYPHS=unicode` or `ascii` in the environment
+OpenCode starts with when the terminal font has none. The interface uses the current theme and
+leaves native tabs, the composer and permission prompts in place. Headless clients use the
+same tools without the panel.
 
 The adapter registers native `omca_*` evidence, notepad, AST, task and file
 tools. It does not start a duplicate OMCA MCP process. Custom filesystem tools
@@ -151,13 +158,25 @@ function word or three or more words. It refuses at 5 missing spaces that are al
 prompt's words. Code, URLs, paths, flags and names inside a sentence are skipped.
 `OMCA_DISABLED_HOOKS=delegation-guard` turns the refusal off.
 
-**Limits:** OpenCode has no OMCA Stop veto, so nothing keeps a session working. A
-run's final task does refuse to complete until a passing verdict names it, and refuses
+**Continuation:** OpenCode has no Stop veto, so OMCA continues the session instead. Once the
+`omca` session creates a task or starts or completes one, each time it would go idle with tasks
+of that run still open, OMCA adds a message that names the next task and the session keeps
+working. It waits while the session's own subagents, or a test, build or lint command it moved
+to the background, are still running, holds when your last message asks to
+pause ("ok, stop here"), and stops after 3 continuations in a row get no tool call or 10 pass
+with no task changing; your next message resumes it. Press Esc to interrupt as usual. OMCA keeps
+this state in OpenCode's plugin storage, so a plugin reload or a restart picks it up.
+`OMCA_DISABLED_HOOKS=task-continuation` turns it off.
+
+**Limits:** A run's final task does refuse to complete until a passing verdict names it, and refuses
 to be deleted or closed as blocked until a verdict of any outcome names it. Completed
 tasks and historical passing evidence do not prove the current checkout is verified.
 The panel labels ledger successes as historical until native execution provenance is
 supported. OpenCode's experimental `todowrite` list is separate from a run, and the
 coordinator is not offered it.
+OMCA reads and writes `.omca/` and runs its git checks on the machine the OpenCode server
+runs on, so a session in a remote workspace is not supported.
+Project rules from `.omca/rules/` and the drift guard run on Claude Code only.
 The TUI is a terminal extension, not a Desktop or Web UI extension. OMCA does not
 replace provider authentication, compaction, scheduling, memory, or native undo.
 

@@ -6,15 +6,43 @@ import { GIT_ENV, type GitAnswer, gitQueries, gitVerdict } from "../src/core/git
 import { isHookDisabled } from "../src/core/kill-switch.ts"
 import { homeDir, toPlatform } from "../src/core/path.ts"
 import { spacing } from "./spacing.ts"
+import { BUILT_IN_WORKERS, READ_ONLY_AGENTS } from "./workflows.ts"
 
 export type GuardResult = { deny: true; reason: string } | { deny: false }
 
 const ALLOW: GuardResult = { deny: false }
-const SH_FAMILY = ["sh", "bash", "zsh"]
+// cmd shares rd and del with PowerShell, whose rules know them.
+const POWERSHELL = ["powershell", "pwsh", "cmd"]
 const GIT_TIMEOUT_MS = 5000
+const MUTATING_TOOLS = ["write", "edit", "patch", "shell"]
+// OpenCode's own tools that change a session, worktree, artifact or automation. Their listing and
+// reading tools stay open to read-only agents.
+export const HOST_MUTATORS = [
+  "opencode_session_rename", "opencode_session_move", "opencode_worktree_create", "opencode_worktree_remove",
+  "opencode_artifact_create", "opencode_artifact_update", "opencode_artifact_delete",
+  "opencode_automation_create", "opencode_automation_pause", "opencode_automation_resume", "opencode_automation_delete",
+]
 
+// OpenCode runs every other shell it accepts with POSIX grammar: sh, bash, zsh, dash, ksh, and a
+// POSIX fallback for fish and nu.
 export const shellKind = (shell: string): Context["shell"] =>
-  SH_FAMILY.includes(shell.replace(/^.*[\\/]/, "").toLowerCase().replace(/\.exe$/, "")) ? "bash" : "powershell"
+  POWERSHELL.includes(shell.replace(/^.*[\\/]/, "").toLowerCase().replace(/\.exe$/, "")) ? "powershell" : "bash"
+
+/**
+ * The specialists' contract, held at the call: permission rules from the user's config or the
+ * session come after the agent's own and can allow what its deny rules refuse.
+ */
+export function checkAgentTool(agent: string, tool: string, target: string, specialists: ReadonlySet<string>): GuardResult {
+  if (READ_ONLY_AGENTS.has(agent) && (MUTATING_TOOLS.includes(tool) || HOST_MUTATORS.includes(tool))) {
+    return { deny: true, reason: `${agent} is read-only, so it cannot run ${tool}` }
+  }
+  if (tool !== "subagent") return ALLOW
+  if (specialists.has(agent)) return { deny: true, reason: `${agent} is a specialist and does not delegate` }
+  if (agent === "omca" && BUILT_IN_WORKERS.includes(target)) {
+    return { deny: true, reason: `OMCA delegates to its own specialists, not to the built-in ${target} agent` }
+  }
+  return ALLOW
+}
 
 function shellContext(projectRoot: string, shell: string, cwd: string): Context {
   const home = homeDir(process.env)
@@ -86,7 +114,7 @@ function editInputs(tool: string, input: Record<string, unknown>, projectRoot: s
   if (tool === "edit") return [{ file_path: path(input.path), new_string: input.newString }]
   if (tool !== "patch") return []
   const text = String(input.patchText ?? "")
-  const headers = [...text.matchAll(/^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm)]
+  const headers = [...text.matchAll(/^[ \t]*\*\*\* (?:Add|Update|Delete) File: (.+)$/gm)]
   return headers.map((header, i) => ({
     file_path: path((header[1] ?? "").trim()),
     content: addedLines(text.slice(header.index, headers[i + 1]?.index)),

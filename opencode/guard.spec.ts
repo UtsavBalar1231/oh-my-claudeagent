@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import { checkDelegation, checkEdit, checkShell, shellKind } from "./guard.ts"
+import { checkAgentTool, checkDelegation, checkEdit, checkShell, shellKind } from "./guard.ts"
 
 const BASH = "/bin/bash"
 const shell = (command: string) => checkShell(command, process.cwd(), BASH)
@@ -196,12 +196,14 @@ describe("the shell the command runs in", () => {
     expect(checkShell("Remove-Item -Recurse -Force ~", root, "C:\\Program Files\\PowerShell\\7\\pwsh.exe")).toEqual(denied)
   })
 
-  test("the sh family is read as bash, whatever the path or case", () => {
-    expect(shellKind("/usr/bin/zsh")).toBe("bash")
-    expect(shellKind("C:\\Program Files\\Git\\bin\\BASH.EXE")).toBe("bash")
-    expect(shellKind("sh")).toBe("bash")
-    expect(shellKind("pwsh")).toBe("powershell")
-    expect(shellKind("cmd.exe")).toBe("powershell")
+  test("every shell but PowerShell and cmd is read as bash, whatever the path or case", () => {
+    for (const shell of ["/usr/bin/zsh", "C:\\Program Files\\Git\\bin\\BASH.EXE", "sh", "/usr/bin/dash", "/bin/ksh", "/usr/bin/fish", "nu"]) expect(shellKind(shell)).toBe("bash")
+    for (const shell of ["pwsh", "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "cmd.exe"]) expect(shellKind(shell)).toBe("powershell")
+  })
+
+  test("a removal through an unset variable is denied in dash as in bash", () => {
+    expect(checkShell("x=/; rm -rf $x", process.cwd(), "/usr/bin/dash")).toEqual(checkShell("x=/; rm -rf $x", process.cwd(), BASH))
+    expect(checkShell("x=/; rm -rf $x", process.cwd(), "/usr/bin/dash")).toMatchObject({ deny: true })
   })
 
   test("a command the guard cannot read is refused", () => {
@@ -331,6 +333,12 @@ describe("the comment gate", () => {
     expect(errorSpy).toHaveBeenCalledTimes(0)
   })
 
+  test("an indented patch header is read as the host reads it", () => {
+    process.env.OMCA_COMMENT_GATE = "deny"
+    const patchText = `*** Begin Patch\n  *** Add File: scripts/patched.sh\n+# ----------\n+user_name="$input_value"\n*** End Patch`
+    expect(checkEdit("patch", { patchText }, tmp)).toEqual({ deny: true, reason: expect.stringContaining(SEPARATOR) })
+  })
+
   test("a patch is judged one file at a time, so a Markdown section does not hide a source section", () => {
     process.env.OMCA_COMMENT_GATE = "deny"
     const patchText = [
@@ -428,5 +436,30 @@ describe("a delegation prompt", () => {
     const text = readFileSync(join(import.meta.dir, "..", path), "utf8")
     expect(checkDelegation(text)).toEqual({ deny: false })
     expect(checkDelegation(deleteEveryThirdSpace(text)).deny).toBe(true)
+  })
+})
+
+describe("the specialists' contract", () => {
+  const specialists = new Set(["omca-explorer", "omca-executor"])
+  const denied = (reason: string) => ({ deny: true, reason })
+
+  test("a read-only specialist cannot edit, run a shell or use OpenCode's own mutators", () => {
+    for (const tool of ["write", "edit", "patch", "shell", "opencode_worktree_create", "opencode_session_move"]) {
+      expect(checkAgentTool("omca-explorer", tool, "", specialists)).toEqual(denied(`omca-explorer is read-only, so it cannot run ${tool}`))
+    }
+    for (const tool of ["read", "grep", "omca_evidence_read", "webfetch", "opencode_worktree_list", "opencode_models", "opencode_read_mcp_resource"]) expect(checkAgentTool("omca-explorer", tool, "", specialists)).toEqual({ deny: false })
+  })
+
+  test("an executing specialist edits and runs a shell but does not delegate", () => {
+    for (const tool of ["write", "shell", "opencode_worktree_create"]) expect(checkAgentTool("omca-executor", tool, "", specialists)).toEqual({ deny: false })
+    expect(checkAgentTool("omca-executor", "subagent", "omca-explorer", specialists)).toEqual(denied("omca-executor is a specialist and does not delegate"))
+  })
+
+  test("the coordinator delegates to specialists and not to the built-in workers", () => {
+    expect(checkAgentTool("omca", "subagent", "omca-executor", specialists)).toEqual({ deny: false })
+    for (const target of ["general", "explore"]) {
+      expect(checkAgentTool("omca", "subagent", target, specialists)).toEqual(denied(`OMCA delegates to its own specialists, not to the built-in ${target} agent`))
+    }
+    expect(checkAgentTool("build", "subagent", "general", specialists)).toEqual({ deny: false })
   })
 })

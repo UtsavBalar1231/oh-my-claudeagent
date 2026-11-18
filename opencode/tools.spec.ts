@@ -7,6 +7,7 @@ import { dirname, join } from "node:path";
 import { tools as astTools } from "../servers/tools/ast.ts";
 import { LEDGER } from "../src/core/omca-paths.ts";
 import { withLock } from "../servers/io.ts";
+import { createChecks } from "./checks.ts";
 import { registerTools } from "./tools.ts";
 
 const dirs: string[] = [];
@@ -32,6 +33,7 @@ async function fake() {
   const tools = new Map<string, Info>();
   const assertions: Assertion[] = [];
   const changes: string[] = [];
+  const touches: string[][] = [];
   let permission = (_input: Assertion) => {};
   let reportProgress = (_update: Record<string, unknown>) => {};
   const ctx = {
@@ -45,14 +47,15 @@ async function fake() {
       },
     },
   } as unknown as Plugin.Context;
-  await registerTools(ctx, async (sessionID) => { changes.push(sessionID); });
+  const checks = createChecks();
+  await registerTools(ctx, async (sessionID) => { changes.push(sessionID); }, async (sessionID, root) => { touches.push([sessionID, root]); }, checks);
   const progress: Record<string, unknown>[] = [];
   const call = async (name: string, input: Record<string, unknown> = {}, sessionID = "ses_a", agent = "build", id: string = crypto.randomUUID(), signal = new AbortController().signal, messageID = "msg_1") => {
     const tool = tools.get(`omca_${name}`);
     if (!tool) throw new Error(`Missing native tool ${name}`);
     return tool.execute(input, { sessionID, agent, messageID, id, signal, progress: async (update: Record<string, unknown>) => { progress.push(update); reportProgress(update); } } as unknown as ToolContext);
   };
-  return { a, b, locations, agents, assertions, changes, tools, progress, call, deny: (fn: typeof permission) => { permission = fn; }, onProgress: (fn: typeof reportProgress) => { reportProgress = fn; } };
+  return { a, b, locations, agents, assertions, changes, touches, tools, progress, call, checks, deny: (fn: typeof permission) => { permission = fn; }, onProgress: (fn: typeof reportProgress) => { reportProgress = fn; } };
 }
 
 const note = { plan_name: "native", section: "learnings", content: "session-specific" };
@@ -201,6 +204,19 @@ test("the task tools keep a run on disk that any session in the checkout reads",
   expect(listed.content).toBe("Run work:\n#1 [pending] Do it\n#2 [pending] Final verification [final] [waiting on #1]");
   expect(JSON.parse(String((await f.call("task_get", { taskId: "2" }, "ses_c", "plan")).content))).toMatchObject({ id: "2", isFinal: true, blockedBy: ["1"], run: "work" });
   expect(f.changes).toEqual(["ses_a", "ses_a", "ses_a"]);
+  expect(f.touches).toEqual([["ses_a", f.a], ["ses_a", f.a]]);
+});
+
+test("starting or completing a task takes the run on, and linking or reopening one does not", async () => {
+  const f = await fake();
+  await coordinate(f, "task_create", newTask("work"));
+  f.touches.length = 0;
+  await coordinate(f, "task_update", { taskId: "1", subject: "Renamed" });
+  await coordinate(f, "task_update", { taskId: "1", status: "pending" });
+  expect(f.touches).toEqual([]);
+  await coordinate(f, "task_update", { taskId: "1", status: "in_progress" });
+  await coordinate(f, "task_update", { taskId: "1", status: "completed" });
+  expect(f.touches).toEqual([["ses_a", f.a], ["ses_a", f.a]]);
 });
 
 test.each(["build", "plan", "omca-executor"])("only the coordinator changes the task list, not %s", async (agent) => {
@@ -240,6 +256,35 @@ test("the final task refuses completion until a passing verdict names it, end to
   await expect(coordinate(f, "task_update", { taskId: "2", status: "completed" })).rejects.toThrow("no passing final verification names it");
   await coordinate(f, "evidence_log", { ...evidence, evidence_type: "final_verification", exit_code: 0, task_id: "2" });
   expect((await coordinate(f, "task_update", { taskId: "2", status: "completed" })).content).toBe("Task #2 [completed] Do it");
+});
+
+test("completing a task waits for evidence after the session's own last check, and only its own", async () => {
+  const f = await fake();
+  await coordinate(f, "task_create", newTask("work"));
+  await coordinate(f, "task_create", newTask("work"));
+  f.checks.ran("ses_a", "cd web && bun test", 1);
+  f.checks.ran("ses_b", "just ci", 0);
+  await expect(coordinate(f, "task_update", { taskId: "1", status: "completed" })).rejects.toThrow(/^You ran `cd web && bun test` at \d\d:\d\d but logged no evidence after it\. Log the real result with omca_evidence_log, including a non-zero exit_code if it failed\. Example: omca_evidence_log\(evidence_type="test", command="cd web && bun test"/);
+  expect(JSON.parse(readFileSync(taskFile(f.a, "1"), "utf8")).status).toBe("pending");
+  expect((await coordinate(f, "task_update", { taskId: "1", status: "in_progress" })).content).toBe("Task #1 [in_progress] Do it");
+  await f.call("evidence_log", evidence, "ses_b", "omca-executor");
+  await expect(coordinate(f, "task_update", { taskId: "1", status: "completed" })).rejects.toThrow("logged no evidence");
+  await coordinate(f, "evidence_log", evidence);
+  expect((await coordinate(f, "task_update", { taskId: "1", status: "completed" })).content).toBe("Task #1 [completed] Do it");
+  f.checks.ran("ses_a", "bun run lint", 0);
+  process.env.OMCA_DISABLED_HOOKS = "task-completed";
+  restores.push(() => { delete process.env.OMCA_DISABLED_HOOKS; });
+  expect((await coordinate(f, "task_update", { taskId: "2", status: "completed" })).content).toBe("Task #2 [completed] Do it");
+});
+
+test("a read-only specialist reads a file outside the checkout without an audit entry or an edit approval", async () => {
+  const f = await fake();
+  writeFileSync(join(f.b, "outside.txt"), "outside file");
+  expect(String((await f.call("file_read", { path: join(f.b, "outside.txt") }, "ses_a", "omca-explorer")).content)).toContain("outside file");
+  expect(f.assertions.some((input) => input.action === "edit")).toBe(false);
+  expect(existsSync(join(f.a, ".omca"))).toBe(false);
+  await f.call("file_read", { path: join(f.b, "outside.txt") }, "ses_a", "omca-executor");
+  expect(existsSync(join(f.a, ".omca", "logs", "file-access.jsonl"))).toBe(true);
 });
 
 test("task writes honor native denials and create nothing when refused", async () => {
