@@ -1,6 +1,7 @@
 export const READ_ONLY_AGENTS = new Set([
   "omca-explorer", "omca-architect", "omca-researcher", "omca-viewer", "omca-analyzer", "omca-reviewer",
 ])
+export const BUILT_IN_WORKERS = ["general", "explore"]
 
 export const COORDINATOR = `Coordinate work through OpenCode's native subagent tool.
 Do small, understood changes directly. Delegate sizeable independent tasks to the appropriate OMCA specialist with a complete scope and expected verification.
