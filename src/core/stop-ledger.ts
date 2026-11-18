@@ -2,6 +2,14 @@ export type StopGate = "task-continuation" | "drift-guard";
 
 export type StopLedger = Map<StopGate, number>;
 
+// A pause is a whole sentence or clause ("lets pause here for now.", "ok, stop here"), so a request
+// that only uses one of the words ("do task 2 later", "pause the music") is not one.
+const PAUSE_REQUEST =
+  /(?:^|[.!?,;]\s*)(?:(?:ok(?:ay)?|please|lets|can we|we can|you can|well)\s+)*(?:pause(?: here| now| for now)?|stop(?: here| now| for now)|thats enough(?: for now| for today)?|hold off(?: for now)?|take a break|(?:continue|resume|pick (?:this|it) up|finish (?:this|it|the rest)) (?:later|tomorrow)|later)(?: for now)?(?:\s+(?:please|thanks))?\s*(?=[.!?,;]|$)/m;
+
+/** Whether the user's message asks to pause the run, which holds task continuation. */
+export const isPauseRequest = (text: string): boolean => PAUSE_REQUEST.test(text.toLowerCase().replaceAll("'", ""));
+
 // Blocks a gate may spend before it fails open; it gets them back once its condition is met.
 export const STOP_BLOCK_CAP = 5;
 
