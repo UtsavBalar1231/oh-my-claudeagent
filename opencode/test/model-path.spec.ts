@@ -1,10 +1,11 @@
 import { afterAll, beforeAll, describe, test } from "bun:test"
-import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
+import { MAX_STALLS } from "../continuation.ts"
 import { commit, countLines, git, type Listing, opencodeBin, removeDir, scratchDir, type Server, snapshot, startServer, startStubProvider, until, writeConfig } from "./harness.ts"
 
 type Message = { role?: string; content?: unknown }
-type Request = { model?: string; messages?: Message[]; tools?: { function: { name: string } }[] }
+type Request = { model?: string; reasoning_effort?: string; messages?: Message[]; tools?: { function: { name: string } }[] }
 type Named = { name?: string; parentID?: string | null; status?: { status?: string } }
 type Fixture = { root: string; ws: string; server: Server; stopProvider: () => Promise<void>; stubLog: string; baseline: number }
 
@@ -226,6 +227,8 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
     const explorer = requests().filter((request) => system(request).includes(EXPLORER))
     verify(explorer.length > 0, "models: no omca-explorer request")
     verify(explorer.every((request) => request.model === "scripted-sonnet"), `models: omca-explorer went to ${explorer.map((request) => request.model).join(",")}`)
+    verify(explorer.every((request) => request.reasoning_effort === "high"), `models: omca-explorer did not run at its declared effort: ${explorer.map((request) => request.reasoning_effort).join(",")}`)
+    verify(requests().filter((request) => !worker(request)).every((request) => request.reasoning_effort === undefined), "models: a build request carried an OMCA effort")
     verify(requests().filter((request) => !worker(request)).every((request) => request.model === "scripted"), "models: a build request left the default model")
   }, SLOW)
 
@@ -273,6 +276,7 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
     verify(childRequests.length > 0, "tasks: the worker did not run")
     verify(childRequests.every((request) => !toolNames(request).some((name) => ["omca_task_create", "omca_task_update"].includes(name))), "tasks: a worker was offered a task writer")
     verify(childRequests.every((request) => toolNames(request).includes("omca_task_list")), "tasks: a worker cannot read the list")
+    verify(childRequests.every((request) => system(request).includes('[ACTIVE RUN] stub-run. Record discoveries with omca_notepad_write, plan_name "stub-run"')), "tasks: a worker was not told the run's name for its notes")
     verify(task("1").status === "pending", "tasks: a worker changed the list")
 
     const refused = requests().length
@@ -283,6 +287,56 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
     await inOmca("task-verdict")
     await inOmca("task-close-final")
     verify(task("2").status === "completed", "tasks: the final task did not close after its verdict")
+  }, SLOW)
+
+  test("a coordinator turn that ends with open tasks resumes in the same run until the stall budget stops it", async () => {
+    const start = requests().length
+    await run("task-create", "omca")
+    const nudges = requests().slice(start).filter((request) => lastText(request).startsWith("[OMCA CONTINUATION]"))
+    verify(nudges.length === MAX_STALLS, `continuation: expected ${MAX_STALLS} continuations before the stall budget, saw ${nudges.length}`)
+    verify(nudges.every((request) => lastText(request).includes("was approved with /omca-start-work")), "continuation: the continuation does not state its authority")
+    verify(nudges.every((request) => toolNames(request).includes("question")), "continuation: the coordinator is not offered the question tool the continuation names")
+  }, SLOW)
+
+  test("a plugin reload keeps the session's continuation, and the user's next message resumes it", async () => {
+    const output = await run("task-create", "omca")
+    const sessionID = /"sessionID":"(ses_[^"]+)"/.exec(output)?.[1]
+    verify(sessionID !== undefined, `reload: no session id in the run output: ${output.slice(0, 400)}`)
+    const loads = () => need().server.log().split("loading plugin").length
+    const before = loads()
+    appendFileSync(join(need().root, "plugin", "opencode", "continuation.ts"), "\n")
+    await until("the plugin reloads", 30_000, async () => loads() > before, diagnostics)
+    const start = requests().length
+    await opencode(["run", "--server", need().server.base, "--model", "stub/scripted", "--agent", "omca", "--session", sessionID ?? "", "--auto", "--format", "json", "go on"], 180_000)
+    const nudges = requests().slice(start).filter((request) => lastText(request).startsWith("[OMCA CONTINUATION]"))
+    verify(nudges.length === MAX_STALLS, `reload: expected ${MAX_STALLS} continuations after the reload, saw ${nudges.length}`)
+    verify(!/omca: (could not store|could not record the prompt|could not read this session|task continuation failed)/.test(need().server.log()), "reload: the continuation logged a storage failure")
+  }, SLOW)
+
+  test("completing a task waits for evidence after the coordinator's own failing check", async () => {
+    const outcome = async (scenario: string) => {
+      const start = requests().length
+      await run(scenario, "omca")
+      return requests().slice(start).filter(lastIsTool).map(lastText).find((result) => /Task #\d+ \[|logged no evidence/.test(result)) ?? ""
+    }
+    const refused = await outcome("task-check-unlogged")
+    verify(refused.includes("You ran `bun test ./omca-no-such-spec` at ") && refused.includes("logged no evidence after it. Log the real result with omca_evidence_log"), `checks: completion was not refused for the unlogged check: ${refused}`)
+    const completed = await outcome("task-check-logged")
+    verify(/^Task #\d+ \[completed\] Stub task$/.test(completed), `checks: completion after the evidence was refused: ${completed}`)
+  }, SLOW)
+
+  test.each([
+    ["task-check-background", true],
+    ["task-sleep-background", false],
+  ])("the continuation waits for the coordinator's own backgrounded check and not for other background commands: %s", async (scenario, waits) => {
+    const start = requests().length
+    await run(scenario, "omca")
+    const seen = () => requests().slice(start)
+    const nudges = () => seen().filter((request) => lastText(request).startsWith("[OMCA CONTINUATION]"))
+    await until(`${scenario}: the command's notice and ${MAX_STALLS} continuations`, 60_000, async () => nudges().length === MAX_STALLS && seen().some((request) => lastText(request).includes("OMCA-BACKGROUND-DONE")), diagnostics)
+    const first = nudges()[0]?.messages ?? []
+    const sawNotice = first.some((message) => text(message.content).includes("OMCA-BACKGROUND-DONE"))
+    verify(sawNotice === waits, `continuation: the first continuation ${sawNotice ? "waited for" : "did not wait for"} the background command`)
   }, SLOW)
 
   test("Code Mode discovers deferred native OMCA tools", async () => {
@@ -309,7 +363,7 @@ describe.skipIf(!opencodeBin)("opencode model path", () => {
       verify(childStarted === (agent === "build"), `${scenario}: unexpected child launch for ${agent}`)
       if (agent === "omca") {
         const result = observed.filter(lastIsTool).map(lastText).join("\n")
-        verify(/denied|not allowed|rejected/i.test(result), `${scenario}: no permission denial reached OMCA: ${result}`)
+        verify(result.includes(`omca guard: OMCA delegates to its own specialists, not to the built-in ${scenario.replace("native-", "")} agent`), `${scenario}: OMCA's refusal did not reach the model: ${result}`)
       }
     }
   }, SLOW)

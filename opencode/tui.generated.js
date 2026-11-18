@@ -117,9 +117,18 @@ var Omca = Rpc.define({
               required: ["name", "state", "detail"],
               additionalProperties: false
             }
+          },
+          continuation: {
+            type: "object",
+            properties: {
+              state: { type: "string", enum: ["off", "on", "paused", "stopped"] },
+              reason: { type: "string" }
+            },
+            required: ["state", "reason"],
+            additionalProperties: false
           }
         },
-        required: ["sessionID", "directory", "run", "evidence", "notepads", "health"],
+        required: ["sessionID", "directory", "run", "evidence", "notepads", "health", "continuation"],
         additionalProperties: false
       }
     }

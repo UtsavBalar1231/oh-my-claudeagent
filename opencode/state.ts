@@ -7,6 +7,7 @@ import { NOTEPAD_SECTIONS, parseEntries, toPlanName } from "../src/core/notepad.
 import { LEDGER } from "../src/core/omca-paths.ts";
 import { redact } from "../src/core/visual.ts";
 import { hasCode, projectRoot } from "../servers/io.ts";
+import type { ContinuationStatus } from "./continuation.ts";
 
 export type Run = { name: string; tasks: NativeTask[] };
 
@@ -20,6 +21,7 @@ export interface Snapshot {
   };
   notepads: Array<{ section: string; content: string }>;
   health: Array<{ name: string; state: "ok" | "warning" | "error"; detail: string }>;
+  continuation: ContinuationStatus;
 }
 
 export const TASKS_DIR = ".omca/state/tasks";
@@ -141,7 +143,7 @@ function evidenceVerdict(entries: Evidence[], run: Run | null): Snapshot["eviden
 /** `expectedRun` is the run whose notepads were approved; a list that moved to another run since is refused. */
 export function readSnapshot(directory: string, sessionID: string, expectedRun?: string | null): Snapshot {
   const snapshot: Snapshot = {
-    directory, sessionID, run: null, evidence: { entries: [], verdict: "missing" }, notepads: [],
+    directory, sessionID, run: null, evidence: { entries: [], verdict: "missing" }, notepads: [], continuation: { state: "off", reason: "" },
     health: [{ name: "verification", state: "warning", detail: "Native server-authored verification provenance is not supported yet; ledger successes are historical, not verified." }],
   };
   const report = (name: string, state: Snapshot["health"][number]["state"], detail: string): void => { snapshot.health.push({ name, state, detail: redact(detail, homedir(), "<masked>").text }); };

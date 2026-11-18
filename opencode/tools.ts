@@ -17,9 +17,11 @@ import { workingTreeStamp } from "../servers/tree-stamp.ts";
 import { appendEvidence, COMMAND_MAX_CHARS, rotateLedger, SNIPPET_MAX_CHARS, TASK_ID_MAX_CHARS, tools as evidenceTools, VERIFIED_BY_MAX_CHARS } from "../servers/tools/evidence.ts";
 import { tools as filesystemTools } from "../servers/tools/filesystem.ts";
 import { appendNotepad, compactNotepad, formatNotepadList, type NotepadListing, tools as notepadTools } from "../servers/tools/notepad.ts";
+import type { Checks } from "./checks.ts";
 import { canonicalPath, checkPath, ownedPath, requestScope, type RequestScope, within } from "./permissions.ts";
 import { currentRun, readSnapshot, readTaskFiles, TASKS_DIR } from "./state.ts";
 import { createTask, TASK_STATUSES, tasksLock, updateTask } from "./tasks.ts";
+import { READ_ONLY_AGENTS } from "./workflows.ts";
 
 const DIRECT = new Set(["evidence_log", "notepad_write"]);
 const MAX_AST_FILES = 100;
@@ -51,7 +53,7 @@ function schema(tool: Tool): Tool["inputSchema"] {
 
 function description(tool: Tool): string {
   if (tool.name === "evidence_log") return "Record an attested command result with its real integer exit code. This is historical evidence, not a native execution receipt or verified completion. final_verification is a run's verdict and names the run's final task with task_id; that task cannot complete until a passing verdict names it.";
-  if (tool.name === "file_read") return "Read a regular text file with line numbers and paging, subject to native read and external_directory permissions and the sensitive/network-path denylist. Non-plan calls also require edit permission for a checkout-local audit entry. Plan-agent reads create no files.";
+  if (tool.name === "file_read") return "Read a regular text file with line numbers and paging, subject to native read and external_directory permissions and the sensitive/network-path denylist. Other agents' calls also require edit permission for a checkout-local audit entry; reads by Plan and the read-only specialists create no files.";
   if (["ast_search", "ast_find_rule", "ast_replace"].includes(tool.name)) {
     const operation = tool.name === "ast_search" ? "Find code by syntax pattern, not text or regular expression. Use $VAR for one AST node and $$$ for several."
       : tool.name === "ast_find_rule" ? "Find code with an ast-grep YAML rule. Use relational rules when a simple pattern cannot express the structure."
@@ -183,7 +185,7 @@ async function astPaths(args: Record<string, unknown>, scope: RequestScope, writ
   return checked;
 }
 
-export async function registerTools(ctx: Plugin.Context, changed: (sessionID: string) => Promise<void>): Promise<void> {
+export async function registerTools(ctx: Plugin.Context, changed: (sessionID: string) => Promise<void>, touched: (sessionID: string, root: string) => Promise<void>, checks: Checks): Promise<void> {
   const previews = new Map<string, string>();
   const descriptors: Tool[] = [...evidenceTools, ...notepadTools, ...astTools, ...filesystemTools];
   const definitions: Info[] = descriptors.map((tool): Info => ({
@@ -205,7 +207,10 @@ export async function registerTools(ctx: Plugin.Context, changed: (sessionID: st
       };
       let content: string;
       try {
-        if (tool.name === "evidence_log") content = await evidenceLog(args, scope, context);
+        if (tool.name === "evidence_log") {
+          content = await evidenceLog(args, scope, context);
+          checks.logged(context.sessionID);
+        }
         else if (tool.name === "evidence_read") {
           await scope.paths("read", [join(scope.root, LEDGER)], true);
           content = await tool.call(args, shared);
@@ -220,14 +225,15 @@ export async function registerTools(ctx: Plugin.Context, changed: (sessionID: st
           const path = argReader(args, tool.name).string("path");
           const [file] = await scope.paths("read", [path]);
           const audit = join(scope.root, ".omca", "logs", "file-access.jsonl");
-          if (context.agent !== "plan") {
+          const audited = context.agent !== "plan" && !READ_ONLY_AGENTS.has(context.agent);
+          if (audited) {
             await scope.paths("edit", [audit, dirname(audit)], true);
             const initializeState = await scope.authorizeStateWrite();
             await initializeState();
           }
           await scope.current();
           content = await tool.call({ ...args, path: file }, shared);
-          if (context.agent !== "plan") {
+          if (audited) {
             await scope.current();
             ownedPath(scope.root, audit);
             mkdirSync(dirname(audit), { recursive: true });
@@ -266,14 +272,13 @@ export async function registerTools(ctx: Plugin.Context, changed: (sessionID: st
         await pending;
       }
       if (progressError !== undefined) throw progressError;
-      context.signal.throwIfAborted();
       if (write) await changed(context.sessionID);
       return { content };
     },
   }));
   definitions.push({
     name: "health_check",
-    description: "Read checkout-local native OMCA health. Historical ledger evidence is not native verified completion; OpenCode has no documented Stop veto.",
+    description: "Read checkout-local native OMCA health. Historical ledger evidence is not native verified completion.",
     input: { type: "object", properties: {}, additionalProperties: false },
     options: { namespace: "omca", codemode: true },
     execute: async (input, context) => {
@@ -326,6 +331,7 @@ export async function registerTools(ctx: Plugin.Context, changed: (sessionID: st
         const fields = { subject: a.string("subject"), description: a.string("description"), activeForm: a.string("activeForm", ""), metadata };
         const { scope, beforeWrite } = await writableScope(input, context, "task_create");
         const task = await createTask(scope.root, fields, beforeWrite);
+        await touched(context.sessionID, scope.root);
         await changed(context.sessionID);
         return { content: `Task #${task.id} created: ${task.subject}` };
       },
@@ -366,8 +372,11 @@ export async function registerTools(ctx: Plugin.Context, changed: (sessionID: st
           ...(addBlockedBy !== undefined && { addBlockedBy }),
           ...(isRecord(args.metadata) && { metadata: args.metadata }),
         };
+        const unlogged = change.status === "completed" ? checks.unlogged(context.sessionID) : undefined;
+        if (unlogged !== undefined) throw new Error(unlogged);
         const { scope, beforeWrite } = await writableScope(input, context, "task_update");
         const task = await updateTask(scope.root, change, beforeWrite);
+        if (change.status === "in_progress" || change.status === "completed") await touched(context.sessionID, scope.root);
         await changed(context.sessionID);
         return { content: task === null ? `Task #${taskId} deleted` : `Task #${task.id} [${task.status}] ${task.subject}` };
       },

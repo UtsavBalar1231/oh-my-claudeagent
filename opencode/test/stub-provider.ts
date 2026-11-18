@@ -28,6 +28,17 @@ const SCENARIOS: Record<string, { tool: string; args: Json }> = {
   "task-first-done": { tool: "omca_task_update", args: { taskId: "1", status: "completed" } },
   "task-worker": { tool: "subagent", args: { agent: "omca-executor", description: "task worker", prompt: "OMCA-SCENARIO:task-first-done" } },
   "write-file": { tool: "write", args: { path: "explored.txt", content: "explored\n" } },
+  "check-background": { tool: "shell", args: { command: "sleep 5; bun test --help; echo OMCA-BACKGROUND-DONE", timeout: 1000 } },
+  "sleep-background": { tool: "shell", args: { command: "sleep 5; echo OMCA-BACKGROUND-DONE", timeout: 1000 } },
+  "failing-check": { tool: "shell", args: { command: "bun test ./omca-no-such-spec" } },
+  "check-logged": { tool: "omca_evidence_log", args: { evidence_type: "test", command: "bun test ./omca-no-such-spec", exit_code: 1, output_snippet: "no spec matched" } },
+  "task-complete-created": { tool: "omca_task_update", args: { taskId: "$CREATED", status: "completed" } },
+}
+const SEQUENCES: Record<string, string[]> = {
+  "task-check-unlogged": ["task-create", "failing-check", "task-complete-created"],
+  "task-check-logged": ["task-create", "failing-check", "check-logged", "task-complete-created"],
+  "task-check-background": ["task-create", "check-background"],
+  "task-sleep-background": ["task-create", "sleep-background"],
 }
 const SUBAGENT_ID = "omca-explorer"
 
@@ -55,13 +66,15 @@ function fillArgs(tool: Tool, known: Json): Json {
 function pickCall(body: Json): Call | undefined {
   const tools = (body.tools ?? []) as Tool[]
   const messages = (body.messages ?? []) as Message[]
-  const last = messages.at(-1)
-  if (!tools.length || last?.role !== "user") return undefined
-  const name = text(last.content).match(/OMCA-SCENARIO:([\w-]+)/)?.[1]
-  const scenario = name ? SCENARIOS[name] : undefined
+  const asked = messages.findLastIndex((message) => message.role === "user")
+  if (!tools.length || asked === -1) return undefined
+  const name = text(messages[asked]?.content).match(/OMCA-SCENARIO:([\w-]+)/)?.[1]
+  const step = name ? (SEQUENCES[name] ?? [name])[messages.slice(asked + 1).filter((message) => message.role === "tool").length] : undefined
+  const scenario = step ? SCENARIOS[step] : undefined
   const tool = tools.find((t) => t.function.name === scenario?.tool)
   if (!scenario || !tool) return undefined
-  return { name: tool.function.name, arguments: JSON.stringify(fillArgs(tool, scenario.args)) }
+  const created = messages.map((message) => /Task #(\d+) created/.exec(text(message.content))?.[1]).filter(Boolean).at(-1) ?? ""
+  return { name: tool.function.name, arguments: JSON.stringify(fillArgs(tool, scenario.args)).replaceAll('"$CREATED"', JSON.stringify(created)) }
 }
 
 function chunk(id: string, model: string, delta: Json, finish: string | null = null) {
