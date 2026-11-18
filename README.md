@@ -13,7 +13,8 @@ Real Claude Code sessions. Model replies are scripted.
 oh-my-claudeagent (OMCA) coordinates specialist agents, plans and verification evidence in
 Claude Code and OpenCode V2. Both adapters share state formats, safety checks and durable
 operations, and in both a run's final task will not complete until a passing verdict names it.
-Claude Code also holds a session at Stop while a run is open; OpenCode has no Stop veto. The blog post
+While a run has open tasks, Claude Code holds a session at Stop and OpenCode continues it when it
+would go idle. The blog post
 [Claude Code, with receipts](https://utsavbalar.in/blog/oh-my-claudeagent) describes the original
 workflow.
 
@@ -45,7 +46,7 @@ agent, so the orchestrator comes from an `agent` key setup adds to your own sett
 
 ### OpenCode V2
 
-The OpenCode adapter requires OpenCode 2.2.5 or later in the 2.x release line.
+The OpenCode adapter requires OpenCode 2.3.2 or later in the 2.x release line.
 It adds a selectable `omca` coordinator, native specialist tools, and a terminal
 panel opened with `/omca`. Build and Plan remain available. See
 [OpenCode setup](docs/usage.md#use-it-from-opencode) for installation and limits.
