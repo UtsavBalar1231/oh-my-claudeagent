@@ -87,7 +87,7 @@ jobs:
           node-version: 24
 
       - name: Install OpenCode CLI
-        run: npm i -g @opencode/cli@2.2.5 # zizmor: ignore[adhoc-packages]
+        run: npm i -g @opencode/cli@2.3.2 # zizmor: ignore[adhoc-packages]
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -112,7 +112,7 @@ jobs:
         run: |
           {
             echo "### What this job checks ($RUNNER_OS)"
-            echo "The OpenCode adapter passes its unit tests and loads in a real OpenCode 2.2.5 install, via \`just test-opencode\`. The TypeScript job typechecks it."
+            echo "The OpenCode adapter passes its unit tests and loads in a real OpenCode 2.3.2 install, via \`just test-opencode\`. The TypeScript job typechecks it."
             echo ""
             echo "### If this fails"
             echo "The adapter's prompt translation or its runtime wiring drifted from what OpenCode expects. Run \`just test-opencode\` locally with bun and opencode on PATH to see the exact failure."
