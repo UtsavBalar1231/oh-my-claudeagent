@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.0] - 2026-11-19
+
+### Added
+
+- **OpenCode continuation:** a coordinator on OpenCode ended its turn after each task or
+  verification batch and waited for a go-ahead while its run still had open tasks. Once the
+  top-level `omca` session creates a task or starts or completes one, each time it would go idle
+  with tasks of that run still open, the adapter adds a message naming the next task, shown as
+  `OMCA continues <run>: <n> open, next #<id>`, and the session keeps working. It waits while the
+  session's own subagents, or a test, build or lint command it moved to the background, are
+  still running, holds when your last message asks to pause, and stops after 3
+  continuations in a row get no tool call or 10 pass with no task changing; your next message
+  resumes it. The state is kept in OpenCode's plugin storage, so a plugin reload or a restart
+  picks it up, and the panel says when tasks are open but this session is not continuing them.
+  `OMCA_DISABLED_HOOKS=task-continuation` or `stop-gates` turns it off.
+- **OpenCode task completion check:** as on Claude Code, the coordinator cannot complete a task
+  while its own last test, build or lint command has no `omca_evidence_log` after it. Before, it
+  could run a failing check, log nothing and close the task. `OMCA_DISABLED_HOOKS=task-completed`
+  turns the check off.
+- **OpenCode run name for workers:** each OMCA worker is told the open run's name, so its notes
+  land in the run's notepad, and a read-only specialist is told to report them instead.
+
+### Changed
+
+- **OpenCode 2.3.2:** the adapter targets OpenCode 2.3.2 or later in the 2.x line, with
+  `@opencode/plugin` 2.3.2 and `@opentui` 0.8.4; CI loads it in OpenCode 2.3.2.
+- **OpenCode panel:** five tabs on keys 1 to 5 (Tasks, Agents, Evidence, Notepad, Doctor). Tasks
+  shows whether the run continues, the next task and the task groups in the order Claude Code
+  uses. Every list has a cursor, Enter opens a scrollable detail, `/omca [tab]` opens or closes
+  the panel on a tab, and the prompt footer shows the run's progress and a paused or stopped
+  continuation. Markers use Nerd Font glyphs; `OMCA_GLYPHS=unicode` or `ascii` changes them.
+- **OpenCode permissions:** the guard refuses at call time, over an allow in your config, a
+  read-only specialist's write, edit, patch, shell and OpenCode session, worktree, artifact and
+  automation tools, a specialist's delegation, and the coordinator's delegation to the built-in
+  General and Explore agents. Specialists no longer get OpenCode's `question` tool.
+
+### Fixed
+
+- **OpenCode read-only specialists:** with `edit` allowed in your OpenCode config, the explorer
+  and the other read-only specialists could write files.
+- **OpenCode effort:** a declared effort failed the session when the tier's model has no variant
+  of that name. The adapter now sets it per request, only when the model lists it and no variant
+  was chosen.
+- **OpenCode guard:** a relative `workdir` was judged against the server's directory instead of
+  the session's; `dash`, `ksh` and `fish` commands were read with the PowerShell rules, which let
+  `x=/; rm -rf $x` through; and an indented patch header skipped the comment gate.
+- **OpenCode commands:** `/omca-start-work` dropped an attachment's source.
+- **OpenCode file reads:** `omca_file_read` refused every read-only specialist, because its audit
+  entry needs an edit they are denied. Their reads now leave no audit entry, as Plan's do.
+- **OpenCode panel:** choosing a worker in Agents opened nothing, a dialog closed on the click
+  that opened it, errors showed as `[object Object]`, the header flickered every 5 seconds, and
+  lists had no length limit.
+
 ## [4.2.2] - 2026-11-17
 
 ### Changed
@@ -3530,6 +3583,7 @@ for multi-agent orchestration.
 - Shellcheck fixes applied across all hook scripts
 - Ruff fixes applied to Python MCP servers
 
+[4.3.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.2.2...v4.3.0
 [4.2.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.2.1...v4.2.2
 [4.2.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.2.0...v4.2.1
 [4.2.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.1.0...v4.2.0

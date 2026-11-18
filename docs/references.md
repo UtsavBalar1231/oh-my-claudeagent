@@ -216,12 +216,12 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | `brief-rows` | OMCA's rows for the brief and follow-up messages main sends a subagent in the agent view; the engine's row shows instead |
 | `notify` | The one notification OMCA sends when the last background agent of a wave finishes |
 | `refusal-recovery` | The follow-up prompt after a `reasoning_extraction` refusal |
-| `stop-gates` | Every stop gate |
-| `task-continuation`, `drift-guard` | One stop gate |
+| `stop-gates` | Every stop gate, and the OpenCode adapter's continuation of a run |
+| `task-continuation`, `drift-guard` | One stop gate. `task-continuation` also turns off the OpenCode adapter's continuation of a run when its session would go idle |
 | `final-verification` | The final task's refusals: completing it without a passing verdict, and marking it blocked, deleting it or unmarking it without any verdict |
 | `final-task-guard` | The refusals on updates that mark the final task blocked, delete it or unmark it, leaving the completion check on |
-| `task-completed` | The task completion check |
-| `verification-recorder` | Recording each agent's verification commands and its own `evidence_log` calls, which the turn line, the Stats page and the task check read |
+| `task-completed` | The task completion check, on Claude Code and OpenCode |
+| `verification-recorder` | Recording each agent's verification commands and its own `evidence_log` calls, which the turn line, the Stats page and the task check read; on OpenCode, the coordinator's |
 | `context-injector` | `AGENTS.md`, `README.md` and rule injection when a file is read or edited |
 | `comment-gate` | The comment check on writes |
 | `delegation-guard` | The OpenCode adapter's refusal of a delegation prompt that runs words together |

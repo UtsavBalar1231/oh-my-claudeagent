@@ -16,7 +16,7 @@
   `just test` selects explicit roots; bare `bun test` also collects mod tests that need
   `just test-mod` (`claude plugin test .`). OpenCode specs run separately with `just test-opencode`.
 - Full checks need `ast-grep` (or `sg`) and Claude Code (CI pins 2.1.325).
-  OpenCode integration specs skip without `opencode` on PATH; CI installs 2.2.5.
+  OpenCode integration specs skip without `opencode` on PATH; CI installs 2.3.2.
   `just smoke` uses a mock model; `tests/plugin-evals/` calls a real model and is manual.
 
 ## Runtime boundaries
@@ -31,7 +31,8 @@
   allow decisions belong to native permission settings. See `hooks/AGENTS.md`.
 - `opencode/index.ts` is the server plugin; `opencode/rpc.ts` is the import-safe
   contract for the optional TUI. Read `opencode/AGENTS.md` before adapter work.
-  OpenCode has no Stop veto; historical evidence is not current-checkout verification.
+  OpenCode continues a run on session idle, not at Stop; historical evidence is
+  not current-checkout verification.
 - After OpenCode UI or RPC changes, run `just build-opencode` and include
   `opencode/tui.generated.js` with the source changes. Never edit it by hand.
   `just test-opencode` checks artifact freshness before running specs.

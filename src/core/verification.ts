@@ -71,11 +71,11 @@ export function failureExitCode(error: unknown): number | null {
   return code === undefined ? null : Number(code);
 }
 
-export function unloggedReason({ command, at }: Verification): string {
+export function unloggedReason({ command, at }: Verification, tool = "evidence_log"): string {
   const ran = new Date(at * 1000);
   return (
     `You ran \`${command}\` at ${two(ran.getHours())}:${two(ran.getMinutes())} but logged no evidence after it. ` +
-    "Log the real result with evidence_log, including a non-zero exit_code if it failed. " +
-    `Example: evidence_log(evidence_type="test", command="${command}", exit_code=0, output_snippet="10 passed")`
+    `Log the real result with ${tool}, including a non-zero exit_code if it failed. ` +
+    `Example: ${tool}(evidence_type="test", command="${command}", exit_code=0, output_snippet="10 passed")`
   );
 }
