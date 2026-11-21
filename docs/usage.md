@@ -158,6 +158,11 @@ function word or three or more words. It refuses at 5 missing spaces that are al
 prompt's words. Code, URLs, paths, flags and names inside a sentence are skipped.
 `OMCA_DISABLED_HOOKS=delegation-guard` turns the refusal off.
 
+Asking the `omca` coordinator for work in your own words is enough: it continues or reopens a
+run, or creates tasks for new work, without asking you to run `/omca-start-work`, which only
+starts executing a finished plan. An open run on the task list is taken up only when you ask for
+work on it.
+
 **Continuation:** OpenCode has no Stop veto, so OMCA continues the session instead. Once the
 `omca` session creates a task or starts or completes one, each time it would go idle with tasks
 of that run still open, OMCA adds a message that names the next task and the session keeps
