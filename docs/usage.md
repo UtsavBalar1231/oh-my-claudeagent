@@ -122,7 +122,7 @@ Commands:
 | --- | --- |
 | `/omca [tasks\|agents\|evidence\|notepad\|doctor]` | Open the terminal panel on a tab without starting work; run it again to close or focus the panel |
 | `/omca-plan <request>` | Discuss a plan in native Plan mode; save a file only when asked |
-| `/omca-start-work [plan or instructions]` | Ask approval, then coordinate the open run or turn the plan into tasks and run them |
+| `/omca-start-work [plan or instructions]` | Coordinate the open run, or turn the plan into tasks and run them. Typing it is the approval, so no permission prompt follows |
 | `/omca-analyzer`, `/omca-reviewer`, `/omca-build-fixer` | Ask the primary agent to launch the specialist |
 
 Use Build or OMCA before starting work. A plan is the conversation or a document in

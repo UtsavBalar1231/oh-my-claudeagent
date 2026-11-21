@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **OpenCode approvals:** after a run closed or a task was blocked, the OMCA coordinator answered
+  "continue", new work or a one-off request by asking you to run `/omca-start-work`, and the
+  command then asked again in an `omca.start` permission dialog. Your own message now approves
+  the work it asks for: the coordinator reopens a blocked task, continues a run or creates tasks
+  for new work without the command, and typing `/omca-start-work` is its only approval, with no
+  dialog after it. An open run is still taken up only when you ask for work on it.
+
 ## [4.3.0] - 2026-11-19
 
 ### Added
