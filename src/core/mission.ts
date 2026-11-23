@@ -1,7 +1,6 @@
 import { contentLines, inlineMarkdown } from "./markdown.ts";
-import { formatUsd } from "./pricing.ts";
 import { inputText } from "./tool-input.ts";
-import { agentGlyph, COLUMN_GAP, displayWidth, fitEnd, formatDuration, formatTokens, type Glyphs, oneLine, padEnd, padStart, shortType } from "./ui-kit.ts";
+import { agentGlyph, COLUMN_GAP, displayWidth, fitEnd, formatDuration, formatTokens, formatUsd, type Glyphs, oneLine, padEnd, padStart, shortType } from "./ui-kit.ts";
 import { agentKey, fitPieces, levelMark, mergePieces, ON_SURFACE, type Piece, piecesWidth, redact, type ThemeKey, TONE_KEYS, wrapPieces } from "./visual.ts";
 
 /** `mcp__server__tool` as its tool's own name; every other tool as named. */

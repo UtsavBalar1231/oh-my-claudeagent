@@ -209,3 +209,29 @@ The deploy script failed when API_TOKEN=<value> was set in the shell.
 ```text
 [Compacted: 12 earlier lines removed]
 ```
+
+## Delegation records
+
+The mod writes one JSON file per delegation to `.omca/metrics/<session id>/<agent id>.json`, and the Stats page reads them. A record is written as `running` when the agent spawns and rewritten once when its turn ends.
+
+`estimated_cost_usd` is Claude Code's own `/cost` figure for the agent, read when its turn ends, or `null` where Claude Code lists no cost for the agent. It is an estimate, not a bill, and it includes fast mode, long prompts, the advisor and web search. It starts over at `/clear` and `/resume`.
+
+A record of an executor that finished:
+
+```json
+{
+  "session_id": "4f1c2d9e-7a3b-4c51-9e2f-0b6d8a1c3e57",
+  "agent_id": "a6d9600f011962d93",
+  "agent_type": "oh-my-claudeagent:executor",
+  "model": "claude-sonnet-5-5",
+  "effort": "high",
+  "started_at": "2026-11-23T18:13:02.114Z",
+  "ended_at": "2026-11-23T18:15:40.902Z",
+  "duration_ms": 158788,
+  "input_tokens": 48211,
+  "output_tokens": 3904,
+  "estimated_cost_usd": 0.1356,
+  "outcome": "completed",
+  "evidence_logged": true
+}
+```

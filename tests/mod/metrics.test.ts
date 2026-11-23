@@ -89,6 +89,10 @@ test("each delegation is written running at spawn and overwritten once when its 
     [`${METRICS}/s1/a-2.json`, running2],
   ]);
 
+  w.agents = [
+    { id: "a-1", description: "", type: "x", status: "running", cost: { usd: 0.0348 } },
+    { id: "a-2", description: "", type: "x", status: "running" },
+  ];
   await drain($.turn.step({ turnId: "t-a-1", index: 0, model: "claude-sonnet-5-5", effort: "high", messageCount: 1, agentId: "a-1" }));
   await drain($.turn.step({ turnId: "t-a-2", index: 0, model: "claude-haiku-4-5", messageCount: 1, agentId: "a-2" }));
   await logEvidence($, "a-1");
@@ -107,7 +111,7 @@ test("each delegation is written running at spawn and overwritten once when its 
         duration_ms: 90_000,
         input_tokens: 13_000,
         output_tokens: 500,
-        estimated_cost_usd: 0.0125,
+        estimated_cost_usd: 0.0348,
         outcome: "completed",
         evidence_logged: true,
       },
@@ -118,7 +122,7 @@ test("each delegation is written running at spawn and overwritten once when its 
         ...running2,
         ended_at: "2026-10-02T12:01:45.000Z",
         duration_ms: 75_000,
-        estimated_cost_usd: 0,
+        estimated_cost_usd: null,
         outcome: "aborted",
         evidence_logged: false,
       },
@@ -138,20 +142,20 @@ test("each delegation is written running at spawn and overwritten once when its 
       "2 delegations in 1 session",
       "Agents · 2 types",
       "  agent     runs  median  est. cost  evidence",
-      "◆ executor     1   1m30s      $0.01    ✓ 100%",
-      "◆ explorer     1   1m15s      $0.00       n/a",
+      "◆ executor     1   1m30s      $0.03    ✓ 100%",
+      "◆ explorer     1   1m15s        n/a       n/a",
       "Tokens per delegation · 2 delegations",
       "█▁ peak 13.5k",
       "Estimated cost",
-      `$0.01 ${"█".repeat(41)}`,
-      "2026-11-12 list prices",
+      `$0.03+ ${"█".repeat(40)}`,
+      "n/a: no cost from Claude Code · Claude Code's estimate",
       "r: Reload",
     ]);
     await ui.unmount();
   }
 });
 
-test("a turn that reports no usage after its steps counted tokens leaves the cost unpriced, not zero", async ($, on) => {
+test("an agent the list holds no cost for is recorded with a null cost, not zero", async ($, on) => {
   const { w, writes } = engine(on);
   await $.agent.spawn(spawn("oh-my-claudeagent:executor", "Fix the parser"));
   await drain($.turn.step({ turnId: "t-a-1", index: 0, model: "claude-sonnet-5-5", messageCount: 1, agentId: "a-1" }));

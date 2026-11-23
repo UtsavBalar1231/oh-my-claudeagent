@@ -9,6 +9,7 @@ import {
   fitMiddle,
   formatDuration,
   formatTokens,
+  formatUsd,
   formatWhen,
   glyphs,
   glyphTier,
@@ -315,6 +316,18 @@ describe("formatDuration", () => {
     [5_430_000, "1h30m"],
   ])("%p ms is %p", (ms, text) => {
     expect(formatDuration(ms)).toBe(text);
+  });
+});
+
+describe("formatUsd", () => {
+  test.each([
+    [2.855, "$2.86"],
+    [0.0135, "$0.01"],
+    [0.004, "<$0.01"],
+    [0, "$0.00"],
+    [1234.5, "$1234.50"],
+  ])("$%p formats as %p", (usd, text) => {
+    expect(formatUsd(usd)).toBe(text);
   });
 });
 

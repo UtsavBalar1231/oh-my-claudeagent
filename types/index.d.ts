@@ -119,7 +119,6 @@ declare module "claude-code" {
         turns: readonly { agentType: string; tokens: number }[];
         sessions: number;
         skipped: number;
-        pricingAsOf: string;
         error: string | null;
         readAt: number;
       };

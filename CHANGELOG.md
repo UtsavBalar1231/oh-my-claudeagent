@@ -30,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lists a Monitor as `monitor` rather than `shell`, so the continuation gate now lets a session
   stop while a Monitor runs, as it does for a running subagent, and the Monitor's output wakes
   the session. A background shell, such as a dev server, still does not.
+- **Agent costs:** the cost on an agent's lane, in its delegation record and on the Stats page is
+  now Claude Code's own per-agent figure, so it includes fast mode, long prompts, the advisor and
+  web search, and it starts over at `/clear` and `/resume`. An agent Claude Code lists no cost for,
+  such as a teammate in a pane of its own, shows none. The hand-kept price table and the pricing
+  date on the Stats page are gone; delegation records written before this release keep the
+  table's estimate.
 
 ### Fixed
 

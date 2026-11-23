@@ -1,9 +1,8 @@
 import type { RenderElement } from "claude-code";
 import { RENAMES } from "../../src/core/agent-names.ts";
 import { aggregate, type MetricsRecord, METRICS_DIR, parseRecords } from "../../src/core/metrics.ts";
-import { formatUsd, PRICING_AS_OF } from "../../src/core/pricing.ts";
 import { isSafeId } from "../../src/core/session-id.ts";
-import { agentGlyph, COLUMN_GAP, displayWidth, fitEnd, formatDuration, formatTokens, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
+import { agentGlyph, COLUMN_GAP, displayWidth, fitEnd, formatDuration, formatTokens, formatUsd, padEnd, padStart, shortType } from "../../src/core/ui-kit.ts";
 import { agentKey, fitPieces, type Level, levelMark, type Piece, spark, stack, type ThemeKey, TONE_KEYS } from "../../src/core/visual.ts";
 import { type Host, reason, type State, update } from "../host.ts";
 import type { Subcommand } from "../omca-router.ts";
@@ -66,7 +65,7 @@ const store = (host: Host, next: Stats) =>
 
 export async function load(host: Host): Promise<void> {
   const [root, readAt] = await Promise.all([host.session.root(), host.clock.now()]);
-  const base = { pricingAsOf: PRICING_AS_OF, readAt };
+  const base = { readAt };
   try {
     const read = await readRecords(host, `${root}/${METRICS_DIR}`);
     const { sessions, skipped } = read;
@@ -261,8 +260,8 @@ function costNotes(stats: Stats, g: View["g"]): string {
   const excluded = partial.reduce((sum, row) => sum + row.unpriced, 0);
   return [
     ...(excluded > 0 ? [`+ excludes ${plural(excluded, "unpriced run")}`] : []),
-    ...(stats.rows.some((row) => row.unpriced > 0 && row.unpriced === finished(row)) ? ["n/a: no listed price"] : []),
-    `${stats.pricingAsOf} list prices`,
+    ...(stats.rows.some((row) => row.unpriced > 0 && row.unpriced === finished(row)) ? ["n/a: no cost from Claude Code"] : []),
+    "Claude Code's estimate",
   ].join(` ${g.dot} `);
 }
 
@@ -310,7 +309,7 @@ function costCard(stats: Stats, view: View, width: number): RenderElement {
       tone: "warn",
       isAscii: view.isAscii,
       width,
-      children: [Text({ dimColor: true, wrap: "wrap", children: ["No finished run has a listed price, so no cost is shown"] })],
+      children: [Text({ dimColor: true, wrap: "wrap", children: ["No finished run has a cost from Claude Code, so no cost is shown"] })],
     });
   }
   const total = priced.reduce((sum, row) => sum + row.estimatedCostUsd, 0);

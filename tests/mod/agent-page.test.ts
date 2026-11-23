@@ -83,7 +83,7 @@ async function runningAgent($: Engine, on: On, prefix: string) {
   await $.command.run(run(""));
   await $.agent.spawn(spawnOf(1, "Fix the heading parser", "Fix the heading parser."));
   const id = `${prefix}-1`;
-  w.agents = [{ id, description: "", type: "x", status: "running" }];
+  w.agents = [{ id, description: "", type: "x", status: "running", cost: { usd: 0.0937 } }];
   w.conversations.set(id, [message("user", BRIEF), message("assistant", "Reading the parser.")]);
   const pagesOf = (): Record<string, Page> => (state.read("pages") ?? {}) as Record<string, Page>;
   return { w, id, state, pagesOf, d };
@@ -106,7 +106,7 @@ test("a lane head's button opens the page of a running agent: header, full brief
   expect(state.keys.filter((key) => key === "pages")).toEqual(["pages"]);
   expect(pageBody(await ui.drawn())).toEqual([
     "◆ executor · Fix the heading par…",
-    "◆ running · 2s · 0 tokens · ~$0.…",
+    "◆ running · 2s · 0 tokens",
     "sonnet-5-5",
     "0 tool calls",
     `started ${clockOf(STARTED)}`,
@@ -427,7 +427,7 @@ test("on a short pane the page opens on the agent's identity with its keys last 
   await w.clock.advance(10);
 
   const body = pageBody(await ui.drawn()).map((row) => row.trimEnd());
-  expect(body.slice(0, 3)).toEqual(["◆ executor · Fix the heading parser", "◆ running · 0s · 0 tokens · ~$0.00", "Brief"]);
+  expect(body.slice(0, 3)).toEqual(["◆ executor · Fix the heading parser", "◆ running · 0s · 0 tokens", "Brief"]);
   expect(body.slice(-3)).toEqual([CUE, KEYS_ROW, ""]);
   expect(await ui.find({ type: "Raster" })).toBeUndefined();
   expect(w.focused).not.toContain("b");
@@ -444,7 +444,7 @@ test("below six rows the identity shares one line, so the window keeps its cue",
   await ui.redraw();
 
   const body = pageBody(await ui.drawn()).map((row) => row.trimEnd());
-  expect(body[0]).toBe("◆ executor · ◆ running · 0s · 0 tokens · ~$0.00 · Fix the heading parser");
+  expect(body[0]).toBe("◆ executor · ◆ running · 0s · 0 tokens · Fix the heading parser");
   expect(body[1]).toBe("Brief");
   expect(body.slice(-3)).toEqual([CUE, KEYS_ROW, ""]);
   await ui.unmount();

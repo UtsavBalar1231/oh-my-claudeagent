@@ -402,9 +402,9 @@ Two pages have no digit key. `/omca stats` and `/omca doctor` open them, the tab
 one shown after the tabs, and a digit goes back to a tab:
 
 - **Stats**: runs per agent type, the evidence rate of executor and build-fixer, the agents that
-  run checks, tokens per finished delegation, and the estimated cost by agent, across the
-  project's recorded sessions. Runs on a model without a
-  known price are counted as excluded rather than estimated. `r` reloads the records.
+  run checks, tokens per finished delegation, and the cost by agent as Claude Code estimates it,
+  across the project's recorded sessions. Runs for which Claude Code reported no cost are counted
+  as excluded rather than estimated. `r` reloads the records.
 - **Doctor**: the checks described below.
 
 As you type, the prompt's typeahead offers the `/omca` subcommands. Press Ctrl+X then Tab,

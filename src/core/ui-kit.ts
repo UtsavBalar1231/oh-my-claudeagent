@@ -278,6 +278,16 @@ export function formatTokens(tokens: number): string {
   return `${(tokens / 1_000_000).toFixed(1)}M`;
 }
 
+/**
+ * Dollars to the cent, rounded through whole units of 1e-8 dollar so $2.855 shows as $2.86
+ * rather than as the float just below it; a cost under a cent but above zero is `<$0.01`.
+ */
+export function formatUsd(usd: number): string {
+  const cents = Math.round(Math.round(usd * 1e8) / 1e6);
+  if (cents === 0 && usd > 0) return "<$0.01";
+  return `$${(cents / 100).toFixed(2)}`;
+}
+
 export const two = (value: number) => String(value).padStart(2, "0");
 
 export function formatWhen(at: number | string): string {

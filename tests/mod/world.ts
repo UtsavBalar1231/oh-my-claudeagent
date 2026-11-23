@@ -37,7 +37,7 @@ export const WINDOWS = layoutOf("win32", "win32", "C:\\work", "C:\\Users\\u", { 
 export const LAYOUTS: readonly Layout[] = [POSIX, WINDOWS];
 
 // A test names the fields the mod reads; `agent.list` fills the rest.
-type ListedAgent = Pick<AgentInfo, "id" | "description" | "type" | "status" | "parentId">;
+type ListedAgent = Pick<AgentInfo, "id" | "description" | "type" | "status" | "parentId"> & Partial<Pick<AgentInfo, "cost">>;
 
 const listed = (agent: ListedAgent): AgentInfo => ({
   kind: "local_agent",
