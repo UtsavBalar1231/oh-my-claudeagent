@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Status line after `/compact`:** Claude Code's payload holds an all-zero `current_usage`
+  between a compaction and the next request, and its docs say to treat that as no reading. A
+  payload with no percentage beside it drew the context bar at 0%; it now shows the waiting
+  state, as before the first request.
 - **OpenCode approvals:** after a run closed or a task was blocked, the OMCA coordinator answered
   "continue", new work or a one-off request by asking you to run `/omca-start-work`, and the
   command then asked again in an `omca.start` permission dialog. Your own message now approves

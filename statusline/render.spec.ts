@@ -730,6 +730,12 @@ describe("context bar", () => {
     expect(bar({ context_window_size: 200000, current_usage: usage })).toBe(`${filled(G, 10)}${empty(10)} ${G}50%${R}  ${label("200k")}`);
   });
 
+  test("all-zero current usage, as after /compact, waits like no usage", () => {
+    const zeros = { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0 };
+    expect(bar({ context_window_size: 200000, current_usage: zeros })).toBe(bar({ context_window_size: 200000, current_usage: null }));
+    expect(bar({ context_window_size: 200000, current_usage: null })).toContain("[waiting...]");
+  });
+
   test("remaining percentage stands in for the used percentage", () => {
     expect(bar({ context_window_size: 200000, remaining_percentage: 92 })).toBe(`${filled(G, 2)}${empty(18)} ${G}8%${R}  ${label("200k")}`);
   });
