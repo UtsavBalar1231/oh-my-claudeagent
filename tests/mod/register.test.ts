@@ -41,6 +41,7 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
         "turn.step",
         "turn.complete",
         "agent.spawn",
+        "agent.report",
         "prompt.edit",
         "prompt.change",
         "prompt.autocomplete",

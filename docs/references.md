@@ -182,7 +182,7 @@ rejects every `model.*` call, `http.fetch` and `store.*`.
 | `UserPromptExpansion` | any | `guidance`, `slash-mode-detector` |
 | `SubagentStart` | any | `subagent-context`: protocol, date, output contract and run context for each subagent |
 | `PreToolUse` | `Write`, `Edit`, `TaskUpdate` | `final-task-guard` (on `TaskUpdate`), `comment-gate` |
-| `PostToolUse` | `Read`, `Write`, `Edit`, `Agent`, `SubagentHandback`, `Bash`, `PowerShell`, `TaskCreate`, `TaskUpdate`, `evidence_log` | `verification-recorder`, `context-injector`, `task-touch`, `empty-task-response` |
+| `PostToolUse` | `Read`, `Write`, `Edit`, `SubagentHandback`, `Bash`, `PowerShell`, `TaskCreate`, `TaskUpdate`, `evidence_log` | `verification-recorder`, `context-injector`, `task-touch`, `empty-task-response` |
 | `PostToolUseFailure` | any | `failure-recovery`: advice on a failed call, and a stuck-loop note from a tool's third failure in five minutes; `verification-recorder`, for a verification that ran and exited non-zero |
 | `Stop` | any | `stop-gates`: task continuation (open tasks of a run), drift guard, in that order |
 | `TaskCompleted` | any | `task-completed`: refuses to complete a task while the completing agent's own recent verification has no `evidence_log` call from that agent after it, and a run's final task until its `final_verification` is logged |
@@ -215,6 +215,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | `blocker-rows` | OMCA's rows for its own refusals and held completions in the transcript; the engine's error text shows instead |
 | `brief-rows` | OMCA's rows for the brief and follow-up messages main sends a subagent in the agent view; the engine's row shows instead |
 | `notify` | The one notification OMCA sends when the last background agent of a wave finishes |
+| `report-receipts` | The receipt line under a subagent's report: the files its tool calls edited, its last check and whether evidence was logged after it |
 | `refusal-recovery` | The follow-up prompt after a `reasoning_extraction` refusal |
 | `stop-gates` | Every stop gate, and the OpenCode adapter's continuation of a run |
 | `task-continuation`, `drift-guard` | One stop gate. `task-continuation` also turns off the OpenCode adapter's continuation of a run when its session would go idle |
@@ -225,7 +226,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | `context-injector` | `AGENTS.md`, `README.md` and rule injection when a file is read or edited |
 | `comment-gate` | The comment check on writes |
 | `delegation-guard` | The OpenCode adapter's refusal of a delegation prompt that runs words together |
-| `empty-task-response` | The note on an empty or transitional agent report; concise findings need no fixed headers |
+| `empty-task-response` | The note on an empty or transitional agent report, to the caller with the report and to the subagent on its own hand-back; concise findings need no fixed headers |
 | `failure-recovery` | Advice after a failed tool call |
 | `subagent-context` | The context each subagent gets at start |
 | `keyword-detector`, `slash-mode-detector` | Mode detection from prompts and slash commands. `keyword-detector` also takes the underline off trigger phrases in the prompt |

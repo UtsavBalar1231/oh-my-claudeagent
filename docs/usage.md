@@ -264,6 +264,14 @@ The analyzer, reviewer and build-fixer skills (`/oh-my-claudeagent:analyzer`, `/
 `/oh-my-claudeagent:build-fixer`) fork into a background subagent and its result arrives in the conversation
 when it finishes. `/rewind` does not undo the build-fixer's edits, as with executors, so revert them with git.
 
+On Claude Code, a subagent's report reaches the conversation that started it with a receipt line of what OMCA saw
+the agent's tool calls do, so the model can check the agent's account against it: the files it
+edited, its last verification command and exit code, and whether evidence was logged after that
+check, as in ``[OMCA receipt] … edited 2 files (src/a.ts, src/b.ts); last check `just test` failed
+with exit code 1, with no evidence logged after it.`` An agent that edited nothing and ran no
+check gets no line. A report that is empty or stops at its opening gets advice to resume the agent
+once. `OMCA_DISABLED_HOOKS=report-receipts` turns the receipt off.
+
 ## The transcript, the band and the pane
 
 ### In the transcript

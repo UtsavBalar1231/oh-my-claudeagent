@@ -18,7 +18,7 @@ event is unregistered on purpose; `docs/references.md` carries the per-event rea
 try/catch. `host.ts` defines the `Host` closures a feature receives in place of `$`, so a
 feature module takes `host` and never `$`. The features are `bash-guard`, `server-check`,
 `mod-marker`, `agents-tracker`, `agent-rows`, `metrics`, `band`, `pane` with its `tabs/`, `footer`,
-`group-rows`, `blocker-rows`, `brief-rows`, `notify`, `keyword-paint`, `completion`, `refusal-recovery`, `omca-router`, `task-tools`,
+`group-rows`, `blocker-rows`, `brief-rows`, `notify`, `report-receipts`, `keyword-paint`, `completion`, `refusal-recovery`, `omca-router`, `task-tools`,
 `task-list` and `task-rows`. `doctor.ts` runs the Doctor page's checks and fixes for `tabs/doctor.ts`; it registers
 no event. `project-root.ts` gives `host.session.root()` the repository top level of the engine's
 root, as the `omca` server names its root, so a launch from a subdirectory reads and writes the same
@@ -118,6 +118,21 @@ ignores all three and raises it at once. The first spawn of a wave calls
 `$.ui.cancelNotify("agents-done")` to take back a held one. Every call is awaited in a try/catch
 that logs.
 `OMCA_DISABLED_HOOKS=notify` turns the feature off.
+
+`report-receipts` adds to a subagent's report what OMCA saw its tool calls do. Its `tool.call` post,
+on the `{ agentId: /./ }` registration beside `agents-tracker`, keeps a module record per agent of
+the calls that ran (a refused call adds nothing): the files a successful `Edit`, `Write` or
+`NotebookEdit` named, its last verification command through `shellReceipt` with the exit code from
+an error's `Exit code N` line, and whether a successful `evidence_log` followed that check. Its
+`agent.report` post appends one `[OMCA receipt]` line when the agent edited a file or ran a check
+(`receiptLine` in `src/core/report-receipt.ts`), and the `[POOR AGENT OUTPUT]` advice when a
+`completed` report other than `web-fetch`'s is empty or a stalled opening. `agent.report` fires once
+per report, for background and foreground agents and again after a `SendMessage` resume, in `-p` and
+in a terminal, also where `sec-default` is seated (probed on 2.1.330); a hook that throws leaves the
+report as the agent wrote it, so the registration carries no `.catch`. The record misses edits made
+through Bash and calls before a mod reload, which is why the line says what OMCA saw.
+`OMCA_DISABLED_HOOKS=report-receipts` drops the receipt and `empty-task-response` drops the advice,
+which on the server also covers the subagent's own hand-back.
 
 `task-rows` places one row with `$.ui.place` under the turn line of a main turn that changed a run's
 tasks, found by comparing the `tasks` atom at that turn's `turn.start` with the atom at its

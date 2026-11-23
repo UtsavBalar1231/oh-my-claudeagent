@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Receipts on subagent reports:** a subagent's report now reaches the conversation that started
+  it with a line of what OMCA saw its tool calls do: the files it edited, its last verification
+  command with its exit code, and whether evidence was logged after that check. The orchestrator
+  can tell an agent that says "tests pass" from one whose last check failed or never ran.
+  `OMCA_DISABLED_HOOKS=report-receipts` turns it off.
+
 ### Changed
 
 - **Claude Code 2.1.330 or later:** OMCA now needs Claude Code 2.1.330, up from 2.1.300, and both
@@ -25,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Empty reports from background agents:** the advice to resume an agent whose report came back
+  empty or stalled reached the orchestrator only for an agent it waited on. It now comes with every
+  report, a background agent's included, and the server no longer hooks the `Agent` tool for it.
 - **Status line after `/compact`:** Claude Code's payload holds an all-zero `current_usage`
   between a compaction and the next request, and its docs say to treat that as no reading. A
   payload with no percentage beside it drew the context bar at 0%; it now shows the waiting
