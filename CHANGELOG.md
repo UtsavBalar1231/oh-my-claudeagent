@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Flaky checks in a run:** `/start-work` took a rerun that passed as evidence that a failed check
+  was a false positive. A rerun that passes now shows only that the failure is intermittent, and
+  a failure that fails the same way without the run's changes is named in the report as
+  pre-existing.
 - **A running Monitor pauses task continuation:** from Claude Code 2.1.329 the Stop payload
   lists a Monitor as `monitor` rather than `shell`, so the continuation gate now lets a session
   stop while a Monitor runs, as it does for a running subagent, and the Monitor's output wakes
