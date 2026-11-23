@@ -16,6 +16,9 @@
   "supportUrl": "https://github.com/UtsavBalar1231/oh-my-claudeagent/issues",
   "documentationUrl": "https://github.com/UtsavBalar1231/oh-my-claudeagent/blob/main/docs/usage.md",
   "license": "MIT",
+  "engines": {
+    "claude-code": ">=2.1.330"
+  },
   "types": "./types/index.d.ts",
   "keywords": [
     "agents",

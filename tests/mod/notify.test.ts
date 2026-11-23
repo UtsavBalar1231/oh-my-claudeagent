@@ -6,9 +6,8 @@ const OPTIONS = { title: "OMCA", key: "agents-done", delayMs: 60_000, untilBack:
 
 type Sent = { text: string; title: string | undefined; key: string | undefined; delayMs: number | undefined; untilBack: boolean | undefined };
 
-function engine(on: On, env: Record<string, string> = {}, version = "2.1.322", rejects = false) {
+function engine(on: On, env: Record<string, string> = {}, rejects = false) {
   const w = world(on, {}, {}, env);
-  w.version = version;
   const sent: Sent[] = [];
   const cancelled: string[] = [];
   let spawned = 0;
@@ -112,15 +111,6 @@ test("the first spawn of each wave takes back a held notification, and a later s
   expect(cancelled).toEqual(["agents-done", "agents-done"]);
 });
 
-test("a client before 2.1.321 gets the title alone and no cancel", async ($, on) => {
-  const { sent, cancelled } = engine(on, {}, "2.1.300");
-  await spawn($, 1, "explorer", "Map the callers");
-  await finish($, "a-1");
-
-  expect(cancelled).toEqual([]);
-  expect(sent).toEqual([{ text: "explorer finished · Map the callers", title: "OMCA", key: undefined, delayMs: undefined, untilBack: undefined }]);
-});
-
 test("OMCA_DISABLED_HOOKS=notify sends and cancels nothing", async ($, on) => {
   const { sent, cancelled } = engine(on, { OMCA_DISABLED_HOOKS: "notify" });
   await spawn($, 1, "explorer", "Map the callers");
@@ -131,7 +121,7 @@ test("OMCA_DISABLED_HOOKS=notify sends and cancels nothing", async ($, on) => {
 });
 
 test("a notification the engine refuses is logged and does not throw out of the hook", async ($, on) => {
-  const { w, sent } = engine(on, {}, "2.1.322", true);
+  const { w, sent } = engine(on, {}, true);
   await spawn($, 1, "explorer", "Map the callers");
   await finish($, "a-1");
 

@@ -9,7 +9,8 @@ Use omca-explorer for local code investigation, omca-researcher for external doc
 Use omca-architect for architecture and hard debugging, omca-analyzer for requirements gaps, omca-reviewer for saved-plan review, omca-build-fixer for build and type failures, and omca-viewer for visual analysis.
 The built-in general and explore delegation targets are denied for OMCA. Other custom agents remain usable subject to native permissions. Report an unavailable specialist instead of silently falling back.
 Keep workers as leaf agents. Do not poll a running child's transcript.
-Respect the user's chosen model, permissions, worktree, and interruption. Start or take up a run only after /omca-start-work and its permission approval.
+Respect the user's chosen model, permissions, worktree, and interruption.
+The user's own message approves the work it asks for. Continue, resume or reopen a run, or create tasks for new work, as soon as the user asks, without asking them to run /omca-start-work; that command is only the user's way to start executing a finished plan. Take up an open run from the task list only when the user asks for work on it.
 A run lives on this checkout's task list, which omca_task_list and omca_task_get read. You change it with omca_task_create and omca_task_update; child agents read it and never change it.
 Record real build, test, and lint results with omca_evidence_log. A tool or session reporting success does not imply a zero command exit code.
 Separate completed tasks, historical test evidence, and verification of the current checkout. A run's final task will not complete until a passing verdict names it.

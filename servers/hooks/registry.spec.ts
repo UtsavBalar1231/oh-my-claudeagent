@@ -86,7 +86,7 @@ describe("hooks.json against the registry", () => {
 
   test("PostToolUse reaches the task tools, whose touch the continuation gate waits for, and evidence_log, which satisfies its caller's verification", () => {
     expect(HOOKS.PostToolUse?.map(({ matcher }) => matcher)).toEqual([
-      "Read|Write|Edit|Agent|SubagentHandback|Bash|PowerShell|TaskCreate|TaskUpdate|mcp__plugin_oh-my-claudeagent_omca__evidence_log",
+      "Read|Write|Edit|SubagentHandback|Bash|PowerShell|TaskCreate|TaskUpdate|mcp__plugin_oh-my-claudeagent_omca__evidence_log",
     ]);
   });
 

@@ -1,11 +1,8 @@
 import { type MetricsRecord, outcomeOf, parseRecord, recordPath } from "../src/core/metrics.ts";
-import { estimateCostUsd } from "../src/core/pricing.ts";
 import type { Features } from "./dispatch.ts";
 import { type Host, type State } from "./host.ts";
 
 type Row = State["agents"][string];
-
-const NO_USAGE = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 };
 
 async function locate(host: Host, agentId: string): Promise<{ root: string; sessionId: string; path: string } | undefined> {
   const [root, sessionId] = await Promise.all([host.session.root(), host.session.id()]);
@@ -58,17 +55,14 @@ export const metrics: Features = {
       const row = await agentRow(host, e.agentId);
       if (row === undefined || row.teammate) return undefined;
       const endedAt = row.endedAt ?? (await host.clock.now());
-      // A turn without usage counted nothing, by the engine's contract; tokens its steps did
-      // count without one cannot be split into priced kinds, so they stay unpriced.
-      const usage = e.usage ?? (row.inputTokens + row.outputTokens === 0 ? { ...NO_USAGE, model: row.model } : undefined);
       await write(host, at.path, {
         ...running(at.sessionId, e.agentId, row),
         ended_at: new Date(endedAt).toISOString(),
         duration_ms: endedAt - row.startedAt,
         input_tokens: row.inputTokens,
         output_tokens: row.outputTokens,
-        // The lane prices each response on its own, which a model priced by prompt length needs.
-        estimated_cost_usd: usage === undefined ? null : e.usage === undefined ? estimateCostUsd(usage.model, usage) : row.costUsd,
+        // agents-tracker's turn.complete runs first and leaves the agent's final figure on its row.
+        estimated_cost_usd: row.costUsd,
         outcome: outcomeOf(e),
         evidence_logged: row.evidenceLogged,
       });

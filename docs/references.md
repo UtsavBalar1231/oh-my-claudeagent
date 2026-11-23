@@ -63,7 +63,7 @@ Only orchestrator and planner can spawn further agents. `servers/categories.json
 work to tiers for delegation: `quick`, `standard` and `readonly` to `sonnet`, `deep` to `opus`,
 `hardest` to `fable`.
 
-No agent sets `background: true`. A probe on Claude Code 2.1.319 against a mock model found that an
+No agent sets `background: true`. A probe against a mock model found that an
 agent spawned from the main session already runs in the background in `claude -p` and in an
 interactive session with fork mode on or off, and its result arrives in a `<task-notification>`
 before `-p` exits. The flag only overrides an explicit request to wait, and in `claude -p` a
@@ -182,7 +182,7 @@ rejects every `model.*` call, `http.fetch` and `store.*`.
 | `UserPromptExpansion` | any | `guidance`, `slash-mode-detector` |
 | `SubagentStart` | any | `subagent-context`: protocol, date, output contract and run context for each subagent |
 | `PreToolUse` | `Write`, `Edit`, `TaskUpdate` | `final-task-guard` (on `TaskUpdate`), `comment-gate` |
-| `PostToolUse` | `Read`, `Write`, `Edit`, `Agent`, `SubagentHandback`, `Bash`, `PowerShell`, `TaskCreate`, `TaskUpdate`, `evidence_log` | `verification-recorder`, `context-injector`, `task-touch`, `empty-task-response` |
+| `PostToolUse` | `Read`, `Write`, `Edit`, `SubagentHandback`, `Bash`, `PowerShell`, `TaskCreate`, `TaskUpdate`, `evidence_log` | `verification-recorder`, `context-injector`, `task-touch`, `empty-task-response` |
 | `PostToolUseFailure` | any | `failure-recovery`: advice on a failed call, and a stuck-loop note from a tool's third failure in five minutes; `verification-recorder`, for a verification that ran and exited non-zero |
 | `Stop` | any | `stop-gates`: task continuation (open tasks of a run), drift guard, in that order |
 | `TaskCompleted` | any | `task-completed`: refuses to complete a task while the completing agent's own recent verification has no `evidence_log` call from that agent after it, and a run's final task until its `final_verification` is logged |
@@ -215,6 +215,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | `blocker-rows` | OMCA's rows for its own refusals and held completions in the transcript; the engine's error text shows instead |
 | `brief-rows` | OMCA's rows for the brief and follow-up messages main sends a subagent in the agent view; the engine's row shows instead |
 | `notify` | The one notification OMCA sends when the last background agent of a wave finishes |
+| `report-receipts` | The receipt line under a subagent's report: the files its tool calls edited, its last check and whether evidence was logged after it |
 | `refusal-recovery` | The follow-up prompt after a `reasoning_extraction` refusal |
 | `stop-gates` | Every stop gate, and the OpenCode adapter's continuation of a run |
 | `task-continuation`, `drift-guard` | One stop gate. `task-continuation` also turns off the OpenCode adapter's continuation of a run when its session would go idle |
@@ -225,7 +226,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | `context-injector` | `AGENTS.md`, `README.md` and rule injection when a file is read or edited |
 | `comment-gate` | The comment check on writes |
 | `delegation-guard` | The OpenCode adapter's refusal of a delegation prompt that runs words together |
-| `empty-task-response` | The note on an empty or transitional agent report; concise findings need no fixed headers |
+| `empty-task-response` | The note on an empty or transitional agent report, to the caller with the report and to the subagent on its own hand-back; concise findings need no fixed headers |
 | `failure-recovery` | Advice after a failed tool call |
 | `subagent-context` | The context each subagent gets at start |
 | `keyword-detector`, `slash-mode-detector` | Mode detection from prompts and slash commands. `keyword-detector` also takes the underline off trigger phrases in the prompt |
@@ -336,10 +337,15 @@ reads, the ledger and notepads, and links the JSON Schema for the ledger.
 | `plan` and `start-work`, which stop unless `health_check` reports the runtime `ok` | Yes | When bun is on the app's `PATH` | Yes | When bun is on the app's `PATH` | Unless `allowManagedMcpServersOnly`, `allowManagedHooksOnly`, `disableAllHooks` or `allowManagedModsOnly` |
 | `omca` MCP tools | Yes | When bun is on the app's `PATH` | Yes | When bun is on the app's `PATH` | Unless `allowManagedMcpServersOnly` |
 | Stop checks, guidance, context injection | Yes | When bun is on the app's `PATH` | Yes | When bun is on the app's `PATH` | Unless `allowManagedHooksOnly` or `disableAllHooks` |
-| Guard decisions | Yes | When the app's Claude Code is 2.1.300 or later | Yes | Yes | Unless `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks` |
+| Guard decisions | Yes | When the app's Claude Code is 2.1.330 or later | Yes | Yes | Unless `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks` |
 | Band, pane, Tasks pane, doctor | Yes | As guard decisions, with [Desktop's differences](usage.md#desktop-and-vs-code) | No | No ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)) | As the guard |
 | Turn line, agent rows, receipts and image previews in the transcript | Yes, pictures where the terminal draws them (kitty, Ghostty, iTerm2 3.5 or later, and tmux 3.3 or later with passthrough on) | No: Desktop keeps its own rows, and the turn's figures and receipt arrive as a text row beneath the answer | No | No | As the guard |
 | Status line | Yes | Not documented | No | Not documented | Unless `allowManagedHooksOnly` or `disableAllHooks` |
+
+Every row needs Claude Code 2.1.330 or later on that surface. The manifests declare
+`engines: { "claude-code": ">=2.1.330" }`, so a client from 2.1.323 to 2.1.329 refuses to install
+OMCA, keeps the version it has on `claude plugin update`, and does not load a newer copy. A client
+older than 2.1.323 ignores the range and loads OMCA without its mod.
 
 Where the built-in `sec-default` guard loads (a machine whose managed settings set at least one
 key or that has a `managed-mcp.json` file, or a session signed in with `/login` on a Team or
@@ -350,7 +356,7 @@ loads no plugins.
 ## Platform support
 
 CI runs the validator, the lint, the type checks, the bun specs, the mod tests, a smoke session
-and the OpenCode adapter specs against Claude Code 2.1.325. Pushes to main and pull requests run
+and the OpenCode adapter specs against Claude Code 2.1.330. Pushes to main and pull requests run
 on Linux; a release tag or a manual run adds macOS and Windows. The
 guard reads Bash and PowerShell commands, including `cmd /c` and `Invoke-Expression`, and
 resolves home and project paths per platform. The README screenshots are captured with tmux,

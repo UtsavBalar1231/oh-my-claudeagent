@@ -26,7 +26,7 @@ function record(root: string, session: Session, agent: string, slot: Verificatio
 }
 
 // PostToolUse fires for evidence_log only once the entry is written: a refused call fires
-// PostToolUseFailure instead (probed on 2.1.319).
+// PostToolUseFailure instead.
 function markLogged(root: string, session: Session, agent: string, now: number): void {
   const slot = session.verifications?.get(agent);
   if (slot === undefined || slot.evidence_logged) return;

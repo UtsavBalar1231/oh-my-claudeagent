@@ -10,6 +10,7 @@ type Sites = {
   "turn.complete": [Args<"turn.complete">, EventResult<"turn.complete">];
   "prompt.submit": [Args<"prompt.submit">, EventResult<"prompt.submit">];
   "agent.spawn": [Args<"agent.spawn">, EventResult<"agent.spawn">];
+  "agent.report": [Args<"agent.report">, EventResult<"agent.report">];
   "prompt.edit": [Args<"prompt.edit">, EventResult<"prompt.edit">];
   "prompt.change": [Args<"prompt.change">, EventResult<"prompt.change">];
   "prompt.autocomplete": [Args<"prompt.autocomplete">, EventResult<"prompt.autocomplete">];

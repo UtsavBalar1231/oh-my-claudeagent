@@ -451,7 +451,7 @@ test("only the coordinator is offered the task writers, and it gets one list", a
   }
 })
 
-test("start-work refuses Plan mode before asking anything", async () => {
+test("start-work refuses Plan mode before changing anything", async () => {
   const fake = fakeContext()
   fake.session("ses_one").agent = "plan"
   await plugin.setup(fake.ctx)
@@ -460,11 +460,11 @@ test("start-work refuses Plan mode before asking anything", async () => {
   expect(fake.prompts).toEqual([])
 })
 
-test("start-work asks approval, switches to the coordinator and writes no state", async () => {
+test("start-work is its own approval: it asks nothing more, switches to the coordinator and writes no state", async () => {
   const fake = fakeContext()
   await plugin.setup(fake.ctx)
   await command(fake, "omca-start-work").execute({ sessionID: "ses_one", prompt: { text: " plans/work.md " }, delivery: "steer" })
-  expect(fake.permissions).toEqual([{ sessionID: "ses_one", action: "omca.start", resources: ["plans/work.md"], save: [] }])
+  expect(fake.permissions).toEqual([])
   expect(fake.session("ses_one").agent).toBe("omca")
   expect(fake.prompts[0]).toMatchObject({ sessionID: "ses_one", delivery: "steer" })
   expect(String(fake.prompts[0]?.text)).toStartWith("The user ran /omca-start-work and approved it.")
@@ -473,20 +473,13 @@ test("start-work asks approval, switches to the coordinator and writes no state"
   expect(existsSync(join(fake.ctx.location.directory, ".omca"))).toBe(false)
 })
 
-test("start-work with no argument approves the open run", async () => {
+test("start-work with no argument continues the open run without a permission prompt", async () => {
   const fake = fakeContext()
   await plugin.setup(fake.ctx)
   await command(fake, "omca-start-work").execute({ sessionID: "ses_one", prompt: { text: "" }, delivery: "steer" })
-  expect(fake.permissions).toEqual([{ sessionID: "ses_one", action: "omca.start", resources: ["*"], save: [] }])
-})
-
-test("a denied start leaves the session where it was", async () => {
-  const fake = fakeContext()
-  await plugin.setup(fake.ctx)
-  fake.deny(() => { throw new Error("native denial") })
-  await expect(command(fake, "omca-start-work").execute({ sessionID: "ses_one", prompt: { text: "work.md" }, delivery: "steer" })).rejects.toThrow("native denial")
-  expect(fake.session("ses_one").agent).toBe("build")
-  expect(fake.prompts).toEqual([])
+  expect(fake.permissions).toEqual([])
+  expect(fake.session("ses_one").agent).toBe("omca")
+  expect(String(fake.prompts[0]?.text)).toStartWith("The user ran /omca-start-work and approved it.")
 })
 
 test("the panel reads the checkout's run for any session in it", async () => {

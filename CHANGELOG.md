@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.4.0] - 2026-11-24
+
+### Added
+
+- **Receipts on subagent reports:** a subagent's report now reaches the conversation that started
+  it with a line of what OMCA saw its tool calls do: the files it edited, its last verification
+  command with its exit code, and whether evidence was logged after that check. The orchestrator
+  can tell an agent that says "tests pass" from one whose last check failed or never ran.
+  `OMCA_DISABLED_HOOKS=report-receipts` turns it off.
+
+### Changed
+
+- **Claude Code 2.1.330 or later:** OMCA now needs Claude Code 2.1.330, up from 2.1.300, and both
+  manifests say so in `engines`. On Claude Code 2.1.323 to 2.1.329 an install is refused with a
+  message to run `claude update`, and `claude plugin update` keeps the OMCA you have; an older
+  client loads OMCA without its mod. CI and the install check test with 2.1.330, and the engine
+  types are regenerated from it.
+- **Flaky checks in a run:** `/start-work` took a rerun that passed as evidence that a failed check
+  was a false positive. A rerun that passes now shows only that the failure is intermittent, and
+  a failure that fails the same way without the run's changes is named in the report as
+  pre-existing.
+- **A running Monitor pauses task continuation:** from Claude Code 2.1.329 the Stop payload
+  lists a Monitor as `monitor` rather than `shell`, so the continuation gate now lets a session
+  stop while a Monitor runs, as it does for a running subagent, and the Monitor's output wakes
+  the session. A background shell, such as a dev server, still does not.
+- **Agent costs:** the cost on an agent's lane, in its delegation record and on the Stats page is
+  now Claude Code's own per-agent figure, so it includes fast mode, long prompts, the advisor and
+  web search, and it starts over at `/clear` and `/resume`. An agent Claude Code lists no cost for,
+  such as a teammate in a pane of its own, shows none. The hand-kept price table and the pricing
+  date on the Stats page are gone; delegation records written before this release keep the
+  table's estimate.
+
+### Fixed
+
+- **Empty reports from background agents:** the advice to resume an agent whose report came back
+  empty or stalled reached the orchestrator only for an agent it waited on. It now comes with every
+  report, a background agent's included, and the server no longer hooks the `Agent` tool for it.
+- **Status line after `/compact`:** Claude Code's payload holds an all-zero `current_usage`
+  between a compaction and the next request, and its docs say to treat that as no reading. A
+  payload with no percentage beside it drew the context bar at 0%; it now shows the waiting
+  state, as before the first request.
+- **OpenCode approvals:** after a run closed or a task was blocked, the OMCA coordinator answered
+  "continue", new work or a one-off request by asking you to run `/omca-start-work`, and the
+  command then asked again in an `omca.start` permission dialog. Your own message now approves
+  the work it asks for: the coordinator reopens a blocked task, continues a run or creates tasks
+  for new work without the command, and typing `/omca-start-work` is its only approval, with no
+  dialog after it. An open run is still taken up only when you ask for work on it.
+
 ## [4.3.0] - 2026-11-19
 
 ### Added
@@ -3583,6 +3631,7 @@ for multi-agent orchestration.
 - Shellcheck fixes applied across all hook scripts
 - Ruff fixes applied to Python MCP servers
 
+[4.4.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.3.0...v4.4.0
 [4.3.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.2.2...v4.3.0
 [4.2.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.2.1...v4.2.2
 [4.2.1]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.2.0...v4.2.1

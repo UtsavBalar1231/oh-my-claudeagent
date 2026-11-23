@@ -357,6 +357,7 @@ function recording() {
     Code: draw("Code"),
     Markdown: draw("Markdown"),
     Progress: draw("Progress"),
+    Shader: draw("Shader"),
   };
   return { calls, table };
 }

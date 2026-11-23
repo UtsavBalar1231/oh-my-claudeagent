@@ -106,7 +106,8 @@ async function threeAgents($: Engine, on: On) {
   await $.agent.spawn(spawnOf(1, "executor", "Fix the heading parser", "Fix the heading parser so fenced lines are skipped."));
   await $.agent.spawn(spawnOf(2, "explorer", "Map the router callers", "Find every caller of the router."));
   await $.agent.spawn(spawnOf(3, "architect", "Review the ledger design", "Review the ledger rotation."));
-  w.agents = ["a-1", "a-2", "a-3"].map((id) => ({ id, description: "", type: "x", status: "running" }));
+  const listedCosts = [["a-1", 0.0371], ["a-2", 0.2349], ["a-3", 1.5]] as const;
+  w.agents = listedCosts.map(([id, usd]) => ({ id, description: "", type: "x", status: "running", cost: { usd } }));
   await stepAll($, "a-1", 3);
   await stepAll($, "a-2", 2);
   await stepAll($, "a-3", 1);
@@ -209,17 +210,17 @@ test("the latest wave's finished agents keep their blocks under a Finished label
     "executor        ◆ running     15s",
     "Fix the heading parser",
     "✶ Bash bun test src/par…  4 calls",
-    "sonnet-5-5 · high · 4.5k · ~$0.02",
+    "sonnet-5-5 · high · 4.5k · ~$0.04",
     "Finished",
     "architect       ! stopped     15s",
     "Review the ledger design",
     "stopped",
-    "sonnet-5-5 · high · 2.5k · ~$0.01",
+    "sonnet-5-5 · high · 2.5k · ~$1.50",
     " ",
     "explorer        ✓ done        12s",
     "Map the router callers",
     "Mapped 14 callers of the router.",
-    "sonnet-5-5 · high · 2.5k · ~$0.01",
+    "sonnet-5-5 · high · 2.5k · ~$0.23",
     "d: Details  1 running · 2 finished · 9.5k tokens",
   ]);
   const done = await ui.find({ key: "done-a-2" });
@@ -294,7 +295,7 @@ test("hovering a lane reveals a card, drawn last so it paints over the rows belo
   await $.command.run(run(""));
   const secret = "sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123";
   await $.agent.spawn(spawnOf(1, "executor", "Rotate the key", `Rotate the key ${secret} kept in /home/u/.env and confirm the service restarts cleanly afterwards.`));
-  w.agents = [{ id: "a-1", description: "", type: "x", status: "running" }];
+  w.agents = [{ id: "a-1", description: "", type: "x", status: "running", cost: { usd: 0.0612 } }];
   await stepAll($, "a-1", 1);
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
 
@@ -347,7 +348,7 @@ test("a card that cannot fit below its lane in a short inline body is pinned ins
     "Fix the heading parser so fenced lines are skipped.",
     "Last output",
     "Found the heading rule.",
-    "4 tool calls · 4.5k tokens · ~$0.02",
+    "4 tool calls · 4.5k tokens · ~$0.04",
   ]);
   await ui.unmount();
 });
@@ -376,7 +377,7 @@ test("d shows each running block's prompt and last output and a finished block's
     "executor        ◆ running      0s",
     "Fix the heading parser",
     "· Bash bun test src/par…  4 calls",
-    "sonnet-5-5 · high · 4.5k · ~$0.02",
+    "sonnet-5-5 · high · 4.5k · ~$0.04",
     "prompt  Fix the heading parser so",
     "        fenced lines are skipped.",
     "output  Found the heading rule.",
@@ -384,7 +385,7 @@ test("d shows each running block's prompt and last output and a finished block's
     "explorer        ◆ running      0s",
     "Map the router callers",
     "· ast_search              2 calls",
-    "sonnet-5-5 · high · 3.0k · ~$0.01",
+    "sonnet-5-5 · high · 3.0k · ~$0.23",
     "prompt  Find every caller of the",
     "        router.",
     "output  none yet",
@@ -392,7 +393,7 @@ test("d shows each running block's prompt and last output and a finished block's
     "architect       ✓ done         0s",
     "Review the ledger design",
     "The ledger holds.",
-    "sonnet-5-5 · high · 2.5k · ~$0.01",
+    "sonnet-5-5 · high · 2.5k · ~$1.50",
     "prompt  Review the ledger",
     "        rotation.",
     "d: Hide details  2 running · 1 finished",
@@ -555,7 +556,7 @@ test("OMCA_GLYPHS=ascii draws relaxed blocks in ASCII, the agent's glyph in a on
   engine(on, STEPS);
   await $.command.run(run(""));
   await $.agent.spawn(spawnOf(1, "executor", "Fix the heading parser", "Fix it."));
-  w.agents = [{ id: "a-1", description: "", type: "x", status: "running" }];
+  w.agents = [{ id: "a-1", description: "", type: "x", status: "running", cost: { usd: 0.0371 } }];
   await stepAll($, "a-1", 3);
   const ui = await $.ui.mount(pane("terminal", INLINE_80));
 
@@ -568,7 +569,7 @@ test("OMCA_GLYPHS=ascii draws relaxed blocks in ASCII, the agent's glyph in a on
     `executor${" ".repeat(44)}@ running      0s`,
     "Fix the heading parser",
     spread("| Bash bun test src/parser.spec.ts", "4 calls", 69),
-    "sonnet-5-5 - high - 4.5k tokens - ~$0.02",
+    "sonnet-5-5 - high - 4.5k tokens - ~$0.04",
     "d: Details  1 running - 0 finished - 4.5k tokens",
   ]);
   expect(body(tree).filter((row) => !isAscii(row))).toEqual([]);
@@ -670,21 +671,21 @@ test("a running agent with no mascot keeps its icon in the mini's place and the 
   await ui.unmount();
 });
 
-test("two priced steps add up on the lane as an approximate cost beside the token count", async ($, on) => {
+test("a lane's cost is the agent list's figure at the last step, beside the token count and marked approximate", async ($, on) => {
   engine(on, { "a-1": [{ uses: [] }, { uses: [] }] });
   const w = world(on, {});
   await $.command.run(run(""));
   await $.agent.spawn(spawnOf(1, "executor", "Price the steps", "Price the steps."));
-  w.agents = [{ id: "a-1", description: "", type: "x", status: "running" }];
+  w.agents = [{ id: "a-1", description: "", type: "x", status: "running", cost: { usd: 0.0482 } }];
   await stepAll($, "a-1", 2);
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
 
-  expect(body(await ui.drawn())).toContain("sonnet-5-5 · high · 3.0k · ~$0.01");
+  expect(body(await ui.drawn())).toContain("sonnet-5-5 · high · 3.0k · ~$0.05");
   await ui.unmount();
 });
 
-test("a step whose model has no price drops the lane's cost and it stays dropped", async ($, on) => {
-  engine(on, { "a-1": [{ uses: [] }, { uses: [] }] }, "claude-mystery-1");
+test("an agent the list holds no cost for shows no cost on its lane, not zero", async ($, on) => {
+  engine(on, { "a-1": [{ uses: [] }, { uses: [] }] });
   const w = world(on, {});
   await $.command.run(run(""));
   await $.agent.spawn(spawnOf(1, "executor", "Price the steps", "Price the steps."));
@@ -795,6 +796,7 @@ test("spare rows wrap a block's task and result to two lines, and its details pr
   const task = "Port the incremental lexer onto the shared token stream and keep every fixture";
   await $.agent.spawn(spawnOf(1, "executor", task, `${task}. Then run the whole suite and report every failure that remains in the tree.`));
   await $.agent.spawn(spawnOf(2, "explorer", "Map the router callers", "Map."));
+  w.agents = [{ id: "a-2", description: "", type: "x", status: "running", cost: { usd: 0.0731 } }];
   await finish($, "a-2", `${task} and say what is left.`);
   w.agents = running(1);
   const ui = await $.ui.mount(pane("terminal", DOCK_120));
@@ -810,7 +812,7 @@ test("spare rows wrap a block's task and result to two lines, and its details pr
     "Map the router callers",
     "Port the incremental lexer onto",
     "the shared token stream and keep…",
-    "sonnet-5-5 · 2.5k tokens · ~$0.00",
+    "sonnet-5-5 · 2.5k tokens · ~$0.07",
     "d: Details  1 running · 1 finished · 2.5k tokens",
   ]);
   await ui.press({ key: "d" });
@@ -860,12 +862,12 @@ test("the empty state tells what a lane is and how to open it", async ($, on) =>
   await ui.unmount();
 });
 
-test("a resumed agent reopens its row and lane with the start and totals it had, and its next completion adds to them", async ($, on) => {
+test("a resumed agent reopens its row and lane with the start and totals it had, and its next completion adds to its tokens and takes the engine's cost", async ($, on) => {
   const w = world(on, {});
   const last = new Map<string, Record<string, Record<string, unknown>>>();
   on("state.set", (_$, e, next) => (last.set(e.key, e.value as Record<string, Record<string, unknown>>), next(e)));
   engine(on, STEPS);
-  w.agents = [{ id: "a-1", description: "", type: "x", status: "running" }];
+  w.agents = [{ id: "a-1", description: "", type: "x", status: "running", cost: { usd: 0.0412 } }];
   const row = () => last.get("agents")?.["a-1"];
   const lane = () => last.get("lanes")?.["a-1"];
 
@@ -875,7 +877,7 @@ test("a resumed agent reopens its row and lane with the start and totals it had,
   await finish($, "a-1", "Fixed.");
   const ended = row();
   expect(ended).toMatchObject({ status: "answer", inputTokens: 2000, outputTokens: 500 });
-  expect(ended?.["costUsd"]).toBeGreaterThan(0);
+  expect(ended?.["costUsd"]).toBe(0.0412);
   expect(ended?.["endedAt"]).not.toBeNull();
   expect(w.toasts).toEqual([]);
 
@@ -884,10 +886,25 @@ test("a resumed agent reopens its row and lane with the start and totals it had,
   expect(row()).toEqual({ ...ended, status: "running", endedAt: null });
   expect(lane()).toEqual({ prompt: "Fix the heading parser so fenced lines are skipped.", calls: 2, tool: null, output: "", result: "" });
 
+  w.agents = [{ id: "a-1", description: "", type: "x", status: "running", cost: { usd: 0.1031 } }];
   await stepAll($, "a-1", 1);
   await $.turn.complete({ answer: "Fixed again.", durationMs: 1000, isAborted: false, turnId: "t-a-1", reason: "answer", agentId: "a-1", usage: usage(3000, 700) });
   expect(row()).toMatchObject({ status: "answer", startedAt: ended?.["startedAt"], inputTokens: 5000, outputTokens: 1200 });
   expect(row()?.["endedAt"]).not.toBeNull();
-  expect(row()?.["costUsd"]).toBe((ended?.["costUsd"] as number) * 2);
+  expect(row()?.["costUsd"]).toBe(0.1031);
   expect(w.toasts).toEqual([]);
+});
+
+test("an agent the list drops before it finishes keeps the last cost the list gave", async ($, on) => {
+  const w = world(on, {});
+  const last = new Map<string, Record<string, Record<string, unknown>>>();
+  on("state.set", (_$, e, next) => (last.set(e.key, e.value as Record<string, Record<string, unknown>>), next(e)));
+  engine(on, STEPS);
+  w.agents = [{ id: "a-1", description: "", type: "x", status: "running", cost: { usd: 0.0412 } }];
+
+  await $.agent.spawn(spawnOf(1, "executor", "Fix the heading parser", "Fix the heading parser so fenced lines are skipped."));
+  await stepAll($, "a-1", 1);
+  w.agents = [];
+  await finish($, "a-1", "Fixed.");
+  expect(last.get("agents")?.["a-1"]).toMatchObject({ status: "answer", costUsd: 0.0412 });
 });

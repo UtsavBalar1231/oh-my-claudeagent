@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { POOR_HANDBACK, POOR_OUTPUT } from "./empty-task-response.ts";
+import { POOR_OUTPUT } from "../../src/core/report-receipt.ts";
+import { POOR_HANDBACK } from "./empty-task-response.ts";
 import { dispatch, type Payload } from "./registry.ts";
 
 const NOW = 1_786_000_000_000;
@@ -28,20 +29,12 @@ function check(fields: Record<string, unknown>) {
 const handback = (message: string, agentType = "oh-my-claudeagent:executor") =>
   check({ tool_name: "SubagentHandback", agent_id: "a1", agent_type: agentType, tool_input: { message } });
 
-const agentResult = (toolResponse: unknown, subagentType = "oh-my-claudeagent:executor") =>
-  check({ tool_name: "Agent", tool_input: { subagent_type: subagentType }, tool_response: toolResponse });
-
-describe("payloads that carry no report", () => {
-  test("empty-task-response: async launch acknowledgement is silent", async () => {
-    expect(await agentResult({ isAsync: true, status: "async_launched", agentId: "a1", outputFile: "/tmp/a1.txt" })).toEqual({});
+describe("payloads that carry no hand-back", () => {
+  test("empty-task-response: an Agent result is left to the mod's agent.report, even an empty one", async () => {
+    expect(await check({ tool_name: "Agent", tool_input: { subagent_type: "oh-my-claudeagent:executor" }, tool_response: { status: "completed", content: [] } })).toEqual({});
   });
 
-  test("empty-task-response: completed Agent result pointing at a hand-back is silent", async () => {
-    const pointer = `This agent's report was delivered to you as a message from "a1" (its SubagentHandback call). Read it there; it is not repeated here.`;
-    expect(await agentResult({ status: "completed", handback: "send", content: [{ type: "text", text: pointer }] })).toEqual({});
-  });
-
-  test("empty-task-response: a tool other than Agent or SubagentHandback is never checked", async () => {
+  test("empty-task-response: a tool other than SubagentHandback is never checked", async () => {
     expect(await check({ tool_name: "Read", tool_input: { message: "4" }, tool_response: { status: "completed", content: [] } })).toEqual({});
   });
 });
@@ -120,27 +113,6 @@ describe("a report whose lines start with a bracket", () => {
     const report = "[FILES: src/a.ts, src/b.ts]\nANSWER: the guard lives in src/b.ts and the parser in src/a.ts\nNEXT STEPS: none";
     expect(await handback(report, "oh-my-claudeagent:explorer")).toEqual({});
     expect(await handback("[src/guard.ts:20 rejects unknown IDs before lookup; the existing regression passes]")).toEqual({});
-  });
-});
-
-describe("a completed Agent result carries the report in content[].text", () => {
-  test("empty-task-response: completed Agent prose needs no header-repair advisory", async () => {
-    expect(await agentResult({ status: "completed", content: [{ type: "text", text: UNSTRUCTURED }] })).toEqual({});
-  });
-
-  test("empty-task-response: completed Agent result with a full report is silent", async () => {
-    expect(await agentResult({ status: "completed", content: [{ type: "text", text: FULL_EXECUTOR_REPORT }] })).toEqual({});
-  });
-
-  test("empty-task-response: completed Agent result with empty content gives the orchestrator the poor-output advice", async () => {
-    expect(POOR_OUTPUT).toContain("delegation error carrying the agent's partial work");
-    expect(await agentResult({ status: "completed", content: [] })).toEqual(POOR);
-  });
-
-  test("empty-task-response: text blocks are joined and blocks without text are skipped", async () => {
-    const [head = "", tail = ""] = FULL_EXECUTOR_REPORT.split("\nEVIDENCE:");
-    const content = [{ type: "text", text: head }, { type: "image" }, { type: "text", text: `EVIDENCE:${tail}` }];
-    expect(await agentResult({ status: "completed", content })).toEqual({});
   });
 });
 

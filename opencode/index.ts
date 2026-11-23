@@ -203,11 +203,10 @@ async function setup(ctx: Context) {
       })
       editor.add({
         name: "omca-start-work",
-        description: "Approve and run a plan, or the open run on this checkout's task list, in Build or OMCA",
+        description: "Run a plan, or the open run on this checkout's task list, in Build or OMCA",
         execute: async ({ sessionID, prompt, delivery }) => {
           const session = await sessionAt(sessionID)
           if (session.agent === "plan") throw new Error("Switch to Build or OMCA before starting work")
-          await ctx.permission.assert({ sessionID, action: "omca.start", resources: [prompt.text.trim() || "*"], save: [] })
           await ctx.session.switchAgent({ sessionID, agent: "omca" })
           await ctx.session.prompt({ ...expand(prompt, EXECUTION), metadata: { source: COMMAND_SOURCE }, sessionID, delivery })
         },
@@ -216,10 +215,6 @@ async function setup(ctx: Context) {
   }
 
   await ctx.permission.hook("evaluate", (event) => {
-    if (event.action === "omca.start") {
-      event.effect = "ask"
-      event.message = "Start OMCA execution of this plan in the current session?"
-    }
     if (event.agent === "plan" && event.action === "subagent" && event.resources.some((id) => id !== "explore" && !READ_ONLY_AGENTS.has(id))) {
       event.effect = "deny"
       event.message = "OMCA planning cannot launch execution-capable specialists"
