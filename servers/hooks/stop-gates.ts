@@ -143,7 +143,8 @@ function askedUserThisTurn(entries: Entries): boolean {
 
 // A spawned subagent is a background task, so every parallel wave ends a turn this way; the
 // turn is paused until the work wakes it, not stalled mid-run. A background shell (a dev
-// server, a watcher) runs on its own and wakes nothing, so it does not count.
+// server, a watcher) runs on its own and wakes nothing, so it does not count. A Monitor feeds
+// each output line back to the session, so it counts like a subagent.
 const hasLiveBackgroundTask = (tasks: unknown): boolean =>
   Array.isArray(tasks) &&
   tasks.some((task) => isRecord(task) && task.type !== "shell" && !TERMINAL_TASK_STATUS.test(String(task.status ?? "running").toLowerCase()));

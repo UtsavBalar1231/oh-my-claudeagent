@@ -8,7 +8,7 @@ file is listed in the [reference](references.md).
 ### Install
 
 Install the plugin with the command in the [README](../README.md#install). OMCA needs Claude
-Code 2.1.300 or later and bun 1.4.2 or later. `ast-grep` (or `sg`) is optional: without it the
+Code 2.1.330 or later and bun 1.4.2 or later. `ast-grep` (or `sg`) is optional: without it the
 `ast_*` tools return an error and everything else works.
 
 ### Run setup
@@ -122,7 +122,7 @@ Commands:
 | --- | --- |
 | `/omca [tasks\|agents\|evidence\|notepad\|doctor]` | Open the terminal panel on a tab without starting work; run it again to close or focus the panel |
 | `/omca-plan <request>` | Discuss a plan in native Plan mode; save a file only when asked |
-| `/omca-start-work [plan or instructions]` | Ask approval, then coordinate the open run or turn the plan into tasks and run them |
+| `/omca-start-work [plan or instructions]` | Coordinate the open run, or turn the plan into tasks and run them. Typing it is the approval, so no permission prompt follows |
 | `/omca-analyzer`, `/omca-reviewer`, `/omca-build-fixer` | Ask the primary agent to launch the specialist |
 
 Use Build or OMCA before starting work. A plan is the conversation or a document in
@@ -157,6 +157,11 @@ token missing from an English word list into listed words, and counts a join tha
 function word or three or more words. It refuses at 5 missing spaces that are also 1% of the
 prompt's words. Code, URLs, paths, flags and names inside a sentence are skipped.
 `OMCA_DISABLED_HOOKS=delegation-guard` turns the refusal off.
+
+Asking the `omca` coordinator for work in your own words is enough: it continues or reopens a
+run, or creates tasks for new work, without asking you to run `/omca-start-work`, which only
+starts executing a finished plan. An open run on the task list is taken up only when you ask for
+work on it.
 
 **Continuation:** OpenCode has no Stop veto, so OMCA continues the session instead. Once the
 `omca` session creates a task or starts or completes one, each time it would go idle with tasks
@@ -258,6 +263,14 @@ Type `@agent-oh-my-claudeagent:<name>` to send a request to one agent, for examp
 The analyzer, reviewer and build-fixer skills (`/oh-my-claudeagent:analyzer`, `/oh-my-claudeagent:reviewer`,
 `/oh-my-claudeagent:build-fixer`) fork into a background subagent and its result arrives in the conversation
 when it finishes. `/rewind` does not undo the build-fixer's edits, as with executors, so revert them with git.
+
+On Claude Code, a subagent's report reaches the conversation that started it with a receipt line of what OMCA saw
+the agent's tool calls do, so the model can check the agent's account against it: the files it
+edited, its last verification command and exit code, and whether evidence was logged after that
+check, as in ``[OMCA receipt] … edited 2 files (src/a.ts, src/b.ts); last check `just test` failed
+with exit code 1, with no evidence logged after it.`` An agent that edited nothing and ran no
+check gets no line. A report that is empty or stops at its opening gets advice to resume the agent
+once. `OMCA_DISABLED_HOOKS=report-receipts` turns the receipt off.
 
 ## The transcript, the band and the pane
 
@@ -389,9 +402,9 @@ Two pages have no digit key. `/omca stats` and `/omca doctor` open them, the tab
 one shown after the tabs, and a digit goes back to a tab:
 
 - **Stats**: runs per agent type, the evidence rate of executor and build-fixer, the agents that
-  run checks, tokens per finished delegation, and the estimated cost by agent, across the
-  project's recorded sessions. Runs on a model without a
-  known price are counted as excluded rather than estimated. `r` reloads the records.
+  run checks, tokens per finished delegation, and the cost by agent as Claude Code estimates it,
+  across the project's recorded sessions. Runs for which Claude Code reported no cost are counted
+  as excluded rather than estimated. `r` reloads the records.
 - **Doctor**: the checks described below.
 
 As you type, the prompt's typeahead offers the `/omca` subcommands. Press Ctrl+X then Tab,
@@ -570,7 +583,7 @@ server's whole normalized name followed by `__*`. A shorter prefix such as
 
 `/omca doctor` opens the Doctor page and runs its checks:
 
-- the OMCA version that is loaded, and whether Claude Code meets the 2.1.300 floor;
+- the OMCA version that is loaded, and whether Claude Code meets the 2.1.330 floor;
 - whether bun 1.4.2 or later is on the session's `PATH`;
 - when a hook last reached the `omca` server;
 - whether `ast-grep` or `sg` is on `PATH`;
@@ -639,10 +652,10 @@ keeps a warning under the prompt while the server is off, and the Doctor page re
 missing. Make bun reachable from the app's `PATH`, for example
 by linking it into a directory the app searches, and restart the app.
 
-The Code tab in Desktop runs its own bundled copy of Claude Code. OMCA's mod
-(the guard, transcript rows, band, pane and toasts) runs there only when that copy is 2.1.300 or
-later; `/status` in a Code-tab session shows its version. On an older copy the agents, skills,
-MCP tools and stop gates still work and the mod does not load. Desktop for Linux is a beta for
+The Code tab in Desktop runs its own bundled copy of Claude Code, and OMCA loads there only when
+that copy is 2.1.330 or later; `/status` in a Code-tab session shows its version. A copy from
+2.1.323 to 2.1.329 lists OMCA as not loaded. An older copy loads the agents, skills, MCP tools and
+stop gates without the mod (the guard, transcript rows, band, pane and toasts). Desktop for Linux is a beta for
 Debian and Ubuntu that updates through the package manager, so a newer bundled copy arrives with
 the app's own update. When `/plugin` in a Desktop session does not list OMCA, name the plugin's
 folder in `CLAUDE_CODE_PLUGIN_DIRS` ([anthropics/claude-code#94635](https://github.com/anthropics/claude-code/issues/94635)).
@@ -690,8 +703,9 @@ the tool again; do not skip the evidence.
 
 **The band, the pane and the guard are gone.** The mod is not running. On the first prompt of a
 session the `omca` server shows a message once when that happens, saying the Bash guard, band and
-pane are off. Run `/plugin` and check that OMCA is listed under mods active. The mod does not
-load on a Claude Code older than 2.1.300. Mods are off when your organization sets
+pane are off. Run `/plugin` and check that OMCA is listed under mods active. A Claude Code older
+than 2.1.323 loads OMCA without its mod; from 2.1.323 to 2.1.329 it does not load OMCA at all.
+Mods are off when your organization sets
 `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks`, when Anthropic turns them
 off remotely, or after the mod worker crashes three times. Using Desktop can save that remote
 switch as off in `~/.claude.json`, which then turns mods off in the terminal too; removing `cachedGrowthBookFeatures.tengu_plugin_hooks_modules` from that file and restarting

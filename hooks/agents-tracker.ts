@@ -1,7 +1,6 @@
 import type { AgentInfo, TurnUsage } from "claude-code";
 import { FORK, lookOf } from "../src/core/agent-type.ts";
 import { firstLine, lastLine, toolDetail } from "../src/core/mission.ts";
-import { estimateCostUsd } from "../src/core/pricing.ts";
 import { fitEnd, glyphs, oneLine } from "../src/core/ui-kit.ts";
 import { EVIDENCE_LOG_TOOL } from "../src/core/verification.ts";
 import { redact } from "../src/core/visual.ts";
@@ -103,10 +102,9 @@ function editLane(host: Host, id: string, change: (lane: Lane) => Lane): Promise
 const inputTokens = (usage: TurnUsage) =>
   usage.input_tokens + usage.cache_read_input_tokens + usage.cache_creation_input_tokens;
 
-function stepCost(total: number | null, usage: TurnUsage | null): number | null {
-  if (total === null || usage === null) return total;
-  const cost = estimateCostUsd(usage.model, usage);
-  return cost === null ? null : total + cost;
+/** Claude Code's own estimate for the agent, which the list drops soon after the agent reports; null where the list holds none. */
+async function costOf(host: Host, agentId: string): Promise<number | null> {
+  return (await host.agent.list()).find((agent) => agent.id === agentId)?.cost?.usd ?? null;
 }
 
 function edit(host: Host, id: string, change: (row: Row) => Row): Promise<void> {
@@ -117,11 +115,13 @@ function edit(host: Host, id: string, change: (row: Row) => Row): Promise<void> 
   });
 }
 
-function endAgent(host: Host, id: string, status: Status, usage: TurnUsage | undefined, at: number): Promise<void> {
+async function endAgent(host: Host, id: string, status: Status, usage: TurnUsage | undefined, at: number): Promise<void> {
   const before = carried.get(id);
   carried.delete(id);
-  return edit(host, id, (row) => ({
+  const costUsd = await costOf(host, id);
+  await edit(host, id, (row) => ({
     ...row,
+    costUsd: costUsd ?? row.costUsd,
     ...(row.teammate ? { status: "idle" as const } : { status, endedAt: at }),
     ...(usage === undefined
       ? {}
@@ -179,7 +179,7 @@ export const agentsTracker: Features = {
           endedAt: null,
           inputTokens: 0,
           outputTokens: 0,
-          costUsd: 0,
+          costUsd: null,
           status: "running",
           teammate: e.isTeammate === true,
           evidenceLogged: false,
@@ -235,13 +235,14 @@ export const agentsTracker: Features = {
     async post(host, e, result) {
       if (e.agentId === undefined) return undefined;
       const { usage } = result;
+      const costUsd = await costOf(host, e.agentId);
       await edit(host, e.agentId, (row) => ({
         ...row,
         status: "running",
         effort: e.effort ?? row.effort,
         inputTokens: row.inputTokens + (usage === null ? 0 : inputTokens(usage)),
         outputTokens: row.outputTokens + (usage?.output_tokens ?? 0),
-        costUsd: stepCost(row.costUsd, usage),
+        costUsd: costUsd ?? row.costUsd,
       }));
       const last = result.toolUses.at(-1);
       const [detail, output] = await Promise.all([

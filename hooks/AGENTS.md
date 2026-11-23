@@ -18,7 +18,7 @@ event is unregistered on purpose; `docs/references.md` carries the per-event rea
 try/catch. `host.ts` defines the `Host` closures a feature receives in place of `$`, so a
 feature module takes `host` and never `$`. The features are `bash-guard`, `server-check`,
 `mod-marker`, `agents-tracker`, `agent-rows`, `metrics`, `band`, `pane` with its `tabs/`, `footer`,
-`group-rows`, `blocker-rows`, `brief-rows`, `notify`, `keyword-paint`, `completion`, `refusal-recovery`, `omca-router`, `task-tools`,
+`group-rows`, `blocker-rows`, `brief-rows`, `notify`, `report-receipts`, `keyword-paint`, `completion`, `refusal-recovery`, `omca-router`, `task-tools`,
 `task-list` and `task-rows`. `doctor.ts` runs the Doctor page's checks and fixes for `tabs/doctor.ts`; it registers
 no event. `project-root.ts` gives `host.session.root()` the repository top level of the engine's
 root, as the `omca` server names its root, so a launch from a subdirectory reads and writes the same
@@ -87,7 +87,7 @@ atoms written once per turn or per finished agent, since a row subscribes to eve
   (`isExpanded` false), with OMCA's two-line row. `refusalOf` in `src/core/refusals.ts` reads the
   refusal back from the reason text OMCA wrote, only where the engine puts a refusal: at the start of
   the text, after one of its wrappers, or, for the comment check's two heads, after a bare `Error: `
-  that Claude Code 2.1.319 gives a refused Write or Edit. A failed command that only quotes a reason
+  that Claude Code gives a refused Write or Edit. A failed command that only quotes a reason
   matches nothing. The task subject comes from the `tasks` atom's last sync, not a read in the
   drawing. A missing prop, an expanded view, a remote surface or `OMCA_DISABLED_HOOKS=blocker-rows`
   leaves the engine's row. The Stop-hook holds and the comment gate's advice draw no row: no render
@@ -112,12 +112,27 @@ has an `agentId`, is not denied and is not a teammate, and a spawn with `resume`
 running. `turn.complete` records the end of a member by its `reason`: `answer` finished, `aborted`
 stopped, and `error` or `refusal` failed (`outcomeOf` in `src/core/notify.ts`). With no member
 running, `agentsDoneText` builds the one-line text, cut under 200 characters, and the wave is emptied
-after the send. From 2.1.321 the call carries `key: "agents-done"`, `delayMs: 60_000` and
+after the send. The call carries `key: "agents-done"`, `delayMs: 60_000` and
 `untilBack: true`, so a host holds it a minute and drops it when the person returns; a terminal
 ignores all three and raises it at once. The first spawn of a wave calls
-`$.ui.cancelNotify("agents-done")` to take back a held one. A client older than 2.1.321 gets the
-title alone and no cancel. Every call is awaited in a try/catch that logs.
+`$.ui.cancelNotify("agents-done")` to take back a held one. Every call is awaited in a try/catch
+that logs.
 `OMCA_DISABLED_HOOKS=notify` turns the feature off.
+
+`report-receipts` adds to a subagent's report what OMCA saw its tool calls do. Its `tool.call` post,
+on the `{ agentId: /./ }` registration beside `agents-tracker`, keeps a module record per agent of
+the calls that ran (a refused call adds nothing): the files a successful `Edit`, `Write` or
+`NotebookEdit` named, its last verification command through `shellReceipt` with the exit code from
+an error's `Exit code N` line, and whether a successful `evidence_log` followed that check. Its
+`agent.report` post appends one `[OMCA receipt]` line when the agent edited a file or ran a check
+(`receiptLine` in `src/core/report-receipt.ts`), and the `[POOR AGENT OUTPUT]` advice when a
+`completed` report other than `web-fetch`'s is empty or a stalled opening. `agent.report` fires once
+per report, for background and foreground agents and again after a `SendMessage` resume, in `-p` and
+in a terminal, also where `sec-default` is seated (probed on 2.1.330); a hook that throws leaves the
+report as the agent wrote it, so the registration carries no `.catch`. The record misses edits made
+through Bash and calls before a mod reload, which is why the line says what OMCA saw.
+`OMCA_DISABLED_HOOKS=report-receipts` drops the receipt and `empty-task-response` drops the advice,
+which on the server also covers the subagent's own hand-back.
 
 `task-rows` places one row with `$.ui.place` under the turn line of a main turn that changed a run's
 tasks, found by comparing the `tasks` atom at that turn's `turn.start` with the atom at its

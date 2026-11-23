@@ -48,7 +48,7 @@ export type Inputs = {
   hasTaskTools: boolean;
 };
 
-const ENGINE_FLOOR = "2.1.300";
+const ENGINE_FLOOR = "2.1.330";
 export const BUN_FLOOR = "1.4.2";
 const FRESH_MS = 10 * 60_000;
 

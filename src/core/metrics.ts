@@ -92,7 +92,7 @@ export function median(values: readonly number[]): number {
   return sorted.length % 2 === 1 ? (sorted[middle] ?? 0) : ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
 }
 
-// Costs are summed in the pricing table's integer unit, so a total is exact to the table's precision.
+// Costs are summed in whole units of 1e-8 dollar, so a total does not pick up float noise.
 const UNITS_PER_USD = 1e8;
 
 export function aggregate(records: readonly MetricsRecord[]): StatsRow[] {

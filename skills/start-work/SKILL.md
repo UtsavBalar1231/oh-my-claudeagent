@@ -234,7 +234,7 @@ Before each retry, classify the failure and reduce it to a signature.
 
 A fresh delegation after a failed attempt carries what was tried and why it failed: the exact commands or edits and the observed error. When a relaunched task fails again with the same error, call the `advisor` tool before the next relaunch, when you have it.
 
-A verification failure is never dismissed as a false positive without evidence that the failure itself was spurious, such as a logged flaky-test rerun that then passes.
+A verification failure is never dismissed as a false positive. A rerun that passes shows the failure is intermittent, not that it is harmless. A failure that fails the same way without the run's changes predates the run: name it in the report as pre-existing.
 
 ### Blocked tasks
 

@@ -15,6 +15,7 @@ import { modMarker } from "./mod-marker.ts";
 import { notify } from "./notify.ts";
 import { router } from "./omca-router.ts";
 import { refusalRecovery } from "./refusal-recovery.ts";
+import { reportReceipts } from "./report-receipts.ts";
 import { pane } from "./pane.ts";
 import { projectRoot } from "./project-root.ts";
 import { groupRows } from "./group-rows.ts";
@@ -183,7 +184,8 @@ const guardFailed = (reason: string): EventResult<"tool.check"> => ({
 export const register: Register = (on, pluginOptions) => {
   const options = readOptions(pluginOptions);
   const bash = featuresFor("tool.check", { bashGuard });
-  const toolCall = featuresFor("tool.call", { agentsTracker });
+  const toolCall = featuresFor("tool.call", { agentsTracker, reportReceipts });
+  const agentReport = featuresFor("agent.report", { reportReceipts });
   const taskCall = featuresFor("tool.call", { taskList });
   const sendCall = featuresFor("tool.call", { briefRows });
   const sessionStart = featuresFor("session.start", { taskTools, refusalRecovery, pane, modMarker, band, serverCheck, keywordPaint, taskList });
@@ -223,6 +225,7 @@ export const register: Register = (on, pluginOptions) => {
   });
   on("turn.complete", ($, e, next) => dispatch(bindHost($, options), "turn.complete", turnComplete, e, next));
   on("agent.spawn", ($, e, next) => dispatch(bindHost($, options), "agent.spawn", agentSpawn, e, next)).catch((_$, e, next) => next(e));
+  on("agent.report", ($, e, next) => dispatch(bindHost($, options), "agent.report", agentReport, e, next));
   on("prompt.edit", ($, e, next) => dispatch(bindHost($, options), "prompt.edit", promptEdit, e, next));
   on("prompt.change", ($, e, next) => dispatch(bindHost($, options), "prompt.change", promptChange, e, next));
   on("prompt.autocomplete", ($, e, next) => dispatch(bindHost($, options), "prompt.autocomplete", promptAutocomplete, e, next));

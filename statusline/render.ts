@@ -324,6 +324,8 @@ function contextPercent({ context_window: ctx }: Payload): number | null {
   const usage = ctx.current_usage;
   if (usage == null || size <= 0) return null;
   const used = (usage.input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0) + (usage.cache_read_input_tokens ?? 0);
+  // All zeros is how the payload reads after /compact until the next API call.
+  if (used === 0) return null;
   return Math.max(0, Math.min(100, (used / size) * 100));
 }
 
