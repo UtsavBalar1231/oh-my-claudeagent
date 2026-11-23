@@ -526,6 +526,12 @@ describe("task continuation and background work", () => {
     expect(await run.stop({ background_tasks: [...shell, ...RUNNING_SUBAGENT] }, NOW + 10 * SECOND)).toEqual({});
   });
 
+  test("a running Monitor opens it, since its output wakes the session", async () => {
+    const run = await openRun();
+    const monitor = [{ id: "task-003", type: "monitor", status: "running", description: "wait for the deploy", command: "until curl -sf localhost:8080; do sleep 5; done" }];
+    expect(await run.stop({ background_tasks: monitor })).toEqual({});
+  });
+
   test("a finished background task still blocks", async () => {
     const run = await openRun();
     expect(await run.stop({ background_tasks: FINISHED_SUBAGENT })).toEqual(CONTINUE);
