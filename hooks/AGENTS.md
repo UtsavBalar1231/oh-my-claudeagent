@@ -87,7 +87,7 @@ atoms written once per turn or per finished agent, since a row subscribes to eve
   (`isExpanded` false), with OMCA's two-line row. `refusalOf` in `src/core/refusals.ts` reads the
   refusal back from the reason text OMCA wrote, only where the engine puts a refusal: at the start of
   the text, after one of its wrappers, or, for the comment check's two heads, after a bare `Error: `
-  that Claude Code 2.1.319 gives a refused Write or Edit. A failed command that only quotes a reason
+  that Claude Code gives a refused Write or Edit. A failed command that only quotes a reason
   matches nothing. The task subject comes from the `tasks` atom's last sync, not a read in the
   drawing. A missing prop, an expanded view, a remote surface or `OMCA_DISABLED_HOOKS=blocker-rows`
   leaves the engine's row. The Stop-hook holds and the comment gate's advice draw no row: no render
@@ -112,11 +112,11 @@ has an `agentId`, is not denied and is not a teammate, and a spawn with `resume`
 running. `turn.complete` records the end of a member by its `reason`: `answer` finished, `aborted`
 stopped, and `error` or `refusal` failed (`outcomeOf` in `src/core/notify.ts`). With no member
 running, `agentsDoneText` builds the one-line text, cut under 200 characters, and the wave is emptied
-after the send. From 2.1.321 the call carries `key: "agents-done"`, `delayMs: 60_000` and
+after the send. The call carries `key: "agents-done"`, `delayMs: 60_000` and
 `untilBack: true`, so a host holds it a minute and drops it when the person returns; a terminal
 ignores all three and raises it at once. The first spawn of a wave calls
-`$.ui.cancelNotify("agents-done")` to take back a held one. A client older than 2.1.321 gets the
-title alone and no cancel. Every call is awaited in a try/catch that logs.
+`$.ui.cancelNotify("agents-done")` to take back a held one. Every call is awaited in a try/catch
+that logs.
 `OMCA_DISABLED_HOOKS=notify` turns the feature off.
 
 `task-rows` places one row with `$.ui.place` under the turn line of a main turn that changed a run's

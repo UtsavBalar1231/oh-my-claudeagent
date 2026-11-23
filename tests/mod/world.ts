@@ -292,9 +292,9 @@ export const run = (args: string, columns = 120) =>
 export type Size = { columns: number; rows: number; placement: "dock" | "inline"; isCapped?: true };
 
 // The body a terminal of `columns` gives the pane: inline spans the width inside two borders,
-// a dock opens at the pane's requested width inside its frame. A capped dock is the 2.1.305+
-// one, which with its divider takes at most 45% of the terminal (measured on 2.1.308: a
-// 51-column body at 120 columns, 87 at 200); the terminal docks from 110 columns.
+// a dock opens at the pane's requested width inside its frame. A capped dock with its divider
+// takes at most 45% of the terminal (measured: a 51-column body at 120 columns, 87 at 200);
+// the terminal docks from 110 columns.
 export function bodyColumns(size: Size): number {
   if (size.placement === "inline") return size.columns - 4;
   const requested = Math.max(Math.min(96, Math.max(56, Math.round(size.columns * 0.45))), Math.min(120, size.columns - 100));

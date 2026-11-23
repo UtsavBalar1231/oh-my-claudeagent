@@ -63,7 +63,7 @@ Only orchestrator and planner can spawn further agents. `servers/categories.json
 work to tiers for delegation: `quick`, `standard` and `readonly` to `sonnet`, `deep` to `opus`,
 `hardest` to `fable`.
 
-No agent sets `background: true`. A probe on Claude Code 2.1.319 against a mock model found that an
+No agent sets `background: true`. A probe against a mock model found that an
 agent spawned from the main session already runs in the background in `claude -p` and in an
 interactive session with fork mode on or off, and its result arrives in a `<task-notification>`
 before `-p` exits. The flag only overrides an explicit request to wait, and in `claude -p` a
@@ -336,10 +336,15 @@ reads, the ledger and notepads, and links the JSON Schema for the ledger.
 | `plan` and `start-work`, which stop unless `health_check` reports the runtime `ok` | Yes | When bun is on the app's `PATH` | Yes | When bun is on the app's `PATH` | Unless `allowManagedMcpServersOnly`, `allowManagedHooksOnly`, `disableAllHooks` or `allowManagedModsOnly` |
 | `omca` MCP tools | Yes | When bun is on the app's `PATH` | Yes | When bun is on the app's `PATH` | Unless `allowManagedMcpServersOnly` |
 | Stop checks, guidance, context injection | Yes | When bun is on the app's `PATH` | Yes | When bun is on the app's `PATH` | Unless `allowManagedHooksOnly` or `disableAllHooks` |
-| Guard decisions | Yes | When the app's Claude Code is 2.1.300 or later | Yes | Yes | Unless `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks` |
+| Guard decisions | Yes | When the app's Claude Code is 2.1.330 or later | Yes | Yes | Unless `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks` |
 | Band, pane, Tasks pane, doctor | Yes | As guard decisions, with [Desktop's differences](usage.md#desktop-and-vs-code) | No | No ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)) | As the guard |
 | Turn line, agent rows, receipts and image previews in the transcript | Yes, pictures where the terminal draws them (kitty, Ghostty, iTerm2 3.5 or later, and tmux 3.3 or later with passthrough on) | No: Desktop keeps its own rows, and the turn's figures and receipt arrive as a text row beneath the answer | No | No | As the guard |
 | Status line | Yes | Not documented | No | Not documented | Unless `allowManagedHooksOnly` or `disableAllHooks` |
+
+Every row needs Claude Code 2.1.330 or later on that surface. The manifests declare
+`engines: { "claude-code": ">=2.1.330" }`, so a client from 2.1.323 to 2.1.329 refuses to install
+OMCA, keeps the version it has on `claude plugin update`, and does not load a newer copy. A client
+older than 2.1.323 ignores the range and loads OMCA without its mod.
 
 Where the built-in `sec-default` guard loads (a machine whose managed settings set at least one
 key or that has a `managed-mcp.json` file, or a session signed in with `/login` on a Team or

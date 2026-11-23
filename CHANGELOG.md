@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Claude Code 2.1.330 or later:** OMCA now needs Claude Code 2.1.330, up from 2.1.300, and both
+  manifests say so in `engines`. On Claude Code 2.1.323 to 2.1.329 an install is refused with a
+  message to run `claude update`, and `claude plugin update` keeps the OMCA you have; an older
+  client loads OMCA without its mod. CI and the install check test with 2.1.330, and the engine
+  types are regenerated from it.
 - **Flaky checks in a run:** `/start-work` took a rerun that passed as evidence that a failed check
   was a false positive. A rerun that passes now shows only that the failure is intermittent, and
   a failure that fails the same way without the run's changes is named in the report as
