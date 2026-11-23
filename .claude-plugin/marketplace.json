@@ -7,7 +7,7 @@
   },
   "metadata": {
     "description": "oh-my-claudeagent: Claude Code, with receipts",
-    "version": "4.3.0"
+    "version": "4.4.0"
   },
   "plugins": [
     {
@@ -20,7 +20,7 @@
         "sha": "1d25950606974dd5a060e48e53e6d585cd1796c4"
       },
       "description": "Claude Code, with receipts. Plans with you, hands each task to a specialist agent, and keeps a session from calling work done until a verification is logged. Its hooks run in every session, a guard holds destructive shell commands for review, and setup can point your status line at OMCA.",
-      "version": "4.3.0",
+      "version": "4.4.0",
       "engines": {
         "claude-code": ">=2.1.330"
       },
