@@ -142,7 +142,10 @@ test("on Windows git's forward-slash top level takes the engine's backslashes", 
   const { w, lists, writes } = launched(on, at("C:\\work\\sub", WINDOWS), { stdout: "C:/work\n" });
   await $.session.start({ cwd: "C:\\work\\sub", surface: "terminal", isInteractive: true });
   expect(markers(w)).toEqual([`C:/work/.omca/state/mod/${SESSION}.json`]);
-  expect(writes.filter((path) => path.includes("/.omca/state/mod/")).map((path) => path.slice(path.indexOf("C:")))).toEqual([`C:\\work/.omca/state/mod/${SESSION}.json`]);
+  const written = writes.filter((path) => /[\\/]\.omca[\\/]state[\\/]mod[\\/]/.test(path)).map((path) => path.slice(path.indexOf("C:")));
+  const spelled = `C:\\work/.omca/state/mod/${SESSION}.json`;
+  // A Windows host writes every separator of a drive path as a backslash, so only a POSIX host shows the mod's own spelling.
+  expect([[spelled], [spelled.replaceAll("/", "\\")]]).toContainEqual(written);
   expect(lists).toEqual([taskListIdFor("C:\\work")]);
 });
 
