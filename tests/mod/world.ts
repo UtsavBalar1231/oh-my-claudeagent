@@ -36,6 +36,21 @@ export const POSIX = layoutOf("posix", "linux", ROOT, HOME, { HOME });
 export const WINDOWS = layoutOf("win32", "win32", "C:\\work", "C:\\Users\\u", { USERPROFILE: "C:\\Users\\u" });
 export const LAYOUTS: readonly Layout[] = [POSIX, WINDOWS];
 
+// A test names the fields the mod reads; `agent.list` fills the rest.
+type ListedAgent = Pick<AgentInfo, "id" | "description" | "type" | "status" | "parentId">;
+
+const listed = (agent: ListedAgent): AgentInfo => ({
+  kind: "local_agent",
+  taskStatus: "running",
+  label: agent.description,
+  startTime: 0,
+  cwd: ROOT,
+  tokenCount: 0,
+  tokenSamples: [],
+  hasRow: false,
+  ...agent,
+});
+
 export type World = {
   tools: string[];
   layout: Layout;
@@ -47,7 +62,7 @@ export type World = {
   settings: Record<string, unknown>;
   /** One source's settings, answered for `settings.read({ source })`; a source left out answers `settings`. */
   sources: Partial<Record<SettingsSource, Record<string, unknown>>>;
-  agents: AgentInfo[];
+  agents: ListedAgent[];
   panes: UiPane[];
   reads: string[];
   /** The paths `fs.read` was asked for; `reads` also holds exists, stat and list calls. */
@@ -142,7 +157,7 @@ export function world(
     said: [],
     clock: mock.clock(on, { now: Date.UTC(2026, 9, 2, 12, 0, 0) }),
     style: OUTPUT_STYLE,
-    version: "2.1.325",
+    version: "2.1.330",
   };
   mock.env(on, { OMCA_GLYPHS: "unicode", ...layout.env, ...env });
   on("session.root", () => ({ value: layout.root }));
@@ -151,7 +166,7 @@ export function world(
   }));
   on("session.id", () => ({ value: w.sessionId }));
   on("settings.read", (_$, e) => ({ value: (e.source === undefined ? undefined : w.sources[e.source]) ?? w.settings }));
-  on("agent.list", () => ({ value: w.agents }));
+  on("agent.list", () => ({ value: w.agents.map(listed) }));
   on("tool.list", () => ({ value: w.tools.map((name) => ({ name })) as never }));
   on("fs.read", { path: /[\\/]output-styles[\\/]omca-default\.md$/ }, (_$, e) => {
     w.reads.push(spelled(e.path));
