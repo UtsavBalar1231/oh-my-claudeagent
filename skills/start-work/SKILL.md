@@ -32,11 +32,11 @@ Run it from a session where the Agent tool is available:
 
 When plan mode is active, call `ExitPlanMode` first. Plugin agents cannot set their own `permissionMode`, so delegated agents inherit plan mode and could not edit.
 
-The task tools do not return metadata. `TaskList` prints `#id [status] subject (owner) [blocked by #a, #b]`, and `TaskGet` adds the description and the full `Blocked by:` list. Read a run through its final task:
+The task tools do not return metadata, so read the runs with OMCA's `task_list` and `task_get`, loading them if needed: `ToolSearch({query: "select:mcp__plugin_oh-my-claudeagent_omca__task_list,mcp__plugin_oh-my-claudeagent_omca__task_get", max_results: 2})`. `task_list` prints each run's tasks under `Run <name>:` and marks its final task `[final]`:
 
-1. Call `TaskList`. Each open task with the subject `Final verification` is one open run.
-2. Call `TaskGet` on it. Its description gives the run's name and the path of its plan document. Its `Blocked by:` line lists the run's other tasks.
-3. Leave alone any task no final task lists. It belongs to no run.
+1. Each run whose `[final]` task is open is one open run.
+2. Call `TaskGet` on that final task. Its description gives the path of the run's plan document.
+3. Leave alone the tasks under `In no run:`.
 
 Then choose:
 
@@ -65,7 +65,7 @@ Tell the user which run this is and how many of its tasks are complete.
 
 ## Delegation prompt
 
-Every delegation prompt carries these five sections. Call `TaskGet` first: `TaskList` shows only the title.
+Every delegation prompt carries these five sections. Call `task_get` on the task first: it gives the description and, in `blockedBy`, the tasks it depends on, completed ones included. `TaskList` shows only the title.
 
 ```markdown
 ## 1. TASK
@@ -88,7 +88,7 @@ Every delegation prompt carries these five sections. Call `TaskGet` first: `Task
 ### Run
 [The run's name, which is the `plan_name` for `notepad_write`.]
 ### Dependencies
-[What the tasks in its `Blocked by:` line built]
+[What the tasks in its `blockedBy` built]
 ### Files in play
 [The description's paths, plus what already exists at each]
 ```
