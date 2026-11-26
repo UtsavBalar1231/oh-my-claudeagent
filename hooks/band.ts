@@ -186,7 +186,7 @@ export const band: Features = {
           }),
         );
       }
-      // The engine refuses the whole band when the Box holding `beneath`, or any Box around it,
+      // The engine draws none of OMCA's row when the Box holding `beneath`, or any Box around it,
       // sets a size, a position, `display` or `overflow`.
       return Box({ key: "omca-band", flexDirection: "column", children: [...rows, beneath] });
     },

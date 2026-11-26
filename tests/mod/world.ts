@@ -59,6 +59,8 @@ export type World = {
   files: Map<string, { text: string; mtimeMs: number }>;
   /** A directory's own mtime for `fs.stat`, set by `touchDir`; a directory left out reports 0. */
   dirs: Map<string, number>;
+  /** Paths whose `fs.exists` is refused, as a permission rule refuses it. */
+  refused: Set<string>;
   settings: Record<string, unknown>;
   /** One source's settings, answered for `settings.read({ source })`; a source left out answers `settings`. */
   sources: Partial<Record<SettingsSource, Record<string, unknown>>>;
@@ -131,6 +133,7 @@ export function world(
     spelled,
     files: new Map(Object.entries(files).map(([path, text], index) => [key(path), { text, mtimeMs: 1_000 + index }])),
     dirs: new Map(),
+    refused: new Set(),
     settings,
     sources: {},
     agents: [],
@@ -183,6 +186,7 @@ export function world(
   });
   on("fs.exists", (_$, e) => {
     w.reads.push(spelled(e.path));
+    if (w.refused.has(key(e.path))) return { deny: `refused: ${spelled(e.path)}` };
     return { value: w.files.has(key(e.path)) || [...w.files.keys()].some((path) => path.startsWith(`${key(e.path)}/`)) };
   });
   on("fs.stat", (_$, e) => {

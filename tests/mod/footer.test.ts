@@ -92,6 +92,14 @@ test("a verification this turn that the status file calls unlogged is named in t
   });
 });
 
+test("a refused look at the status file reads as no verification, and the footer still draws", async ($, on) => {
+  const { w, meter } = engine(on, { [STATUS]: statusFile("just test", STARTED_S + 2) });
+  w.refused.add(STATUS);
+  await $.turn.start({ text: "Run the tests", turnId: "t-1" });
+
+  expect(await turn($, w, meter, 0.2812)).toEqual({ text: `4s · 12.3k${B}in${B}845${B}out · $0.0312${B}engine${B}cost` });
+});
+
 test("a ledger written after the run by someone else does not make a run the status file calls unlogged read logged", async ($, on) => {
   const { w, meter } = engine(on, { [STATUS]: statusFile("just test", STARTED_S + 2) });
   ledgerAt(w, STARTED_S + 3);
