@@ -88,10 +88,10 @@ describe("depersonalization", () => {
     expect(await runNamed(checks, "depersonalization", ctx)).toMatchObject({ status: "pass" });
   });
 
-  test("every shipped file is scanned, CHANGELOG.md included, and nothing packaging leaves out", async () => {
-    const shipped = fixture({ "CHANGELOG.md": `${HOME}\n` });
+  test("every shipped file is scanned, and nothing packaging leaves out, CHANGELOG.md included", async () => {
+    const shipped = fixture({ "README.md": `${HOME}\n` });
     expect(await runNamed(checks, "depersonalization", shipped)).toMatchObject({ status: "fail" });
-    const unshipped = fixture({ "tests/data.md": `${HOME}\n`, "scripts/qa/x.ts": `${HOME}\n`, "servers/a.spec.ts": `${HOME}\n` });
+    const unshipped = fixture({ "CHANGELOG.md": `${HOME}\n`, "tests/data.md": `${HOME}\n`, "scripts/qa/x.ts": `${HOME}\n`, "servers/a.spec.ts": `${HOME}\n` });
     expect(await runNamed(checks, "depersonalization", unshipped)).toMatchObject({ status: "pass" });
   });
 

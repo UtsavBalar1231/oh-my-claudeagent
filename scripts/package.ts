@@ -43,6 +43,7 @@ export const EXCLUDES = [
   "/.pre-commit-config.yaml",
   "/.editorconfig",
   "/CONTRIBUTING.md",
+  "/CHANGELOG.md",
   "/package.json",
   "/bun.lock",
   "/bunfig.toml",

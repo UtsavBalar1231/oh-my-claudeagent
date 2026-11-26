@@ -201,7 +201,7 @@ The full lists are in the reference: [hooks](docs/references.md#hooks),
   ledger and notepads, with a JSON Schema for the ledger.
 - [Contributing](CONTRIBUTING.md): development setup, adding agents, skills and hooks, and the
   prose and comment policy.
-- [Changelog](CHANGELOG.md).
+- [Changelog](https://github.com/UtsavBalar1231/oh-my-claudeagent/blob/main/CHANGELOG.md).
 
 ## Acknowledgments
 
