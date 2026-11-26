@@ -10,7 +10,8 @@
 //
 // A second session drives a run's final task through the client's own task tools: it creates the
 // task, reads the client's task file at the path `taskListDir` computes, reads it back through the
-// server's `task_list`, is refused completion by TaskCompleted, logs the verdict and completes it.
+// server's `task_list`, starts the task and stops once with the run open, which the Stop gate
+// continues, is refused completion by TaskCompleted, logs the verdict and completes it.
 // Its checks are prefixed "task run:" so they can be judged apart from the guard's.
 //
 // Usage: bun scripts/qa/ci-smoke.ts
@@ -59,6 +60,7 @@ const OMCA_TOOL = "mcp__plugin_oh-my-claudeagent_omca__";
 const RUN = "ci-smoke-run";
 const FINAL_SUBJECT = "Review the smoke run";
 const TASK_ID = "1";
+const PAUSE = "Pausing before the review.";
 
 export function taskRunScript(taskFile: string): Script {
   const complete = call("TaskUpdate", { taskId: TASK_ID, status: "completed" });
@@ -67,6 +69,8 @@ export function taskRunScript(taskFile: string): Script {
       call("TaskCreate", { subject: FINAL_SUBJECT, description: "Review the smoke run and record its verdict.", activeForm: "Reviewing the smoke run", metadata: { run: RUN, final: true } }),
       call("Read", { file_path: taskFile }),
       call(`${OMCA_TOOL}task_list`, {}),
+      call("TaskUpdate", { taskId: TASK_ID, status: "in_progress" }),
+      say(PAUSE),
       complete,
       call(`${OMCA_TOOL}evidence_log`, { evidence_type: "final_verification", command: "ci smoke task run", exit_code: 0, output_snippet: "COMPLETE", task_id: TASK_ID }),
       complete,
@@ -198,11 +202,17 @@ async function taskRunSmoke({ checks, scratch }: Qa): Promise<void> {
     `task run: task_list did not show the run and its final task: ${shown(listed)}`,
   );
 
-  const updates = named("TaskUpdate");
+  const trace = readJsonLines<TraceEntry>(join(project, ".omca", "state", "hook-trace.jsonl"));
+  const stops = trace.filter((entry) => entry.event === "Stop").map((entry) => entry.output);
+  checks.check(
+    stops[0] === "continue" && stops.at(-1) === "empty",
+    "task run: the Stop gate continued the turn that stopped with the run open, and let the last stop through",
+    `task run: the Stop gate traced ${JSON.stringify(stops)}, expected "continue" first and "empty" last`,
+  );
+
+  const updates = named("TaskUpdate").slice(1);
   const refusal = `Task #${TASK_ID} '${FINAL_SUBJECT}' is the final task of run '${RUN}', and no passing final verification names it.`;
-  const completions = readJsonLines<TraceEntry>(join(project, ".omca", "state", "hook-trace.jsonl"))
-    .filter((entry) => entry.event === "TaskCompleted")
-    .map((entry) => entry.output);
+  const completions = trace.filter((entry) => entry.event === "TaskCompleted").map((entry) => entry.output);
   checks.check(
     updates[0]?.text.includes(refusal) === true && completions[0] === "block",
     "task run: TaskCompleted refused the first completion until a final verification named the task",

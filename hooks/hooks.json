@@ -152,7 +152,8 @@
               "transcript_path": "${transcript_path}",
               "stop_hook_active": "${stop_hook_active}",
               "last_assistant_message": "${last_assistant_message}",
-              "background_tasks": "${background_tasks}"
+              "background_tasks": "${background_tasks}",
+              "session_crons": "${session_crons}"
             }
           }
         ]
