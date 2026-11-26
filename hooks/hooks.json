@@ -84,6 +84,7 @@
             "server": "plugin:oh-my-claudeagent:omca",
             "tool": "omca_hook",
             "timeout": 10,
+            "onFailure": "continue",
             "input": {
               "event": "PreToolUse",
               "session_id": "${session_id}",
@@ -132,6 +133,7 @@
               "tool_name": "${tool_name}",
               "tool_input": "${tool_input}",
               "error": "${error}",
+              "is_interrupt": "${is_interrupt}",
               "duration_ms": "${duration_ms}"
             }
           }

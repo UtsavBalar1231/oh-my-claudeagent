@@ -144,7 +144,9 @@ function classify(tool: string, payload: Payload): string | Recovery | undefined
 }
 
 export const handle: Handler = (payload, { session, now }) => {
-  if (isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "failure-recovery")) return;
+  // An interrupt is the person stopping the call, not the tool failing, so it gets no advice and does
+  // not count toward the stuck-loop breaker. The hook input substitutes the flag as a string.
+  if (isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "failure-recovery") || String(payload.is_interrupt) === "true") return;
   const tool = text(payload.tool_name);
   const found = classify(tool, payload);
   if (found === undefined) return;

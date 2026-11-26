@@ -536,7 +536,7 @@ describe("through the server", () => {
     const hook = { event: "PostToolUse", session_id: sessionId, agent_id: "", tool_name: "Bash", tool_input: JSON.stringify({ command: "just test" }) };
     expect(await callTool("omca_hook", hook)).toContain("PostToolUse");
     const recorded = JSON.parse(read(statusFile));
-    expect(recorded.verification).toEqual({ command: "just test", at: recorded.last_hook_at, exit_code: null, evidence_logged: false });
+    expect(recorded.verification).toEqual({ command: "just test", at: recorded.last_hook_at, exit_code: 0, evidence_logged: false });
 
     expect(await callTool("evidence_log", testEvidence)).toBe("Evidence recorded: test (exit 0), 1 total entries");
     expect(JSON.parse(read(statusFile)).verification).toEqual(recorded.verification);

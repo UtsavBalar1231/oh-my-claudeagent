@@ -478,6 +478,13 @@ describe("session scope and switches", () => {
     expect(await report(edit("old_string not found in file"), NOW + 1)).toContain("Retry: 1");
   });
 
+  test("an interrupted call gets no advice and does not count", async () => {
+    const { report, sessionId } = session();
+    expect(await report(bash("Command timed out", { is_interrupt: "true" }))).toBeUndefined();
+    expect(counts(sessionId)).toBeUndefined();
+    expect(await report(bash("Command timed out", { is_interrupt: "false" }))).toContain("Command timed out");
+  });
+
   test("OMCA_DISABLED_HOOKS naming failure-recovery silences the advice and stops the counting", async () => {
     process.env.OMCA_DISABLED_HOOKS = "failure-recovery";
     const { report, sessionId } = session();
@@ -512,6 +519,7 @@ test("hooks.json routes every tool failure to omca_hook through one unfiltered e
             tool_name: "${tool_name}",
             tool_input: "${tool_input}",
             error: "${error}",
+            is_interrupt: "${is_interrupt}",
             duration_ms: "${duration_ms}",
           },
         },
