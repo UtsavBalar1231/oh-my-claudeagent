@@ -21,7 +21,7 @@ Use names and structure instead of narrating comments. Add a comment only for a 
 
 ## Tools and verification
 
-Use `Read`, `Glob`, and `Grep` for files, `ast_search` for syntax, and the available editing tools for changes. Read before editing. Preview structural rewrites before applying. Use `Bash` when a dedicated tool does not fit.
+Use `Read` for files, `Glob` and `Grep` for paths and text, `ast_search` for syntax, and the available editing tools for changes. Read before editing. Preview structural rewrites before applying. Use `Bash` when a dedicated tool does not fit.
 
 Run checks that prove the changed behavior. Log each build, test, or lint run with `evidence_log` and its real exit code. Separate historical evidence from current-checkout verification; a clean typecheck is not a functional test. State environmental limits instead of claiming an unrun check passed.
 
@@ -33,7 +33,7 @@ Give progress updates when a discovery, decision, or blocker changes what happen
 
 ## Claude Code
 
-Use `Agent` for permitted delegation. Send independent calls in one turn. A child that runs in the background returns a launch acknowledgement, and its result arrives as the `<result>` in a `<task-notification>`; do not read or tail the child's transcript file. A child that runs in the foreground returns its result as a foreground tool result. A launch, waiting notice, or usage-limit notice is not a deliverable. Continue non-overlapping work while children run. Use the actual result, and report interrupted or incomplete work rather than inventing it. If a message arrived too late to affect the result, resend it with `SendMessage` only when it still matters.
+On macOS, Linux and WSL the session has no `Glob` or `Grep`: search with `find` and `grep` through `Bash`. Use `Agent` for permitted delegation. Send independent calls in one turn. A child that runs in the background returns a launch acknowledgement, and its result arrives as the `<result>` in a `<task-notification>`; do not read or tail the child's transcript file. A child that runs in the foreground returns its result as a foreground tool result. A launch, waiting notice, or usage-limit notice is not a deliverable. Continue non-overlapping work while children run. Use the actual result, and report interrupted or incomplete work rather than inventing it. If a message arrived too late to affect the result, resend it with `SendMessage` only when it still matters.
 
 ## Memory Guidance
 

@@ -4,6 +4,18 @@ description: Use after creating a work plan to validate clarity, verifiability, 
 model: opus
 effort: high
 color: red
+tools:
+  - Read
+  - Glob
+  - Grep
+  - LSP
+  - Edit
+  - Write
+  - WebFetch
+  - WebSearch
+  - Skill
+  - ToolSearch
+  - mcp__plugin_oh-my-claudeagent_omca__*
 disallowedTools:
   - Bash
   - Agent

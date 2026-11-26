@@ -45,12 +45,21 @@ describe("frontmatter keys", () => {
 });
 
 describe("agent frontmatter", () => {
-  test("a tools allowlist fails", async () => {
-    const ctx = fixture({ "agents/demo.md": agent("name: demo", "tools: Read, Grep") });
+  test("a tools list without the omca server, ToolSearch or a shell left out fails", async () => {
+    const ctx = fixture({ "agents/demo.md": agent("name: demo", "tools: Read, Grep, Bash") });
     expect(await runNamed(checks, "agent frontmatter", ctx)).toEqual({
       status: "fail",
-      detail: "agents/demo.md: a tools allowlist drops every tool it omits, use disallowedTools",
+      detail: [
+        "agents/demo.md: a tools list must name mcp__plugin_oh-my-claudeagent_omca__*, or the agent loses the omca tools",
+        "agents/demo.md: a tools list must name ToolSearch, or every omca tool loads up front",
+        "agents/demo.md: a tools list is for an agent without a shell; restrict a shell agent with disallowedTools",
+      ].join("; "),
     });
+  });
+
+  test("a tools list that keeps the omca server and ToolSearch and leaves the shell out passes", async () => {
+    const ctx = fixture({ "agents/demo.md": agent("name: demo", "tools:", "  - Read", "  - Glob", "  - ToolSearch", "  - mcp__plugin_oh-my-claudeagent_omca__*") });
+    expect(await runNamed(checks, "agent frontmatter", ctx)).toMatchObject({ status: "pass" });
   });
 
   test("a colon in the name fails", async () => {

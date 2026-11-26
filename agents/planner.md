@@ -5,6 +5,26 @@ model: opus
 effort: high
 color: cyan
 memory: project
+tools:
+  - Read
+  - Glob
+  - Grep
+  - LSP
+  - Edit
+  - Write
+  - Agent
+  - SendMessage
+  - AskUserQuestion
+  - ExitPlanMode
+  - TaskCreate
+  - TaskGet
+  - TaskList
+  - TaskUpdate
+  - WebFetch
+  - WebSearch
+  - Skill
+  - ToolSearch
+  - mcp__plugin_oh-my-claudeagent_omca__*
 disallowedTools:
   - Bash
 ---
