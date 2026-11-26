@@ -31,8 +31,8 @@ describe("registry", () => {
   test("lists every handler per event, in order", () => {
     const names = Object.fromEntries(Object.entries(REGISTRY).map(([event, handlers]) => [event, handlers.map(([name]) => name)]));
     expect(names).toEqual({
-      PreToolUse: ["final-task-guard", "comment-gate"],
-      PostToolUse: ["verification-recorder", "context-injector", "task-touch", "empty-task-response"],
+      PreToolUse: ["final-task-guard", "comment-gate", "empty-task-response"],
+      PostToolUse: ["verification-recorder", "context-injector", "task-touch"],
       PostToolUseFailure: ["failure-recovery", "verification-recorder"],
       UserPromptSubmit: ["mod-notice", "guidance", "keyword-detector"],
       UserPromptExpansion: ["guidance", "slash-mode-detector"],
@@ -86,7 +86,7 @@ describe("hooks.json against the registry", () => {
 
   test("PostToolUse reaches the task tools, whose touch the continuation gate waits for, and evidence_log, which satisfies its caller's verification", () => {
     expect(HOOKS.PostToolUse?.map(({ matcher }) => matcher)).toEqual([
-      "Read|Write|Edit|SubagentHandback|Bash|PowerShell|TaskCreate|TaskUpdate|mcp__plugin_oh-my-claudeagent_omca__evidence_log",
+      "Read|Write|Edit|Bash|PowerShell|TaskCreate|TaskUpdate|mcp__plugin_oh-my-claudeagent_omca__evidence_log",
     ]);
   });
 

@@ -2,7 +2,6 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { POOR_OUTPUT } from "../../src/core/report-receipt.ts";
 import { POOR_HANDBACK } from "./empty-task-response.ts";
 import { dispatch, type Payload } from "./registry.ts";
 
@@ -10,8 +9,7 @@ const NOW = 1_786_000_000_000;
 const FULL_EXECUTOR_REPORT =
   "TASK: fix the bug\nSTATUS: complete\nCHANGES: scripts/foo.sh, fixed field read\nEVIDENCE: just test-hooks passed, 21 tests\nNOTES: no blockers";
 const UNSTRUCTURED = "The guard in src/guard.ts:20 rejects unknown IDs before lookup. Its existing regression passes; the next change belongs in the parser.";
-const POOR = { hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: POOR_OUTPUT } };
-const OWN = { hookSpecificOutput: { hookEventName: "PostToolUse", additionalContext: POOR_HANDBACK } };
+const OWN = { hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: POOR_HANDBACK } };
 
 const roots: string[] = [];
 
@@ -23,19 +21,15 @@ afterEach(() => {
 function check(fields: Record<string, unknown>) {
   const root = mkdtempSync(join(tmpdir(), "omca-task-response-"));
   roots.push(root);
-  return dispatch({ event: "PostToolUse", session_id: crypto.randomUUID(), ...fields }, root, NOW);
+  return dispatch({ event: "PreToolUse", session_id: crypto.randomUUID(), ...fields }, root, NOW);
 }
 
 const handback = (message: string, agentType = "oh-my-claudeagent:executor") =>
   check({ tool_name: "SubagentHandback", agent_id: "a1", agent_type: agentType, tool_input: { message } });
 
 describe("payloads that carry no hand-back", () => {
-  test("empty-task-response: an Agent result is left to the mod's agent.report, even an empty one", async () => {
-    expect(await check({ tool_name: "Agent", tool_input: { subagent_type: "oh-my-claudeagent:executor" }, tool_response: { status: "completed", content: [] } })).toEqual({});
-  });
-
   test("empty-task-response: a tool other than SubagentHandback is never checked", async () => {
-    expect(await check({ tool_name: "Read", tool_input: { message: "4" }, tool_response: { status: "completed", content: [] } })).toEqual({});
+    expect(await check({ tool_name: "TaskUpdate", tool_input: { taskId: "1", message: "" } })).toEqual({});
   });
 });
 
@@ -48,7 +42,7 @@ describe("SubagentHandback carries the report", () => {
     ]) expect(await handback(report!, `oh-my-claudeagent:${role}`)).toEqual({});
   });
 
-  test("empty-task-response: an empty hand-back asks the subagent for its findings", async () => {
+  test("empty-task-response: an empty hand-back is refused, so the subagent sends its findings again", async () => {
     expect(await handback("")).toEqual(OWN);
     expect(POOR_HANDBACK).not.toContain("required sections");
   });
@@ -116,13 +110,22 @@ describe("a report whose lines start with a bracket", () => {
   });
 });
 
-describe("a hand-back payload with no agent id", () => {
-  test("empty-task-response: warns with the poor-output advice when the output is empty", async () => {
-    expect(await check({ tool_name: "SubagentHandback", agent_type: "explorer", tool_input: { message: "" } })).toEqual(POOR);
+describe("one refusal per agent", () => {
+  const send = (root: string, agentId: string, message: string) =>
+    dispatch({ event: "PreToolUse", session_id: "sid-once", tool_name: "SubagentHandback", agent_id: agentId, tool_input: { message } }, root, NOW);
+
+  test("empty-task-response: an agent's second poor hand-back goes through, and another agent is still refused once", async () => {
+    const root = mkdtempSync(join(tmpdir(), "omca-task-response-"));
+    roots.push(root);
+    expect(await send(root, "once-a", "")).toEqual(OWN);
+    expect(await send(root, "once-a", "")).toEqual({});
+    expect(await send(root, "once-b", "Let me look.")).toEqual(OWN);
   });
 
-  test("empty-task-response: short completed results without an agent id do not trigger retries", async () => {
-    expect(await check({ tool_name: "SubagentHandback", agent_type: "explorer", tool_input: { message: "src/main.ts:10 defines main" } })).toEqual({});
+  test("empty-task-response: a payload with no session is never refused, since no refusal could be counted", async () => {
+    const root = mkdtempSync(join(tmpdir(), "omca-task-response-"));
+    roots.push(root);
+    expect(await dispatch({ event: "PreToolUse", tool_name: "SubagentHandback", agent_id: "a1", tool_input: { message: "" } }, root, NOW)).toEqual({});
   });
 });
 
@@ -135,17 +138,16 @@ describe("kill switch and a full hand-back payload", () => {
   });
 
   const fixture = (message: string): Payload => ({
-    event: "PostToolUse",
-    hook_event_name: "PostToolUse",
+    event: "PreToolUse",
+    hook_event_name: "PreToolUse",
     tool_name: "SubagentHandback",
     agent_id: "fixture-agent-001",
     agent_type: "oh-my-claudeagent:executor",
     tool_input: { message },
-    tool_response: { success: true, message: "Report delivered to your caller." },
-    session_id: "fixture-sid-001",
+    session_id: crypto.randomUUID(),
   });
 
-  test("a poor hand-back in a full payload gets the hand-back advice", async () => {
+  test("a poor hand-back in a full payload is refused", async () => {
     const root = mkdtempSync(join(tmpdir(), "omca-task-response-"));
     roots.push(root);
     expect(await dispatch(fixture("Let me check that."), root, NOW)).toEqual(OWN);

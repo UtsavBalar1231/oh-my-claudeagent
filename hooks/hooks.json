@@ -77,7 +77,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Write|Edit|TaskUpdate",
+        "matcher": "Write|Edit|TaskUpdate|SubagentHandback",
         "hooks": [
           {
             "type": "mcp_tool",
@@ -87,6 +87,7 @@
             "input": {
               "event": "PreToolUse",
               "session_id": "${session_id}",
+              "agent_id": "${agent_id}",
               "tool_name": "${tool_name}",
               "tool_input": "${tool_input}"
             }
@@ -96,7 +97,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Read|Write|Edit|SubagentHandback|Bash|PowerShell|TaskCreate|TaskUpdate|mcp__plugin_oh-my-claudeagent_omca__evidence_log",
+        "matcher": "Read|Write|Edit|Bash|PowerShell|TaskCreate|TaskUpdate|mcp__plugin_oh-my-claudeagent_omca__evidence_log",
         "hooks": [
           {
             "type": "mcp_tool",

@@ -35,12 +35,12 @@ export const REGISTRY: Readonly<Record<string, readonly (readonly [string, Handl
   PreToolUse: [
     ["final-task-guard", finalTaskGuard],
     ["comment-gate", commentGate],
+    ["empty-task-response", emptyTaskResponse],
   ],
   PostToolUse: [
     ["verification-recorder", verificationRecorder],
     ["context-injector", contextInjector],
     ["task-touch", taskTouch],
-    ["empty-task-response", emptyTaskResponse],
   ],
   PostToolUseFailure: [
     ["failure-recovery", failureRecovery],
