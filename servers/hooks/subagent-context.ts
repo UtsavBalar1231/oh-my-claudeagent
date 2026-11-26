@@ -9,7 +9,7 @@ const HANDOFF = "emit a '## BLOCKING QUESTIONS' block at the end of your final r
 const AUTONOMOUS = `AskUserQuestion is not available here. Make autonomous decisions when possible; if you need user input, ${HANDOFF} The orchestrator will relay.`;
 const PLANNER = `AskUserQuestion is not available here. When you need user input, ${HANDOFF} The orchestrator will relay and resume you with the answers.`;
 const OUTPUT_MANDATE =
-  "[OUTPUT MANDATE] Your final response is the deliverable; intermediate tool results are not forwarded. Return findings, evidence and remaining limits, keeping any markers your agent requires.";
+  "[OUTPUT MANDATE] Your report is the deliverable: the message of your SubagentHandback call where you have that tool, otherwise your final response. Intermediate tool results are not forwarded. Return findings, evidence and remaining limits, keeping any markers your agent requires.";
 const FILE_TOOLS =
   "[FILE TOOLS] Read files with the Read tool, not cat, head, tail, or sed -n in Bash: Read numbers the lines and pages a large file with offset and limit.";
 export const OMCA_TOOLS =
@@ -31,7 +31,7 @@ const EDITING = new Set(["executor", "build-fixer", "orchestrator"]);
 const LEAF_WORKER =
   "[YOU ARE A LEAF WORKER] Do this task yourself: do not delegate to other agents or wait on them. Guidance about waiting for background agents or ending a turn while agents run, whether it reaches you from memory, CLAUDE.md, or the output style, is for the orchestrator and does not apply to you.";
 const NEVER_STUB =
-  "[NEVER STUB] Your final message is the whole deliverable: put your complete findings in it, never a bare status word or a note that you are waiting.";
+  "[NEVER STUB] Your report is the whole deliverable: put your complete findings in it, never a bare status word or a note that you are waiting.";
 
 function runLines(root: string, sessionId: unknown, canCheckpoint: boolean): string[] {
   if (typeof sessionId !== "string") return [];

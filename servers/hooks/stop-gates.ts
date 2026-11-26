@@ -149,6 +149,11 @@ const hasLiveBackgroundTask = (tasks: unknown): boolean =>
   Array.isArray(tasks) &&
   tasks.some((task) => isRecord(task) && task.type !== "shell" && !TERMINAL_TASK_STATUS.test(String(task.status ?? "running").toLowerCase()));
 
+// A one-shot wake-up (ScheduleWakeup, a self-paced /loop, a one-time CronCreate) resumes the session
+// itself, so the run is paused, not stalled. A recurring cron fires on its own schedule, which can be
+// days away, so it does not count.
+const hasPendingWakeup = (crons: unknown): boolean => Array.isArray(crons) && crons.some((cron) => isRecord(cron) && cron.recurring === false);
+
 const isFreshCompaction = (session: Session | undefined, now: number): boolean =>
   session?.compactedAt !== undefined && now - session.compactedAt < COMPACTION_FRESH_SECONDS * 1000;
 
@@ -164,7 +169,7 @@ const taskContinuation: Gate = async (turn) => {
     return undefined;
   }
   if (session.runBackoff !== undefined && session.runBackoff.run !== run.name) settleRun(session);
-  if (hasLiveBackgroundTask(payload.background_tasks)) {
+  if (hasLiveBackgroundTask(payload.background_tasks) || hasPendingWakeup(payload.session_crons)) {
     refund(session, "task-continuation");
     return undefined;
   }

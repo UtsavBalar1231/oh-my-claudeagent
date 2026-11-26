@@ -7,6 +7,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.5.0] - 2026-11-26
+
+### Added
+
+- **Status line with no setup:** in a terminal, OMCA's mod now draws its status line under the
+  prompt when your settings name no `statusLine` command, through Claude Code 2.1.332's status
+  line site. It is the same renderer and the same three rows as the one setup installs, fed from
+  Claude Code's own figures; the vim mode, worktree, pull request, lines changed, extra
+  directories and prompt cache still need setup's command. Any `statusLine` command takes the line
+  over, `statuslineMode: off` turns both off, and `OMCA_DISABLED_HOOKS=status-line` turns off the
+  mod's line alone.
+- **Empty subagent reports go back to the subagent:** in auto mode a subagent hands its report
+  back through `SubagentHandback`. OMCA now refuses a subagent's first empty or stalled hand-back,
+  and Claude Code asks it to send the report again; its next hand-back goes through either way, so
+  no report is lost. `OMCA_DISABLED_HOOKS=empty-task-response` turns it off.
+- **A pending wake-up pauses a run:** a session that stops with a run open while a one-shot
+  wake-up is scheduled (`ScheduleWakeup`, a self-paced `/loop`, a one-time `CronCreate`) is no
+  longer pushed on to the next task, since the wake-up resumes it. A recurring cron does not pause
+  the run.
+
+### Changed
+
+- **Claude Code 2.1.332 or later:** OMCA now needs Claude Code 2.1.332, up from 2.1.330, and both
+  manifests say so in `engines`. A client from 2.1.323 to 2.1.331 refuses the install, and keeps
+  the OMCA it has on `claude plugin update`. CI and the install check test with 2.1.332, and the
+  engine types come from it. The guard already refuses a destructive command that a skill runs as
+  it loads (`` !`<command>` ``), whether the skill is typed, invoked by Claude or set to
+  `context: fork`, so OMCA adds no `PreSkillShellCommand` hook.
+- **Text search in analyzer, reviewer and planner:** on macOS, Linux and WSL, Claude Code leaves
+  out the Glob and Grep tools unless an agent's `tools` list names them and leaves out Bash. These
+  three agents have no Bash, so they had no way to search text there. Each now lists its tools,
+  Glob and Grep and every `omca` tool among them. Third-party MCP tools no longer reach these
+  three agents. The lists also hold for a split-pane teammate, which ignores `disallowedTools`,
+  and leave out PowerShell on Windows; viewer no longer gets PowerShell either.
+- **Prompts match Claude Code 2.1.332:** a subagent hears that its report is its
+  `SubagentHandback` message where it has that tool. The retry advice after a failed delegation
+  says that the agent wrote no report but may have changed files. The orchestrator learns that
+  `disallowedTools` holds only for an in-process teammate, and that the guard refuses a whole-tree
+  `git restore` or `git checkout` rather than asking. Searches name `find` and `grep` through Bash
+  where Glob and Grep are absent.
+- **Write and Edit go ahead when the `omca` server stalls:** OMCA's `PreToolUse` hook sets
+  `onFailure: "continue"`, which Claude Code documents for Code Mode, where a hook that times out
+  otherwise refuses the call. Not yet checked in a Code Mode session.
+
+### Fixed
+
+- **Runs on Claude Code 2.1.332:** from 2.1.332, `TaskGet` leaves completed tasks out of a
+  task's `Blocked by:` line. `/start-work` read a run's tasks from that line on the final task,
+  so it lost the run's finished tasks and their count, and an executor's prompt lost the tasks
+  its work builds on. `/start-work` and `/handoff` now read a run's tasks and each task's
+  dependencies with OMCA's `task_list` and `task_get`, which read the task files.
+- **Refusal recovery after a follow-up:** OMCA counted its own follow-up prompt twice, so the
+  next refused turn you started got no follow-up of its own.
+- **An interrupted call is not a failure:** stopping a tool call no longer counts toward the
+  stuck-loop breaker or brings failure advice.
+- **Prompt fill fallback:** when an app was asked to fill the prompt box and never answered, or a
+  plugin kept the text out, the toast no longer says the box cannot be filled; it gives the text to
+  type if the box is still empty.
+- **Docs:** auto mode, where a terminal session starts by default, drops package-manager run rules
+  such as `Bash(bun run *)`; compaction keeps the skill list, so `/reload-skills` is only for skills
+  changed on disk; tool search stays on behind a gateway; the README names every `PreToolUse`
+  matcher; mods are off under `disableAllHooks` in any settings file, `--safe-mode` and `--bare`;
+  `fable` resolves to Fable 5 in Claude apps gateway sessions; idle compaction lists its
+  conditions; an update takes `/reload-plugins`; and the guard section notes the shell head start.
+
 ## [4.4.0] - 2026-11-24
 
 ### Added
@@ -3631,6 +3696,7 @@ for multi-agent orchestration.
 - Shellcheck fixes applied across all hook scripts
 - Ruff fixes applied to Python MCP servers
 
+[4.5.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.4.0...v4.5.0
 [4.4.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.3.0...v4.4.0
 [4.3.0]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.2.2...v4.3.0
 [4.2.2]: https://github.com/UtsavBalar1231/oh-my-claudeagent/compare/v4.2.1...v4.2.2

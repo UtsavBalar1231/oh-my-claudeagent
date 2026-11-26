@@ -86,9 +86,10 @@ describe("parseView", () => {
 describe("sessionSettings", () => {
   const base = parseView('{"command":"x"}');
 
-  test("a plain view keeps the fullscreen settings, and --inline drops tui only", () => {
-    expect(sessionSettings(base, false)).toEqual({ tui: "fullscreen", prefersReducedMotion: true, agent: "oh-my-claudeagent:orchestrator" });
-    expect(sessionSettings(base, true)).toEqual({ prefersReducedMotion: true, agent: "oh-my-claudeagent:orchestrator" });
+  test("a plain view keeps the fullscreen settings with the mod's status line off, and --inline drops tui only", () => {
+    const pluginConfigs = { "oh-my-claudeagent@inline": { options: { statuslineMode: "off" } } };
+    expect(sessionSettings(base, false)).toEqual({ tui: "fullscreen", prefersReducedMotion: true, agent: "oh-my-claudeagent:orchestrator", pluginConfigs });
+    expect(sessionSettings(base, true)).toEqual({ prefersReducedMotion: true, agent: "oh-my-claudeagent:orchestrator", pluginConfigs });
   });
 
   test("options go under the --plugin-dir key and settings merge in", () => {
@@ -99,7 +100,7 @@ describe("sessionSettings", () => {
       prefersReducedMotion: true,
       agent: "oh-my-claudeagent:orchestrator",
       permissions: { allow: ["Bash"] },
-      pluginConfigs: { "oh-my-claudeagent@inline": { options: { showBand: false } } },
+      pluginConfigs: { "oh-my-claudeagent@inline": { options: { statuslineMode: "off", showBand: false } } },
     });
   });
 });

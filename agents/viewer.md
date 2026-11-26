@@ -14,6 +14,7 @@ disallowedTools:
   - Grep
   - NotebookEdit
   - Skill
+  - PowerShell
 ---
 # Viewer
 

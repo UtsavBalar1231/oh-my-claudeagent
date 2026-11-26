@@ -39,7 +39,9 @@ export const refusalRecovery: Features = {
     },
   },
   "prompt.submit": {
-    pre(_host, e) {
+    pre(host, e) {
+      // The follow-up passes through this plugin's own hooks too; its arrival is already queued.
+      if (e.origin.kind === "plugin" && e.origin.name === host.plugin.name) return;
       const user = e.origin.kind === "composer" || e.origin.kind === "bridge";
       if (user) {
         // Once queued, the engine may start either turn first; neither can safely inherit user provenance.
@@ -86,7 +88,6 @@ export const refusalRecovery: Features = {
       const timer = host.clock.after(0, async () => {
         if (pending !== attempt || at !== generation || current?.id !== e.turnId) return;
         attempt.queued = true;
-        // The engine skips this plugin's prompt.submit hook for its own submitted prompt.
         const followUp: Origin = { user: false };
         arrivals.push(followUp);
         try {

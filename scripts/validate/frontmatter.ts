@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
+import { parseFrontmatter } from "../../src/core/frontmatter.ts";
 import { type Check, type Context, listFiles, type Outcome, pass, relative, skip, verdict } from "./core.ts";
 
 // The keys the platform reads for an agent or a skill. Claude Code loads an agent with an unknown
@@ -7,7 +8,7 @@ import { type Check, type Context, listFiles, type Outcome, pass, relative, skip
 // so a misspelled `disallowedTools` would silently drop an agent's tool restrictions.
 const AGENT_KEYS = new Set([
   "name", "description", "model", "effort", "maxTurns", "tools", "disallowedTools", "skills", "memory",
-  "background", "omitClaudeMd", "isolation", "color", "experimental",
+  "background", "omitClaudeMd", "isolation", "color", "experimental", "autoCompactWindow",
 ]);
 const SKILL_KEYS = new Set([
   "name", "description", "when_to_use", "argument-hint", "arguments", "disable-model-invocation", "user-invocable",
@@ -17,7 +18,6 @@ const SKILL_KEYS = new Set([
 const EFFORT_LEVELS = new Set(["low", "medium", "high", "xhigh", "max"]);
 
 export const DESCRIPTION_HARD_CAP = 1536;
-export const DESCRIPTION_SOFT_CAP = 512;
 
 const BLOCK_INDICATOR = /^[|>][+-]?\d?$/;
 
@@ -83,6 +83,23 @@ function safeRead(path: string): string | undefined {
 
 const linesOf = (path: string): string[] => frontmatterLines(readFileSync(path, "utf8")) ?? [];
 
+// A tools list is what brings Glob and Grep back on macOS, Linux and WSL, for an agent that leaves
+// Bash out. It also drops every MCP tool it does not name, and `mcp__*` names none.
+const OMCA_SERVER_TOOLS = "mcp__plugin_oh-my-claudeagent_omca__*";
+
+function toolsProblems(name: string, path: string): string[] {
+  const value = parseFrontmatter(readFileSync(path, "utf8"))?.tools;
+  if (value === undefined) return [];
+  const tools = (Array.isArray(value) ? value : value.split(",")).map((tool) => tool.trim());
+  return [
+    ...(tools.includes(OMCA_SERVER_TOOLS) ? [] : [`${name}: a tools list must name ${OMCA_SERVER_TOOLS}, or the agent loses the omca tools`]),
+    ...(tools.includes("ToolSearch") ? [] : [`${name}: a tools list must name ToolSearch, or every omca tool loads up front`]),
+    ...(tools.some((tool) => tool === "Bash" || tool === "PowerShell")
+      ? [`${name}: a tools list is for an agent without a shell; restrict a shell agent with disallowedTools`]
+      : []),
+  ];
+}
+
 function agentHygiene(ctx: Context): Outcome {
   const files = agentFiles(ctx);
   if (files.length === 0) return { status: "fail", detail: `no agent files found in ${ctx.agentsDir}` };
@@ -90,9 +107,7 @@ function agentHygiene(ctx: Context): Outcome {
   for (const file of files) {
     const lines = linesOf(file);
     const name = relative(ctx.root, file);
-    if (topLevelKeys(lines).includes("tools")) {
-      problems.push(`${name}: a tools allowlist drops every tool it omits, use disallowedTools`);
-    }
+    problems.push(...toolsProblems(name, file));
     if ((scalar(lines, "name") ?? "").includes(":")) {
       problems.push(`${name}: name must not contain ':', the platform rejects the agent at load time`);
     }
@@ -100,7 +115,7 @@ function agentHygiene(ctx: Context): Outcome {
       problems.push(`${name}: maxTurns truncates the agent mid-task, let it stop on its own conditions`);
     }
   }
-  return verdict(problems, `${files.length} agents: no tools allowlist, no maxTurns and no colon in a name`);
+  return verdict(problems, `${files.length} agents: tools lists keep the omca tools and no shell, no maxTurns and no colon in a name`);
 }
 
 function frontmatterKeys(ctx: Context): Outcome {
@@ -144,20 +159,14 @@ function skillDescriptionCap(ctx: Context): Outcome {
   const files = skillFiles(ctx);
   if (files.length === 0) return skip("no SKILL.md files found under skills/");
   const over: string[] = [];
-  const long: string[] = [];
   for (const file of files) {
     const length = descriptionLength(linesOf(file));
-    const entry = `${basename(dirname(file))} (${length})`;
-    if (length > DESCRIPTION_HARD_CAP) over.push(entry);
-    else if (length > DESCRIPTION_SOFT_CAP) long.push(entry);
+    if (length > DESCRIPTION_HARD_CAP) over.push(`${basename(dirname(file))} (${length})`);
   }
   if (over.length > 0) {
     return { status: "fail", detail: `description plus when_to_use over the ${DESCRIPTION_HARD_CAP} character platform cap: ${over.join(", ")}` };
   }
-  if (long.length > 0) {
-    return { status: "warn", detail: `description plus when_to_use over ${DESCRIPTION_SOFT_CAP} characters, older clients may truncate: ${long.join(", ")}` };
-  }
-  return pass(`${files.length} skills within ${DESCRIPTION_SOFT_CAP} characters of description plus when_to_use`);
+  return pass(`${files.length} skills within ${DESCRIPTION_HARD_CAP} characters of description plus when_to_use`);
 }
 
 export const checks: readonly Check[] = [

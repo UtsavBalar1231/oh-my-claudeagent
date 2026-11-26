@@ -725,13 +725,13 @@ test("a copy the surface refuses says why", async ($, on) => {
   await ui.unmount();
 });
 
-test("a rerun the prompt box refuses goes to a toast with the text to type", async ($, on) => {
+test("a rerun a hook keeps out of the prompt box goes to a toast with the text to type, hedged since the cause is unknown", async ($, on) => {
   on("prompt.fill", () => ({ isFilled: false }));
   const w = world(on, FILES);
   const ui = await openEvidence($, DOCK_120);
 
   await ui.press({ key: "r" });
-  expect(w.toasts.at(-1)).toBe("The prompt box cannot be filled here. Type: Run the final verification again (`just ci`) and log the verdict with evidence_log as final_verification evidence.");
+  expect(w.toasts.at(-1)).toBe("If the prompt box is still empty, type: Run the final verification again (`just ci`) and log the verdict with evidence_log as final_verification evidence.");
   await ui.unmount();
 });
 

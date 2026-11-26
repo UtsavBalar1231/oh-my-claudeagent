@@ -18,8 +18,8 @@ allowed-tools:
   - Bash(git diff *)
   - Bash(git log *)
   - Bash(git branch --show-current)
-  - TaskList
-  - TaskGet
+  - mcp__plugin_oh-my-claudeagent_omca__task_list
+  - mcp__plugin_oh-my-claudeagent_omca__task_get
   - mcp__plugin_oh-my-claudeagent_omca__notepad_read
   - mcp__plugin_oh-my-claudeagent_omca__notepad_list
 ---
@@ -36,6 +36,6 @@ Separate observed results from assumptions and pending checks. Do not invent tas
 
 This skill is user-invoked through `/oh-my-claudeagent:handoff`; do not load it automatically. Find a requested plan document in the configured `plansDirectory`, the `plans/` directory of the Claude config directory (`CLAUDE_CONFIG_DIR`, or `~/.claude`) by default, or `.omca/plans`.
 
-A run's tasks live on Claude Code's task list, which a new session in this checkout shares. Load the task tools with `ToolSearch({query: "select:TaskCreate,TaskUpdate,TaskList,TaskGet", max_results: 4})` and read the list with `TaskList`. The task tools do not return metadata, so call `TaskGet` on an open `Final verification` task: its description names the run and its plan document, and its `Blocked by:` line lists the run's tasks. The run's notepad `issues` section names the tasks closed as blocked, which the list prints with their last status. Name the run and its open tasks by id and subject; there is no need to restate their descriptions, since the next session reads them from the list.
+A run's tasks live on Claude Code's task list, which a new session in this checkout shares. The task tools do not return metadata, so read the list with OMCA's `task_list` and `task_get`, loading them if needed: `ToolSearch({query: "select:mcp__plugin_oh-my-claudeagent_omca__task_list,mcp__plugin_oh-my-claudeagent_omca__task_get", max_results: 2})`. `task_list` prints each run's tasks under `Run <name>:`, marks its final task `[final]`, and marks a task closed as blocked `[closed as blocked: <why>]`. Call `task_get` on an open run's final task: its description names the plan document. Name the run and its open tasks by id and subject; there is no need to restate their descriptions, since the next session reads them from the list.
 
 The user can start a new session with `claude`, paste the handoff as the first message, and run `/oh-my-claudeagent:start-work` to continue the run. Do not create the session programmatically.

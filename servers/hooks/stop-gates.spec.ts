@@ -532,6 +532,15 @@ describe("task continuation and background work", () => {
     expect(await run.stop({ background_tasks: monitor })).toEqual({});
   });
 
+  test("a pending one-shot wake-up opens it, and a recurring cron does not", async () => {
+    const run = await openRun();
+    const wakeup = { id: "cron-001", schedule: "30 14 26 11 *", recurring: false, prompt: "check the deploy" };
+    const daily = { id: "cron-002", schedule: "0 9 * * 1-5", recurring: true, prompt: "check the build" };
+    expect(await run.stop({ session_crons: [daily] })).toEqual(CONTINUE);
+    const payload = payloadOf({ event: "Stop", session_id: run.sessionId, stop_hook_active: "false", session_crons: JSON.stringify([daily, wakeup]) });
+    expect(await dispatch(payload, run.root, NOW + 10 * SECOND)).toEqual({});
+  });
+
   test("a finished background task still blocks", async () => {
     const run = await openRun();
     expect(await run.stop({ background_tasks: FINISHED_SUBAGENT })).toEqual(CONTINUE);
@@ -979,6 +988,7 @@ describe("the Stop handler", () => {
               stop_hook_active: "${stop_hook_active}",
               last_assistant_message: "${last_assistant_message}",
               background_tasks: "${background_tasks}",
+              session_crons: "${session_crons}",
             },
           },
         ],

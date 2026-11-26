@@ -86,11 +86,13 @@ describe("smokeScript", () => {
 describe("taskRunScript", () => {
   const calls = taskRunScript("/config/tasks/omca-project-12345678/1.json").main.map((turn) => turn.content.map((block) => (block.type === "tool_use" ? [block.name, block.input] : ["text", block.text])));
 
-  test("creates the final task, reads its file and the server's list, then completes it around the verdict", () => {
+  test("creates the final task, reads its file and the server's list, starts it and stops once, then completes it around the verdict", () => {
     expect(calls).toEqual([
       [["TaskCreate", { subject: "Review the smoke run", description: "Review the smoke run and record its verdict.", activeForm: "Reviewing the smoke run", metadata: { run: "ci-smoke-run", final: true } }]],
       [["Read", { file_path: "/config/tasks/omca-project-12345678/1.json" }]],
       [["mcp__plugin_oh-my-claudeagent_omca__task_list", {}]],
+      [["TaskUpdate", { taskId: "1", status: "in_progress" }]],
+      [["text", "Pausing before the review."]],
       [["TaskUpdate", { taskId: "1", status: "completed" }]],
       [["mcp__plugin_oh-my-claudeagent_omca__evidence_log", { evidence_type: "final_verification", command: "ci smoke task run", exit_code: 0, output_snippet: "COMPLETE", task_id: "1" }]],
       [["TaskUpdate", { taskId: "1", status: "completed" }]],

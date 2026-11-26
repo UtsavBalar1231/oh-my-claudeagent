@@ -86,7 +86,7 @@ describe("omca_hook over stdio", () => {
     const sessionId = crypto.randomUUID();
     expect(await server.hook(bashCall(sessionId, "bun test"))).toBe(NOTE);
     const status = JSON.parse(readFileSync(join(server.project, ".omca", "state", "session", `${sessionId}.json`), "utf8"));
-    expect(status.verification).toMatchObject({ command: "bun test", exit_code: null, evidence_logged: false });
+    expect(status.verification).toMatchObject({ command: "bun test", exit_code: 0, evidence_logged: false });
 
     const completed = JSON.parse(await server.hook({ ...bashCall(sessionId, ""), event: "TaskCompleted", tool_name: "", tool_input: "", tool_response: "" }));
     expect(completed.decision).toBe("block");

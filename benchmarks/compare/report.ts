@@ -381,7 +381,7 @@ export function renderMarkdown(raw: RawResults): { results: Record<string, unkno
       "",
       table(tokenHeader, turn1.rows),
       "",
-      `**Turn 1 with tool search on** (\`ENABLE_TOOL_SEARCH=true\`, session (a), ${probeRounds(raw.toolSearch)} rounds). Claude Code turns tool search off when \`ANTHROPIC_BASE_URL\` is not a first-party host, which is the case in this harness, so the tables above ship every MCP tool schema in the \`tools\` array. Against the first-party API, MCP tools are deferred and only their names are listed (counted under Tools MCP here). This table is the closer match to real first-party traffic for MCP-heavy arms; tools that declare \`alwaysLoad\` stay loaded either way.`,
+      `**Turn 1 with tool search on** (\`ENABLE_TOOL_SEARCH=true\`, session (a), ${probeRounds(raw.toolSearch)} rounds). Claude Code before 2.1.304 turns tool search off when \`ANTHROPIC_BASE_URL\` is not a first-party host, which is the case in this harness, so on such a client the tables above ship every MCP tool schema in the \`tools\` array; from 2.1.304 tool search stays on behind a gateway. Against the first-party API, MCP tools are deferred and only their names are listed (counted under Tools MCP here). This table is the closer match to real first-party traffic for MCP-heavy arms; tools that declare \`alwaysLoad\` stay loaded either way.`,
       "",
       table(tokenHeader, turn1Search.rows),
       "",

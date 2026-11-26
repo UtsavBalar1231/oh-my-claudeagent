@@ -41,7 +41,7 @@ type Engine = World & { writes: string[]; release: () => void; started: Promise<
 // The calls world.ts leaves out: a held `bun --version`, ast-grep found only as sg, the engine
 // version, and writes recorded in order, refused for any path in `refuse`.
 function engine(on: On, w: World, options: { hold?: boolean; refuse?: readonly string[] } = {}): Engine {
-  w.version = "2.1.330";
+  w.version = "2.1.332";
   let release = () => {};
   let started = () => {};
   const held = new Promise<void>((resolve) => (release = resolve));
@@ -84,7 +84,7 @@ function body(tree: RenderElement): string[] {
 }
 
 const CHECKS = [
-  " ✓ OK    Claude Code   2.1.330 meets the 2.1.330 floor",
+  " ✓ OK    Claude Code   2.1.332 meets the 2.1.332 floor",
   " ✓ OK    bun           bun 1.4.2 is on PATH",
   " ✓ OK    omca server   Last hook call 2 min ago",
   " ✓ OK    ast-grep      sg 0.39.0 is on PATH",
@@ -286,7 +286,7 @@ for (const layout of LAYOUTS) {
     w.version = undefined;
     await ui.press({ key: "r" });
     expect(rows(await ui.drawn()).slice(-2)).toEqual(["✗ The checks failed: version unavailable", "r: Run again"]);
-    w.version = "2.1.330";
+    w.version = "2.1.332";
     await ui.press({ key: "r" });
     expect(rows(await ui.drawn()).find((row) => row.startsWith(" ! WARN  Status line"))).toBe(
       " ! WARN  Status line  No refreshInterval, so it redraws on events only  and goes stale while agents run  i: Add refreshInterval 5",
@@ -382,7 +382,7 @@ for (const layout of LAYOUTS) {
     expect(drawn[3]).toBe("o: Show passing   + 13 ok - Claude Code, bun, omca server, ast-grep, O...");
     await ui.press({ key: "o" });
     const opened = body(await ui.drawn());
-    expect(opened).toContain("[+ OK]   Claude Code   2.1.330 meets the 2.1.330 floor");
+    expect(opened).toContain("[+ OK]   Claude Code   2.1.332 meets the 2.1.332 floor");
     expect(opened.at(-2)).toBe("  v 11 more - ^v scroll");
       expect(rows(await ui.drawn()).filter((row) => !isAscii(row))).toEqual([]);
     await ui.unmount();
@@ -632,7 +632,7 @@ test("a row is a chip with the level's glyph and word on its tone, the label bol
         piece({ color: "inverseText", backgroundColor: "success", weight: "semibold" }, " ✓ OK "),
         piece({}, "   "),
         piece({ weight: "semibold" }, "Claude Code   "),
-        piece({}, "2.1.330 meets the 2.1.330 floor"),
+        piece({}, "2.1.332 meets the 2.1.332 floor"),
       ),
     ],
   });
@@ -647,12 +647,12 @@ test("a row is a chip with the level's glyph and word on its tone, the label bol
   await ui.unmount();
 });
 
-test("an engine older than 2.1.330 fails the Claude Code check", async ($, on) => {
+test("an engine older than 2.1.332 fails the Claude Code check", async ($, on) => {
   const w = engine(on, world(on, {}, {}));
-  w.version = "2.1.329";
+  w.version = "2.1.331";
   await $.command.run(run("doctor", 120));
   const ui = await $.ui.mount(pane("terminal", WIDE));
-  expect(rows(await ui.drawn())).toContainEqual(expect.stringContaining("Claude Code   2.1.329 is older than 2.1.330, which the OMCA mod needs"));
+  expect(rows(await ui.drawn())).toContainEqual(expect.stringContaining("Claude Code   2.1.331 is older than 2.1.332, which the OMCA mod needs"));
   await ui.unmount();
 });
 

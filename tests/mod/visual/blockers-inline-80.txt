@@ -1,4 +1,4 @@
- ▐▛███▛█   Claude Code v2.1.325
+ ▐▛███▛█   Claude Code v2.1.332
 ▝▜██████▀  Opus 5.5 · API Usage Billing
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
 
@@ -24,7 +24,7 @@
 ✻ Worked for 0s · done HH:MM · NN.Nk in NN out · $X.XX
    sum-run  0/1 · +1 task · /tasklist
 
-  1 tasks (0 done, 1 open)
+  0/1 task done
   ◻ Review the sum helper
  sum-run ────────────── 0/1                                                [-]
 1: Task list

@@ -77,16 +77,18 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Write|Edit|TaskUpdate",
+        "matcher": "Write|Edit|TaskUpdate|SubagentHandback",
         "hooks": [
           {
             "type": "mcp_tool",
             "server": "plugin:oh-my-claudeagent:omca",
             "tool": "omca_hook",
             "timeout": 10,
+            "onFailure": "continue",
             "input": {
               "event": "PreToolUse",
               "session_id": "${session_id}",
+              "agent_id": "${agent_id}",
               "tool_name": "${tool_name}",
               "tool_input": "${tool_input}"
             }
@@ -96,7 +98,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Read|Write|Edit|SubagentHandback|Bash|PowerShell|TaskCreate|TaskUpdate|mcp__plugin_oh-my-claudeagent_omca__evidence_log",
+        "matcher": "Read|Write|Edit|Bash|PowerShell|TaskCreate|TaskUpdate|mcp__plugin_oh-my-claudeagent_omca__evidence_log",
         "hooks": [
           {
             "type": "mcp_tool",
@@ -131,6 +133,7 @@
               "tool_name": "${tool_name}",
               "tool_input": "${tool_input}",
               "error": "${error}",
+              "is_interrupt": "${is_interrupt}",
               "duration_ms": "${duration_ms}"
             }
           }
@@ -151,7 +154,8 @@
               "transcript_path": "${transcript_path}",
               "stop_hook_active": "${stop_hook_active}",
               "last_assistant_message": "${last_assistant_message}",
-              "background_tasks": "${background_tasks}"
+              "background_tasks": "${background_tasks}",
+              "session_crons": "${session_crons}"
             }
           }
         ]

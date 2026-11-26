@@ -5,7 +5,11 @@ import { type Check, type Context, type Outcome, pass, verdict } from "./core.ts
 export const REGISTER = "hooks/register.ts";
 
 // The built-in sec-default guard continues these past user-tier mods wherever it loads.
-const GUARDED = ["prompt.context", "prompt.section", "prompt.compose", "skill.prompt", "attribution.text", "settings.read"];
+// A session.append hook counts whatever door it filters to, since three of its doors are guarded.
+const GUARDED = [
+  "prompt.context", "prompt.section", "prompt.compose", "prompt.attachment", "skill.prompt", "attribution.text", "telemetry.log",
+  "session.compact", "session.append", "settings.read",
+];
 // A matcher may nest one object, as `{ component: "ToolUse", props: { tool: "Agent" } }` does.
 const ON = /(?<![\w$.])on\(\s*(["'`])([^"'`]+)\1\s*(?:,\s*(\{(?:[^{}]|\{[^{}]*\})*\}))?/g;
 

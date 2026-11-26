@@ -69,7 +69,7 @@ describe("hook stamp", () => {
     expect(status(root, sessionId)).toEqual({
       session_id: sessionId,
       last_hook_at: NOW_S + 2,
-      verification: { command: "just test", at: NOW_S + 2, exit_code: null, evidence_logged: false },
+      verification: { command: "just test", at: NOW_S + 2, exit_code: 0, evidence_logged: false },
     });
   });
 
@@ -81,7 +81,7 @@ describe("hook stamp", () => {
     writeFileSync(ledgerPath(root), '{"entries":[]}');
     utimesSync(ledgerPath(root), NOW_S + 3, NOW_S + 3);
     await stop(root, sessionId, NOW + STAMP_INTERVAL_MS);
-    expect(status(root, sessionId).verification).toEqual({ command: "just test", at: NOW_S, exit_code: null, evidence_logged: false });
+    expect(status(root, sessionId).verification).toEqual({ command: "just test", at: NOW_S, exit_code: 0, evidence_logged: false });
   });
 
   test("a subagent's verification never reaches the status file", async () => {

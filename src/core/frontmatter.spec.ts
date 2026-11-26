@@ -88,7 +88,13 @@ test.each([
 });
 
 const AGENT_FIELDS: Record<string, Record<string, string | string[]>> = {
-  analyzer: { model: "opus", effort: "high", color: "yellow", disallowedTools: ["Bash", "Write", "Edit", "NotebookEdit", "Agent"] },
+  analyzer: {
+    model: "opus",
+    effort: "high",
+    color: "yellow",
+    tools: ["Read", "Glob", "Grep", "LSP", "WebFetch", "WebSearch", "Skill", "ToolSearch", "mcp__plugin_oh-my-claudeagent_omca__*"],
+    disallowedTools: ["Bash", "Write", "Edit", "NotebookEdit", "Agent"],
+  },
   architect: { model: "fable", effort: "xhigh", color: "purple", memory: "project", disallowedTools: ["Write", "Edit", "NotebookEdit", "Agent"] },
   "build-fixer": { model: "opus", effort: "medium", color: "yellow", disallowedTools: ["Agent"] },
   executor: { model: "sonnet", effort: "high", color: "green", disallowedTools: ["Agent"] },
@@ -100,7 +106,17 @@ const AGENT_FIELDS: Record<string, Record<string, string | string[]>> = {
     disallowedTools: ["Write", "Edit", "NotebookEdit", "Agent"],
   },
   orchestrator: { model: "opus", effort: "high", color: "purple", memory: "project" },
-  planner: { model: "opus", effort: "high", color: "cyan", memory: "project", disallowedTools: ["Bash"] },
+  planner: {
+    model: "opus",
+    effort: "high",
+    color: "cyan",
+    memory: "project",
+    tools: [
+      "Read", "Glob", "Grep", "LSP", "Edit", "Write", "Agent", "SendMessage", "AskUserQuestion", "ExitPlanMode",
+      "TaskCreate", "TaskGet", "TaskList", "TaskUpdate", "WebFetch", "WebSearch", "Skill", "ToolSearch", "mcp__plugin_oh-my-claudeagent_omca__*",
+    ],
+    disallowedTools: ["Bash"],
+  },
   researcher: {
     model: "sonnet",
     effort: "high",
@@ -109,13 +125,20 @@ const AGENT_FIELDS: Record<string, Record<string, string | string[]>> = {
     memory: "project",
     disallowedTools: ["Write", "Edit", "NotebookEdit", "Agent"],
   },
-  reviewer: { model: "opus", effort: "high", color: "red", memory: "project", disallowedTools: ["Bash", "Agent"] },
+  reviewer: {
+    model: "opus",
+    effort: "high",
+    color: "red",
+    tools: ["Read", "Glob", "Grep", "LSP", "Edit", "Write", "WebFetch", "WebSearch", "Skill", "ToolSearch", "mcp__plugin_oh-my-claudeagent_omca__*"],
+    disallowedTools: ["Bash", "Agent"],
+    memory: "project",
+  },
   viewer: {
     model: "opus",
     effort: "medium",
     omitClaudeMd: "true",
     color: "pink",
-    disallowedTools: ["Agent", "Bash", "Edit", "Write", "Glob", "Grep", "NotebookEdit", "Skill"],
+    disallowedTools: ["Agent", "Bash", "Edit", "Write", "Glob", "Grep", "NotebookEdit", "Skill", "PowerShell"],
   },
 };
 

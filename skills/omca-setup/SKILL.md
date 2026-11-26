@@ -41,7 +41,7 @@ Run each command and compare the version it prints:
 claude --version
 ```
 
-PASS at 2.1.330 or later. Otherwise FAIL and **stop**: OMCA's mod needs Claude Code 2.1.330 or later.
+PASS at 2.1.332 or later. Otherwise FAIL and **stop**: OMCA's mod needs Claude Code 2.1.332 or later.
 
 ```bash
 bun --version
@@ -99,7 +99,7 @@ Claude Code starts each session as the agent the `agent` setting names, and it d
 
 ### Phase 5: status line
 
-The `statuslineMode` plugin option is `${user_config.statuslineMode}`. Claude Code substitutes the option into this file only when the user has set it, so when that still reads as a placeholder instead of `off` or `on`, the default `on` applies. When it is `off`, skip this phase.
+The `statuslineMode` plugin option is `${user_config.statuslineMode}`. Claude Code substitutes the option into this file only when the user has set it, so when that still reads as a placeholder instead of `off` or `on`, the default `on` applies. When it is `off`, skip this phase. Without this phase the mod still draws OMCA's status line in a terminal where no `statusLine` is set; the command this phase installs adds the vim mode, worktree, pull request, lines changed, extra directories and prompt cache, which the mod cannot read.
 
 1. Preview the change:
 
@@ -131,7 +131,7 @@ Only the installed cache copy is edited, because a `--plugin-dir` checkout is tr
 
 ```
 === oh-my-claudeagent setup ===
-Claude Code  PASS 2.1.330
+Claude Code  PASS 2.1.332
 bun          PASS 1.4.2
 ast-grep     PASS 0.44.0 | WARN not found
 Runtime      PASS | <runtime>: <runtime_reason>

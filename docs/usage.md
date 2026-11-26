@@ -8,7 +8,7 @@ file is listed in the [reference](references.md).
 ### Install
 
 Install the plugin with the command in the [README](../README.md#install). OMCA needs Claude
-Code 2.1.330 or later and bun 1.4.2 or later. `ast-grep` (or `sg`) is optional: without it the
+Code 2.1.332 or later and bun 1.4.2 or later. `ast-grep` (or `sg`) is optional: without it the
 `ast_*` tools return an error and everything else works.
 
 ### Run setup
@@ -63,7 +63,8 @@ For GitHub Enterprise Server, use `{ "source": "git", "url": "<clone URL>" }` as
 ### Update and uninstall
 
 To update, run `claude plugin update oh-my-claudeagent@omca`, or open the plugin on the
-Installed tab of `/plugin` and choose Update now. Then restart Claude Code. The status line
+Installed tab of `/plugin` and choose Update now. Then run `/reload-plugins`, or restart Claude
+Code. The status line
 launcher runs the renderer from the most recently updated install, so the status line needs no
 second setup run. If you set `disableForceOrchestrationStyle`, run setup again after each update.
 
@@ -250,8 +251,8 @@ the model cannot.
 
 ### After compaction
 
-Skills can go missing from the model's list after the conversation compacts. Run `/reload-skills`
-to send the full skill list again. Claude Code also compacts a long conversation on its own after
+Compaction keeps the skill list: Claude Code sends it again with the summary. `/reload-skills`
+is only for a skill added or changed on disk during the session. Claude Code also compacts a long conversation on its own after
 about an hour idle, in the terminal, the Desktop app and VS Code (`idleCompaction`; see
 `docs/references.md` for the settings).
 
@@ -513,11 +514,15 @@ OMCA's guard checks every Bash, PowerShell and Monitor command before it runs, i
 to another interpreter: `bash -c`, `sh -c`, `eval`, a heredoc fed to a shell, `pwsh -Command`,
 `cmd /c` and `Invoke-Expression` with a literal string. It also sees through wrappers such as
 `sudo`, `env`, `timeout`, `nice`, `nohup`, `stdbuf`, `ionice`, `chrt`, `setsid`, `time` and
-`xargs`.
+`xargs`. It also checks the shell commands a skill or command runs as it loads, written
+`` !`<command>` `` in its file, whether you type its name, Claude invokes it or it sets
+`context: fork`. When the guard denies one, the skill does not load.
 
 The guard denies only a command that destroys something, with no dialog, in every permission mode
 including bypassPermissions. Every other command goes on to Claude Code's own permission checks.
-The deny reason names the cause, so Claude can rewrite the command.
+The deny reason names the cause, so Claude can rewrite the command. A denied command never runs,
+but Claude Code may already have started the session's shell for it, running your shell start-up
+files; `CLAUDE_CODE_DISABLE_SHELL_HEAD_START=1` turns that head start off.
 
 A recursive removal of the filesystem root, your home, the project or a folder directly under
 root or home is always denied. The guard reads the command the way the shell runs it:
@@ -572,9 +577,11 @@ no switch.
 ### Permissions
 
 OMCA's hooks never auto-allow a command: they refuse, ask or advise, and an allow comes only
-from the permission rules in your settings. To stop the prompts for package scripts you trust,
-add allow rules such as `Bash(bun run *)` to your settings, or run `/fewer-permission-prompts`,
-which proposes rules from your past sessions. An allow rule for an MCP server reaches only the
+from the permission rules in your settings. To stop the prompts for commands you trust, add
+narrow allow rules such as `Bash(bun test)` to your settings, or run `/fewer-permission-prompts`,
+which proposes rules from your past sessions. Auto mode, where a terminal session with no
+configured mode starts, drops broad rules on entry, package-manager run rules such as
+`Bash(bun run *)` among them, and its classifier decides those calls instead. An allow rule for an MCP server reaches only the
 server it names, so allow all of OMCA's tools with `mcp__plugin_oh-my-claudeagent_omca__*`, the
 server's whole normalized name followed by `__*`. A shorter prefix such as
 `mcp__plugin_oh-my-claudeagent` matches nothing.
@@ -583,7 +590,7 @@ server's whole normalized name followed by `__*`. A shorter prefix such as
 
 `/omca doctor` opens the Doctor page and runs its checks:
 
-- the OMCA version that is loaded, and whether Claude Code meets the 2.1.330 floor;
+- the OMCA version that is loaded, and whether Claude Code meets the 2.1.332 floor;
 - whether bun 1.4.2 or later is on the session's `PATH`;
 - when a hook last reached the `omca` server;
 - whether `ast-grep` or `sg` is on `PATH`;
@@ -613,7 +620,12 @@ agent row and `s` on the status line row for `/oh-my-claudeagent:omca-setup`, an
 
 ## The status line
 
-Once setup has configured it, the status line shows three rows, each on its own line: the
+In a terminal, OMCA's mod draws the status line under the prompt whenever your settings name no
+`statusLine` command, so it needs no setup. `/oh-my-claudeagent:omca-setup` can point the setting
+at OMCA's renderer instead, which also shows what the mod cannot read: the vim mode, the worktree,
+the pull request, lines changed, extra directories and the prompt cache. Another `statusLine`
+command, or one your organization manages, takes the line over, and the `statuslineMode` option
+set to `off` stops both. Either way the status line shows three rows, each on its own line: the
 session (model and effort, vim mode and the active agent), the workspace (a context bar, git state, the project, the worktree and pull request, lines
 changed and extra directories), and usage (the session's cost and duration, the prompt cache's
 state and time left, your usage limits and a spend limit). A row too wide for the terminal wraps
@@ -653,8 +665,8 @@ missing. Make bun reachable from the app's `PATH`, for example
 by linking it into a directory the app searches, and restart the app.
 
 The Code tab in Desktop runs its own bundled copy of Claude Code, and OMCA loads there only when
-that copy is 2.1.330 or later; `/status` in a Code-tab session shows its version. A copy from
-2.1.323 to 2.1.329 lists OMCA as not loaded. An older copy loads the agents, skills, MCP tools and
+that copy is 2.1.332 or later; `/status` in a Code-tab session shows its version. A copy from
+2.1.323 to 2.1.331 lists OMCA as not loaded. An older copy loads the agents, skills, MCP tools and
 stop gates without the mod (the guard, transcript rows, band, pane and toasts). Desktop for Linux is a beta for
 Debian and Ubuntu that updates through the package manager, so a newer bundled copy arrives with
 the app's own update. When `/plugin` in a Desktop session does not list OMCA, name the plugin's
@@ -704,10 +716,11 @@ the tool again; do not skip the evidence.
 **The band, the pane and the guard are gone.** The mod is not running. On the first prompt of a
 session the `omca` server shows a message once when that happens, saying the Bash guard, band and
 pane are off. Run `/plugin` and check that OMCA is listed under mods active. A Claude Code older
-than 2.1.323 loads OMCA without its mod; from 2.1.323 to 2.1.329 it does not load OMCA at all.
-Mods are off when your organization sets
-`allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks`, when Anthropic turns them
-off remotely, or after the mod worker crashes three times. Using Desktop can save that remote
+than 2.1.323 loads OMCA without its mod; from 2.1.323 to 2.1.331 it does not load OMCA at all.
+Mods are off when `disableAllHooks` is set in any settings file, when
+Claude Code starts with `--safe-mode` or `--bare`, when your organization sets
+`allowManagedModsOnly` or `allowManagedHooksOnly`, when Anthropic turns them off remotely, or
+after the mod worker crashes three times. Using Desktop can save that remote
 switch as off in `~/.claude.json`, which then turns mods off in the terminal too; removing `cachedGrowthBookFeatures.tengu_plugin_hooks_modules` from that file and restarting
 clears it ([#99130](https://github.com/anthropics/claude-code/issues/99130)). With two copies of
 OMCA enabled from different marketplaces, only one copy's hooks and mod load, and `/plugin` notes

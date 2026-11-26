@@ -12,6 +12,7 @@ export type AtomHost<K extends keyof State> = {
 export type Options = {
   showBand: boolean;
   enableKeywordTriggers: boolean;
+  statusLine: boolean;
 };
 
 type Env = () => Promise<string | undefined>;
@@ -71,6 +72,8 @@ export type Host = {
     id: Engine["session"]["id"];
     root: Engine["session"]["root"];
     cwd: Engine["session"]["cwd"];
+    model: Engine["session"]["model"];
+    info: Engine["session"]["info"];
     surfaces: Engine["session"]["surfaces"];
     usage: Engine["session"]["usage"];
     version: Engine["session"]["version"];
@@ -166,12 +169,19 @@ export const resolvedSession = (): Session => session ?? UNRESOLVED;
 
 /**
  * Puts `text` in the prompt box. Where the box does not take it, as on a surface that draws its
- * own composer, a toast carries the text so the person can type it.
+ * own composer, a toast carries the text so the person can type it. An app that never answered
+ * may have taken it, and a hook's refusal names no cause, so those two toasts hedge.
  */
 export async function fillPrompt(host: Host, text: string): Promise<void> {
   const { isFilled, refusal } = await host.prompt.fill({ text });
   if (isFilled) return;
-  host.ui.toast(refusal === "dialog" ? `Close the open dialog, then type: ${text}` : `The prompt box cannot be filled here. Type: ${text}`);
+  host.ui.toast(
+    refusal === "dialog"
+      ? `Close the open dialog, then type: ${text}`
+      : refusal === "no_composer"
+        ? `The prompt box cannot be filled here. Type: ${text}`
+        : `If the prompt box is still empty, type: ${text}`,
+  );
 }
 
 /** `mtimeMs:size`, or `absent` when the file cannot be stated. */

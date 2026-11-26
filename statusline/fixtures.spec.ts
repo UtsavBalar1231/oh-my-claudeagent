@@ -2,11 +2,9 @@ import { afterEach, beforeEach, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { GitInfo } from "./git.ts";
-import { NO_REPO } from "./git.ts";
 import { displayWidth } from "../src/core/ui-kit.ts";
 import { specEnv, tmpEnv } from "../tests/fixtures/spec-env.ts";
-import { type Payload, render } from "./render.ts";
+import { type GitInfo, NO_REPO, type Payload, render } from "../src/core/status-line.ts";
 
 process.env.TZ = "UTC";
 

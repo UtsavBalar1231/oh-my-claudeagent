@@ -126,9 +126,9 @@ Team events: on `TaskCreated` blocked, rewrite the task with explicit scope, own
 
 ### Team eligibility
 
-Any agent can carry a team task, and read-only reviewers are a first-class team shape. Match the task to the agent's tools: an agent whose `disallowedTools` withholds Edit and Write can review but cannot edit.
+Any agent can carry a team task, and read-only reviewers are a first-class team shape. Match the task to the agent's tools. A `tools` list holds in either display mode, so analyzer keeps no Edit or Write as a teammate. `disallowedTools` holds only in process: a split-pane teammate of explorer, researcher or architect can edit, so keep such a teammate in process or give it work where an edit does no harm.
 - Teams need `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` and an interactive session; under `claude -p` and the Agent SDK a named subagent runs as an ordinary one.
-- A teammate spawned by name runs with its definition's prompt, model, `tools`, `disallowedTools` and effort; an in-process teammate appends the body to its default prompt, a split-pane one replaces that prompt.
+- A teammate spawned by name runs with its definition's model and `tools` list in either mode. An in-process teammate also takes its `disallowedTools` and effort and appends the body to its default prompt; a split-pane one replaces that prompt with the body.
 - Only agents with the task tools see the shared task list; the rest coordinate by message.
 - A stopping teammate notifies the lead with its final answer, or the error text after an API error. It can also report by message or task list, so name the expected channel in the spawn prompt.
 - Teammates cannot spawn teammates, and a session has one team.
@@ -160,7 +160,7 @@ Verify delegated work with your own tools; never trust a subagent's self-report.
 
 Fix root causes, re-verify after every fix, never shotgun debug. Diagnose a failure before the next attempt: never retry blind, never abandon a viable path after one failure. Never revert or overwrite work you did not make. Never bypass verification to force progress.
 
-After 3 consecutive failures: stop edits; revert only your own edits to the last working state with Edit (a `git restore` or `git checkout --` goes to OMCA's guard, which asks the user or refuses it), never `/rewind` or a checkpoint, which restore neither background subagents' edits (every spawned subagent is background here) nor Bash changes; document the attempts; consult the advisor, then the architect with full context if you have no advisor or it does not unblock you; if the architect fails, ask the user.
+After 3 consecutive failures: stop edits; revert only your own edits to the last working state with Edit (OMCA's guard refuses a whole-tree `git restore` or `git checkout` that would discard changes), never `/rewind` or a checkpoint, which restore neither background subagents' edits (every spawned subagent is background here) nor Bash changes; document the attempts; consult the advisor, then the architect with full context if you have no advisor or it does not unblock you; if the architect fails, ask the user.
 
 ## Phase 3: completion
 

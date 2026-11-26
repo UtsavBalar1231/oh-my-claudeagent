@@ -20,7 +20,7 @@ workflow.
 
 ## Requirements
 
-- Claude Code 2.1.330 or later. An update on Claude Code 2.1.323 to 2.1.329 keeps the OMCA you
+- Claude Code 2.1.332 or later. An update on Claude Code 2.1.323 to 2.1.331 keeps the OMCA you
   have until you update Claude Code.
 - bun 1.4.2 or later, on the `PATH` Claude Code starts with. The `omca` server, its hooks and
   the status line run on bun.
@@ -120,7 +120,9 @@ the passing checks fold into one line that `o` opens.
 
 The status line shows the session (model, effort and agent), the workspace
 (context window and git state) and usage (duration, usage limits, and cost for accounts billed
-by the token) on rows of their own, and fits itself to the terminal's width.
+by the token) on rows of their own, and fits itself to the terminal's width. In a terminal the mod
+draws it with no setup when your settings name no status line command; setup adds the prompt
+cache, vim mode, pull request and lines changed.
 
 <img src=".github/assets/statusline.png" width="900" alt="The OMCA status line under the prompt shows three rows: the model and effort; a context bar, the git branch with change counts and the project; and the session cost and duration. Below it, Claude Code lists the two running executors with their tasks, times and tokens. Above, the turn line waits on the two executors and the band shows the checkout-redesign run at 6 of 14.">
 
@@ -137,7 +139,7 @@ project files stay on that server. OMCA adds no telemetry or external service.
 
 **Settings hooks.** `hooks/hooks.json` registers `SessionStart` (only after `/clear` and
 compaction), `UserPromptSubmit`, `UserPromptExpansion`, `SubagentStart`, `PreToolUse` (only
-Write and Edit), `PostToolUse`, `PostToolUseFailure`, `Stop` and
+Write, Edit, TaskUpdate and SubagentHandback), `PostToolUse`, `PostToolUseFailure`, `Stop` and
 `TaskCompleted`. Each is an `mcp_tool` hook that calls `omca_hook` on the local server. They run
 in every session because the gates and the guidance need each turn's events: a comment gate
 on writes, the verification recorder and rule injection after tool calls,

@@ -56,6 +56,31 @@ test("the follow-up's own refused turn starts no further follow-up", async ($, o
   expect(submitted).toHaveLength(2);
 });
 
+test("a user turn after the follow-up gets a follow-up of its own", async ($, on) => {
+  const w = world(on);
+  const submitted: string[] = [];
+  on("session.start", (_$, e) => ({ cwd: e.cwd }));
+  on("prompt.submit", (_$, e) => (submitted.push(e.text), { text: e.text }));
+  on("turn.start", (_$, e) => ({ turnId: e.turnId }));
+  on("turn.complete", (_$, e) => ({ text: e.answer }));
+  await $.session.start(start());
+  await $.prompt.submit(prompt("Review this task"));
+  await $.turn.start({ text: "Review this task", turnId: "user-3" });
+  await $.turn.complete(refused("user-3", "reasoning_extraction"));
+  await w.clock.settle();
+  expect(submitted).toHaveLength(2);
+  // The engine passes the plugin's own submission through the plugin's other hooks too.
+  await $.prompt.submit(prompt(submitted[1]!, "plugin"));
+  await $.turn.start({ text: submitted[1]!, turnId: "plugin-2" });
+  await $.turn.complete({ answer: "Checked.", durationMs: 10, isAborted: false, reason: "answer", turnId: "plugin-2" });
+  await $.prompt.submit(prompt("Try the parser instead"));
+  await $.turn.start({ text: "Try the parser instead", turnId: "user-4" });
+  await $.turn.complete(refused("user-4", "reasoning_extraction"));
+  await w.clock.settle();
+  expect(submitted.at(-1)).toContain("normal coding tools");
+  expect(submitted).toHaveLength(5);
+});
+
 test("a usage-policy refusal such as cyber starts no follow-up", async ($, on) => {
   const w = world(on);
   const submitted: string[] = [];

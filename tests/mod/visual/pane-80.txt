@@ -12,7 +12,7 @@
 
 ✻ Waiting for executor, explorer, architect · NN.Nk in NN out · $X.XX
 
- executor  Fix the heading parser                      1s · 2 calls · 8.9k tok
+ executor  Fix the heading parser                      1s · 2 calls · 9.0k tok
   ⎿  Fenced lines are skipped now, and the heading tests pass.
 
 ● ok

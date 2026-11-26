@@ -35,12 +35,12 @@ export const REGISTRY: Readonly<Record<string, readonly (readonly [string, Handl
   PreToolUse: [
     ["final-task-guard", finalTaskGuard],
     ["comment-gate", commentGate],
+    ["empty-task-response", emptyTaskResponse],
   ],
   PostToolUse: [
     ["verification-recorder", verificationRecorder],
     ["context-injector", contextInjector],
     ["task-touch", taskTouch],
-    ["empty-task-response", emptyTaskResponse],
   ],
   PostToolUseFailure: [
     ["failure-recovery", failureRecovery],
@@ -61,7 +61,7 @@ export const REGISTRY: Readonly<Record<string, readonly (readonly [string, Handl
   SessionStart: [["session-start", sessionStart]],
 };
 
-const OBJECT_FIELDS = ["tool_input", "tool_response", "background_tasks"];
+const OBJECT_FIELDS = ["tool_input", "tool_response", "background_tasks", "session_crons"];
 
 // The client substitutes an absent path as "", an object as JSON, and a string as the raw
 // string, so text that is not JSON is the field's own string value.

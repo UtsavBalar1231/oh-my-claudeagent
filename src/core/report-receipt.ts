@@ -5,7 +5,7 @@ import { oneLine } from "./ui-kit.ts";
 import { EVIDENCE_LOG_TOOL, isVerificationCommand } from "./verification.ts";
 
 export const POOR_OUTPUT =
-  "[POOR AGENT OUTPUT] The agent returned no substantive report. A rate limit, server error, or kill arrives as a delegation error carrying the agent's partial work. Resume a resumable agent once with SendMessage and ask for its findings, evidence and limits, without repeating the investigation. Built-in Explore and Plan agents cannot be resumed; relaunch those. If the next reply is also empty, report the gap and use the available evidence instead of looping.";
+  "[POOR AGENT OUTPUT] The agent returned no substantive report. Resume it once with SendMessage and ask for its findings, evidence and limits, without repeating the investigation. The built-in Explore and Plan agents can finish without an ID to resume them by; relaunch one of those. If the next reply is also empty, report the gap and use the available evidence instead of looping.";
 
 // A report under 200 characters that opens with a transitional phrase stopped mid-work. Only the
 // opening counts: a short report's `NEXT STEPS:` line is a section, not a stall.

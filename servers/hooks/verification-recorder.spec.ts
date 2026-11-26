@@ -89,9 +89,9 @@ describe("recognised runners", () => {
     expect(JSON.parse(readFileSync(statusPath(root, sessionId), "utf8"))).toEqual({
       session_id: sessionId,
       last_hook_at: NOW_S,
-      verification: { command: "just test", at: NOW_S, exit_code: null, evidence_logged: false },
+      verification: { command: "just test", at: NOW_S, exit_code: 0, evidence_logged: false },
     });
-    expect(touchSession(sessionId).verifications?.get("")).toEqual({ command: "just test", at: NOW_S, exit_code: null, evidence_logged: false });
+    expect(touchSession(sessionId).verifications?.get("")).toEqual({ command: "just test", at: NOW_S, exit_code: 0, evidence_logged: false });
   });
 
   test("recorder: a runner after && is anchored and records", async () => {
@@ -246,7 +246,7 @@ describe("single-slot overwrite policy", () => {
     const sessionId = crypto.randomUUID();
     await record(root, sessionId, "just test");
     expect(await record(root, sessionId, "just lint", NOW + 10_000)).toEqual(NOTE);
-    expect(slot(root, sessionId)).toEqual({ command: "just test", at: NOW_S, exit_code: null, evidence_logged: false });
+    expect(slot(root, sessionId)).toEqual({ command: "just test", at: NOW_S, exit_code: 0, evidence_logged: false });
   });
 
   test("recorder: an unsatisfied slot older than an hour is replaced by a later verification", async () => {
@@ -257,7 +257,7 @@ describe("single-slot overwrite policy", () => {
     expect(slot(root, sessionId)).toEqual({
       command: "just lint",
       at: NOW_S + 3601,
-      exit_code: null,
+      exit_code: 0,
       evidence_logged: false,
     });
   });
@@ -268,7 +268,7 @@ describe("single-slot overwrite policy", () => {
     await record(root, sessionId, "just test");
     await logEvidence(root, sessionId, NOW + 60_000);
     await record(root, sessionId, "just lint", NOW + 120_000);
-    expect(slot(root, sessionId)).toEqual({ command: "just lint", at: NOW_S + 120, exit_code: null, evidence_logged: false });
+    expect(slot(root, sessionId)).toEqual({ command: "just lint", at: NOW_S + 120, exit_code: 0, evidence_logged: false });
   });
 
   test("recorder: a verification in another session leaves this session's slot alone", async () => {
@@ -278,8 +278,8 @@ describe("single-slot overwrite policy", () => {
     await record(root, first, "just test");
     await record(root, second, "just lint");
     expect([slot(root, first), slot(root, second)]).toEqual([
-      { command: "just test", at: NOW_S, exit_code: null, evidence_logged: false },
-      { command: "just lint", at: NOW_S, exit_code: null, evidence_logged: false },
+      { command: "just test", at: NOW_S, exit_code: 0, evidence_logged: false },
+      { command: "just lint", at: NOW_S, exit_code: 0, evidence_logged: false },
     ]);
   });
 });
@@ -289,7 +289,7 @@ describe("a verification belongs to the agent that ran it", () => {
     const root = project();
     const sessionId = crypto.randomUUID();
     expect(await record(root, sessionId, "bun run build", NOW, "a54ee4c474f89151b")).toEqual(NOTE);
-    expect(slotOf(sessionId, "a54ee4c474f89151b")).toEqual({ command: "bun run build", at: NOW_S, exit_code: null, evidence_logged: false });
+    expect(slotOf(sessionId, "a54ee4c474f89151b")).toEqual({ command: "bun run build", at: NOW_S, exit_code: 0, evidence_logged: false });
     expect(slotOf(sessionId, "")).toBeUndefined();
   });
 
@@ -299,7 +299,7 @@ describe("a verification belongs to the agent that ran it", () => {
     await record(root, sessionId, "just test");
     expect(await logEvidence(root, sessionId, NOW + 5_000)).toEqual({});
     expect(slotOf(sessionId, "")?.evidence_logged).toBe(true);
-    expect(slot(root, sessionId)).toEqual({ command: "just test", at: NOW_S, exit_code: null, evidence_logged: true });
+    expect(slot(root, sessionId)).toEqual({ command: "just test", at: NOW_S, exit_code: 0, evidence_logged: true });
   });
 
   test("a subagent's evidence_log leaves the main conversation's slot unlogged", async () => {
@@ -383,11 +383,18 @@ describe("exit_code is display-only", () => {
     expect(slot(root, sessionId)).toMatchObject({ exit_code: 1 });
   });
 
-  test("recorder: a non-object tool_response degrades exit_code to null", async () => {
+  test("recorder: a success with no exit code in its response records 0, since a non-zero exit fails the call", async () => {
     const root = project();
     const sessionId = crypto.randomUUID();
     const output = await dispatch(bash(sessionId, { tool_input: { command: "just test" }, tool_response: "some text" }), root, NOW);
     expect(output).toEqual(NOTE);
+    expect(slot(root, sessionId)).toMatchObject({ exit_code: 0 });
+  });
+
+  test("recorder: a verification sent to the background has no exit code yet", async () => {
+    const root = project();
+    const sessionId = crypto.randomUUID();
+    await dispatch(bash(sessionId, { tool_input: { command: "just test", run_in_background: true }, tool_response: { backgroundTaskId: "b1" } }), root, NOW);
     expect(slot(root, sessionId)).toMatchObject({ exit_code: null });
   });
 });

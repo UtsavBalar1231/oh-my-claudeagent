@@ -45,12 +45,21 @@ describe("frontmatter keys", () => {
 });
 
 describe("agent frontmatter", () => {
-  test("a tools allowlist fails", async () => {
-    const ctx = fixture({ "agents/demo.md": agent("name: demo", "tools: Read, Grep") });
+  test("a tools list without the omca server, ToolSearch or a shell left out fails", async () => {
+    const ctx = fixture({ "agents/demo.md": agent("name: demo", "tools: Read, Grep, Bash") });
     expect(await runNamed(checks, "agent frontmatter", ctx)).toEqual({
       status: "fail",
-      detail: "agents/demo.md: a tools allowlist drops every tool it omits, use disallowedTools",
+      detail: [
+        "agents/demo.md: a tools list must name mcp__plugin_oh-my-claudeagent_omca__*, or the agent loses the omca tools",
+        "agents/demo.md: a tools list must name ToolSearch, or every omca tool loads up front",
+        "agents/demo.md: a tools list is for an agent without a shell; restrict a shell agent with disallowedTools",
+      ].join("; "),
     });
+  });
+
+  test("a tools list that keeps the omca server and ToolSearch and leaves the shell out passes", async () => {
+    const ctx = fixture({ "agents/demo.md": agent("name: demo", "tools:", "  - Read", "  - Glob", "  - ToolSearch", "  - mcp__plugin_oh-my-claudeagent_omca__*") });
+    expect(await runNamed(checks, "agent frontmatter", ctx)).toMatchObject({ status: "pass" });
   });
 
   test("a colon in the name fails", async () => {
@@ -79,12 +88,8 @@ describe("agent frontmatter", () => {
 describe("skill description cap", () => {
   const long = (length: number) => `description: ${"x".repeat(length)}`;
 
-  test("a description at the soft cap passes and one past it warns", async () => {
-    expect(await runNamed(checks, "skill description cap", fixture({ "skills/demo/SKILL.md": skill(long(512)) }))).toMatchObject({ status: "pass" });
-    expect(await runNamed(checks, "skill description cap", fixture({ "skills/demo/SKILL.md": skill(long(513)) }))).toEqual({
-      status: "warn",
-      detail: "description plus when_to_use over 512 characters, older clients may truncate: demo (513)",
-    });
+  test("a description at the platform cap passes", async () => {
+    expect(await runNamed(checks, "skill description cap", fixture({ "skills/demo/SKILL.md": skill(long(1536)) }))).toMatchObject({ status: "pass" });
   });
 
   test("a description past the platform cap fails", async () => {

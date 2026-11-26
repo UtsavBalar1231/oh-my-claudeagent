@@ -17,7 +17,7 @@
   "documentationUrl": "https://github.com/UtsavBalar1231/oh-my-claudeagent/blob/main/docs/usage.md",
   "license": "MIT",
   "engines": {
-    "claude-code": ">=2.1.330"
+    "claude-code": ">=2.1.332"
   },
   "types": "./types/index.d.ts",
   "keywords": [
@@ -44,7 +44,7 @@
         "off",
         "on"
       ],
-      "description": "on lets /oh-my-claudeagent:omca-setup point your status line at OMCA's renderer; off makes setup leave it alone.",
+      "description": "on draws OMCA's status line where your settings name no statusLine command, and lets /oh-my-claudeagent:omca-setup point your status line at OMCA's renderer; off does neither.",
       "sensitive": false
     },
     "disableForceOrchestrationStyle": {

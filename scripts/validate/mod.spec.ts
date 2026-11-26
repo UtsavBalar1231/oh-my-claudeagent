@@ -171,6 +171,7 @@ describe("the real tree", () => {
       'on("ui.render", {component:"ToolResult",props:{tool:/^(?:Bash|PowerShell|Monitor|TaskUpdate|Write|Edit)$/}})',
       'on("ui.render", {component:"ToolGroup"})',
       'on("ui.render", {component:"Placed",props:{plugin:"oh-my-claudeagent"}})',
+      'on("ui.render", {component:"StatusLine"})',
     ]);
   });
 });
