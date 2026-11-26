@@ -223,7 +223,7 @@ Status and remote run at the same time.
 | File | Purpose |
 |---|---|
 | `main.ts` | Entry point: reads stdin, reads git, prints the render. |
-| `render.ts` | Payload types, the segments, the layout (`arrange`), and every formatting helper. |
+| `../src/core/status-line.ts` | Payload types, the segments, the layout (`arrange`), and every formatting helper. The mod draws the same renderer through Claude Code's status line site when no command is set. |
 | `git.ts` | Branch, status counts, remote, and the cache. |
 | `launcher.ts` | Copied to `~/.claude/omca/statusline.ts`; runs the renderer of the enabled install Claude Code updated last. |
 | `*.spec.ts` | `bun test statusline`. |

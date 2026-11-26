@@ -19,7 +19,7 @@ try/catch. `host.ts` defines the `Host` closures a feature receives in place of 
 feature module takes `host` and never `$`. The features are `bash-guard`, `server-check`,
 `mod-marker`, `agents-tracker`, `agent-rows`, `metrics`, `band`, `pane` with its `tabs/`, `footer`,
 `group-rows`, `blocker-rows`, `brief-rows`, `notify`, `report-receipts`, `keyword-paint`, `completion`, `refusal-recovery`, `omca-router`, `task-tools`,
-`task-list` and `task-rows`. `doctor.ts` runs the Doctor page's checks and fixes for `tabs/doctor.ts`; it registers
+`task-list`, `task-rows` and `status-line`. `doctor.ts` runs the Doctor page's checks and fixes for `tabs/doctor.ts`; it registers
 no event. `project-root.ts` gives `host.session.root()` the repository top level of the engine's
 root, as the `omca` server names its root, so a launch from a subdirectory reads and writes the same
 `.omca/`. Pure logic lives in `src/core/`.
@@ -58,8 +58,7 @@ atoms written once per turn or per finished agent, since a row subscribes to eve
   the engine's.
   The line names the agents the engine lists in `waitingFor`. The engine keeps its own line, with
   the facts on a row beneath, in the ctrl+o view (`isExpanded`), while the turn waits on a
-  workflow, and while agents run that the props do not name, as from a client older than
-  `waitingFor`. A session without a terminal gets the facts as the `turn.complete` text instead.
+  workflow, and while agents run that the props do not name. A session without a terminal gets the facts as the `turn.complete` text instead.
 - `agent-rows` redraws the `ToolUse` row of a single Agent call from its own input (registered
   with `props: { tool: "Agent" }`, so no other tool row reaches the mod); several agents
   launched together are one engine block no hook reaches. It also keeps a finished subagent's
@@ -106,6 +105,21 @@ atoms written once per turn or per finished agent, since a row subscribes to eve
   and a notification's rows, a remote surface, a text over 100,000 characters and
   `OMCA_DISABLED_HOOKS=brief-rows` leave the engine's row.
 
+`status-line` draws OMCA's status line at the engine's `StatusLine` site, from the renderer that
+`statusline/main.ts` runs (`src/core/status-line.ts`), so a user who never ran the setup step still
+has it. The hook passes, leaving the engine's line, unless the site holds no output (`text` is null),
+is not managed, has a row to spare (`maxRows` above 0), the merged settings name no `statusLine`, the
+`statuslineMode` option is not `off` and `OMCA_DISABLED_HOOKS` does not name `status-line`. It builds
+the payload from engine calls (`$.session.model`, its id spelled as the settings payload names it,
+`usage`, `cwd`, `info`, the `agent` setting when `info` names no agent type, the latest main-loop
+`turn.step` effort) in place of the stdin payload, so the prompt cache, vim mode, pull request, lines
+changed, worktree and added directories stay absent, and passes `maxRows` as the line cap and
+`COLUMNS` and `OMCA_GLYPHS` as the environment. Git comes from `git status --porcelain=v2 --branch -u`
+and `git remote get-url origin` through `host.process.run`, kept for 5 seconds as the settings
+command's cache is, and any failure draws without the git segments. A main-loop `turn.complete`
+invalidates `ui.render`, and so does a main-loop `turn.step` at most once in 5 seconds, since the
+redraw runs every OMCA site on screen again.
+
 `notify` sends one `$.ui.notify`, titled `OMCA`, when the last background agent of a wave ends. The
 wave is a module value, not an atom, so a change redraws nothing: `agent.spawn` adds an agent that
 has an `agentId`, is not denied and is not a teammate, and a spawn with `resume` puts it back to
@@ -132,7 +146,7 @@ in a terminal, also where `sec-default` is seated (probed on 2.1.330); a hook th
 report as the agent wrote it, so the registration carries no `.catch`. The record misses edits made
 through Bash and calls before a mod reload, which is why the line says what OMCA saw.
 `OMCA_DISABLED_HOOKS=report-receipts` drops the receipt and `empty-task-response` drops the advice,
-which on the server also covers the subagent's own hand-back.
+which on the server also covers the refusal of a subagent's first empty hand-back.
 
 `task-rows` places one row with `$.ui.place` under the turn line of a main turn that changed a run's
 tasks, found by comparing the `tasks` atom at that turn's `turn.start` with the atom at its
@@ -146,7 +160,7 @@ same `keywordSpans` reader in `src/core/keywords.ts`, only with `enableKeywordTr
 detector's switch off. A `prompt.edit` answer carries the runs as typing goes on, and `prompt.change`
 repaints with `$.prompt.read` and `$.prompt.paint` for a write no edit carries, as a recalled entry
 or an undo. It notes a mode at `prompt.submit` as the detector announces it, once a session, and
-stops marking it. `$.prompt.paint` rejects on an old client and leaves the draft as it stands.
+stops marking it. A rejected `$.prompt.paint` leaves the draft as it stands.
 
 `server-check` also keeps a `$.ui.status` line while the `omca` server is not connected, which the
 engine draws under the prompt as `⚠ oh-my-claudeagent: ...`. Each main `turn.start` asks the engine

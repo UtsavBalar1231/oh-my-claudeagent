@@ -6,7 +6,7 @@
 - `bun` 1.4.2 or later, runtime for the MCP server, the hooks module, the status line and the scripts
 - `ast-grep` CLI (`ast-grep` or `sg`), structural code-search tools
 - `just`, task runner for dev commands. Its recipes run in bash, so on Windows run them from Git Bash
-- `claude`, Claude Code 2.1.330 or later, which loads the mod: `just test-mod`, the validator's engine group and `just qa` need it
+- `claude`, Claude Code 2.1.332 or later, which loads the mod: `just test-mod`, the validator's engine group and `just qa` need it
 - `pre-commit`, which runs the git hooks that `just setup` installs
 - `uv`, which `just bench` uses to install a baseline whose status line is the Python renderer
 
@@ -40,7 +40,7 @@ name: agent-name
 description: One-line role description
 model: sonnet|opus|fable
 effort: max|xhigh|high|medium|low
-disallowedTools: Write, Edit  # use disallowedTools, NOT tools:
+disallowedTools: Write, Edit  # or a tools list, for an agent without a shell
 memory: project                   # optional; enables persistent project memory
 ---
 ```
@@ -48,7 +48,7 @@ memory: project                   # optional; enables persistent project memory
 Key rules:
 - Declare the tier alias in `model:`, not a full generation ID. The alias tracks the platform's current model for that tier, so the frontmatter never goes stale. The roster uses three tiers: `sonnet` for routine workers whose scope the orchestrator fixes (search, scoped implementation, docs lookup), `opus` for agents whose output turns on judgment, and `fable` for architect-class reasoning. `haiku` remains a valid per-call override but is not what a new agent declares.
 - Pick `effort:` deliberately, alongside the tier. `low` suits short scoped work that is not intelligence-sensitive, `medium` is the Sonnet 5.5 and Opus 5.5 default for day-to-day work with a clear scope, `high` is the intelligence-sensitive default for orchestration and planning, `xhigh` buys deeper reasoning for architect. Reserve `xhigh` and `max` for a measured quality gain: Opus 5.5 thinks more per turn at a given level than Opus 5 did.
-- Use `disallowedTools:` to restrict capabilities, never `tools:`. `tools:` is a strict allowlist that blocks MCP tool inheritance, and an incomplete list launches the agent with no usable tools. `bun scripts/validate.ts --check claims` fails on a `tools:` key in agent frontmatter.
+- Restrict an agent that keeps a shell with `disallowedTools:`. Give an agent without a shell a `tools:` list instead: on macOS, Linux and WSL, Claude Code leaves out Glob and Grep unless a subagent's `tools` names them and leaves out Bash, and a `tools` list holds for a split-pane teammate, where `disallowedTools` does not. The list drops every tool it omits, MCP tools included (`mcp__*` matches none), so it names `mcp__plugin_oh-my-claudeagent_omca__*` and `ToolSearch`, and every built-in tool the body uses. `just validate --check claims` fails a `tools:` list that leaves out either or names Bash or PowerShell.
 - Keep `name:` free of `:`. The platform rejects an agent whose frontmatter name holds a colon, so the agent never loads. The `oh-my-claudeagent:` prefix used at call sites is added by the platform.
 - Do not declare `permissionMode:`. Claude Code strips it from plugin agents for security.
 - Add the agent to every list of the roster: the agent catalog table in `templates/claudemd.md`, the agents table in `docs/references.md` and the agent list in the root `AGENTS.md`. `servers/categories.json` maps categories to tiers and changes only when a category does.
@@ -61,7 +61,7 @@ Key rules:
 2. Follow existing frontmatter format (`name`, `description`, `argument-hint` if applicable)
 3. If the skill should be keyword-activated, add a detection pattern to `src/core/keywords.ts`
 4. A skill that omits `context: fork` expands inline in whatever session invoked it, so one invoked from the main session runs at depth 0 and keeps that session's `Agent` tool. That is what an orchestrator skill needs; `start-work` is the worked example, fanning out to `executor` agents from an inline body. `context: fork` does the opposite. It runs the body in a forked subagent one level down, where the platform may withhold the `Agent` tool depending on the configured spawn depth, so do not reach for it when the body has to delegate.
-5. Keep a skill description under the 512-character soft cap and the 1,536-character hard cap. The platform truncates at the hard cap, and older clients may truncate at the soft cap. Run `just validate --check claims` before committing: it counts `description` plus `when_to_use`, warns at 512 and fails at 1,536. Move longer trigger phrases or usage notes into the SKILL.md body.
+5. Keep a skill description as short as its triggers allow, and within the 1,536-character platform cap, where the platform truncates. Run `just validate --check claims` before committing: it counts `description` plus `when_to_use` and fails past 1,536. Move longer trigger phrases or usage notes into the SKILL.md body.
 6. Keep hook internals out of skills. Skills describe what users do, and hooks automate how. Unless a skill's primary purpose is hook configuration or diagnosis, it must not mention raw `.omca/state/*.json` file paths (use the omca server's MCP tools or Claude Code's task tools instead), hook handler names (`task-completed`, `stop-gates`), hook event names (`PreToolUse`, `Stop`) or hook env vars (`OMCA_DISABLED_HOOKS`). The recognized exception is `omca-setup`, which states the hook and managed-settings policy it works under and sends a diagnosis to `/omca doctor`. A file path in a skill forces users to learn internal layouts they cannot control, and every hook refactor then has to update skill prose.
 
 ## Testing
