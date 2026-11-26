@@ -7,7 +7,7 @@ const read = (path: string): string => readFileSync(join(REPO, path), "utf8");
 const JUSTFILE = read("justfile");
 
 type Step = { name?: string; uses?: string; run?: string; if?: string; with?: Record<string, unknown> };
-type Job = { "runs-on": string; "timeout-minutes"?: number; strategy?: { "fail-fast": boolean; matrix: { os: string } }; env?: Record<string, string>; steps: Step[] };
+type Job = { "runs-on": string; "timeout-minutes"?: number | string; strategy?: { "fail-fast": boolean; matrix: { os: string } }; env?: Record<string, string>; steps: Step[] };
 type Workflow = { on: Record<string, unknown>; jobs: Record<string, Job> };
 
 const parse = <T>(path: string): T => Bun.YAML.parse(read(path)) as T;
@@ -114,8 +114,11 @@ describe("workflow contract", () => {
     expect(job("validate-manifest")["runs-on"]).toBe("ubuntu-latest");
   });
 
-  test("no job may run past 15 minutes, which the slowest job's longest run fits twice over", () => {
-    expect(Object.entries(CI.jobs).filter(([, ci]) => (ci["timeout-minutes"] ?? 360) > 15).map(([name]) => name)).toEqual([]);
+  test("no job may run past 15 minutes, which the slowest job's longest run fits twice over, but a macOS leg may wait 45 for its runner", () => {
+    const macosWait = "${{ matrix.os == 'macos-latest' && 45 || 15 }}";
+    for (const [name, ci] of Object.entries(CI.jobs)) {
+      expect([name, ci["timeout-minutes"]]).toEqual([name, ci["runs-on"] === "${{ matrix.os }}" ? macosWait : 15]);
+    }
   });
 
   test("ast-grep comes from the local action, which pins an archive digest for each OS", () => {
