@@ -51,7 +51,7 @@ const AUTONOMOUS_PROTOCOL =
 const PLANNER_PROTOCOL =
   "AskUserQuestion is not available here. When you need user input, emit a '## BLOCKING QUESTIONS' block at the end of your final response (Q1., Q2., lettered options A/B/C, Recommended: line) and return. The orchestrator will relay and resume you with the answers.";
 const COMMON =
-  "\n[OUTPUT MANDATE] Your final response is the deliverable; intermediate tool results are not forwarded. Return findings, evidence and remaining limits, keeping any markers your agent requires." +
+  "\n[OUTPUT MANDATE] Your report is the deliverable: the message of your SubagentHandback call where you have that tool, otherwise your final response. Intermediate tool results are not forwarded. Return findings, evidence and remaining limits, keeping any markers your agent requires." +
   "\n[FILE TOOLS] Read files with the Read tool, not cat, head, tail, or sed -n in Bash: Read numbers the lines and pages a large file with offset and limit." +
   "\n[REFUSALS] When a permission check denies a call or the user declines it, that decides the outcome the call was after. Do not get there through another tool, command, path or host. Report what stays undone and carry on with the rest. Retry only when the denial's own message says to wait and try again." +
   "\n[OMCA TOOLS] `evidence_log` and `notepad_write` are always available. Load any other omca tool with ToolSearch first, by its full name: `select:mcp__plugin_oh-my-claudeagent_omca__ast_search`. A guessed prefix finds nothing.";
@@ -64,7 +64,7 @@ const ORCHESTRATING_GUIDANCE =
   "\n[TEAM CONTRACT] OMCA agents are thin wrappers over Claude-native subagents and agent teams. Use subagents when workers only need to report back. Use native agent teams when workers need the shared task list or direct teammate messaging.";
 const WORKER_CONTRACT =
   "\n[YOU ARE A LEAF WORKER] Do this task yourself: do not delegate to other agents or wait on them. Guidance about waiting for background agents or ending a turn while agents run, whether it reaches you from memory, CLAUDE.md, or the output style, is for the orchestrator and does not apply to you." +
-  "\n[NEVER STUB] Your final message is the whole deliverable: put your complete findings in it, never a bare status word or a note that you are waiting.";
+  "\n[NEVER STUB] Your report is the whole deliverable: put your complete findings in it, never a bare status word or a note that you are waiting.";
 
 const RUN_BLOCK =
   "\n[ACTIVE RUN] my-run: 1 open, next #2 Say hello" +
