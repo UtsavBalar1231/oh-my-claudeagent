@@ -19,6 +19,9 @@ env:
 # A macOS minute costs ten Linux minutes and a Windows minute two, so pull requests and pushes to
 # main run on Linux. A release tag and a manual run (`gh workflow run ci.yml --ref <branch>`) add
 # macOS and Windows.
+# GitHub counts the wait for an arm64 macOS runner against a job's timeout, and macOS jobs have
+# waited past 15 minutes without one, which cancels them and skips the release. A macOS leg gets
+# 45 minutes; once it has a runner it finishes in a few, and a wait is not billed.
 defaults:
   run:
     shell: bash
@@ -27,7 +30,7 @@ jobs:
   validate:
     name: Validate Plugin (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: ${{ matrix.os == 'macos-latest' && 45 || 15 }}
     strategy:
       fail-fast: false
       matrix:
@@ -62,7 +65,7 @@ jobs:
   test-opencode:
     name: OpenCode Adapter (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: ${{ matrix.os == 'macos-latest' && 45 || 15 }}
     strategy:
       fail-fast: false
       matrix:
@@ -121,7 +124,7 @@ jobs:
   typescript:
     name: TypeScript Checks (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: ${{ matrix.os == 'macos-latest' && 45 || 15 }}
     strategy:
       fail-fast: false
       matrix:
@@ -208,7 +211,7 @@ jobs:
   mod:
     name: Mod Tests and Smoke (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: ${{ matrix.os == 'macos-latest' && 45 || 15 }}
     strategy:
       fail-fast: false
       matrix:

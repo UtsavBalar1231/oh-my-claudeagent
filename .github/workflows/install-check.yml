@@ -21,7 +21,8 @@ jobs:
   install:
     name: Install from the marketplace (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    # A macOS leg can wait past 15 minutes for an arm64 runner, which GitHub counts against the timeout.
+    timeout-minutes: ${{ matrix.os == 'macos-latest' && 45 || 15 }}
     strategy:
       fail-fast: false
       matrix:
