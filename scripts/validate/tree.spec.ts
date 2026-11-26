@@ -6,6 +6,19 @@ import { checks, shellOrPythonScripts } from "./tree.ts";
 
 afterEach(cleanup);
 
+describe("shipped file size", () => {
+  test("a shipped file over 256 KiB fails, and an excluded one does not count", async () => {
+    const big = "x".repeat(256 * 1024 + 1);
+    const ctx = fixture({ "docs/huge.md": big, "tests/huge.txt": big, "CONTRIBUTING.md": big });
+    expect(await runNamed(checks, "shipped file size", ctx)).toEqual({ status: "fail", detail: `docs/huge.md ships ${big.length} bytes, over 262144` });
+  });
+
+  test("a file at 256 KiB passes", async () => {
+    const ctx = fixture({ "docs/edge.md": "x".repeat(256 * 1024) });
+    expect(await runNamed(checks, "shipped file size", ctx)).toMatchObject({ status: "pass" });
+  });
+});
+
 describe("core imports", () => {
   test.each([
     ['import { readFileSync } from "node:fs";', "named import"],

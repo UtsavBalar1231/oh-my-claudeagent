@@ -1,5 +1,6 @@
-import { closeSync, openSync, readSync } from "node:fs";
+import { closeSync, openSync, readSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { listPackageFiles } from "../package.ts";
 import { type Check, type Context, type Outcome, readText, verdict } from "./core.ts";
 
 const SCRIPT_EXTENSION = /\.(?:py|sh|bash)$/;
@@ -42,7 +43,20 @@ function testFileLocation(ctx: Context): Outcome {
   return verdict(problems, "every *.test.ts lives in tests/mod/");
 }
 
+// The Anthropic plugin directory takes no file over 256 KiB, so a shipped file stays under it.
+const MAX_SHIPPED_BYTES = 256 * 1024;
+
+function shippedFileSize(ctx: Context): Outcome {
+  const files = listPackageFiles(ctx.tracked());
+  const problems = files.flatMap((path) => {
+    const size = statSync(join(ctx.root, path)).size;
+    return size > MAX_SHIPPED_BYTES ? [`${path} ships ${size} bytes, over ${MAX_SHIPPED_BYTES}`] : [];
+  });
+  return verdict(problems, `${files.length} shipped files, none over ${MAX_SHIPPED_BYTES} bytes`);
+}
+
 export const checks: readonly Check[] = [
+  { name: "shipped file size", run: shippedFileSize },
   { name: "core imports", run: coreImports },
   { name: "test file location", run: testFileLocation },
   { name: "shell and python scripts", run: shellOrPython },

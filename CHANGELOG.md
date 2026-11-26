@@ -47,6 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `disallowedTools` holds only for an in-process teammate, and that the guard refuses a whole-tree
   `git restore` or `git checkout` rather than asking. Searches name `find` and `grep` through Bash
   where Glob and Grep are absent.
+- **The installed plugin leaves out `CHANGELOG.md`:** it passed the Anthropic plugin directory's
+  256 KiB limit for one file. The README links to it on GitHub, and validation now fails any
+  shipped file over that limit.
 - **Write and Edit go ahead when the `omca` server stalls:** OMCA's `PreToolUse` hook sets
   `onFailure: "continue"`, which Claude Code documents for Code Mode, where a hook that times out
   otherwise refuses the call. Not yet checked in a Code Mode session.

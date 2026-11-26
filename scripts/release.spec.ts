@@ -52,7 +52,7 @@ function write(path: string, text: string): void {
 
 const json = (path: string) => JSON.parse(readFileSync(join(root, path), "utf8"));
 
-const PACKAGED = [".claude-plugin/marketplace.json", ".claude-plugin/plugin.json", "CHANGELOG.md", "README.md", "agents/a.md"];
+const PACKAGED = [".claude-plugin/marketplace.json", ".claude-plugin/plugin.json", "README.md", "agents/a.md"];
 
 beforeEach(() => {
   scratch = mkdtempSync(join(tmpdir(), "omca-release-spec-"));
