@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { getGitInfo, type GitInfo, type GitOptions, NO_REPO, parsePorcelainV2, readBranchFromHead, resolveGitDir } from "./git.ts";
+import { type GitInfo, NO_REPO, parsePorcelainV2 } from "../src/core/status-line.ts";
+import { getGitInfo, type GitOptions, readBranchFromHead, resolveGitDir } from "./git.ts";
 
 const GIT_ENV = {
   GIT_AUTHOR_NAME: "f",

@@ -1,8 +1,40 @@
-import { baseName, inferPlatform } from "../src/core/path.ts";
-import { AGENT_ICONS, cells, displayWidth, formatDuration, formatTokens, type GlyphTier, glyphTier } from "../src/core/ui-kit.ts";
-import type { GitInfo } from "./git.ts";
+import { baseName, inferPlatform } from "./path.ts";
+import { AGENT_ICONS, cells, displayWidth, formatDuration, formatTokens, type GlyphTier, glyphTier } from "./ui-kit.ts";
 
 export type Env = Record<string, string | undefined>;
+
+export interface GitInfo {
+  repo: boolean;
+  branch: string;
+  staged: number;
+  modified: number;
+  untracked: number;
+  remote: string;
+  remoteFetchedAt: number;
+}
+
+export const NO_REPO: GitInfo = { repo: false, branch: "", staged: 0, modified: 0, untracked: 0, remote: "", remoteFetchedAt: 0 };
+
+export function parsePorcelainV2(output: string): { staged: number; modified: number; untracked: number } {
+  const counts = { staged: 0, modified: 0, untracked: 0 };
+  for (const line of output.split("\n")) {
+    if (line.startsWith("1 ") || line.startsWith("2 ")) {
+      const xy = line.split(" ", 2)[1] ?? "";
+      if (xy.length >= 2) {
+        if (xy[0] !== ".") counts.staged++;
+        if (xy[1] !== ".") counts.modified++;
+      }
+    } else if (line.startsWith("u ")) counts.modified++;
+    else if (line.startsWith("? ")) counts.untracked++;
+  }
+  return counts;
+}
+
+/** The branch a `--branch` status names, spelled as the settings command spells a detached head. */
+export function branchOfPorcelainV2(output: string): string {
+  const head = /^# branch\.head (.+)$/m.exec(output)?.[1] ?? "";
+  return head === "(detached)" ? `(detached:${/^# branch\.oid (\w{7})/m.exec(output)?.[1] ?? ""})` : head;
+}
 
 interface Usage {
   input_tokens?: number | null;
@@ -571,12 +603,13 @@ function compactSegments(c: Ctx): Segment[] {
   ]);
 }
 
-export function render(data: Payload, git: GitInfo, env: Env, now: Date): string {
+export function render(data: Payload, git: GitInfo, env: Env, now: Date, maxLines?: number): string {
   const c: Ctx = { data, git, ...statusGlyphs(env), now };
   const sep = separator(c.g.dot);
   const columns = terminalColumns(env);
   const width = Math.max(1, columns - STATUS_LINE_INSET);
   if (columns < COMPACT_BELOW_COLUMNS) return arrange(compactSegments(c), width, 1, sep).join("\n");
   const rows = terminalLines(env);
-  return stackRows(fullRows(c, width), width, rows !== null && rows < SHORT_TERMINAL_LINES ? SHORT_MAX_LINES : MAX_LINES, sep).join("\n");
+  const budget = rows !== null && rows < SHORT_TERMINAL_LINES ? SHORT_MAX_LINES : MAX_LINES;
+  return stackRows(fullRows(c, width), width, Math.min(maxLines ?? budget, budget), sep).join("\n");
 }

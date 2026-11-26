@@ -20,6 +20,7 @@ import { pane } from "./pane.ts";
 import { projectRoot } from "./project-root.ts";
 import { groupRows } from "./group-rows.ts";
 import { serverCheck } from "./server-check.ts";
+import { statusLine } from "./status-line.ts";
 import { TASK_COMMAND, taskList } from "./task-list.ts";
 import { taskRows } from "./task-rows.ts";
 import { taskTools } from "./task-tools.ts";
@@ -80,6 +81,8 @@ function bindHost($: EngineInterface, options: Options): Host {
       // The omca server names its root by `git rev-parse --show-toplevel`; a launch from a subdirectory must find the same `.omca/`.
       root: () => $.session.root().then((started) => projectRoot(started, (argv, init) => $.process.run(argv, init))),
       cwd: () => $.session.cwd(),
+      model: () => $.session.model(),
+      info: () => $.session.info(),
       surfaces: () => $.session.surfaces(),
       usage: (args) => $.session.usage(args),
       version: () => $.session.version(),
@@ -173,6 +176,7 @@ export function readOptions(options: PluginOptions): Options {
   return {
     showBand: options["showBand"] !== false,
     enableKeywordTriggers: options["enableKeywordTriggers"] === true,
+    statusLine: options["statuslineMode"] !== "off",
   };
 }
 
@@ -188,11 +192,11 @@ export const register: Register = (on, pluginOptions) => {
   const agentReport = featuresFor("agent.report", { reportReceipts });
   const taskCall = featuresFor("tool.call", { taskList });
   const sendCall = featuresFor("tool.call", { briefRows });
-  const sessionStart = featuresFor("session.start", { taskTools, refusalRecovery, pane, modMarker, band, serverCheck, keywordPaint, taskList });
+  const sessionStart = featuresFor("session.start", { taskTools, refusalRecovery, pane, modMarker, band, serverCheck, keywordPaint, taskList, statusLine });
   const promptSubmit = featuresFor("prompt.submit", { refusalRecovery, keywordPaint });
   const turnStart = featuresFor("turn.start", { refusalRecovery, footer, modMarker, serverCheck, taskRows });
-  const turnStep = featuresFor("turn.step", { metrics, agentsTracker, briefRows });
-  const turnComplete = featuresFor("turn.complete", { agentsTracker, agentRows, metrics, pane, footer, refusalRecovery, taskList, band, taskRows, notify });
+  const turnStep = featuresFor("turn.step", { metrics, agentsTracker, briefRows, statusLine });
+  const turnComplete = featuresFor("turn.complete", { agentsTracker, agentRows, metrics, pane, footer, refusalRecovery, taskList, band, taskRows, notify, statusLine });
   const agentSpawn = featuresFor("agent.spawn", { agentsTracker, metrics, briefRows, notify });
   const promptEdit = featuresFor("prompt.edit", { band, refusalRecovery, keywordPaint });
   const promptChange = featuresFor("prompt.change", { band, keywordPaint });
@@ -210,6 +214,7 @@ export const register: Register = (on, pluginOptions) => {
   const resultRender = featuresFor("ui.render ToolResult", { blockerRows });
   const groupRender = featuresFor("ui.render ToolGroup", { groupRows });
   const placedRender = featuresFor("ui.render Placed", { taskRows });
+  const statusLineRender = featuresFor("ui.render StatusLine", { statusLine });
 
   on("tool.check", { tool: /^(?:Bash|PowerShell|Monitor)$/ }, ($, e, next) =>
     dispatch(bindHost($, options), "tool.check", bash, e, next, guardFailed),
@@ -263,5 +268,8 @@ export const register: Register = (on, pluginOptions) => {
   );
   on("ui.render", { component: "Placed", props: { plugin: "oh-my-claudeagent" } }, ($, e, next) =>
     dispatch(bindHost($, options), "ui.render Placed", placedRender, e, next),
+  );
+  on("ui.render", { component: "StatusLine" }, ($, e, next) =>
+    dispatch(bindHost($, options), "ui.render StatusLine", statusLineRender, e, next),
   );
 };

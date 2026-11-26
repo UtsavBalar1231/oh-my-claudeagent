@@ -1,16 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { basename, join } from "node:path";
-import { AGENT_ICONS, displayWidth, type GlyphTier } from "../src/core/ui-kit.ts";
-import { NO_REPO } from "./git.ts";
-import type { GitInfo } from "./git.ts";
+import { AGENT_ICONS, displayWidth, type GlyphTier } from "./ui-kit.ts";
 import {
   arrange,
   block,
+  branchOfPorcelainV2,
   composePr,
   DEFAULT_MAIN_AGENT,
   fixed,
   formatResetTime,
+  type GitInfo,
+  NO_REPO,
   NERD_GLYPHS,
   type Payload,
   projectDirOf,
@@ -24,7 +25,7 @@ import {
   terminalColumns,
   terminalLines,
   visibleTruncate,
-} from "./render.ts";
+} from "./status-line.ts";
 
 process.env.TZ = "UTC";
 
@@ -346,7 +347,7 @@ describe("segments", () => {
   });
 
   test("every shipped agent has its own glyph", () => {
-    const shipped = readdirSync(join(import.meta.dir, "..", "agents")).filter((f) => f.endsWith(".md")).map((f) => f.slice(0, -".md".length));
+    const shipped = readdirSync(join(import.meta.dir, "..", "..", "agents")).filter((f) => f.endsWith(".md")).map((f) => f.slice(0, -".md".length));
     expect(shipped.filter((name) => !Object.hasOwn(AGENT_ICONS, name))).toEqual([]);
   });
 
@@ -892,6 +893,20 @@ describe("stacked rows", () => {
   });
 });
 
+describe("branch of a porcelain v2 status", () => {
+  test("a branch is read from its head line", () => {
+    expect(branchOfPorcelainV2("# branch.oid 0123456789\n# branch.head feature/x\n1 .M N... 1 1 1 a b f")).toBe("feature/x");
+  });
+
+  test("a detached head reads as the settings command spells it", () => {
+    expect(branchOfPorcelainV2("# branch.oid 0123456789abcdef\n# branch.head (detached)\n")).toBe("(detached:0123456)");
+  });
+
+  test("a status with no branch lines names none", () => {
+    expect(branchOfPorcelainV2("? new.ts\n")).toBe("");
+  });
+});
+
 describe("layout", () => {
   const dir = "/work/layout-app";
 
@@ -979,6 +994,15 @@ describe("layout", () => {
 
   test("a height under 20 gives the same two lines at any height", () => {
     expect(at(80, 15)).toEqual(at(80, 19));
+  });
+
+  test("a line cap below the layout's budget cuts the lines, and one above it changes nothing", () => {
+    const env = { ...ASCII, COLUMNS: "80" };
+    const uncapped = render(rich(), richGit, env, NOW);
+    expect(uncapped.split("\n")).toHaveLength(4);
+    expect(render(rich(), richGit, env, NOW, 2).split("\n")).toHaveLength(2);
+    expect(render(rich(), richGit, env, NOW, 9)).toBe(uncapped);
+    expect(render(rich(), richGit, { ...env, LINES: "15" }, NOW, 9).split("\n")).toHaveLength(2);
   });
 
   test("every line fits the columns left after the margins, at every width and height, counting wide characters as two", () => {

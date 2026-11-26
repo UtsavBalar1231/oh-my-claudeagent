@@ -72,7 +72,9 @@ test("the module registers exactly the dispatchers, env reads and atoms of the c
         "prompt.submit",
         "session.cwd",
         "session.id",
+        "session.info",
         "session.messages",
+        "session.model",
         "session.root",
         "session.surfaces",
         "session.usage",
@@ -300,7 +302,7 @@ test("the router splits the first word from the rest and keeps the rest verbatim
 });
 
 test("options default to a shown band, and take the stored values", async () => {
-  expect(readOptions({})).toEqual({ showBand: true, enableKeywordTriggers: false });
-  expect(readOptions({ showBand: false, enableKeywordTriggers: true })).toEqual({ showBand: false, enableKeywordTriggers: true });
-  expect(readOptions({ showBand: "false", enableKeywordTriggers: "true" })).toEqual({ showBand: true, enableKeywordTriggers: false });
+  expect(readOptions({})).toEqual({ showBand: true, enableKeywordTriggers: false, statusLine: true });
+  expect(readOptions({ showBand: false, enableKeywordTriggers: true })).toEqual({ showBand: false, enableKeywordTriggers: true, statusLine: true });
+  expect(readOptions({ showBand: "false", enableKeywordTriggers: "true", statuslineMode: "off" })).toEqual({ showBand: true, enableKeywordTriggers: false, statusLine: false });
 });

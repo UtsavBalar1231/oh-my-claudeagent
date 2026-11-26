@@ -12,6 +12,7 @@ export type AtomHost<K extends keyof State> = {
 export type Options = {
   showBand: boolean;
   enableKeywordTriggers: boolean;
+  statusLine: boolean;
 };
 
 type Env = () => Promise<string | undefined>;
@@ -71,6 +72,8 @@ export type Host = {
     id: Engine["session"]["id"];
     root: Engine["session"]["root"];
     cwd: Engine["session"]["cwd"];
+    model: Engine["session"]["model"];
+    info: Engine["session"]["info"];
     surfaces: Engine["session"]["surfaces"];
     usage: Engine["session"]["usage"];
     version: Engine["session"]["version"];

@@ -44,7 +44,7 @@
         "off",
         "on"
       ],
-      "description": "on lets /oh-my-claudeagent:omca-setup point your status line at OMCA's renderer; off makes setup leave it alone.",
+      "description": "on draws OMCA's status line where your settings name no statusLine command, and lets /oh-my-claudeagent:omca-setup point your status line at OMCA's renderer; off does neither.",
       "sensitive": false
     },
     "disableForceOrchestrationStyle": {

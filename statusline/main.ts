@@ -1,6 +1,6 @@
 import { tmpdir } from "node:os";
-import { CACHE_TTL_SECONDS, getGitInfo, GIT_TIMEOUT_MS, NO_REPO } from "./git.ts";
-import { FALLBACK, type Payload, projectDirOf, render } from "./render.ts";
+import { FALLBACK, NO_REPO, type Payload, projectDirOf, render } from "../src/core/status-line.ts";
+import { CACHE_TTL_SECONDS, getGitInfo, GIT_TIMEOUT_MS } from "./git.ts";
 
 async function statusline(): Promise<string> {
   try {
