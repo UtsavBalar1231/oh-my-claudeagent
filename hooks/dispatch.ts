@@ -26,6 +26,7 @@ type Sites = {
   "ui.render ToolResult": [RenderInput<"ToolResult">, RenderElement];
   "ui.render ToolGroup": [RenderInput<"ToolGroup">, RenderElement];
   "ui.render Placed": [RenderInput<"Placed">, RenderElement];
+  "ui.render StatusLine": [RenderInput<"StatusLine">, RenderElement];
 };
 
 export type Site = keyof Sites;

@@ -44,7 +44,7 @@ Merge the explorer findings only after every agent has reported. Until then, car
 
 #### 1. Shell pass
 
-Tracked files already leave out dependencies and build output. Outside a git repository, get the same answers with `Glob`.
+Tracked files already leave out dependencies and build output. Outside a git repository, list the files with `find` in place of `git ls-files`.
 
 ```bash
 git ls-files | awk -F/ '{print NF-1}' | sort -n | uniq -c

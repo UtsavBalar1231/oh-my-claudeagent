@@ -4,6 +4,16 @@ description: Use when requirements are ambiguous, scope is unclear, or a draft p
 model: opus
 effort: high
 color: yellow
+tools:
+  - Read
+  - Glob
+  - Grep
+  - LSP
+  - WebFetch
+  - WebSearch
+  - Skill
+  - ToolSearch
+  - mcp__plugin_oh-my-claudeagent_omca__*
 disallowedTools:
   - Bash
   - Write

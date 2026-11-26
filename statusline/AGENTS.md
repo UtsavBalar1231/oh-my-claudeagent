@@ -7,14 +7,19 @@ shows and how it is configured.
 
 - `main.ts`: entry point. Reads the payload from stdin, reads git, prints the render, and
   prints `[claude]` when anything fails.
-- `render.ts`: payload types, the segments and the layout. `render(data, git, env, now)` takes the
-  environment and the clock as arguments so specs control both. `arrange` fills lines with
+- `../src/core/status-line.ts`: payload types, `GitInfo` and `NO_REPO`, the segments and the layout.
+  It lives in `src/core/` because the mod draws it too (`hooks/status-line.ts`), so it imports no
+  `node:` or `bun:` module. `render(data, git, env, now, maxLines?)` takes the environment and the
+  clock as arguments so specs control both; `maxLines` only lowers the line budget, and this
+  command never passes it. `arrange` fills lines with
   `Segment` values (a `min` and `max` width in cells, and a `draw` for a given width) in priority
   order. `fullRows` gives the session, workspace and usage rows, and
   `stackRows` starts each on its own line, wraps it with `arrange`, and while the lines run past
   the budget drops the segment with the highest `RANK` in any row.
-- `git.ts`: branch, status counts, remote, and the 5-second cache in the temp directory.
-- `fixtures.spec.ts`, `render.spec.ts`, `git.spec.ts`, `main.spec.ts`: `bun test statusline`.
+- `git.ts`: branch, status counts, remote, and the 5-second cache in the temp directory. The
+  porcelain parser is `parsePorcelainV2` in `src/core/status-line.ts`, which the mod shares.
+- `fixtures.spec.ts`, `git.spec.ts`, `main.spec.ts`: `bun test statusline`. The renderer's own spec is
+  `src/core/status-line.spec.ts`.
   The recorded cases live in `tests/fixtures/statusline/`; each case also asserts that no line
   is wider than its `COLUMNS` minus 6 and that no segment is cut.
 - `launcher.ts`: setup copies it to `~/.claude/omca/statusline.ts`, outside the plugin, so it
@@ -30,7 +35,7 @@ Lines use `COLUMNS` minus the 3 cells Claude Code keeps free on each side, measu
 session. The only override is `OMCA_GLYPHS` (`nerd`, `unicode` or `ascii`), which the mod reads too. A new segment is an entry in its row in `fullRows`, at its priority
 position, built as a `block` when its width is fixed, with an entry in `RANK` that says when it
 gives way. Keep a segment whole: only the context bar may change width. The bar's 8 to 20 block range and the 60 and 85 percent color thresholds are
-constants in `render.ts`.
+constants in `src/core/status-line.ts`.
 
-Rounding of exact binary ties goes to the even neighbor (`fixed` in `render.ts`). The recorded
+Rounding of exact binary ties goes to the even neighbor (`fixed` in `src/core/status-line.ts`). The recorded
 fixtures need it, so do not replace it with `toFixed` or `Math.round`.

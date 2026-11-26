@@ -15,7 +15,7 @@
   `bun test --timeout=30000 ./servers/tools/ast.spec.ts`, optionally `-t '<test name>'`.
   `just test` selects explicit roots; bare `bun test` also collects mod tests that need
   `just test-mod` (`claude plugin test .`). OpenCode specs run separately with `just test-opencode`.
-- Full checks need `ast-grep` (or `sg`) and Claude Code (CI pins 2.1.330).
+- Full checks need `ast-grep` (or `sg`) and Claude Code (CI pins 2.1.332).
   OpenCode integration specs skip without `opencode` on PATH; CI installs 2.3.2.
   `just smoke` uses a mock model; `tests/plugin-evals/` calls a real model and is manual.
 
@@ -49,8 +49,11 @@
 - Skills are `skills/*/SKILL.md`. Keep `plan` and `start-work` user-only
   (`disable-model-invocation: true`) and inline (no `context: fork`) so orchestration
   retains the invoking session's `Agent` tool. See `skills/AGENTS.md` for prompt boundaries.
-- Restrict agent tools with `disallowedTools`, not `tools`: an allowlist blocks MCP
-  inheritance. Use model tier aliases in frontmatter, not generation IDs.
+- Restrict an agent that keeps a shell with `disallowedTools`. An agent without a shell
+  (`analyzer`, `planner`, `reviewer`) lists its tools in `tools`, which brings Glob and Grep
+  back on macOS, Linux and WSL; the list names `mcp__plugin_oh-my-claudeagent_omca__*` and
+  `ToolSearch`, since it drops every MCP tool it does not name. Use model tier aliases in
+  frontmatter, not generation IDs.
 - Read `CONTRIBUTING.md` for prose and prompt contracts. Keep model-facing text about
   current behavior; preserve machine-consumed headings, tokens and frontmatter.
   Update a directory's `AGENTS.md` when changing its structure.

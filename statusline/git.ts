@@ -1,23 +1,12 @@
 import { readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, normalize } from "node:path";
-
-export interface GitInfo {
-  repo: boolean;
-  branch: string;
-  staged: number;
-  modified: number;
-  untracked: number;
-  remote: string;
-  remoteFetchedAt: number;
-}
+import { type GitInfo, NO_REPO, parsePorcelainV2 } from "../src/core/status-line.ts";
 
 export interface GitOptions {
   cacheDir: string;
   ttlSeconds: number;
   timeoutMs: number;
 }
-
-export const NO_REPO: GitInfo = { repo: false, branch: "", staged: 0, modified: 0, untracked: 0, remote: "", remoteFetchedAt: 0 };
 
 export const CACHE_TTL_SECONDS = 5;
 export const GIT_TIMEOUT_MS = 3000;
@@ -46,21 +35,6 @@ export function readBranchFromHead(gitDir: string): string {
   if (head.startsWith("ref: refs/heads/")) return head.slice("ref: refs/heads/".length);
   if (head.startsWith("ref: ")) return head.slice("ref: ".length);
   return `(detached:${head.slice(0, 7)})`;
-}
-
-export function parsePorcelainV2(output: string): { staged: number; modified: number; untracked: number } {
-  const counts = { staged: 0, modified: 0, untracked: 0 };
-  for (const line of output.split("\n")) {
-    if (line.startsWith("1 ") || line.startsWith("2 ")) {
-      const xy = line.split(" ", 2)[1] ?? "";
-      if (xy.length >= 2) {
-        if (xy[0] !== ".") counts.staged++;
-        if (xy[1] !== ".") counts.modified++;
-      }
-    } else if (line.startsWith("u ")) counts.modified++;
-    else if (line.startsWith("? ")) counts.untracked++;
-  }
-  return counts;
 }
 
 async function runGit(projectDir: string, args: string[], timeoutMs: number): Promise<string | null> {

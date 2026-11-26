@@ -21,6 +21,7 @@ export type Session = {
   injectedContext?: Set<string>;
   announcedModes?: Set<string>;
   commentGate?: DenyOnce;
+  refusedHandbacks?: Set<string>;
   errorCounts?: Map<string, ErrorCount>;
   stopBlocks?: StopLedger;
   hasTouchedTask?: boolean;

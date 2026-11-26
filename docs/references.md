@@ -66,9 +66,10 @@ work to tiers for delegation: `quick`, `standard` and `readonly` to `sonnet`, `d
 No agent sets `background: true`. A probe against a mock model found that an
 agent spawned from the main session already runs in the background in `claude -p` and in an
 interactive session with fork mode on or off, and its result arrives in a `<task-notification>`
-before `-p` exits. The flag only overrides an explicit request to wait, and in `claude -p` a
-subagent that spawns a flagged agent finishes before that agent's result arrives, which then goes
-to the main session. The probe measures delivery, not model behavior.
+before `-p` exits. The flag only overrides an explicit request to wait, and in `claude -p` with
+fork mode on a subagent that spawns a flagged agent finishes before that agent's result arrives,
+which then goes to the main session. With fork mode off (`CLAUDE_CODE_FORK_SUBAGENT=0`), a `-p`
+subagent waits for its own subagents. The probe measures delivery, not model behavior.
 
 The roster's tier and effort hold unless something overrides them: a `model` passed on one call,
 `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`, which puts every agent on one model, or a `maxEffortLevel`
@@ -125,8 +126,10 @@ command's own mode banner appears. The client raises `UserPromptSubmit` before
 
 Only `evidence_log` and `notepad_write` load with the first request. Every
 other `omca` tool waits behind tool search and loads with `ToolSearch` and the query
-`select:mcp__plugin_oh-my-claudeagent_omca__<tool>`. Where tool search is off, for example behind
-a gateway that is not a first-party host, every tool loads up front.
+`select:mcp__plugin_oh-my-claudeagent_omca__<tool>`. Tool search is on behind an
+`ANTHROPIC_BASE_URL` gateway too. Where it is off (`ENABLE_TOOL_SEARCH=false`, `ToolSearch`
+denied, or a gateway that rejects it and Claude Code retries without it), every tool loads up
+front.
 
 | Tool | Purpose |
 | --- | --- |
@@ -181,10 +184,10 @@ rejects every `model.*` call, `http.fetch` and `store.*`.
 | `UserPromptSubmit` | any | `mod-notice` (on the launch session's first prompt, a message when the mod is not running), `guidance` (first prompt: guidance, session id, the open run, and the session title `OMCA: <run>`), `keyword-detector` |
 | `UserPromptExpansion` | any | `guidance`, `slash-mode-detector` |
 | `SubagentStart` | any | `subagent-context`: protocol, date, output contract and run context for each subagent |
-| `PreToolUse` | `Write`, `Edit`, `TaskUpdate` | `final-task-guard` (on `TaskUpdate`), `comment-gate` |
-| `PostToolUse` | `Read`, `Write`, `Edit`, `SubagentHandback`, `Bash`, `PowerShell`, `TaskCreate`, `TaskUpdate`, `evidence_log` | `verification-recorder`, `context-injector`, `task-touch`, `empty-task-response` |
+| `PreToolUse` | `Write`, `Edit`, `TaskUpdate`, `SubagentHandback` | `final-task-guard` (on `TaskUpdate`), `comment-gate`, `empty-task-response` (on `SubagentHandback`). A failed or slow call lets the tool run (`onFailure: "continue"`), in Code Mode too |
+| `PostToolUse` | `Read`, `Write`, `Edit`, `Bash`, `PowerShell`, `TaskCreate`, `TaskUpdate`, `evidence_log` | `verification-recorder`, `context-injector`, `task-touch` |
 | `PostToolUseFailure` | any | `failure-recovery`: advice on a failed call, and a stuck-loop note from a tool's third failure in five minutes; `verification-recorder`, for a verification that ran and exited non-zero |
-| `Stop` | any | `stop-gates`: task continuation (open tasks of a run), drift guard, in that order |
+| `Stop` | any | `stop-gates`: task continuation (open tasks of a run, paused while a subagent, Monitor or one-shot scheduled wake-up is pending), drift guard, in that order |
 | `TaskCompleted` | any | `task-completed`: refuses to complete a task while the completing agent's own recent verification has no `evidence_log` call from that agent after it, and a run's final task until its `final_verification` is logged |
 
 Each stop gate continues the turn at most five times in a session and gets that budget back once
@@ -202,6 +205,7 @@ Events OMCA leaves unregistered, and why:
 | `FileChanged` | The mod re-reads the evidence ledger and the task list at each turn's end and on the open pane's timer |
 | `StopFailure` | Claude Code discards a handler's output for it, so it cannot resume a run |
 | `Setup` | Claude Code runs no `mcp_tool` hook on it, and `/omca doctor` reports the same checks |
+| `PreSkillShellCommand` | The shell commands a skill runs as it loads already reach the guard on `tool.check`, which refuses a destructive one whether the skill is typed, invoked by Claude or forked |
 | `SubagentStop`, `TaskCreated`, `TeammateIdle`, `Notification`, `ConfigChange`, `CwdChanged`, `DirectoryAdded`, `WorktreeCreate`, `WorktreeRemove`, `InstructionsLoaded`, `MessageDisplay`, `PostToolBatch`, `PreModelSwitch`, `PostModelSwitch`, `Elicitation`, `ElicitationResult` | No OMCA feature needs them |
 
 ### Kill switches
@@ -217,6 +221,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | `notify` | The one notification OMCA sends when the last background agent of a wave finishes |
 | `report-receipts` | The receipt line under a subagent's report: the files its tool calls edited, its last check and whether evidence was logged after it |
 | `refusal-recovery` | The follow-up prompt after a `reasoning_extraction` refusal |
+| `status-line` | The status line the mod draws when your settings name no `statusLine` command |
 | `stop-gates` | Every stop gate, and the OpenCode adapter's continuation of a run |
 | `task-continuation`, `drift-guard` | One stop gate. `task-continuation` also turns off the OpenCode adapter's continuation of a run when its session would go idle |
 | `final-verification` | The final task's refusals: completing it without a passing verdict, and marking it blocked, deleting it or unmarking it without any verdict |
@@ -226,7 +231,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | `context-injector` | `AGENTS.md`, `README.md` and rule injection when a file is read or edited |
 | `comment-gate` | The comment check on writes |
 | `delegation-guard` | The OpenCode adapter's refusal of a delegation prompt that runs words together |
-| `empty-task-response` | The note on an empty or transitional agent report, to the caller with the report and to the subagent on its own hand-back; concise findings need no fixed headers |
+| `empty-task-response` | The note on an empty or transitional agent report to the caller, and the refusal of a subagent's first such hand-back, which Claude Code then asks it to send again; concise findings need no fixed headers |
 | `failure-recovery` | Advice after a failed tool call |
 | `subagent-context` | The context each subagent gets at start |
 | `keyword-detector`, `slash-mode-detector` | Mode detection from prompts and slash commands. `keyword-detector` also takes the underline off trigger phrases in the prompt |
@@ -242,7 +247,7 @@ session. `all` or `*` turns off every one. Set it in the environment Claude Code
 | `OMCA_COMMENT_GATE` | `advise` (default) lets a write through with a note; `deny` blocks it; `off` skips the check. The check reads comments in a Write or Edit. It flags AI attribution or authorship comments and bare `TODO: implement` placeholders, which `deny` always blocks, and context-free TODO or FIXME comments and decorative separator lines, which `deny` blocks once per file and finding. A `@allow` on a comment line or `comment-gate-disable-file` in the first five lines exempts it |
 | `OMCA_GLYPHS` | The glyph set of the pane, band, transcript rows and status line: `nerd` (default, Nerd Font icons; the status line's cache and clock icons and its rings need Nerd Fonts v3), `unicode` (no Nerd Font needed) or `ascii` (plain text) |
 | `CLAUDE_CODE_EFFORT_LEVEL` | Read by the doctor. A level other than `auto` or `unset`, which send no level, runs every agent at it, whatever the agent declares, and the doctor warns |
-| `CLAUDE_AFK_TIMEOUT_MS` | Read by the doctor. A whole number of milliseconds after which an unanswered question continues on its own, so a plan interview can settle on its defaults; it outranks `askUserQuestionTimeout`. Claude Code ignores it in project and local settings, and so does the doctor |
+| `CLAUDE_AFK_TIMEOUT_MS` | Read by the doctor. A whole number of milliseconds after which an unanswered question continues on its own, so a plan interview can settle on its defaults; it outranks `askUserQuestionTimeout`. Claude Code ignores it in project and local settings, and so does the doctor. Claude Code reads it but its docs do not list it |
 | `OMCA_NATIVE_AGENTS_MD` | `1` stops the context injector from adding `AGENTS.md` where Claude Code already loads it natively and no project `CLAUDE.md` is on the path |
 | `OMCA_TRANSCRIPTS_ROOT` | The directory `session_search` reads instead of `~/.claude/projects` |
 | `AST_GREP_BIN` | The ast-grep binary the `ast_*` tools run, looked up on `PATH`, before `ast-grep` and `sg` |
@@ -260,7 +265,7 @@ a project's `.claude/settings.json`.
 | --- | --- | --- |
 | `showBand` | `true` | `false` hides the band above the prompt |
 | `enableKeywordTriggers` | `false` | `true` lets plain phrases point at a skill |
-| `statuslineMode` | `on` | `off` makes `omca-setup` leave your status line alone |
+| `statuslineMode` | `on` | `off` stops the mod drawing OMCA's status line and makes `omca-setup` leave your status line alone |
 | `disableForceOrchestrationStyle` | `false` | `true` makes `omca-setup` remove `force-for-plugin` from the installed `output-styles/omca-default.md`, so your own `outputStyle` applies. Run setup again after each update |
 
 ```json
@@ -283,12 +288,12 @@ The plugin applies none of these.
 | `worktree.baseRef` | `"head"` lets worktree agents see your unpushed commits |
 | `askUserQuestionTimeout` | Leave it at `never`. A timed-out question silently answers a planning question with its default |
 | `advisorModel` | Set it with `/advisor fable` (or `opus`). Telemetry opt-outs and `CLAUDE_CODE_DISABLE_ADVISOR_TOOL` keep it off |
-| `availableModels` | An allowlist must include `sonnet`, `opus` and `fable`, or the agents on a missing tier cannot run. Name the alias: `claude-fable-5-1` permits Fable 5.1 alone, and `fable` resolves to Fable 5.2 |
+| `availableModels` | An allowlist must include `sonnet`, `opus` and `fable`, or the agents on a missing tier cannot run. Name the alias: `claude-fable-5-1` permits Fable 5.1 alone, and `fable` resolves to Fable 5.2, or to Fable 5 in Claude apps gateway sessions unless `ANTHROPIC_DEFAULT_FABLE_MODEL` says otherwise |
 | `permissions.deny` with `Agent(model:fable)` | Gates per-call escalations to the `fable` tier. It cannot cap an agent's declared tier, because those calls carry no `model` |
 | `subagentPromptCacheTtl` | `"1h"` keeps a long parallel run's cache warm, at a higher write price |
-| `idleCompaction` | On by default in the terminal, the Desktop app and VS Code. About an hour after the last request, a conversation over the threshold compacts before its one-hour cache expires. `false` turns it off, as does `DISABLE_AUTO_COMPACT` |
+| `idleCompaction` | On by default in an interactive terminal, the VS Code chat panel and a local or SSH Desktop Code tab, for a conversation on the one-hour cache with auto-compaction on. About an hour after the last request, while the computer stays awake, a conversation over the threshold compacts before that cache expires. `false` turns it off, as does `DISABLE_AUTO_COMPACT` |
 | `CLAUDE_CODE_IDLE_COMPACT_MIN_TOKENS` | Context size at which idle compaction applies. Default 200000, lowest 100000 |
-| `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` | Default 10. A wider parallel group runs in series |
+| `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` | Default 10. A wider parallel group runs in series. Claude Code reads it but its docs do not list it |
 
 Do not add `Write(<path>)`, `NotebookEdit(<path>)` or `Glob(<path>)` rules: they never match.
 `Edit(<path>)` covers every file-editing tool, the file commands Claude Code recognizes in Bash
@@ -337,13 +342,13 @@ reads, the ledger and notepads, and links the JSON Schema for the ledger.
 | `plan` and `start-work`, which stop unless `health_check` reports the runtime `ok` | Yes | When bun is on the app's `PATH` | Yes | When bun is on the app's `PATH` | Unless `allowManagedMcpServersOnly`, `allowManagedHooksOnly`, `disableAllHooks` or `allowManagedModsOnly` |
 | `omca` MCP tools | Yes | When bun is on the app's `PATH` | Yes | When bun is on the app's `PATH` | Unless `allowManagedMcpServersOnly` |
 | Stop checks, guidance, context injection | Yes | When bun is on the app's `PATH` | Yes | When bun is on the app's `PATH` | Unless `allowManagedHooksOnly` or `disableAllHooks` |
-| Guard decisions | Yes | When the app's Claude Code is 2.1.330 or later | Yes | Yes | Unless `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks` |
+| Guard decisions | Yes | When the app's Claude Code is 2.1.332 or later | Yes | Yes | Unless `allowManagedModsOnly`, `allowManagedHooksOnly` or `disableAllHooks` |
 | Band, pane, Tasks pane, doctor | Yes | As guard decisions, with [Desktop's differences](usage.md#desktop-and-vs-code) | No | No ([anthropics/claude-code#99045](https://github.com/anthropics/claude-code/issues/99045)) | As the guard |
 | Turn line, agent rows, receipts and image previews in the transcript | Yes, pictures where the terminal draws them (kitty, Ghostty, iTerm2 3.5 or later, and tmux 3.3 or later with passthrough on) | No: Desktop keeps its own rows, and the turn's figures and receipt arrive as a text row beneath the answer | No | No | As the guard |
-| Status line | Yes | Not documented | No | Not documented | Unless `allowManagedHooksOnly` or `disableAllHooks` |
+| Status line | Yes: the mod draws it with no setup, or setup points the `statusLine` setting at OMCA's renderer | Not documented | No | Not documented | Unless `allowManagedHooksOnly` or `disableAllHooks`; the mod's own line also as the guard |
 
-Every row needs Claude Code 2.1.330 or later on that surface. The manifests declare
-`engines: { "claude-code": ">=2.1.330" }`, so a client from 2.1.323 to 2.1.329 refuses to install
+Every row needs Claude Code 2.1.332 or later on that surface. The manifests declare
+`engines: { "claude-code": ">=2.1.332" }`, so a client from 2.1.323 to 2.1.331 refuses to install
 OMCA, keeps the version it has on `claude plugin update`, and does not load a newer copy. A client
 older than 2.1.323 ignores the range and loads OMCA without its mod.
 
@@ -356,7 +361,7 @@ loads no plugins.
 ## Platform support
 
 CI runs the validator, the lint, the type checks, the bun specs, the mod tests, a smoke session
-and the OpenCode adapter specs against Claude Code 2.1.330. Pushes to main and pull requests run
+and the OpenCode adapter specs against Claude Code 2.1.332. Pushes to main and pull requests run
 on Linux; a release tag or a manual run adds macOS and Windows. The
 guard reads Bash and PowerShell commands, including `cmd /c` and `Invoke-Expression`, and
 resolves home and project paths per platform. The README screenshots are captured with tmux,
@@ -467,8 +472,8 @@ host. Offline, oh-my-claudecode's install tried the npm registry and reported su
   ratios between arms are more reliable than the absolute values. Values are medians over the
   paired runs, and a delta is the difference of two medians. The tool-search column sets
   `ENABLE_TOOL_SEARCH=true` (3 rounds), the closer match to first-party traffic, where MCP tools
-  are deferred; Claude Code turns tool search off when the API host is not first-party, as in
-  this harness.
+  are deferred; Claude Code before 2.1.304 turns tool search off when the API host is not
+  first-party, as in this harness.
 - **First request** is the time from process start to the mock's first request, as the median of
   the paired differences against baseline.
 - **Per-call overhead** is the time from the first to the last main-thread request over 20

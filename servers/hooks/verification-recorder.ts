@@ -1,6 +1,6 @@
 import { isSlotRecent } from "../../src/core/evidence.ts";
 import { isHookDisabled } from "../../src/core/kill-switch.ts";
-import { inputText } from "../../src/core/tool-input.ts";
+import { field, inputText } from "../../src/core/tool-input.ts";
 import {
   classifierNote,
   EVIDENCE_LOG_TOOL,
@@ -37,6 +37,11 @@ function markLogged(root: string, session: Session, agent: string, now: number):
 // A verification belongs to the agent that ran it, and only that agent's own evidence_log
 // satisfies it: a subagent's run never blocks the main conversation, and a subagent's log never
 // covers the main conversation's run.
+// PostToolUse fires only for a command that exited 0, and a Bash response carries no exit code. One
+// that went to the background is still running, so its code is not known yet.
+const successExitCode = (response: unknown): number | null =>
+  typeof field(response, "backgroundTaskId") === "string" ? null : (exitCodeOf(response) ?? 0);
+
 export const handle: Handler = (payload, { root, now, session }) => {
   const tool = payload.tool_name;
   if (typeof tool !== "string" || isHookDisabled(process.env.OMCA_DISABLED_HOOKS, "verification-recorder")) return;
@@ -49,7 +54,7 @@ export const handle: Handler = (payload, { root, now, session }) => {
   if (!SHELLS.has(tool)) return;
   const command = inputText(payload.tool_input, "command");
   if (!isVerificationCommand(command)) return;
-  const exitCode = isFailure ? failureExitCode(payload.error) : exitCodeOf(payload.tool_response);
+  const exitCode = isFailure ? failureExitCode(payload.error) : successExitCode(payload.tool_response);
   if (isFailure && exitCode === null) return;
   if (session !== undefined) {
     record(root, session, agent, { command: quotableCommand(command), at: seconds(now), exit_code: exitCode, evidence_logged: false }, now);
