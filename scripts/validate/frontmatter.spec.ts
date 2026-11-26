@@ -88,12 +88,8 @@ describe("agent frontmatter", () => {
 describe("skill description cap", () => {
   const long = (length: number) => `description: ${"x".repeat(length)}`;
 
-  test("a description at the soft cap passes and one past it warns", async () => {
-    expect(await runNamed(checks, "skill description cap", fixture({ "skills/demo/SKILL.md": skill(long(512)) }))).toMatchObject({ status: "pass" });
-    expect(await runNamed(checks, "skill description cap", fixture({ "skills/demo/SKILL.md": skill(long(513)) }))).toEqual({
-      status: "warn",
-      detail: "description plus when_to_use over 512 characters, older clients may truncate: demo (513)",
-    });
+  test("a description at the platform cap passes", async () => {
+    expect(await runNamed(checks, "skill description cap", fixture({ "skills/demo/SKILL.md": skill(long(1536)) }))).toMatchObject({ status: "pass" });
   });
 
   test("a description past the platform cap fails", async () => {

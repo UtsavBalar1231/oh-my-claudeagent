@@ -8,7 +8,7 @@ import { type Check, type Context, listFiles, type Outcome, pass, relative, skip
 // so a misspelled `disallowedTools` would silently drop an agent's tool restrictions.
 const AGENT_KEYS = new Set([
   "name", "description", "model", "effort", "maxTurns", "tools", "disallowedTools", "skills", "memory",
-  "background", "omitClaudeMd", "isolation", "color", "experimental",
+  "background", "omitClaudeMd", "isolation", "color", "experimental", "autoCompactWindow",
 ]);
 const SKILL_KEYS = new Set([
   "name", "description", "when_to_use", "argument-hint", "arguments", "disable-model-invocation", "user-invocable",
@@ -18,7 +18,6 @@ const SKILL_KEYS = new Set([
 const EFFORT_LEVELS = new Set(["low", "medium", "high", "xhigh", "max"]);
 
 export const DESCRIPTION_HARD_CAP = 1536;
-export const DESCRIPTION_SOFT_CAP = 512;
 
 const BLOCK_INDICATOR = /^[|>][+-]?\d?$/;
 
@@ -160,20 +159,14 @@ function skillDescriptionCap(ctx: Context): Outcome {
   const files = skillFiles(ctx);
   if (files.length === 0) return skip("no SKILL.md files found under skills/");
   const over: string[] = [];
-  const long: string[] = [];
   for (const file of files) {
     const length = descriptionLength(linesOf(file));
-    const entry = `${basename(dirname(file))} (${length})`;
-    if (length > DESCRIPTION_HARD_CAP) over.push(entry);
-    else if (length > DESCRIPTION_SOFT_CAP) long.push(entry);
+    if (length > DESCRIPTION_HARD_CAP) over.push(`${basename(dirname(file))} (${length})`);
   }
   if (over.length > 0) {
     return { status: "fail", detail: `description plus when_to_use over the ${DESCRIPTION_HARD_CAP} character platform cap: ${over.join(", ")}` };
   }
-  if (long.length > 0) {
-    return { status: "warn", detail: `description plus when_to_use over ${DESCRIPTION_SOFT_CAP} characters, older clients may truncate: ${long.join(", ")}` };
-  }
-  return pass(`${files.length} skills within ${DESCRIPTION_SOFT_CAP} characters of description plus when_to_use`);
+  return pass(`${files.length} skills within ${DESCRIPTION_HARD_CAP} characters of description plus when_to_use`);
 }
 
 export const checks: readonly Check[] = [
