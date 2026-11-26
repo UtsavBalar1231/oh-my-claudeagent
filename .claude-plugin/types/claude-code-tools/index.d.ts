@@ -38,7 +38,7 @@ declare module 'claude-code' {
       type_query?: string
       /** list only: the name of a published Artifact type (as list_types shows it; case does not matter) — the listing is then of the Artifacts made from that type instead of the user's gallery. Pass this or `type_url`, not both. */
       type?: string
-      /** quickstart only (required): what is being made — 'document' (writing people will keep editing or pass around as text, such as a memo, plan, spec, proposal or notes), 'slides' (a deck or one slide), 'design' (a visual design or prototype on a canvas), 'other' (a page to look at or use: an explainer, a diagram, anything interactive, a dashboard that shows data, a spreadsheet, anything else, or unsure). */
+      /** quickstart only (required): what is being made — 'document' (writing people will keep editing or pass around as text, such as a memo, plan, spec, proposal or notes), 'slides' (a deck or one slide), 'design' (a visual design or prototype on a canvas), 'other' (a page to look at or use: an explainer, a diagram, anything interactive, a dashboard that shows data, a spreadsheet, a whiteboard, anything else, or unsure). */
       intent?: "document" | "slides" | "design" | "other"
       /** quickstart only: false when a design system's link is already in hand (it is then read with its own call) or one was declined. Omitted or true, the result lists the design systems (not for a document) and, for slides or a design, attaches the default one's README. */
       design_systems?: boolean
@@ -269,11 +269,11 @@ declare module 'claude-code' {
       files?: Array<{
         /** Path within the project, e.g. components/button/index.html */
         path: string
-        /** Path on disk to read file contents from, relative to the localDir approved at finalize_plan. Preferred for anything you have on disk: the tool reads, encodes, and uploads directly so the contents never enter the model context. Mutually exclusive with data. */
+        /** Path on disk to read file contents from, relative to the localDir approved at finalize_plan. Use the same path as `path`, differing only where the server stores a plainer name. The tool reads, encodes, and uploads directly so the contents never enter the model context. Mutually exclusive with data. */
         localPath?: string
-        /** Inline file contents (UTF-8 text, or base64 when encoding is "base64"). For small dynamic content only — anything you have on disk should use localPath instead. */
+        /** Inline file contents (UTF-8 text, or base64 when encoding is "base64"). Do not use: write the content to a file at `path` under the localDir approved at finalize_plan, and pass localPath. */
         data?: string
-        /** Set to "base64" for binary inline data */
+        /** Do not use: localPath files are encoded automatically */
         encoding?: "base64"
         mimeType?: string
       }>
@@ -398,7 +398,15 @@ declare module 'claude-code' {
       /** The symbol name or partial name to search for (workspaceSymbol only). Most language servers return no results for an empty query, so always provide it when using workspaceSymbol. */
       query?: string
     }
+    McpTaskCheck: {
+      /** The id of the background task, the same as for TaskStop. */
+      task_id: string
+    }
     McpTaskResumePolling: {
+      /** The id of the background MCP task, as its notification gave it. */
+      task_id: string
+    }
+    McpTaskShowQuestion: {
       /** The id of the background MCP task, as its notification gave it. */
       task_id: string
     }
@@ -702,7 +710,7 @@ declare module 'claude-code' {
       project_id?: string
       /** Add this folder’s GitHub origin as the project’s repository. The tool reads the remote from git itself; pass false when the folder has no GitHub origin or the user said not to add it. */
       attach_git_remote: boolean
-      /** Where this tool’s description says it sends one message: summary alone, which is the message. Otherwise the brief you drafted of the work to carry on, in the propose_project_setup shape: summary (2–3 plain sentences, no markdown: what the work is, where it stands and what is left; it is also saved in project memory), sessions (≤4 threads for work left unfinished: title, self-contained prompt, one-line description, basis, who ∈ claude|you, produces ∈ pr|doc|decision), routines (≤3, only when asked for or when a check was run by hand on more than one day: name, 5-field UTC cron at most hourly, prompt, description), and, for a new project only (never with project_id), instructions (standing rules that recurred, as a few short bullet lines; never a description of the project or the work), icon (one of Projects, Folder, Code, Database, HandHeart, Beaker, Wrench, Activity, Chart, Team, Users, Book, Box, Note, File, Lightbulb, Palette, Star, Flag, Home, Sun, Clock, Calendar, Scroll, …) and color. Leave name out: project_name names a new project and an existing one keeps its own. evidence.sessions_matched = how many of the quoted sessions the brief draws on (the tool fills the other counts). Every field is optional; send only what the work supports. Shown to the user on the confirmation pane, or on Claude Desktop’s permission card. After their Yes on the pane, or a click on Desktop’s card that Desktop attests, the brief is posted as the project’s setup card as given (a new project’s icon, color and instructions are set on the project at create instead of going on the setup card). After any other allow (another host application, a hook, or a Desktop build that does not attest clicks), everything goes on the setup card for the user to confirm. No thread starts on approval in either case: the setup card lists them and the user starts each one there. */
+      /** Where this tool’s description says it sends one message: summary alone, which is the message. Otherwise the brief you drafted of the work to carry on, in the propose_project_setup shape: summary (2–3 plain sentences, no markdown: what the work is, where it stands and what is left; it is also saved in project memory), sessions (≤4 threads for work left unfinished: title, self-contained prompt, one-line description, basis, who ∈ claude|you, produces ∈ pr|doc|decision), routines (≤3 scheduled tasks, only when asked for or when a check was run by hand on more than one day: name, 5-field UTC cron at most hourly, prompt, description), and, for a new project only (never with project_id), instructions (standing rules that recurred, as a few short bullet lines; never a description of the project or the work), icon (one of Projects, Folder, Code, Database, HandHeart, Beaker, Wrench, Activity, Chart, Team, Users, Book, Box, Note, File, Lightbulb, Palette, Star, Flag, Home, Sun, Clock, Calendar, Scroll, …) and color. Leave name out: project_name names a new project and an existing one keeps its own. evidence.sessions_matched = how many of the quoted sessions the brief draws on (the tool fills the other counts). Every field is optional; send only what the work supports. Shown to the user on the confirmation pane, or on Claude Desktop’s permission card. After their Yes on the pane, or a click on Desktop’s card that Desktop attests, the brief is posted as the project’s setup card as given (a new project’s icon, color and instructions are set on the project at create instead of going on the setup card). After any other allow (another host application, a hook, or a Desktop build that does not attest clicks), everything goes on the setup card for the user to confirm. No thread starts on approval in either case: the setup card lists them and the user starts each one there. */
       proposal: {
         name?: string
         icon?: "Projects" | "Folder" | "Code" | "Database" | "HandHeart" | "Beaker" | "Wrench" | "Activity" | "Chart" | "Team" | "Users" | "Book" | "Box" | "Note" | "File" | "Lightbulb" | "Palette" | "Star" | "Flag" | "Home" | "Sun" | "Clock" | "Calendar" | "Scroll" | "Moon" | "MoonStars" | "SunHorizon" | "Owl" | "Atom" | "DNA" | "Orbit" | "Globe" | "Cloud" | "Hammer" | "Key" | "Lock" | "Camera" | "Microphone" | "CoffeeCup" | "Gift" | "Ghost" | "GraduationCap" | "Library" | "Spreadsheet" | "Slides" | "Checklist" | "Clipboard" | "Image" | "Bookmark" | "Bank" | "Signpost" | "MapPin" | "Mailbox" | "Heart" | "Lightning" | "Shapes" | "Goal" | "Scale" | "Eye" | "Binoculars" | "Bullhorn" | "PaperPlane" | "ChartLine" | "Timer"
@@ -844,7 +852,7 @@ declare module 'claude-code' {
       /** Query to find deferred tools. Use "select:<tool_name>" for direct selection, or keywords to search. */
       query: string
       /** Maximum number of results to return (default: 5) */
-      max_results: number
+      max_results?: number
     }
     WaitForMcpServers: {
       /** Server names to wait for (default: all pending) */
@@ -1225,6 +1233,7 @@ declare module 'claude-code' {
         external?: true
         role?: "editor" | "commenter" | "reader" | "viewer"
         outsidersMayHaveWritten?: true
+        listedKind?: string
         pinned?: boolean
       }>
       truncated?: boolean
@@ -2115,6 +2124,7 @@ declare module 'claude-code' {
         external?: true
         role?: "editor" | "commenter" | "reader" | "viewer"
         outsidersMayHaveWritten?: true
+        listedKind?: string
         pinned?: boolean
       }>
       truncated?: boolean
@@ -3005,6 +3015,7 @@ declare module 'claude-code' {
         external?: true
         role?: "editor" | "commenter" | "reader" | "viewer"
         outsidersMayHaveWritten?: true
+        listedKind?: string
         pinned?: boolean
       }>
       truncated?: boolean
@@ -3895,6 +3906,7 @@ declare module 'claude-code' {
         external?: true
         role?: "editor" | "commenter" | "reader" | "viewer"
         outsidersMayHaveWritten?: true
+        listedKind?: string
         pinned?: boolean
       }>
       truncated?: boolean
@@ -4680,7 +4692,7 @@ declare module 'claude-code' {
       backgroundedByTurnAbort?: boolean
       /** @internal True if the command was moved to the background so a message queued for the model could reach it */
       backgroundedToDeliverMessage?: boolean
-      /** @internal True if that message was a subagent's message or report, and the command had run for a minute */
+      /** @internal True if that message was a subagent's message or report, and the command had run for a minute, or was a person's, and the command waited by sleeping */
       backgroundedForAgentReport?: true
       /** Set when the command hit its timeout and was auto-backgrounded; the timeout value in ms */
       timedOutAfterMs?: number
@@ -5091,7 +5103,17 @@ declare module 'claude-code' {
       /** Number of files containing results */
       fileCount?: number
     }
+    McpTaskCheck: {
+      /** What came of the call */
+      message: string
+      isError: boolean
+    }
     McpTaskResumePolling: {
+      /** What came of the call */
+      message: string
+      isError: boolean
+    }
+    McpTaskShowQuestion: {
       /** What came of the call */
       message: string
       isError: boolean
@@ -5616,6 +5638,7 @@ declare module 'claude-code' {
         }
         project_path?: string
         partial_error?: string
+        opens_by_path?: boolean
       }[]
       rendered_locally?: boolean
     }
@@ -5677,6 +5700,8 @@ declare module 'claude-code' {
       status?: "inline"
       /** True when the skill instructions were loaded read-only (nothing was executed) */
       readOnly?: boolean
+      /** True when an MCP server served the skill */
+      fromMcpServer?: boolean
     } | {
       /** Whether the skill completed successfully */
       success: boolean
@@ -5824,6 +5849,8 @@ declare module 'claude-code' {
       url: string
       /** @internal The model may get the result as a search result that it can cite. */
       citable?: true
+      /** @internal The result holds the page's text. Only the tool_result sent to the model keeps it. */
+      pageText?: true
       artifactRead?: {
         slug: string
         ver?: string
