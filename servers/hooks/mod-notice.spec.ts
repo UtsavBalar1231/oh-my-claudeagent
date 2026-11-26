@@ -49,8 +49,8 @@ function project(marker?: { id: string; text: string }): string {
 const marked = (id: string) => ({ id, text: JSON.stringify({ written_at: NOW - 5_000 }) });
 const prompt = (root: string, id: string) => handle({ event: "UserPromptSubmit", session_id: id }, { root, now: NOW, session: touchSession(id) });
 
-test("the notice names a Claude Code older than 2.1.330 among the causes", () => {
-  expect(MOD_NOT_RUNNING).toContain("older than 2.1.330");
+test("the notice names a Claude Code older than 2.1.332 among the causes", () => {
+  expect(MOD_NOT_RUNNING).toContain("older than 2.1.332");
 });
 
 test("the launch session's first prompt with no marker gets the notice, and no later prompt does", async () => {
