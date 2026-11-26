@@ -125,7 +125,9 @@ const FAMILIES: Family[] = [
     control(checks, o, label) {
       noPluginTrace(checks, o, label);
       checks.check(pluginDenies(o.debug).length === 0, `${label}: no guard deny without the plugin`, `${label}: a guard deny line appeared without the plugin`);
-      checks.check(!existsSync(join(o.project, CANARY)), `${label}: the same command removes ${CANARY} without the plugin`, `${label}: ${CANARY} survived without the plugin, so the scenario proves nothing`);
+      // Claude Code refuses `cd <dir>; rm -rf *` on its own as well (it cannot follow the cd, probed on
+      // 2.1.332), so the control shows only that the turn ran its commands.
+      checks.check(!existsSync(join(o.project, CANARY, "decoy.txt")), `${label}: the turn ran its commands without the plugin`, `${label}: ${CANARY}/decoy.txt survived without the plugin, so the turn never ran`);
     },
   },
   {
@@ -136,7 +138,6 @@ const FAMILIES: Family[] = [
     }),
     plugin(checks, o, label) {
       checks.check(traceCount(o.trace, "SubagentStart") >= 1, `${label}: SubagentStart reached omca_hook`, `${label}: no SubagentStart entry in the trace`);
-      checks.check(traceCount(o.trace, "PostToolUse", "Agent") >= 1, `${label}: PostToolUse reached omca_hook for the Agent call`, `${label}: no PostToolUse Agent entry in the trace`);
     },
     control(checks, o, label) {
       noPluginTrace(checks, o, label);

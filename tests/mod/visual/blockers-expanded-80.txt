@@ -19,7 +19,7 @@
      covered>", exit_code=<0 for COMPLETE, 1 for INCOMPLETE>,
      output_snippet="<verdict, and why the run stops here>", task_id="1").
 
-                                                       HH:MM claude-mock
+                                                              HH:MM claude-mock
 ● The review task is held. Pushing the branch next.
 
 ● Bash(git push --force origin main)
@@ -29,7 +29,7 @@
      to push. Set OMCA_DISABLED_HOOKS=bash-guard to turn this check off for
      testing.
 
-                                                       HH:MM claude-mock
+                                                              HH:MM claude-mock
 ● The sum helper is set up and the push was refused.
 
 ✻ Worked for 0s · done HH:MM

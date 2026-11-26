@@ -16,7 +16,8 @@
 //               files replaced by that cwd; absent or null, an empty directory.
 //   env         {NAME: "value"} set in the session beside the mock's variables
 //   options     the plugin's user options, written as pluginConfigs["oh-my-claudeagent@inline"].options,
-//               the key a --plugin-dir load reads
+//               the key a --plugin-dir load reads; statuslineMode is off unless a view sets it, since
+//               the mod's status line shows the session's live cost and duration
 //   settings    an object merged into the session's settings.json
 //   gitRemote   true makes the session's cwd its own git repository, one commit on main pushed to a
 //               local bare origin
@@ -174,7 +175,7 @@ export function sessionSettings(view: View, inline: boolean): Record<string, unk
     prefersReducedMotion: true,
     agent: MAIN_AGENT,
     ...view.settings,
-    ...(view.options === undefined ? {} : { pluginConfigs: { [INLINE_PLUGIN_KEY]: { options: view.options } } }),
+    pluginConfigs: { [INLINE_PLUGIN_KEY]: { options: { statuslineMode: "off", ...view.options } } },
   };
 }
 

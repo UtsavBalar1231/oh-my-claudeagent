@@ -20,7 +20,7 @@
 
 ● TaskUpdate
 
-                                                                                               HH:MM claude-mock
+                                                                                                      HH:MM claude-mock
 ● The review task is held. Pushing the branch next.
 
 ● Bash(git push --force origin main)
@@ -28,7 +28,7 @@
      branch blocked: it rewrites history everyone else has pulled. Push to another branch, or ask the user to push. Set
      OMCA_DISABLED_HOOKS=bash-guard to turn this check off for testing.
 
-                                                                                               HH:MM claude-mock
+                                                                                                      HH:MM claude-mock
 ● The sum helper is set up and the push was refused.
 
 ✻ Worked for 0s · done HH:MM

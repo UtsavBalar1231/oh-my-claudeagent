@@ -1,5 +1,5 @@
 
- ▐▛███▛█   Claude Code v2.1.325
+ ▐▛███▛█   Claude Code v2.1.332
 ▝▜██████▀  Sonnet 5.5 with high effort · API Usage Billing
  ▝▝   ▝▝   @oh-my-claudeagent:orchestrator · ~/…/cwd
 
@@ -8,7 +8,8 @@
 ❯ explorer · sonnet-5-5 · high · 77 chars · 1 line
   Find every caller of the shared router and say which ones bypass the harness.
 
-  Searched for 2 patterns, listed 1 directory
+  Searched for 2 patterns, listed 1 directory · 2 failed
+
 
 
 
@@ -16,12 +17,11 @@
 
 
 ● Working… (Ns · ↑ N.Nk tokens)
-  ⎿  Tip: Start with small features or bug fixes, tell Claude to propose a plan,
-     and verify its suggested edits
+  ⎿  Tip: Start small, ask Claude for a plan, and check its edits
 ╭────────────────────────────────────────────────────────────────────────────✕─╮
 │ 1: Agents  2: Evidence  3: Notepad                                           │
 │   ▄▄▀▀▀▀▀▀▄▄      explorer · Map the router callers                         │
-│     ▀▀  ▀▀ ▀▄▄▀   running · Ns · NN.Nk tokens                               │
+│     ▀▀  ▀▀ ▀▄▄▀   running · Ns · NN.Nk tokens · ~$0.04                      │
 │    ▀▀▀▀▀▀▀▀   ▀  sonnet-5-5 · high                                           │
 │    ▀▀▀▀▀▀▀▀      3 tool calls                                                │
 │ Brief                                                                        │
@@ -35,6 +35,6 @@
 ─────────────────────────────────────────────────────── Map the router callers ─
 ❯ Message @oh-my-claudeagent:e……
 ────────────────────────────────────────────────────────────────────────────────
-  ⏸ manual mode on · /tasks to see subagents · ← for agents · ↓ to manage
+  ⏸ manual mode on · /tasks to see subagents · esc to stop · ← for agents · ↓…
 
   ◯ main
